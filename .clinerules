@@ -1,0 +1,114 @@
+---
+# Cline Rules Configuration
+# This file configures bmad (Business Model Analysis and Design) integration with Cline
+
+# BMAD Integration Configuration
+bmad:
+  enabled: true
+  version: "v1"
+  root: "_bmad"  # Path to bmad installation
+  workflows: "_bmad/_config/bmad-help.csv"  # Workflow definitions
+  agents: "_bmad/_config/agents"  # Agent configurations
+  modules:
+    - "_bmad/bmb"  # Builder module
+    - "_bmad/bmm"  # Business module
+    - "_bmad/cis"  # Creative innovation system
+    - "_bmad/core"  # Core utilities
+    - "_bmad/tea"  # Testing and automation
+
+# Workflow Discovery
+workflowDiscovery:
+  enabled: true
+  directories:
+    - "_bmad"
+    - ".agent"
+
+# MCP (Model Context Protocol) Configuration
+mcp:
+  servers:
+    - name: "github.com/upstash/context7-mcp"
+      command: "npx"
+      args: ["-y", "@upstash/context7-mcp"]
+      autoApprove: ["resolve-library-id"]
+    - name: "github.com/parallel-web/search-mcp"
+      url: "https://search-mcp.parallel.ai/mcp"
+
+# Default Agent Configuration
+defaultAgents:
+  analyst: "_bmad/bmm/agents/analyst.md"
+  architect: "_bmad/bmm/agents/architect.md"
+  dev: "_bmad/bmm/agents/dev.md"
+  pm: "_bmad/bmm/agents/pm.md"
+  ux-designer: "_bmad/bmm/agents/ux-designer.md"
+  tech-writer: "_bmad/bmm/agents/tech-writer/tech-writer.md"
+  qa: "_bmad/bmm/agents/quinn.md"
+
+# Output Configuration
+output:
+  planning: "_bmad-output/planning-artifacts"
+  implementation: "_bmad-output/implementation-artifacts"
+  testing: "_bmad-output/testing-artifacts"
+
+# Enable BMAD Help System
+help:
+  enabled: true
+  file: "_bmad/core/tasks/help.md"
+---
+
+BMAD (Business Model Analysis and Design) is now integrated with Cline in this repository. To use bmad, you can:
+
+## Quick Start
+
+1. **Get Help**: `/bmad-help` - Show available workflows and next steps
+2. **Quick Spec**: `/bmad-quick-spec` - Rapid specification for simple tasks
+3. **Quick Dev**: `/bmad-quick-dev` - Rapid development for small changes
+
+## Available Modules
+
+### bmm (Business Management Module)
+- `/bmad-bmm-research` - Market/domain/technical research
+- `/bmad-bmm-create-prd` - Create Product Requirements Document
+- `/bmad-bmm-create-architecture` - Create technical architecture
+- `/bmad-bmm-sprint-planning` - Plan development sprints
+- `/bmad-bmm-dev-story` - Execute story implementation
+
+### bmb (Builder Module)
+- `/bmad-bmb-agent` - Create/edit/validate agents
+- `/bmad-bmb-module` - Create/edit/validate modules
+- `/bmad-bmb-workflow` - Create/edit/validate workflows
+
+### cis (Creative Innovation System)
+- `/bmad-cis-design-thinking` - Human-centered design
+- `/bmad-cis-problem-solving` - Systematic problem-solving
+- `/bmad-cis-brainstorming` - Idea generation sessions
+- `/bmad-cis-storytelling` - Compelling narrative creation
+
+### tea (Testing and Automation)
+- `/bmad_tea_framework` - Initialize test framework
+- `/bmad_tea_atdd` - Generate failing tests (TDD red phase)
+- `/bmad_tea_automate` - Expand test coverage
+- `/bmad_tea_test-review` - Quality audit
+
+### core (Essential Utilities)
+- `/bmad-brainstorming` - Interactive brainstorming
+- `/bmad-party-mode` - Multi-agent discussions
+- `/bmad-index-docs` - Quick document indexing
+- `/bmad-editorial-review-prose` - Content review
+
+## Usage Examples
+
+- To start planning your project: `/bmad-bmm-research`
+- To create product specifications: `/bmad-bmm-create-prd`
+- To start sprint planning: `/bmad-bmm-sprint-planning`
+- To develop a feature: `/bmad-bmm-dev-story`
+- To add test coverage: `/bmad_tea_automate`
+
+## Configuration Details
+
+BMAD will:
+1. Load workflows from `_bmad/_config/bmad-help.csv`
+2. Use agents defined in `_bmad/bmm/agents/`
+3. Store outputs in `_bmad-output/` directory
+4. Automatically manage phase transitions
+
+For detailed help: `/bmad-help`
