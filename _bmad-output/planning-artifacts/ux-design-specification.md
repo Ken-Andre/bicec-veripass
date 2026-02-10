@@ -1,16 +1,28 @@
----
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-lastStep: 14
-inputDocuments:
-  - "_bmad-output/planning-artifacts/prd.md"
-  - "_bmad-output/planning-artifacts/product-brief-bicec-veripass-2026-02-07.md"
-  - "_bmad-output/planning-artifacts/research/research_report_kyc_bicec.md"
-  - "_bmad-output/planning-artifacts/research/technical-Bicec-Veripass-research-2026-02-03.md"
-  - "Document de Cadrage Projet.md"
-  - "M1  Cadrage & Dataset.txt"
-  - "README-bmad.md"
-  - "_bmad-output/planning-artifacts/implementation-plan.md"
----
+[//]: # (---)
+
+[//]: # (stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+
+[//]: # (lastStep: 14)
+
+[//]: # (inputDocuments:)
+
+[//]: # (  - "_bmad-output/planning-artifacts/prd.md")
+
+[//]: # (  - "_bmad-output/planning-artifacts/product-brief-bicec-veripass-2026-02-07.md")
+
+[//]: # (  - "_bmad-output/planning-artifacts/research/research_report_kyc_bicec.md")
+
+[//]: # (  - "_bmad-output/planning-artifacts/research/technical-Bicec-Veripass-research-2026-02-03.md")
+
+[//]: # (  - "Document de Cadrage Projet.md")
+
+[//]: # (  - "M1  Cadrage & Dataset.txt")
+
+[//]: # (  - "README-bmad.md")
+
+[//]: # (  - "_bmad-output/planning-artifacts/implementation-plan.md")
+
+[//]: # (---)
 
 # UX Design Specification bicec-veripass
 
