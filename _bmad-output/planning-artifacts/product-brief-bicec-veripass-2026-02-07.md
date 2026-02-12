@@ -1,14 +1,28 @@
----
-stepsCompleted: [1, 2, 3, 4, 5, 6]
-inputDocuments:
-  - "_bmad-output/planning-artifacts/research/research_report_kyc_bicec.md"
-  - "_bmad-output/planning-artifacts/research/technical-Bicec-Veripass-research-2026-02-03.md"
-  - "Document de Cadrage Projet.md"
-  - "M1  Cadrage & Dataset.txt"
-  - "README-bmad.md"
-date: 2026-02-07
-author: Ken
----
+[//]: # (~~---)
+
+[//]: # (stepsCompleted: [1, 2, 3, 4, 5, 6])
+
+[//]: # (inputDocuments:)
+
+[//]: # (  - "_bmad-output/planning-artifacts/research/research_report_kyc_bicec.md")
+
+[//]: # (  - "_bmad-output/planning-artifacts/research/technical-Bicec-Veripass-research-2026-02-03.md")
+
+[//]: # (  - "Document de Cadrage Projet.md")
+
+[//]: # (  - "M1  Cadrage & Dataset.txt")
+
+[//]: # (  - "README-bmad.md")
+
+[//]: # (date: 2026-02-07)
+
+[//]: # (author: Ken)
+
+[//]: # (https://campus.datacamp.com/pdf/web/viewer.html?file=https://projector-video-pdf-converter.datacamp.com/23080/chapter4.pdf#page=21)
+
+[//]: # (https://campus.datacamp.com/pdf/web/viewer.html?file=https://projector-video-pdf-converter.datacamp.com/35209/chapter3.pdf#page=20)
+
+[//]: # (---~~)
 
 # Product Brief: bicec-veripass
 
@@ -34,7 +48,7 @@ Furthermore, the **"Trust Gap"** presents a dual challenge: younger users find b
 ### Primary Users
 
 #### Marie (The Entrepreneur)
-*   **Context**: 24-year-old entrepreneur in Douala. Sensitive to data costs (~500 FCFA/50MB is significant).
+*   **Context**: 24-year-old entrepreneur in Douala. Sensitive to data costs (~500 FCFA/500MB is significant).
 *   **Digital Literacy Spectrum**:
     *   **Segment A (60%)**: "Instagram Native" - Comfortable with apps, expects speed.
     *   **Segment B (30%)**: "Feature Phone Graduate" - New to smartphones, needs guidance.
@@ -55,10 +69,10 @@ Furthermore, the **"Trust Gap"** presents a dual challenge: younger users find b
 *   **Context**: Integration expert, ensures error-free bulk provisioning to Amplitude.
 
 ### Out of Scope (Anti-Personas for MVP)
-- ❌ **Corporate Accounts**: SMEs/SARLs requiring complex registration (Phase 2).
+- ❌ **Corporate Accounts**: SMEs/SARLs requiring complex registration and a longer phase (Phase 2).
 - ❌ **Minors (<18)**: Requires parental consent workflows.
 - ❌ **Non-Cameroonian Residents**: Passport-only users without local NIU.
-- ❌ **Segment C**: Users requiring full physical assistance for smartphone operation.
+- ❌ **Segment C**: Users requiring full physical assistance for smartphone operation (Better for them to go to an agency).
 
 ---
 
@@ -66,9 +80,9 @@ Furthermore, the **"Trust Gap"** presents a dual challenge: younger users find b
 
 A benchmark journey assuming stable 3G and documents ready. *Reality Buffer: 15 minutes.*
 
-- **00:00** - Download app (30s)
+- **00:00** - Download app (30s)  [\/<UTMS:1.9Mb/s>\\]
 - **00:30** - Phone number + OTP (1 min)
-- **01:30** - Tutorial/Onboarding skip (30s)
+- **01:30** - Tutorial/Onboarding skip (2m50s)
 - **02:00** - CNI Capture Recto (1 min - auto-framing)
 - **03:00** - CNI Capture Verso (1 min - QR code priority)
 - **04:00** - NIU Attestation Upload (1.5 min - Photo + OCR)
@@ -151,11 +165,11 @@ Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional
 
 ### Sylvie's "Executive Dashboard" (30-Second Scan)
 
-| Status | Metrics / Critical Alerts |
-| :--- | :--- |
-| 🔴 **RED** | **Action Now**: Dossiers > 2h SLA (Count), Jean's Queue Overload (>10 pending), System Downtime (Uptime <99.9%), Active Fraud Alerts. |
+| Status        | Metrics / Critical Alerts |
+|:--------------| :--- |
+| 🔴 **RED**    | **Action Now**: Dossiers > 2h SLA (Count), Jean's Queue Overload (>10 pending), System Downtime (Uptime <99.9%), Active Fraud Alerts. |
 | 🟡 **YELLOW** | **Watch**: Funnel Drop-off Rate (>25% per step), OCR Accuracy Trend (<90%), Thomas Provisioning Failures (>5%). |
-| 🟢 **GREEN** | **Success**: Daily Onboardings (↗), Mean Time to Activation (<24h), Progress to 3x CAC reduction. |
+| 🟢 **GREEN**  | **Success**: Daily Onboardings (↗), Mean Time to Activation (<24h), Progress to 3x CAC reduction. |
 
 ### Key Performance Indicators (KPIs)
 
@@ -198,10 +212,10 @@ Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional
 ---
 
 ### Out of Scope for MVP
-- 🏢 **Corporate Onboarding**: SMEs/SARLs requiring complex registry checks.
-- 🔞 **Minor Accounts**: Anyone under 18 requiring a parental guarantor workflow.
-- 🌍 **International Passports**: Focusing strictly on Cameroonian CNI for the pilot.
-- 🤖 **Full Automation (STP)**: No "Auto-Approve" without human validation (COBAC compliance requirement).
+-  **Corporate Onboarding**: SMEs/SARLs requiring complex registry checks.
+-  **Minor Accounts**: Anyone under 18 requiring a parental guarantor workflow.
+-  **International Passports**: Focusing strictly on Cameroonian CNI for the pilot.
+-  **Full Automation (STP)**: No "Auto-Approve" without human validation (COBAC compliance requirement).
 
 ---
 

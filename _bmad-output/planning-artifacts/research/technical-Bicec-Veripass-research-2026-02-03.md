@@ -1,21 +1,33 @@
----
-stepsCompleted: [1, 2, 3]
-inputDocuments: []
-workflowType: 'research'
-lastStep: 1
-research_type: 'technical'
-research_topic: 'BICEC Digital Biometric KYC Platform (Cameroon)'
-research_goals: 'Technical feasibility and architecture for <15min mobile-first onboarding, involving Sopra Amplitude/Iwomi Core integration, PaddleOCR/DeepFace on-premise, and Law 2024-017 compliance.'
-user_name: 'Ken'
-date: '2026-02-07'
-web_research_enabled: true
-source_verification: true
----
+[//]: # (---)
+
+[//]: # (stepsCompleted: [1, 2, 3])
+
+[//]: # (inputDocuments: [])
+
+[//]: # (workflowType: 'research')
+
+[//]: # (lastStep: 1)
+
+[//]: # (research_type: 'technical')
+
+[//]: # (research_topic: 'BICEC Digital Biometric KYC Platform &#40;Cameroon&#41;')
+
+[//]: # (research_goals: 'Technical feasibility and architecture for <15min mobile-first onboarding, involving Sopra Amplitude/Iwomi Core integration, PaddleOCR/DeepFace on-premise, and Law 2024-017 compliance.')
+
+[//]: # (user_name: 'Ken')
+
+[//]: # (date: '2026-02-07')
+
+[//]: # (web_research_enabled: true)
+
+[//]: # (source_verification: true)
+
+[//]: # (---)
 
 # Research Report: technical
 
 **Date:** 2026-02-07
-**Author:** Ken
+**Author:** Ken-Andre
 **Research Type:** technical
 
 ---
