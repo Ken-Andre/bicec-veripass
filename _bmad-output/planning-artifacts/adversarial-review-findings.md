@@ -494,11 +494,11 @@ Date de Facturation: 21/08/2020
 ## 📁 Related Documents
 
 - `_bmad-output/planning-artifacts/prd.md` (Owner: PM)
-- `_bmad-output/planning-artifacts/product-brief-bicec-veripass-2026-02-07.md` (Owner: PM)
+- `_bmad-output/planning-artifacts/product-brief-bicec-veripass-2026-02-07.md` (Owner: Business Analyst)
 - `_bmad-output/planning-artifacts/ux-design-specification.md` (Owner: UX Designer)
 - `_bmad-output/planning-artifacts/implementation-plan.md` (Owner: Dev)
 - `_bmad-output/planning-artifacts/research/technical-Bicec-Veripass-research-2026-02-03.md`
-- `_bmad-output/planning-artifacts/research/research_report_kyc_bicec.md`
+- `_bmad-output/planning-artifacts/research/research_report_kyc_bicec.md` (Owner: Business Analyst)
 
 ---
 
