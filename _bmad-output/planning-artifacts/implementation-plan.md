@@ -12,14 +12,13 @@ The mobile app will handle the user journey, document capture, and local passive
 - **[NEW] Capture Module**: Custom camera overlay for CNI (recto/verso) and NIU Attestation.
 - **[NEW] Local AI & Resilience**: Integration of `tflite_flutter` for document edge detection. Implementation of **Local Encrypted Cache** for document storage during upload interruptions (auto-resume).
 - **[NEW] Geolocation**: Native GPS capture with consistency validation against Facture address.
-- **[NEW] Security**: 3 Liveness failures = Auto-wipe session data & redirect to Agency visit.
-- **[NEW] BI Dashboard**: Using `fl_chart` for real-time onboarding metrics (for the user/agent side).
+- **[NEW] Security**: 3 Liveness failures = Auto-wipe session data after user clicks "Recommencer" button.
 
 ### 2. Backend Services (Python/FastAPI)
 Heavy processing will be centralized on the server to handle the AMD CPU/NPU constraints effectively.
 
-- **[NEW] Core Banking (Iwomi Core)**: Exposure of an API to Iwomi Core (middleware) for batch creation (10-50 dossiers) in Sopra Banking Amplitude.
-- **[NEW] IBU Mock (BEAC)**: Realistic API simulating ISO 20022 structure (20-22 chars: Code Pays + Type + Année + Banque + Séquentiel + Clé Mod97). Generates "Shadow IBU" for MVP.
+- **[NEW] Core Banking (Sopra Amplitude)**: Integration with Sopra Banking Amplitude for account provisioning. Sopra handles IBU generation automatically as part of the core banking flow.
+- **[NEW] DGI Tax Mock**: Realistic API simulating tax number validation for MVP demonstration purposes. Will be replaced with real DGI API in production.
 - **[NEW] OCR Engine**: `PaddleOCR` (PP-OCRv4) optimized for Cameroonian ID cards with high-res original storage (AES-256).
 - **[NEW] Biometrics Engine**: `DeepFace` for face matching and `MiniFASNetV2` for active/silent liveness detection.
 - **[NEW] Manual Validation Workflow (MANDATORY)**: 
@@ -51,7 +50,7 @@ A dedicated pipeline to monitor the onboarding funnel, detect fraud patterns, an
 - **Liveness Attack Simulation**: Attempting to bypass liveness with photos/videos of faces.
 
 ## Success Criteria (Phase Pilote 20-50 comptes)
-- **Funnel**: Taux de complétion >75%, Temps moyen client <15 min (Cible 11 min).
+- **Funnel**: Taux de complétion >75%, Temps moyen client <15 min (Cible stretch goal: 11 min).
 - **Quality**: Taux de conformité >95%, Erreur OCR <10%, Faux positifs biométriques <2%, Détection fraude >90%.
 - **Operations**: Délai validation humaine <2h, CSAT >4.2/5, Uptime >99.9%.
 

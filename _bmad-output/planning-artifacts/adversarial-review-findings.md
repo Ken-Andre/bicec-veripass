@@ -32,7 +32,7 @@ The bicec-veripass planning phase shows ambition and vision but suffers from cri
 
 **Evidence from PRD conflicts:**
 - PRD Section 7 (Mobile App) mentions "Monolithic Docker-Compose deployment" but provides zero architectural context
-- Implementation Plan mentions "Core Banking (Iwomi Core)" but never explains the integration architecture
+- Implementation Plan mentions Sopra Amplitude integration but never explains the architecture
 - UX Spec references back-office "side-by-side" views but no architectural support for image storage/retrieval
 
 **What's Missing:**
@@ -395,13 +395,12 @@ Date de Facturation: 21/08/2020
 ### 26. Amplitude Integration: "Iwomi Core" Undefined
 **Severity:** 🟠 MEDIUM | **Agent Hat:** Solutions Architect | **Document Owner:** Implementation Plan
 
-**Finding:** Iwomi Core is mentioned but:
-- What is Iwomi Core? (Internal BICEC tool)
-- What API does it expose? (REST/SOAP/Proprietary - Unknown)
-- How does bicec-veripass integrate?
+**Finding:** References to "Iwomi Core" as a middleware are incorrect.
+- Iwomi is strictly a historical contractor for internal tools.
+- **Core Banking truth:** BICEC uses *strictly* Sopra Banking Amplitude.
 
-**User Clarification:**
-> *Iwomi était un peu comme leur contractuelle fais des recherches web dessus et tu verras. En fait il était comme leurs devs pour des outils internes de l'entreprise et leur intégration avec Iwomi mais leur core banking ne se fait que par Sopra Banking Amplitude.*
+> *Iwomi était un prestataire contractuel pour les outils internes. Le core banking se fait exclusivement par Sopra Banking Amplitude. A part Amplitude, BICEC n'a pas d'autres pour son core banking.*
+**Action:** Removed all Iwomi references. Provisioning is done directly in Sopra Amplitude.
 
 **Solution:** MVP will use internal API (bicec-veripass own DB) → Sopra Banking Amplitude batch API via web service extension.
 

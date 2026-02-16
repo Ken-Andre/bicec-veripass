@@ -34,7 +34,7 @@
 ## 1. Executive Summary
 
 ### Project Vision
-**The Sovereign "Trust Bridge"**: We are building a standalone Acquisition App (Revolut-styled) to transform a 14-day manual process into an 11-minute digital breakthrough. The goal is to prove compliance (COBAC) so clearly that approvals happen in minutes, while making the user feel protected and prioritized.
+**The Client Relationship Hub**: We are building a modern Client Relationship and Service Discovery platform (Revolut-styled) that transforms KYC onboarding into a premium entry point for personal banking. Our goal is to bridge the "Trust Gap" by turning a 14-day manual process into a **15-minute digital breakthrough (11-minute stretch goal)**, while educating users on BICEC's modern service ecosystem (Plans, Savings, Cards) during the validation period.
 
 ### Target Users
 - **Marie (The Entrepreneur)**: Tech-savvy but resource-constrained. Fighting 3G drops and power cuts on an Android 7 device. Needs resilience and clear, non-jargon guidance.
@@ -55,7 +55,7 @@
 ## 2. Core User Experience
 
 ### Defining Experience
-The bicec-veripass experience is defined by **Resilient Speed**. It must feel like a "safe passage" through a complex regulatory landscape. The 11-minute onboarding is the primary loop, optimized for zero data loss and maximum clarity.
+The bicec-veripass experience is defined by **Resilient Speed & Anticipated Value**. It must feel like a "safe passage" through a complex regulatory landscape that opens doors to immediate banking benefits. The **15-minute onboarding** is the primary entry point, optimized for zero data loss and maximum feature discovery.
 
 ### Platform Strategy
 - **Mobile First**: Flutter-based app optimized for Android 7 (minSdk 24).
@@ -68,13 +68,15 @@ The bicec-veripass experience is defined by **Resilient Speed**. It must feel li
 - **Bottom-Sheet Context**: Keeping secondary info tucked away but accessible.
 
 ### Critical Success Moments
-- **The 11-Minute Breakthrough**: First-time completion of a digital account opening.
+- **The 15-Minute Breakthrough**: First-time completion of a digital account opening and service personalization.
+- **The "Service Discovery" Spark**: Seeing high-fidelity banking previews (Ultra/Standard plans) while the dossier is PENDING, proving value immediately.
 - **The "Saved Progress" Reassurance**: Recovering a session after a power failure without re-entering data.
 
 ### Experience Principles
-1. **Revolut Structure, BICEC Soul**: Clean card layouts with vibrant #E37B03 highlights.
-2. **Compliance-First, Evidence-First**: Designs that prioritize the creation of a bulletproof audit trail.
-3. **Resilience as a Safety Net**: Failures are framed as "We saved your spot," not errors.
+1. **Revolut Structure, BICEC Soul**: Clean card layouts with vibrant #E37B03 highlights and premium neobank aesthetics.
+2. **Discovery during Validation**: The UI stays "alive" while KYC is being processed, showcasing future account capabilities.
+3. **Compliance-First, Evidence-First**: Designs that prioritize the creation of a bulletproof audit trail.
+4. **Resilience as a Safety Net**: Failures are framed as "We saved your spot," not errors.
 
 ---
 
@@ -200,7 +202,7 @@ graph TD
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
 | :--- | :--- | :--- | :--- |
 | **C01** | Address Cascade | Region -> Ville -> Quartier dropdowns. | FR9, FR10 |
-| **C02** | Map Pin | OSM centered on selection, manual drop. | FR11 |
+| **C02** | Localiser mon domicile | Bouton "Utiliser ma position actuelle". | FR10, FR11 |
 | **C03** | Utility Proof | ENEO/CAMWATER toggle, capture. | FR12, FR13 |
 | **C04** | NIU Choice | Upload vs Manual Entry toggle. | FR14, FR15 |
 | **C05** | Manual NIU | LimitedAccess warning bottom sheet. | FR16 |
@@ -213,19 +215,35 @@ graph TD
 | **D03** | Wet Sign Intro | Physical paper prep instructions. | FR19 |
 | **D04** | Wet Sign Capture | Multi-capture (3x) doc camera. | FR19 |
 
-### Module E: Submission & Banking Shell
+### Module E: Submission \u0026 Discovery (Plans \u0026 Personalization)
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
 | :--- | :--- | :--- | :--- |
 | **E01** | Secure Submission | Chunked progress (Step X of 4). | FR6, NFR8 |
-| **E02** | Success / Status | "PENDING" status, Push explanation. | FR41 |
-| **E03** | Pending Dashboard | Gated grid (Cash-In vs Lock). | FR39, FR40 |
+| **E02** | Success / Status | "PENDING" status, Push explanation. | FR41, FR45 |
+| **E03** | Plan Selection | Swipeable tab (Ultra/Premium/Standard). | FR39, FR47 |
+| **E04** | Use-Case Selection | Chip/Tag selection for interests. | FR40, FR47 |
+
+### Module F: Account Management Dashboard (Frontend Demo)
+| ID | Screen Name | Key UX Elements | FR/NFR Traceability |
+| :--- | :--- | :--- | :--- |
+| **F01** | Home Dashboard | Main account, Pockets, Savings cards. | FR41, FR45 |
+| **F02** | Account Detail | Add money, Withdraw, Goal tracking. | FR42, FR45 |
+| **F03** | Cards Manager | Online, Virtual, ATM Finder map. | FR44, FR45 |
+| **F04** | Linked Accounts | "See all bank accounts in one place". | FR41, FR47 |
+
+### Module G: Feature Shells (Service Education)
+| ID | Screen Name | Key UX Elements | FR/NFR Traceability |
+| :--- | :--- | :--- | :--- |
+| **G01** | Recurring Transfers | Schedule modal (Date, Frequency). | FR43, FR47 |
+| **G02** | Add Money Flow | Payment amount, Confirm button (Blue). | FR42, FR47 |
+| **G03** | Withdraw Flow | Greyed out state with compliance tooltip. | FR45, FR47 |
 
 ---
 
 ## 7. Low-Fidelity Wireframes: "Hard Screens"
 
 ### B02/B04: CNI Capture Layout
-- **Header**: Back button, Progress Bar (Step 2 of 11).
+- **Header**: Back button, Progress Bar (Step 2 of 15+).
 - **Body**: Active Camera View (Full screen).
 - **Overlay**: 
     - Translucent dark mask with clear CNI-sized rectangle in center.
@@ -243,9 +261,10 @@ graph TD
     - 3-Strike Count: "Tentative 2 sur 3" (Only shown after first failure).
 - **Lockout Screen**: (Shown after 3 strikes)
     - Icon: Locked/Grayed Face.
-    - Message: "Nombre maximum de tentatives atteint."
-    - Primary CTA: [Recommencer du début] (#E37B03).
-    - Secondary CTA: [Trouver une agence] (Outline).
+    - Message: "Désolé pour la gêne, mais pour des raisons techniques/de sécurité, nous sommes obligés de terminer cette session. Ne vous inquiétez pas, vous avez toujours la possibilité d'aller dans une agence locale proche de chez vous, ou de recommencer dès le début."
+    - Primary CTA: [Recommencer] (#E37B03).
+    - **Logic**: Data wiped AFTER clicking Recommencer.
+- **Privacy Note (C02)**: "Nous collectons votre position GPS pour vérifier votre adresse à des fins de conformité. Ces données sont cryptées et jamais partagées (Enregistré pour des fins de contrôle réglementaire de KYC)."
 
 ### B05: OCR Review Layout
 - **Header**: "Vérifiez vos informations".
@@ -254,18 +273,33 @@ graph TD
     - confidence badges: `(Check)` Orange for low confidence, `(OK)` Green for high.
 - **Footer**: Sticky CTA [Confirmer et Continuer].
 
-### E01/E03: Submission & Gated Dashboard
-- **E01 (Submission)**:
-    - Large vibrant Orange circle with "Uploading... 45%".
-    - Resiliency hint: "Ne quittez pas. Nous reprenons automatiquement en cas de coupure."
-- **E03 (Gated Dashboard)**:
-    - **Top**: Greeting "Bonjour Marie", Account Status "En attente de validation".
-    - **Grid Cards**:
-        - [Cash-In] (Active, Orange Icon).
-        - [Localiser Agence] (Active, Blue Icon).
-        - [Virement] (Locked, 20% Opacity, Lock Icon).
-        - [Cartes Virtuelles] (Locked, 20% Opacity, Lock Icon).
-    - **On Tap Locked**: Bottom sheet pops up: "Finalisez votre KYC pour débloquer les virements."
+### E03/E04: Plan \u0026 Use-Case Discovery
+- **E03 (Plans)**:
+    - **Header**: "Choose your plan".
+    - **Body**: Swipeable horizontal cards (Revolut-styled).
+        - **Ultra (Platinum)**: Highlights 4.75% interest, Lounge access.
+        - **Standard**: "Free" with basic features.
+    - **Footer**: [Start Trial / Continue] CTA.
+- **E04 (Personalization)**:
+    - **Header**: "What would you like to achieve?".
+    - **Grid of Chips**: "Invest", "Save", "Budget", "Travel", "Daily Spending".
+    - **Interactive**: Chips turn Orange #E37B03 on selection.
+
+### F01/F03: Banking Dashboard \u0026 Cards (Status Gated)
+- **F01 (Home Dashboard)**:
+    - **Greeting**: "Bonjour Marie", Account Status Badge (e.g., "LIMITED_ACCESS").
+    - **Balances**: Mock £0 balance with currency flag toggle.
+    - **Locked States**: Padlock icon on "Invest" and "Crypto" tabs if status < FULL_ACCESS.
+- **F03 (Cards)**:
+    - **Visual**: Stack of virtual cards (Pink shopping card, Black virtual).
+    - **Callout**: "Submit missing information" badge on card images if KYC pending.
+    - **Secondary CTA**: [Reactivate terminated card] link at bottom.
+
+### G01: Recurring Transfers Modal
+- **Visual**: Minimalist calendar overlay.
+- **Inputs**: [Select Start Date] -> [Select Frequency: Monthly/Weekly].
+- **Summary Text**: "Monthly, starting on December 15, 2023" (Auto-updating).
+- **CTA**: [Set schedule] (Bright Blue).
 
 ---
 
@@ -337,5 +371,18 @@ graph TD
 ### Pending Dashboard & Gating (E03)
 ![Pending Dashboard Mockup](_bmad-output/planning-artifacts/pending_dashboard_mockup.png)
 *High-fidelity banking shell showing the 'Pending' state. Active features like Cash-In are accessible, while premium features are greyed out with a contextual lock.*
+
+### 13. Revolut UI Mapping Table
+> [!NOTE]
+> This table maps Revolut's premium design patterns to equivalent bicec-veripass screens to ensure a high-fidelity, neobank-grade user experience.
+
+| Screen Name | Interaction Type | Description | Options | Error/Status State | Source Image |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **CNI Capture** | Camera Overlay | Revolut-style doc scan with frame. | Auto-crop, Retry | "Stabilisez l'appareil" | Image 3 |
+| **Liveness Selfie**| Facial Detection | Circular frame with pulsing blue guide. | Smile, Turn Head | "3 attempts remaining" | Image 5 |
+| **Plan Selection** | Swipeable Tabs | Ultra/Metal/Premium tier comparison. | Start Trial, Skip | N/A | Image 1 |
+| **Dashboard** | Card Grid | Gated features based on validation status. | Accounts, Pockets | "Locked" state badges | Image 2 |
+| **Account View** | Detail Reveal | Main balance vs Pockets tracking. | Add Money, More | "LIMITED_ACCESS" banner | Image 4 |
+| **Recurring Modal**| Modal Overlay | Minimalist date/freq selection. | Date Picker, Freq | N/A | Image (CSV) |
 
 ---

@@ -18,7 +18,7 @@ A. Architecture Technique (La "Boîte à Outils")
 L'environnement de développement est installé durant cette phase. Le choix se porte sur une approche "Lean Engineering" pour optimiser les coûts :
 • Matériel : Validation d'une station de travail performante (type Dell Inspiron 16 avec Ryzen 7 ou Mac Studio) capable de gérer la conteneurisation Docker et l'inférence IA locale.
 • Logiciels : Installation de la stack Python 3.10+, Flutter SDK, et des bibliothèques d'IA (PaddleOCR, PyTorch),.
-• Middleware : Validation de l'architecture d'intégration avec Iwomi Core pour faire le pont avec le Core Banking Sopra Amplitude.
+• Middleware : Validation de l'architecture d'intégration directe avec le Core Banking Sopra Amplitude.
 B. Conformité Réglementaire (Les Règles Métier)
 Les spécifications fonctionnelles sont figées en collaboration avec le DPO (Data Protection Officer) :
 • Identifiant Bancaire Unique (IBU) : Intégration des exigences de l'Instruction BEAC 001/GR/2021 imposant la capture d'empreintes faciales conformes ISO.
@@ -128,8 +128,8 @@ Alternative de repli : En cas d'indisponibilité de l'API publique, l'intégrati
 Votre projet s'aligne sur les directives de la BEAC sur les services de paiement :
 Protection des Données : L'usage du chiffrement AES-256 et le stockage de vecteurs mathématiques plutôt que d'images brutes répondent parfaitement à la loi camerounaise sur la protection des données à caractère personnel.
 Lutte contre le Blanchiment (AML/CFT) : L'intégration de la "Liveness Detection" (MiniFASNet) est l'argument massue pour rassurer le régulateur sur le risque d'usurpation d'identité, supérieur au risque en agence physique.
-3. Architecture Technique : Le choix Iwomi & Sopra
-L'utilisation du middleware Iwomi Core pour faire le pont avec Sopra Banking Amplitude est la décision la plus sécurisante pour votre IT.
+3. Architecture Technique : Le choix de Sopra Amplitude
+L'intégration directe avec Sopra Banking Amplitude est la décision la plus sécurisante pour votre IT.
 Straight-Through Processing (STP) : C'est le Graal de l'onboarding. En automatisant l'écriture dans le Core Banking sans intervention humaine, vous passez d'une banque "de guichet" à une plateforme technologique.
 Identifiant Bancaire Unique (IBU) : Votre système doit impérativement interroger la base centrale de la BEAC pour vérifier l'existence d'autres comptes et respecter le plafonnement des comptes de paiement si nécessaire.
 4. Indicateurs de Performance (KPIs)
@@ -218,7 +218,7 @@ Justification du "So What?" L'impact sur le compte de résultat est immédiat : 
 Transition : Cette mutation vers l'agilité repose sur une infrastructure technique inviolable, conçue pour intégrer la complexité réglementaire au cœur de l'expérience client.
 --------------------------------------------------------------------------------
 2. Architecture de la Solution et Cadre de Conformité
-La plateforme d'onboarding agit comme la porte d'entrée unifiée de la BICEC, fournissant un socle d'identité numérique robuste aux services existants (BiPay, CRESCO). Sa force réside dans son intégration "Straight-Through Processing" (STP) avec notre Core Banking Sopra Banking Amplitude, via le middleware Iwomi Core, garantissant une activation de compte sans intervention manuelle.
+La plateforme d'onboarding agit comme la porte d'entrée unifiée de la BICEC, fournissant un socle d'identité numérique robuste aux services existants (BiPay, CRESCO). Sa force réside dans son intégration "Straight-Through Processing" (STP) avec notre Core Banking Sopra Banking Amplitude, garantissant une activation de compte sans intervention manuelle.
 Composantes de la Solution
 Fonctionnalité Technologie / Méthode Rôle dans l'Expérience Utilisateur
 Capture CNI / Passeport PaddleOCR & Lecture QR Code Extraction instantanée des données ; auto-cadrage intelligent pour éviter les flous.

@@ -112,7 +112,7 @@ A benchmark journey assuming stable 3G and documents ready. *Reality Buffer: 15 
 
 A resilient, biometric-first app with **mandatory local session persistence** to handle power and network failures. It features a seamless **multi-persona workflow**:
 1.  **Jean (KYC Agent)**: Visually validates originals in high-res via a dedicated portal.
-2.  **Thomas (Operations)**: Triggers bulk account creation in *Sopra Banking Amplitude* via *Iwomi Core* once validated.
+2.  **Thomas (Operations)**: Triggers bulk account creation in *Sopra Banking Amplitude* once validated.
 3.  **Sylvie (Manager)**: Monitors the entire funnel and ops health through a **PostgreSQL + Grafana pipeline**.
 
 Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional identity simulation) ensure that "Marie" can open a restricted account instantly, which then scales to full access (BiPay/CRESCO) once human validation is cleared.
@@ -196,7 +196,7 @@ Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional
 
 #### 🏛️ Back-Office Portal (Ops & KYC)
 - **Jean's Validation Desk**: High-resolution side-by-side comparison of CNI original vs. OCR results.
-- **Thomas's Provisioning Desk**: Integration bridge to *Amplitude* (via *Iwomi Core*), featuring the "Retry" and "Reactivate Identity" buttons for MOCKED flows.
+- **Thomas's Provisioning Desk**: Integration bridge to *Amplitude*, featuring the "Retry" and "Reactivate Identity" buttons for MOCKED flows.
 - **Sylvie's Command Center**: The "Red/Yellow/Green" Grafana dashboard for real-time funnel and SLA monitoring.
 
 ---
@@ -238,7 +238,7 @@ Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional
 
 ### 1. Provisioning Lifecycle (Jean → Thomas)
 *   **Workflow**: `PENDING_KYC` (Jean) → `READY_FOR_OPS` → `PROVISIONING` (Thomas).
-*   **Action**: If Iwomi Core fails to create the account in Amplitude, the state becomes `OPS_ERROR`.
+*   **Action**: If the provisioning service fails to create the account in Amplitude, the state becomes `OPS_ERROR`.
 *   **Resolution**: Thomas handles re-provisioning via a **"Retry"** button; Jean is not disturbed for technical failures.
 
 ### 2. Amplitude Rejection Protocols

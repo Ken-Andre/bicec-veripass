@@ -193,7 +193,7 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
     * Appel API DGI si disponible (avec fallback gracieux si indisponible)
     * En cas d'échec API : obligation pour l'agent de vérifier visuellement l'attestation NIU uploadée
   - **IBU** : Simulation locale pour MVP (API factice réaliste), appel API BEAC réelle en Phase 2 post-MVP
-  - **Core Banking** : Création compte dans Sopra Banking Amplitude (via Iwomi Core) **uniquement après activation manuelle par agent**
+  - **Core Banking** : Création compte dans Sopra Banking Amplitude **uniquement après activation manuelle par agent**
 
 #### C. Back-Office Agent (Interface de Validation)
 - **File d'attente de validation** : 
@@ -302,7 +302,7 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
 
 #### Techniques
 - **Intégrations obligatoires** :
-  - Core Banking Sopra Amplitude (via middleware Iwomi Core)
+  - Core Banking Sopra Amplitude
   - API DGI pour validation NIU (avec fallback validation format + vérification visuelle humaine si API indisponible)
   - API BEAC pour IBU (simulation factice réaliste au MVP, vraie API en Phase 2)
 - **Plateformes** : iOS (>= 13.0) et Android (>= 8.0 / API 26)
@@ -588,10 +588,10 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
 ### Persona 3 : Le Responsable Opérations / Intégration Core Banking
 - **Profil** : Thomas, 38 ans, responsable des opérations bancaires
 - **Objectifs** :
-  - Créer les comptes validés dans Sopra Banking Amplitude via Iwomi Core
+  - Créer les comptes validés dans Sopra Banking Amplitude
   - Traiter par lots les dossiers approuvés par les agents KYC
   - Avoir une visibilité sur les comptes en attente de création dans Amplitude
-  - Gérer les erreurs d'intégration (rejets Amplitude, problèmes Iwomi)
+  - Gérer les erreurs d'intégration (rejets Amplitude)
 - **Frustrations actuelles** :
   - Processus manuel de création de compte dans le système legacy
   - Pas de traçabilité entre validation KYC et création effective dans Core Banking
@@ -647,7 +647,7 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
 1. **Accès interface** : Thomas se connecte à l'interface web d'opérations bancaires
 2. **File d'attente** : Il visualise la liste des comptes validés par les agents KYC mais **pas encore créés dans Sopra Banking Amplitude**
 3. **Sélection par lots** : Il sélectionne 10-50 dossiers validés pour traitement en masse
-4. **Lancement création** : Il lance le processus d'intégration via Iwomi Core
+4. **Lancement création** : Il lance le processus d'intégration directe dans Amplitude.
 5. **Suivi** : Il voit en temps réel les statuts :
    - "En cours de création dans Amplitude..."
    - "Créé avec succès - Compte N° 1234567890"
@@ -1026,11 +1026,11 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
     - Stockage en base locale des IBU générés
   * **Phase 2 (post-MVP)** : Intégration vraie API BEAC avec VPN sécurisé ou mTLS
 
-- **Core Banking (Sopra Amplitude via Iwomi Core)** :
+- **Core Banking (Sopra Amplitude)** :
   * **MVP : Pas d'intégration automatique**
   * Les données validées sont stockées dans une **table intermédiaire** `accounts_pending_creation` avec tous les champs nécessaires pour Amplitude
   * Interface web séparée (voir section C2) permet à l'équipe Opérations de déclencher manuellement la création
-  * **Phase 2-3 (post-MVP, autre équipe)** : Automatisation complète avec API Iwomi Core
+  * **Phase 2-3 (post-MVP, autre équipe)** : Automatisation complète avec API Amplitude direct.
 
 ##### B7. API pour interfaces
 - **Mobile app** :
@@ -1167,7 +1167,7 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
   * Si multiple : Traitement par lots (jusqu'à 50 simultanément)
   * Action :
     - Récupération données dossier depuis `accounts_pending_creation`
-    - **MVP : Pas d'appel réel à Iwomi/Amplitude**, mais simulation avec :
+    - **MVP : Pas d'appel réel à Amplitude**, mais simulation avec :
       * Génération numéro de compte factice (format réaliste : BICEC + 10 chiffres)
       * Délai artificiel 2-5 secondes par compte
       * Mise à jour statut : VALIDATED → ACCOUNT_CREATED
@@ -1201,7 +1201,7 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
     - "Corriger et relancer" : Édition données puis nouvelle tentative
     - "Marquer pour investigation" : Escalade vers équipe IT
   * Exemples d'erreurs (simulées au MVP) :
-    - "Timeout Iwomi Core"
+    - "Timeout Core Banking"
     - "Champ 'Adresse' manquant dans Amplitude"
     - "Doublon détecté dans Amplitude" (NIU déjà existant)
 
