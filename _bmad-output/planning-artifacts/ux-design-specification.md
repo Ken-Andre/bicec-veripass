@@ -289,7 +289,8 @@ graph TD
 - **F01 (Home Dashboard)**:
     - **Greeting**: "Bonjour Marie", Account Status Badge (e.g., "LIMITED_ACCESS").
     - **Balances**: Mock £0 balance with currency flag toggle.
-    - **Locked States**: Padlock icon on "Invest" and "Crypto" tabs if status < FULL_ACCESS.
+    - **Allowed**: Cash-In card active.
+    - **Locked States**: Padlock icon + tooltip "Finalisez votre NIU pour débloquer" on "Invest", "Crypto", "Transfers", and "Cards" tabs if status is `LIMITED_ACCESS`.
 - **F03 (Cards)**:
     - **Visual**: Stack of virtual cards (Pink shopping card, Black virtual).
     - **Callout**: "Submit missing information" badge on card images if KYC pending.

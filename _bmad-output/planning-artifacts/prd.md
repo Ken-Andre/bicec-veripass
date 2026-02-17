@@ -254,7 +254,10 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 ### ⚖️ NIU & Legal Consent
 - **FR14 (Flexible NIU)**: Users can upload the NIU Attestation **OR** manually declare the NIU number.
 - **FR15 (Validation Logic)**: For manual NIU, the system validates format (Regex) and flags the dossier as "NIU Declarative."
-- **FR16 (Status Impact)**: "Declarative NIU" triggers a **LIMITED_ACCESS** account status until back-office verification. LIMITED_ACCESS allows Cash-In transactions only; all other features (Virement, Cards) are locked pending full KYC validation by Jean.
+- **FR16 (Status Impact)**: "Declarative NIU" triggers a **LIMITED_ACCESS** account status. 
+  - **Allowed**: Cash-In (deposits), view balance, account settings, service discovery.
+  - **Blocked**: Outbound transfers, Cash-Out, card issuance, crypto, savings, investment.
+  - **Logic**: Durable state until Jean's manual validation transition to `FULL_ACCESS`.
 - **FR17 (Consent)**: Users must scroll through and accept Terms (CGU) and the Account Contract via a checkbox.
 - **FR18 (Digital Signature)**: Users sign the contract digitally on the touchscreen (timestamped & stored).
 - **FR19 (Wet Signature 3x - MANDATORY)**: Users must sign **3 times on a white paper**; the app captures this photo for the compliance "Signature Card." This is a BEAC/COBAC regulatory requirement confirmed by Ken's supervisor (2026-02-15).
@@ -341,16 +344,16 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
     - **Add new** button for requesting additional cards
   - **Status-based UX**: Cards show error states for PENDING/LIMITED_ACCESS, unlock with FULL_ACCESS
 
-- **FR45 (Gating Logic \u0026 Account Status)**:
+- **FR45 (Gating Logic & Account Status)**:
   - **PENDING** (KYC submitted, awaiting validation):
     - All banking features show "locked" state with "⏳ Your account is being validated" message
     - Users can browse Plans, see feature descriptions, but cannot interact
   - **LIMITED_ACCESS** (Account active but NIU missing or declarative):
-    - **Unlocked**: Cash-In (receive money), View balance, Account settings
-    - **Locked** (gray + padlock icon): Virements sortants, Épargne, Trading, Crédit, Cards
+    - **Unlocked**: Cash-In (deposits/receiving), View balance, Account settings, Service discovery demo
+    - **Locked** (padlock icon + error banner): Outbound transfers, Cash-Out, card issuance, crypto, savings, investment, credit
     - **Warning banner**: "⚠️ Complétez votre NIU pour débloquer toutes les fonctionnalités"
   - **FULL_ACCESS** (Complete KYC + NIU validated):
-    - All UI elements unlocked (still frontend demos, no backend implementation)
+    - All UI elements unlocked (frontend-only demos for MVP)
   - **DISABLED** (Account suspended):
     - Login blocked with message: "Votre compte a été désactivé. Contactez votre agence."
 
@@ -428,3 +431,15 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 ### 📊 Scalability & Accessibility
 - **NFR11 (Concurrent Pilot)**: The MVP node must support **5 concurrent active onboarding sessions** without CPU/RAM throttling.
 - **NFR12 (Language & Literacy)**: The interface must support **French and English** with regional terminology (NIU, ENEO) and vibrant illustrated guidance for lower digital literacy.
+## Appendix C: Regulatory & Legal Compliance Matrix
+
+| Regulation | Key Theme | Summary Requirement | PRD Coverage |
+| :--- | :--- | :--- | :--- |
+| **COBAC R-2023/01** | LBC/FT | Identification, risk classification, and transaction monitoring. | FR1-FR6, FR14-FR16, FR20-FR30, NFR13-NFR14 |
+| **COBAC R-2023/01** | Retention | 10-year storage of KYC dossiers and transaction records. | NFR14, FR36-FR38 |
+| **COBAC R-2019/02** | Prudence | Functional gating for restricted/partially verified accounts. | FR16, FR45 (LIMITED_ACCESS logic) |
+| **Law 2024-017 (Cameroon)** | Data Protection | Sovereignty, minimization, and explicit consent for biometric data. | NFR6, NFR11-14, FR11, FR17-18 |
+| **Law 2024-017** | Data Subject Rights | Rights of access, rectification, and erasure. | FR5, FR28, FR36-FR38 |
+
+> [!NOTE]
+> This matrix maps primary regulatory requirements to specific Functional (FR) and Non-Functional (NFR) requirements to streamline Compliance reviews and COBAC audits.
