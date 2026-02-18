@@ -69,6 +69,7 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 
 ### Critical Success Moments
 - **The 15-Minute Breakthrough**: First-time completion of a digital account opening and service personalization.
+- **The "Dual Auth Setup"**: Collecting and verifying both phone (SMS) and email during onboarding enables flexible login options (phone OR email + code).
 - **The "Service Discovery" Spark**: Seeing high-fidelity banking previews (Ultra/Standard plans) while the dossier is PENDING, proving value immediately.
 - **The "Saved Progress" Reassurance**: Recovering a session after a power failure without re-entering data.
 
@@ -107,18 +108,39 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 
 ### Inspiring Products Analysis
 - **Revolut iOS (Latest)**: The "Gold Standard" for digital-first financial onboarding.
-    - **Successes**: Card-based layouts, seamless transitions, and immediate feedback loops.
-    - **Innovative Interactions**: Progressive disclosure (only showing what's needed), and confidence-building status toasts.
+    - **Successes**: Card-based layouts, seamless transitions, immediate feedback loops.
+    - **Innovative Interactions**: Progressive disclosure, confidence-building status toasts, celebration moments.
+    - **Adopted Patterns**: Success animations after each capture, inline editing, biometric opt-in.
+    
+- **Nubank (Brazil/Mexico)**: Master of emotional onboarding in emerging markets.
+    - **Successes**: Confetti celebrations, plain language, helpful microcopy, trust-building through transparency.
+    - **Innovative Interactions**: Progress timeline, "Why we need this" explanations, delight moments.
+    - **Adopted Patterns**: Welcome value prop screen, success celebration, progress stepper.
+    
+- **Trade Republic (Germany)**: Minimalist efficiency with premium feel.
+    - **Successes**: Clean UI, fast KYC flow, smart defaults, minimal friction.
+    - **Innovative Interactions**: Auto-capture with real-time feedback, smart form validation.
+    - **Adopted Patterns**: Capture success feedback, inline data review, biometric security.
 
-### Transferable UX Patterns
-- **Card-Based Hierarchy**: Revolut's use of clean cards for data entry and review is ideal for BICEC's #E37B03 soul.
-- **Progressive Bottom Sheets**: For supplementary info (e.g., "Why we need your NIU") to keep the main flow uncluttered.
+### Transferable UX Patterns (Expanded)
+- **Card-Based Hierarchy**: Revolut's clean cards for data entry and review, adapted with BICEC's #E37B03 accents.
+- **Progressive Bottom Sheets**: For supplementary info (e.g., "Why we need your NIU") to keep main flow uncluttered.
 - **Illustration-Driven Guidance**: Low-text, high-contrast 2D flat illustrations to overcome digital literacy barriers.
+- **Celebration Moments**: Nubank's confetti animations and success messages to build emotional connection.
+- **Progress Transparency**: Trade Republic's visual stepper to reduce anxiety about process length.
+- **Inline Editing**: Revolut's tap-to-edit pattern for OCR review instead of separate edit modes.
+- **Smart Defaults**: Pre-selecting most common options (e.g., Standard plan) to reduce decision fatigue.
+- **Biometric Opt-in**: Offering Face ID/Fingerprint after PIN setup, not forcing it upfront.
+- **Legal Clarity**: Checkbox consent with hyperlinks instead of forced scrolling through dense text.
+- **Micro-feedback**: Immediate visual/haptic feedback on every successful action (capture, validation, etc.).
 
-### Design Inspiration Strategy
-- **Adopt**: The "clean and confident" Revoult interaction model.
-- **Adapt**: For Cameroonian infrastructure (3G/Offline) and BICEC brand colors.
-- **Avoid**: Dense text screens, jargon, and high-bandwidth-dependent animations.
+### Design Inspiration Strategy (Enhanced)
+- **Adopt from Revolut**: Card layouts, inline editing, biometric security, real-time validation.
+- **Adopt from Nubank**: Celebration moments, plain language, progress transparency, trust-building microcopy.
+- **Adopt from Trade Republic**: Minimalist efficiency, auto-capture feedback, smart defaults.
+- **Adapt for Cameroon**: 3G-optimized animations, offline-first architecture, French/English bilingual, BICEC brand colors (#E37B03).
+- **Avoid**: Dense legal text, forced scrolling, high-bandwidth animations, complex multi-step forms, jargon-heavy copy.
+- **Innovate**: Combine Revolut's premium feel + Nubank's emotional warmth + Trade Republic's efficiency, tailored for Cameroonian banking context.
 
 ---
 
@@ -143,60 +165,97 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 
 ```mermaid
 graph TD
-    A01[A01 Splash] --> A02[A02 Phone]
-    A02 --> A03[A03 OTP]
-    A03 --> A04[A04 App PIN]
-    A04 --> A05[A05 What You Need]
+    %% Entry & Authentication
+    A01[A01 Splash & Language] --> A02[A02 Welcome Value Prop]
+    A02 --> A03[A03 Phone Entry]
+    A03 --> A04[A04 OTP Verify Phone]
+    A04 --> A05[A05 Email Entry]
+    A05 --> A06[A06 Email Verification]
+    A06 --> A07[A07 App PIN Setup]
+    A07 --> A08[A08 Biometric Opt-in]
     
-    A05 --> B01[B01 CNI Recto Guidance]
-    B01 --> B02[B02 CNI Recto Capture]
-    B02 --> B03[B03 CNI Verso Guidance]
-    B03 --> B04[B04 CNI Verso Capture]
-    B04 --> B05[B05 OCR Review]
-    B05 --> B06[B06 Liveness Intro]
-    B06 --> B07[B07 Liveness Challenge]
+    %% Onboarding Context
+    A08 --> A09[A09 What You Need]
+    A09 --> A10[A10 Progress Timeline]
     
-    B07 -->|3 Strikes| B07_Fail[3-Strike Lockout]
-    B07 -->|Success| C01[C01 Address Cascade]
+    %% Identity Capture
+    A10 --> B01[B01 CNI Intro]
+    B01 --> B02[B02 CNI Recto Guidance]
+    B02 --> B03[B03 CNI Recto Capture]
+    B03 --> B04[B04 Capture Success]
+    B04 --> B05[B05 CNI Verso Guidance]
+    B05 --> B06[B06 CNI Verso Capture]
+    B06 --> B07[B07 OCR Processing]
+    B07 --> B08[B08 Data Review & Edit]
     
-    C01 --> C02[C02 Map Pin]
-    C02 --> C03[C03 Utility Proof]
-    C03 --> C04[C04 NIU Choice]
-    C04 --> C05[C05 Manual NIU/Upload]
+    %% Liveness
+    B08 --> B09[B09 Liveness Intro]
+    B09 --> B10[B10 Liveness Challenge]
+    B10 -->|3 Strikes| B10_Fail[Lockout & Support]
+    B10 -->|Success| B11[B11 Liveness Success]
     
-    C05 --> D01[D01 CGU Scroll]
+    %% Address & Fiscal
+    B11 --> C01[C01 Address Cascade]
+    C01 --> C02[C02 GPS Location]
+    C02 --> C03[C03 Utility Proof Intro]
+    C03 --> C04[C04 Utility Capture]
+    C04 --> C05[C05 NIU Choice]
+    C05 --> C06[C06 NIU Entry/Upload]
+    
+    %% Legal & Consent
+    C06 --> D01[D01 Legal Consent]
     D01 --> D02[D02 Digital Signature]
     D02 --> D03[D03 Wet Sign Intro]
     D03 --> D04[D04 Wet Sign Capture]
     
-    D04 --> E01[E01 Secure Submission]
-    E01 --> E02[E02 Success/Status]
-    E02 --> E03[E03 Pending Dashboard]
+    %% Submission & Discovery
+    D04 --> E01[E01 Review Summary]
+    E01 --> E02[E02 Secure Upload]
+    E02 --> E03[E03 Success Celebration]
+    E03 --> E04[E04 Plan Discovery]
+    E04 --> E05[E05 Personalization]
+    E05 --> E06[E06 Pending Dashboard]
 
-    %% Resilience Loops
-    E01 -.->|Signal Drop| E01_Retry[Resume Toast]
-    E01_Retry -.-> E01
+    %% Resilience & Recovery
+    E02 -.->|Network Drop| E02_Retry[Auto Resume]
+    E02_Retry -.-> E02
+    
+    %% Exit Points
+    B10_Fail --> Z01[Branch Redirect]
+    
+    style A01 fill:#E37B03,stroke:#333,stroke-width:2px,color:#fff
+    style E03 fill:#10B981,stroke:#333,stroke-width:2px,color:#fff
+    style E06 fill:#2563EB,stroke:#333,stroke-width:2px,color:#fff
 ```
 
-### Module A: Secure Entry & Context
+### Module A: Secure Entry & Context (Enhanced - Revolut/Nubank Pattern)
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
 | :--- | :--- | :--- | :--- |
-| **A01** | Splash & Language | Logo, EN/FR toggle, Cold start <4s. | FR1, NFR3 |
-| **A02** | Phone Number | +237 locked, numeric keypad. | FR1 |
-| **A03** | OTP Verify | 6-digit input, SMS auto-read. | FR1, FR41 |
-| **A04** | App PIN | 6-digit local PIN setup/confirm. | NFR4 |
-| **A05** | "What You Need" | Checklist illustration, ~11 min timer. | NFR8 (Entry Point) |
+| **A01** | Splash & Language | BICEC logo animation, EN/FR toggle, Cold start <4s. | FR1, NFR3 |
+| **A02** | Welcome Value Prop | Hero illustration + 3 value pillars (Speed/Security/Modern). | NFR8, Marketing |
+| **A03** | Phone Entry | +237 locked, numeric keypad, "Déjà client?" link. | FR1 |
+| **A04** | OTP Verify (Phone) | 6-digit auto-fill, SMS auto-read, Resend timer. | FR1, FR41 |
+| **A05** | Email Entry | Email input with validation, "Hide My Email" option. | FR1, FR41 |
+| **A06** | Email Verification | 6-digit code or link verification, Resend timer. | FR1, FR41 |
+| **A07** | PIN Setup | 6-digit PIN with strength indicator, Confirm screen. | NFR4 |
+| **A08** | Biometric Opt-in | Face ID/Fingerprint toggle, "Skip for now" option. | NFR4 (Enhanced) |
+| **A09** | What You Need | Checklist with icons, ~11 min estimate, "Let's go" CTA. | NFR8 |
+| **A10** | Progress Timeline | Visual stepper (Identity → Address → Legal → Done). | NFR8, UX |
 
-### Module B: Identity & Liveness
+### Module B: Identity & Liveness (Enhanced - Trade Republic Pattern)
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
 | :--- | :--- | :--- | :--- |
-| **B01** | CNI Recto Guidance | Tip-driven illustration (Glare/Blur). | FR2, NFR2 |
-| **B02** | CNI Recto Capture | Camera overlay, auto-capture trigger. | FR2, FR20, NFR2 |
-| **B03** | CNI Verso Guidance | Focus on the back of ID. | FR2, NFR2 |
-| **B04** | CNI Verso Capture | Real-time quality guardrail. | FR2, FR20, NFR2 |
-| **B05** | OCR Review | confidence badges (G/Y), edit pads. | FR5, FR24 |
-| **B06** | Liveness Intro | Randomized challenge explanation. | FR3, FR4 |
-| **B07** | Liveness Challenge | Video circle, active prompt guidance. | FR3, FR4, FR7 |
+| **B01** | CNI Intro | Illustration + "Why we need this" explanation. | FR2, UX |
+| **B02** | CNI Recto Guidance | Animated tips (Glare/Blur/Alignment), "Got it" CTA. | FR2, NFR2 |
+| **B03** | CNI Recto Capture | Camera overlay, auto-capture, real-time feedback. | FR2, FR20, NFR2 |
+| **B04** | Capture Success | Green checkmark animation, "Great!" message. | UX, Feedback |
+| **B05** | CNI Verso Guidance | "Now the back side" with flip animation. | FR2, NFR2 |
+| **B06** | CNI Verso Capture | Same quality guardrails, auto-capture. | FR2, FR20, NFR2 |
+| **B07** | OCR Processing | Loading animation with "Analyzing..." message. | FR5, UX |
+| **B08** | Data Review & Edit | Confidence badges, inline editing, smart validation. | FR5, FR24 |
+| **B09** | Liveness Intro | "Quick selfie check" with privacy reassurance. | FR3, FR4 |
+| **B10** | Liveness Challenge | Circular frame, randomized prompts, 3-strike system. | FR3, FR4, FR7 |
+| **B11** | Liveness Success | Success animation, "Identity verified!" message. | UX, Feedback |
 
 ### Module C: Localization & Fiscal Identity
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
@@ -210,18 +269,20 @@ graph TD
 ### Module D: Consent & Signatures
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
 | :--- | :--- | :--- | :--- |
-| **D01** | CGU Scroll | Scroll gate, check-to-continue. | FR17 |
+| **D01** | CGU Acceptance | Checkbox consent with hyperlinks to legal docs. | FR17 |
 | **D02** | Digital Signature | Sign-on-glass canvas. | FR18 |
 | **D03** | Wet Sign Intro | Physical paper prep instructions. | FR19 |
 | **D04** | Wet Sign Capture | Multi-capture (3x) doc camera. | FR19 |
 
-### Module E: Submission \u0026 Discovery (Plans \u0026 Personalization)
+### Module E: Submission & Discovery (Enhanced - Nubank Celebration Pattern)
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
 | :--- | :--- | :--- | :--- |
-| **E01** | Secure Submission | Chunked progress (Step X of 4). | FR6, NFR8 |
-| **E02** | Success / Status | "PENDING" status, Push explanation. | FR41, FR45 |
-| **E03** | Plan Selection | Swipeable tab (Ultra/Premium/Standard). | FR39, FR47 |
-| **E04** | Use-Case Selection | Chip/Tag selection for interests. | FR40, FR47 |
+| **E01** | Review Summary | Final checklist of all captured data, "Submit" CTA. | FR6, UX |
+| **E02** | Secure Upload | Chunked progress with file names, resilient retry. | FR6, NFR8 |
+| **E03** | Success Celebration | Confetti animation, "Compte créé!" hero message. | UX, Delight |
+| **E04** | Plan Discovery | Swipeable cards (Ultra/Premium/Standard), "Explore" CTA. | FR39, FR47 |
+| **E05** | Personalization | Interest chips (Invest/Save/Travel), multi-select. | FR40, FR47 |
+| **E06** | Pending Dashboard | Limited access view, "Validation in progress" banner. | FR41, FR45 |
 
 ### Module F: Account Management Dashboard (Frontend Demo)
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
@@ -239,6 +300,85 @@ graph TD
 | **G03** | Withdraw Flow | Greyed out state with compliance tooltip. | FR45, FR47 |
 
 ---
+
+## 7. Low-Fidelity Wireframes: "Hard Screens" (Revolut/Nubank-Inspired)
+
+### A02: Welcome Value Prop (New - Nubank Pattern)
+- **Layout**: Full-screen hero with gradient background (#E37B03 to lighter orange).
+- **Hero Illustration**: Modern 3D illustration of mobile banking (person with phone + floating cards).
+- **Headline**: "Votre banque moderne, en 15 minutes" (Bold, 28px).
+- **Value Pillars** (3 cards stacked):
+    1. Icon: Lightning bolt. Text: "Ouverture rapide - 15 min chrono"
+    2. Icon: Shield. Text: "Sécurité bancaire de niveau 1"
+    3. Icon: Sparkles. Text: "Services modernes - Cartes, Épargne, Investissement"
+- **CTA**: Large button "Commencer" (#E37B03, white text).
+- **Footer**: Small text "Déjà client? Se connecter" (link).
+- **UX Note**: This screen builds trust and sets expectations before asking for phone number.
+
+### A08: Progress Timeline (New - Trade Republic Pattern)
+- **Header**: "Votre progression" with close button.
+- **Body**: Vertical stepper with 4 stages:
+    1. ✓ Identité (Completed - Green)
+    2. → Adresse (Current - Orange pulse)
+    3. ○ Documents légaux (Upcoming - Gray)
+    4. ○ Finalisation (Upcoming - Gray)
+- **Each Stage**: Icon + Label + Estimated time (e.g., "~3 min").
+- **Bottom**: "Temps restant: ~8 minutes" with progress bar.
+- **CTA**: "Continuer" button.
+- **UX Note**: Provides orientation and reduces anxiety about process length.
+
+### A05: Email Entry (New - Onboarding Pattern)
+- **Layout**: Full-screen white background.
+- **Header**: "Créez votre compte" (Bold, 34px, left-aligned, 24px margins, 80px from top).
+- **Subtitle**: "Entrez votre adresse email" (Gray #6B7280, 17px, 8px below title).
+- **Email Field**: 56px height, light gray background (#F5F5F5), rounded corners 12px, 32px below subtitle.
+    - Left: Envelope icon gray 20px, 16px from edge
+    - Center: Input placeholder "exemple@mail.com" gray medium 17px, padding left 48px
+    - Right: Clear button (X) gray circle 24px when filled
+- **Suggestion**: "Hide My Email" button blue (#0075FF) 15px, Apple icon 16px left, 16px below field
+- **Primary CTA**: "Continuer" orange (#E37B03) 100% width 56px rounded corners 28px, 24px below suggestion, disabled (40% opacity) if empty
+- **Keyboard**: Email keyboard iOS native 40% bottom screen with @ and . keys
+- **Validation**: Real-time email format, red border if invalid
+- **UX Note**: Collects email for dual authentication (phone + email) enabling login flexibility.
+
+### A06: Email Verification (New - OTP Pattern)
+- **Layout**: Full-screen white background.
+- **Header**: Back button 44px top left.
+- **Title**: "Code à 6 chiffres" (Bold, 32px, left-aligned, 24px margins, 80px from top).
+- **Subtitle**: "Entrez le code envoyé à votre email" (Gray 17px, 8px below title).
+- **OTP Fields**: 6 squares 56px×56px spaced 8px horizontally, centered, light gray background (#F5F5F5), rounded corners 12px.
+    - Visual format: XXX-XXX (dash separator between 3rd and 4th)
+    - Empty state: gray border 1px
+    - Focus state: orange border 2px (#E37B03)
+    - Filled state: black bold digit 24px centered
+- **Keyboard**: Numeric keyboard iOS native 40% bottom screen
+- **Auto-focus**: First field, automatic progression
+- **Email Auto-read**: Automatic code detection from email (iOS/Android)
+- **Timer**: "Renvoyer le code dans 00:17" gray 15px centered, 24px below fields, countdown active
+- **Resend Link**: Becomes "Renvoyer le code" orange clickable when timer = 00:00
+- **Validation**: Auto-submit after 6th digit
+- **Alternative**: "Vérifier via lien email" link gray 15px, 16px below timer
+- **UX Note**: Dual verification method (code or link) for flexibility. Email verified = login via email enabled.
+
+### A08: Progress Timeline (New - Trade Republic Pattern)
+- **Header**: "Votre progression" with close button.
+- **Body**: Vertical stepper with 4 stages:
+    1. ✓ Identité (Completed - Green)
+    2. → Adresse (Current - Orange pulse)
+    3. ○ Documents légaux (Upcoming - Gray)
+    4. ○ Finalisation (Upcoming - Gray)
+- **Each Stage**: Icon + Label + Estimated time (e.g., "~3 min").
+- **Bottom**: "Temps restant: ~8 minutes" with progress bar.
+- **CTA**: "Continuer" button.
+- **UX Note**: Provides orientation and reduces anxiety about process length.
+
+### B04: Capture Success (New - Revolut Feedback Pattern)
+- **Layout**: Full-screen with blurred captured image as background.
+- **Center**: Large green checkmark animation (scale + fade in).
+- **Message**: "Parfait!" (Bold, 24px, centered).
+- **Sub-message**: "Recto de votre CNI capturé" (Regular, 16px).
+- **Auto-transition**: After 1.5s, automatically proceeds to next screen.
+- **UX Note**: Immediate positive feedback builds confidence and momentum.
 
 ## 7. Low-Fidelity Wireframes: "Hard Screens"
 
@@ -266,31 +406,60 @@ graph TD
     - **Logic**: Data wiped AFTER clicking Recommencer.
 - **Privacy Note (C02)**: "Nous collectons votre position GPS pour vérifier votre adresse à des fins de conformité. Ces données sont cryptées et jamais partagées (Enregistré pour des fins de contrôle réglementaire de KYC)."
 
-### B05: OCR Review Layout
-- **Header**: "Vérifiez vos informations".
-- **Body**: Scrollable list of Cards.
+### D01: Legal Consent Layout (Improved - Nubank/Revolut Style)
+- **Header**: "Dernière étape légale" with progress indicator.
+- **Body**: Clean card layout with checkboxes (NOT scroll-gate).
+    - **Checkbox 1**: "J'accepte les [Conditions Générales d'Utilisation](https://www.groupebcp.com/fr/Pages/conditions-generales-utilisation.aspx)" (Hyperlink in blue #2563EB).
+    - **Checkbox 2**: "J'accepte la [Politique de Confidentialité](https://www.groupebcp.com/fr/Pages/politique-confidentialite.aspx)" (Hyperlink).
+    - **Checkbox 3**: "J'accepte les [Conditions Tarifaires](https://www.groupebcp.com/fr/Pages/tarifs.aspx)" (Hyperlink).
+    - **Optional Checkbox**: "Je souhaite recevoir des offres personnalisées par email" (Marketing opt-in, unchecked by default).
+- **Legal Note**: Small gray text "En continuant, vous confirmez avoir lu et compris ces documents."
+- **Footer**: Sticky CTA [Accepter et Continuer] (Disabled until all required checkboxes checked).
+- **UX Principle**: Following Revolut/Trade Republic pattern - NO forced scrolling, just clear consent with accessible links.
+
+### B08: OCR Review Layout (Enhanced)
+- **Header**: "Vérifiez vos informations" with edit icon.
+- **Body**: Scrollable list of Cards with confidence indicators.
     - Each card: [Field Label] - [Value Input Field] - [Confidence Badge].
-    - confidence badges: `(Check)` Orange for low confidence, `(OK)` Green for high.
+    - Confidence badges: Orange warning icon for low confidence, Green checkmark for high.
+    - **Inline Edit**: Tap any field to edit directly (no separate edit mode).
+- **Smart Validation**: Real-time format checking (e.g., CNI number format).
 - **Footer**: Sticky CTA [Confirmer et Continuer].
 
-### E03/E04: Plan \u0026 Use-Case Discovery
-- **E03 (Plans)**:
-    - **Header**: "Choose your plan".
-    - **Body**: Swipeable horizontal cards (Revolut-styled).
-        - **Ultra (Platinum)**: Highlights 4.75% interest, Lounge access.
-        - **Standard**: "Free" with basic features.
-    - **Footer**: [Start Trial / Continue] CTA.
-- **E04 (Personalization)**:
-    - **Header**: "What would you like to achieve?".
-    - **Grid of Chips**: "Invest", "Save", "Budget", "Travel", "Daily Spending".
-    - **Interactive**: Chips turn Orange #E37B03 on selection.
+### E03: Success Celebration (New - Nubank Delight Pattern)
+- **Layout**: Full-screen with animated confetti particles.
+- **Hero Icon**: Large checkmark in circle (Green #10B981), scale animation.
+- **Headline**: "Félicitations!" (Bold, 32px, centered).
+- **Message**: "Votre compte BICEC est créé" (Regular, 18px).
+- **Sub-message**: "Nous validons vos informations. Vous recevrez une notification dans 24-48h."
+- **Illustration**: Happy person with phone (bottom third of screen).
+- **CTA**: "Découvrir mes services" (Orange button).
+- **UX Note**: Celebrates the achievement and sets clear expectations for next steps.
+
+### E04/E05: Plan & Use-Case Discovery (Enhanced)
+- **E04 (Plans)**:
+    - **Header**: "Choisissez votre formule" with "Skip" link.
+    - **Body**: Horizontal swipeable cards (Revolut-styled):
+        - **Ultra**: Purple gradient, "4.75% d'intérêt", "Accès salons", Badge "Recommandé".
+        - **Premium**: Blue gradient, "3% d'intérêt", "Protection achats 2,500 FCFA".
+        - **Standard**: Gray gradient, "Gratuit", "L'essentiel bancaire", Badge "Actif".
+    - **Pagination Dots**: Below cards to show position.
+    - **Footer**: [Commencer l'essai gratuit] or [Continuer avec Standard].
+- **E05 (Personalization)**:
+    - **Header**: "Qu'aimeriez-vous faire?" with subtitle "Sélectionnez vos intérêts".
+    - **Grid of Chips** (2 columns, scrollable):
+        - Row 1: "💰 Épargner", "📈 Investir"
+        - Row 2: "💳 Payer", "✈️ Voyager"
+        - Row 3: "🏠 Budgéter", "🎓 Éducation"
+    - **Interactive**: Selected chips have Orange background + white text.
+    - **Footer**: "Continuer" button (enabled after 1+ selection).
 
 ### F01/F03: Banking Dashboard \u0026 Cards (Status Gated)
 - **F01 (Home Dashboard)**:
     - **Greeting**: "Bonjour Marie", Account Status Badge (e.g., "LIMITED_ACCESS").
-    - **Balances**: Mock £0 balance with currency flag toggle.
+    - **Balances**: Mock 0FCFA balance with currency flag toggle.
     - **Allowed**: Cash-In card active.
-    - **Locked States**: Padlock icon + tooltip "Finalisez votre NIU pour débloquer" on "Invest", "Crypto", "Transfers", and "Cards" tabs if status is `LIMITED_ACCESS`.
+    - **Locked States**: Padlock icon + tooltip "Finalisez votre NIU pour débloquer" on "Invest", "Crypto" tabs if status is `LIMITED_ACCESS`.
 - **F03 (Cards)**:
     - **Visual**: Stack of virtual cards (Pink shopping card, Black virtual).
     - **Callout**: "Submit missing information" badge on card images if KYC pending.
@@ -354,12 +523,18 @@ graph TD
 
 ## 11. Copywriting Strategy (FR/NFR Traceable)
 
-| Logic Area | Copywriting Principle | Example UX Copy (FR) |
-| :--- | :--- | :--- |
-| **Resilience (NFR8)** | Reassuring & Professional | "Nous avons sauvegardé votre progression. Reprise à l'étape [X]." |
-| **Liveness (FR3/FR4)** | Direct & Simple | "Souriez à l'écran maintenant." (No technical jargon like "1:1 matching"). |
-| **Gating (FR39)** | Value-Centric | "Finalisez votre compte pour débloquer les virements et cartes virtuelles." |
-| **Errors (Module B)** | Solution-Oriented | "Image trop floue. Veuillez stabiliser votre téléphone." |
+| Logic Area | Copywriting Principle | Example UX Copy (FR) | Inspiration |
+| :--- | :--- | :--- | :--- |
+| **Welcome (A02)** | Aspirational & Clear | "Votre banque moderne, en 15 minutes" | Nubank |
+| **Email Collection (A05)** | Reassuring & Flexible | "Votre email vous permettra de vous connecter facilement" | Revolut |
+| **Email Verification (A06)** | Clear & Alternative | "Code envoyé à votre email. Vous pouvez aussi cliquer sur le lien." | Trade Republic |
+| **Resilience (NFR8)** | Reassuring & Professional | "Nous avons sauvegardé votre progression. Reprise à l'étape [X]." | Revolut |
+| **Liveness (FR3/FR4)** | Direct & Simple | "Souriez à l'écran maintenant." (No jargon like "1:1 matching") | Trade Republic |
+| **Success (E03)** | Celebratory & Clear | "Félicitations! Votre compte BICEC est créé." | Nubank |
+| **Gating (FR39)** | Value-Centric | "Finalisez votre compte pour débloquer les virements et cartes virtuelles." | Revolut |
+| **Errors (Module B)** | Solution-Oriented | "Image trop floue. Veuillez stabiliser votre téléphone." | Trade Republic |
+| **Legal (D01)** | Transparent & Accessible | "J'accepte les [Conditions Générales]" (hyperlink, not scroll-gate) | Revolut |
+| **Progress (A08)** | Motivating & Specific | "Temps restant: ~8 minutes" | Nubank |
 
 ---
 
