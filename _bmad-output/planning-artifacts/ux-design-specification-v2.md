@@ -169,7 +169,7 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 - **Resilience UX**: Custom toast-style notifications: "Resuming session... We saved your progress."
 - **Inline Editing**: Tap any field with 🟠 or 🔴 badge to edit directly in card (no modal, no separate screen).
 - **Auto-Submit**: "Confirmer et continuer" button remains disabled until all 🟠/🔴 badges are resolved.
-
+- **Restart Flow**: Notifying user how much retries left when retrying liveness test.
 
 ---
 
@@ -269,11 +269,11 @@ graph TD
 ### Access State Definitions (Critical Correction)
 
 #### RESTRICTED_ACCESS (Post-Submission, Pre-Validation)
-**When**: After E06 (dossier submitted), waiting for Jean's validation  
+**When**: After E06 (dossier submitted), waiting for Jean's validation; After in the time and Id or any KYC verification documents expire; User did something suspicious and maybe against our terms conditions
 **What User Sees**: Full app in "vitrine" (discovery) mode  
 **Allowed Actions**:
 - Browse all screens and features (read-only)
-- View plan comparisons (Ultra/Premium/Standard)
+- View plan comparisons (Ultra/Premium/Standard(Free))
 - Explore banking feature descriptions
 - Withdraw existing funds (if any)
 - Move money between own pockets
@@ -294,15 +294,15 @@ graph TD
 - View balance ✅
 - Account settings ✅
 - Service discovery ✅
+- Outbound transfers ✅
+- Cash-Out (withdrawals) ✅
+- Card issuance ✅
 
 **Blocked Actions**:
-- Outbound transfers ❌
-- Cash-Out (withdrawals) ❌
-- Card issuance ❌
 - Crypto ❌
 - Investments ❌
 - Savings products ❌
-
+- Credit issuance (Deeplink auth to Bi-Cresco) ❌
 **UI Indicators**:
 - Persistent banner: "⚠️ Complétez votre NIU pour débloquer toutes les fonctionnalités"
 - Locked features show padlock icon + "NIU requis" tooltip
