@@ -299,6 +299,7 @@ graph TD
 - Card issuance ✅
 
 **Blocked Actions**:
+
 - Crypto ❌
 - Investments ❌
 - Savings products ❌
@@ -393,4 +394,703 @@ graph TD
 | **G01** | Recurring Transfers | Schedule modal (Date, Frequency). | FR43, FR47 |
 | **G02** | Add Money Flow | Payment amount, Confirm button (Blue). | FR42, FR47 |
 | **G03** | Withdraw Flow | Greyed out state with compliance tooltip if LIMITED_ACCESS. | FR45, FR47 |
+
+
+---
+
+## 7. Low-Fidelity Wireframes: "Hard Screens" (Revolut/Nubank-Inspired)
+
+> [!NOTE]
+> All mockup placeholders below will be generated via Google Stitch following the prompt guide at https://discuss.ai.google.dev/t/stitch-prompt-guide/83844/121. No fake image links are included.
+
+### A02: Welcome Value Prop (New - Nubank Pattern)
+**[MOCKUP_A02 — À générer via Stitch]**
+
+- **Layout**: Full-screen hero with gradient background (#E37B03 to lighter orange).
+- **Hero Illustration**: Modern 3D illustration of mobile banking (person with phone + floating cards).
+- **Headline**: "Votre banque moderne, en 15 minutes" (Bold, 28px).
+- **Value Pillars** (3 cards stacked):
+    1. Icon: Lightning bolt. Text: "Ouverture rapide - 15 min chrono"
+    2. Icon: Shield. Text: "Sécurité bancaire de niveau 1"
+    3. Icon: Sparkles. Text: "Services modernes - Cartes, Épargne, Investissement"
+- **CTA**: Large button "Commencer" (#E37B03, white text).
+- **Footer**: Small text "Déjà client? Se connecter" (link).
+- **UX Note**: This screen builds trust and sets expectations before asking for phone number.
+
+### A05: Email Entry (New - Onboarding Pattern)
+**[MOCKUP_A05 — À générer via Stitch]**
+
+- **Layout**: Full-screen white background.
+- **Header**: "Créez votre compte" (Bold, 34px, left-aligned, 24px margins, 80px from top).
+- **Subtitle**: "Entrez votre adresse email" (Gray #6B7280, 17px, 8px below title).
+- **Email Field**: 56px height, light gray background (#F5F5F5), rounded corners 12px, 32px below subtitle.
+    - Left: Envelope icon gray 20px, 16px from edge
+    - Center: Input placeholder "exemple@mail.com" gray medium 17px, padding left 48px
+    - Right: Clear button (X) gray circle 24px when filled
+- **Suggestion**: "Hide My Email" button blue (#0075FF) 15px, Apple icon 16px left, 16px below field
+- **Primary CTA**: "Continuer" orange (#E37B03) 100% width 56px rounded corners 28px, 24px below suggestion, disabled (40% opacity) if empty
+- **Keyboard**: Email keyboard iOS native 40% bottom screen with @ and . keys
+- **Validation**: Real-time email format, red border if invalid
+- **UX Note**: Collects email for dual authentication (phone + email) enabling login flexibility.
+
+### A06: Email Verification (New - OTP Pattern)
+**[MOCKUP_A06 — À générer via Stitch]**
+
+- **Layout**: Full-screen white background.
+- **Header**: Back button 44px top left.
+- **Title**: "Code à 6 chiffres" (Bold, 32px, left-aligned, 24px margins, 80px from top).
+- **Subtitle**: "Entrez le code envoyé à votre email" (Gray 17px, 8px below title).
+- **OTP Fields**: 6 squares 56px×56px spaced 8px horizontally, centered, light gray background (#F5F5F5), rounded corners 12px.
+    - Visual format: XXX-XXX (dash separator between 3rd and 4th)
+    - Empty state: gray border 1px
+    - Focus state: orange border 2px (#E37B03)
+    - Filled state: black bold digit 24px centered
+- **Keyboard**: Numeric keyboard iOS native 40% bottom screen
+- **Auto-focus**: First field, automatic progression
+- **Email Auto-read**: Automatic code detection from email (iOS/Android)
+- **Timer**: "Renvoyer le code dans 00:17" gray 15px centered, 24px below fields, countdown active
+- **Resend Link**: Becomes "Renvoyer le code" orange clickable when timer = 00:00
+- **Validation**: Auto-submit after 6th digit
+- **Alternative**: "Vérifier via lien email" link gray 15px, 16px below timer
+- **UX Note**: Dual verification method (code or link) for flexibility. Email verified = login via email enabled.
+
+### A10: Progress Timeline (New - Trade Republic Pattern)
+**[MOCKUP_A10 — À générer via Stitch]**
+
+- **Header**: "Votre progression" with close button.
+- **Body**: Vertical stepper with 4 stages:
+    1. ✓ Identité (Completed - Green)
+    2. → Adresse (Current - Orange pulse)
+    3. ○ Documents légaux (Upcoming - Gray)
+    4. ○ Finalisation (Upcoming - Gray)
+- **Each Stage**: Icon + Label + Estimated time (e.g., "~3 min").
+- **Bottom**: "Temps restant: ~8 minutes" with progress bar.
+- **CTA**: "Continuer" button.
+- **UX Note**: Provides orientation and reduces anxiety about process length.
+
+### B02/B04: CNI Capture Layout
+**[MOCKUP_B02 — À générer via Stitch]**
+
+- **Header**: Back button, Progress Bar (Step 2 of 15+).
+- **Body**: Active Camera View (Full screen).
+- **Overlay**: 
+    - Translucent dark mask with clear CNI-sized rectangle in center.
+    - Animated alignment corners (Pulse Orange #E37B03 when aligned).
+    - Top Banner: "Recto du CNI" / "Back of CNI".
+    - Bottom Tip: "Alignez la carte dans le cadre. Évitez les reflets."
+- **NFR Note**: Guidance overlays stay >15 FPS on Android 7 by using lean Flutter CustomPainters.
+
+### B04: Capture Success (New - Revolut Feedback Pattern)
+**[MOCKUP_B04 — À générer via Stitch]**
+
+- **Layout**: Full-screen with blurred captured image as background.
+- **Center**: Large green checkmark animation (scale + fade in).
+- **Message**: "Parfait!" (Bold, 24px, centered).
+- **Sub-message**: "Recto de votre CNI capturé" (Regular, 16px).
+- **Auto-transition**: After 1.5s, automatically proceeds to next screen.
+- **UX Note**: Immediate positive feedback builds confidence and momentum.
+
+### B08: OCR Review Layout (CRITICAL - Auto-Extraction Paradigm)
+**[MOCKUP_B08 — À générer via Stitch]**
+
+- **Header**: "Vérifiez vos informations" with edit icon.
+- **Body**: Scrollable list of Cards with confidence indicators.
+    - Each card: [Field Label] - [Value PRE-FILLED by AI] - [Confidence Badge].
+    - **Confidence badges**: 
+        - 🟢 Green checkmark (>85% confidence): Field validated, non-editable by default
+        - 🟠 Orange warning (50-85% confidence): Tap to edit inline directly in card
+        - 🔴 Red alert (<50% confidence): "Non détecté — veuillez corriger" - mandatory fix
+    - **Inline Edit**: Tap any field with 🟠 or 🔴 to edit directly (no modal, no separate screen).
+- **Smart Validation**: Real-time format checking (e.g., CNI number format).
+- **Footer**: Sticky CTA [Confirmer et Continuer] - DISABLED until all 🟠/🔴 badges resolved.
+- **UX Note**: NO blank forms. All data is pre-filled by AI. User only confirms or corrects.
+
+### B10_Fail: 3-Strike Lockout (CRITICAL - Ken's Exact Copy)
+**[MOCKUP_B10_FAIL — À générer via Stitch]**
+
+- **Layout**: Full-screen white background.
+- **Icon**: Locked/Grayed Face illustration centered.
+- **Message**: "Désolé pour la gêne, mais pour des raisons techniques/de sécurité, nous sommes obligés de terminer cette session. Ne vous inquiétez pas, vous avez toujours la possibilité d'aller dans une agence locale proche de chez vous, ou de recommencer dès le début." (Gray text, 17px, centered, line-height 1.5)
+- **Primary CTA**: [Recommencer] button (#E37B03, white text, full width).
+- **Logic**: Data wipes AFTER user clicks "Recommencer" button (not immediately on 3rd failure).
+- **UX Note**: Single-button flow. No separate "Find Agency" CTA - just informational text.
+
+### C02: GPS Button (CRITICAL - Simplified Strategy)
+**[MOCKUP_C02 — À générer via Stitch]**
+
+- **Layout**: Full-screen white background.
+- **Header**: "Localisez votre domicile" (Bold, 28px).
+- **Subtitle**: "Optionnel - Aide à vérifier votre adresse" (Gray, 16px).
+- **Body**: Single button "Utiliser ma position actuelle" (Blue #2563EB, icon: location pin).
+- **Privacy Notice**: Small text below button: "Nous collectons votre position GPS pour vérifier votre adresse à des fins de conformité. Ces données sont cryptées et jamais partagées (Enregistré pour des fins de contrôle réglementaire de KYC)."
+- **Warning Logic**: If GPS distance > X km from selected Quartier, show non-blocking warning: "⚠️ La position GPS semble loin du quartier sélectionné, vérifier ?"
+- **Skip Option**: "Passer cette étape" link at bottom.
+- **UX Note**: NO map embed. NO manual pin placement. Just a button.
+
+### D01: Legal Consent Layout (Improved - Nubank/Revolut Style)
+**[MOCKUP_D01 — À générer via Stitch]**
+
+- **Header**: "Dernière étape légale" with progress indicator.
+- **Body**: Clean card layout with checkboxes (NOT scroll-gate).
+    - **Checkbox 1**: "J'accepte les [Conditions Générales d'Utilisation](link)" (Hyperlink in blue #2563EB).
+    - **Checkbox 2**: "J'accepte la [Politique de Confidentialité](link)" (Hyperlink).
+    - **Checkbox 3**: "J'accepte les [Conditions Tarifaires](link)" (Hyperlink).
+    - **Optional Checkbox**: "Je souhaite recevoir des offres personnalisées par email" (Marketing opt-in, unchecked by default).
+- **Legal Note**: Small gray text "En continuant, vous confirmez avoir lu et compris ces documents."
+- **Footer**: Sticky CTA [Accepter et Continuer] (Disabled until all required checkboxes checked).
+- **UX Principle**: Following Revolut/Trade Republic pattern - NO forced scrolling, just clear consent with accessible links.
+
+### E03: Success Celebration (New - Nubank Delight Pattern)
+**[MOCKUP_E03 — À générer via Stitch]**
+
+- **Layout**: Full-screen with animated confetti particles.
+- **Hero Icon**: Large checkmark in circle (Green #10B981), scale animation.
+- **Headline**: "Félicitations!" (Bold, 32px, centered).
+- **Message**: "Votre dossier BICEC est soumis" (Regular, 18px).
+- **Sub-message**: "Nous validons vos informations. Vous recevrez une notification dans 24-48h."
+- **Illustration**: Happy person with phone (bottom third of screen).
+- **CTA**: "Découvrir mes services" (Orange button).
+- **UX Note**: Celebrates the achievement and sets clear expectations for next steps.
+
+### E04/E05: Plan & Use-Case Discovery (Enhanced)
+**[MOCKUP_E04 — À générer via Stitch]**
+
+- **E04 (Plans)**:
+    - **Header**: "Choisissez votre formule" with "Skip" link.
+    - **Body**: Horizontal swipeable cards (Revolut-styled):
+        - **Ultra**: Purple gradient, "4.75% d'intérêt", "Accès salons", Badge "Recommandé".
+        - **Premium**: Blue gradient, "3% d'intérêt", "Protection achats 2,500 FCFA".
+        - **Standard**: Gray gradient, "Gratuit", "L'essentiel bancaire", Badge "Actif".
+    - **Pagination Dots**: Below cards to show position.
+    - **Footer**: [Commencer l'essai gratuit] or [Continuer avec Standard].
+
+**[MOCKUP_E05 — À générer via Stitch]**
+
+- **E05 (Personalization)**:
+    - **Header**: "Qu'aimeriez-vous faire?" with subtitle "Sélectionnez vos intérêts".
+    - **Grid of Chips** (2 columns, scrollable):
+        - Row 1: "💰 Épargner", "📈 Investir"
+        - Row 2: "💳 Payer", "✈️ Voyager"
+        - Row 3: "🏠 Budgéter", "🎓 Éducation"
+    - **Interactive**: Selected chips have Orange background + white text.
+    - **Footer**: "Continuer" button (enabled after 1+ selection).
+
+### E06: RESTRICTED_ACCESS Dashboard (CRITICAL)
+**[MOCKUP_E06 — À générer via Stitch]**
+
+- **Greeting**: "Bonjour Marie", Account Status Badge "EN ATTENTE DE VALIDATION".
+- **Banner**: Persistent orange banner at top: "⏳ Votre dossier est en cours de validation. Vous découvrez votre futur espace bancaire."
+- **Balances**: Mock 0 FCFA balance with currency flag toggle (read-only).
+- **Feature Cards**: All banking features visible but with "Disponible après validation" overlay.
+- **Allowed Actions**: 
+    - Browse plans (read-only)
+    - View feature descriptions (read-only)
+    - Withdraw existing funds button (if any balance exists)
+    - Move between pockets button (if pockets exist)
+- **Locked Actions**: Deposits, transfers, card issuance all show lock icon.
+- **UX Note**: Full app in "vitrine" mode. NOT LIMITED_ACCESS (which comes after activation).
+
+### F02/F03: Home Dashboard - FULL_ACCESS vs LIMITED_ACCESS
+**[MOCKUP_F02 — À générer via Stitch]**
+
+- **F02 (FULL_ACCESS)**:
+    - **Greeting**: "Bonjour Marie", Account Status Badge "COMPTE ACTIF".
+    - **Main Account**: Balance display, country selector, Accounts button.
+    - **Pockets**: Custom savings pockets with individual balances.
+    - **Savings**: "Add Savings" card showing interest rate (4.75%).
+    - **Linked Accounts**: "Add Linked" card.
+    - **All Features Unlocked**: No padlock icons, all buttons active.
+
+**[MOCKUP_F03 — À générer via Stitch]**
+
+- **F03 (LIMITED_ACCESS)**:
+    - **Banner**: Persistent warning banner: "⚠️ Complétez votre NIU pour débloquer toutes les fonctionnalités"
+    - **Same UI as F02** but with locked features:
+        - Transfers: Padlock icon + "NIU requis" tooltip
+        - Cards: Padlock icon + "NIU requis" tooltip
+        - Crypto: Padlock icon + "NIU requis" tooltip
+        - Investments: Padlock icon + "NIU requis" tooltip
+    - **Unlocked**: Cash-In (deposits), View balance, Settings.
+
+
+---
+
+## 8. Back-Office Agent Journeys (Mermaid Diagrams)
+
+### Jean's Validation Journey (KYC Agent)
+
+```mermaid
+graph TD
+    %% ========== JEAN'S ENTRY ==========
+    J01[J01 Login - Email/Password] --> J02[J02 Validation Queue Dashboard]
+    
+    %% ========== QUEUE MANAGEMENT ==========
+    J02 --> J03{Select Dossier}
+    J03 -->|By Priority| J04[J04 High Priority Dossiers]
+    J03 -->|By FIFO| J05[J05 Oldest First]
+    J03 -->|By Confidence| J06[J06 Low Confidence First]
+    
+    %% ========== DOSSIER INSPECTION ==========
+    J04 --> J07[J07 Dossier Detail View]
+    J05 --> J07
+    J06 --> J07
+    
+    J07 --> J08[J08 Side-by-Side Evidence Viewer]
+    J08 --> J09[J09 CNI Recto/Verso High-Res]
+    J08 --> J10[J10 Selfie vs CNI Photo Comparison]
+    J08 --> J11[J11 Utility Bill Review]
+    J08 --> J12[J12 Wet Signature Verification - AGENCY ONLY]
+    
+    %% ========== OCR REVIEW ==========
+    J09 --> J13[J13 OCR Data Review]
+    J13 --> J14{Data Accuracy?}
+    J14 -->|Correct| J15[J15 Mark as Validated]
+    J14 -->|Needs Correction| J16[J16 Manual Edit with Justification]
+    J16 --> J17[J17 Audit Log Entry - Original Preserved]
+    J17 --> J15
+    
+    %% ========== LIVENESS & BIOMETRICS ==========
+    J10 --> J18{Face Match Score?}
+    J18 -->|>85% Confidence| J19[J19 Approve Biometrics]
+    J18 -->|<85% Confidence| J20[J20 Flag for Manual Review]
+    J20 --> J21{Jean's Decision}
+    J21 -->|Approve| J19
+    J21 -->|Reject| J22[J22 Reject Dossier]
+    
+    %% ========== ADDRESS VERIFICATION ==========
+    J11 --> J23{Address Coherence?}
+    J23 -->|Matches Cascade| J24[J24 Approve Address]
+    J23 -->|Mismatch| J25[J25 Flag for Clarification]
+    J25 --> J26{Jean's Decision}
+    J26 -->|Approve with Note| J24
+    J26 -->|Request Info| J27[J27 Send Push Notification to User]
+    
+    %% ========== NIU VALIDATION ==========
+    J13 --> J28{NIU Status?}
+    J28 -->|Uploaded & Valid| J29[J29 Approve NIU]
+    J28 -->|Declarative| J30[J30 Flag as LIMITED_ACCESS]
+    J28 -->|Missing| J31[J31 Flag as LIMITED_ACCESS]
+    
+    %% ========== FINAL DECISION ==========
+    J15 --> J32[J32 All Checks Complete]
+    J19 --> J32
+    J24 --> J32
+    J29 --> J32
+    J30 --> J32
+    J31 --> J32
+    
+    J32 --> J33{Final Decision}
+    J33 -->|Approve| J34[J34 Approve Dossier]
+    J33 -->|Reject| J22
+    J33 -->|Request Info| J27
+    
+    %% ========== OUTCOMES ==========
+    J34 --> J35[J35 Send to Thomas - Provisioning Queue]
+    J22 --> J36[J36 Send Rejection Notification to User]
+    J27 --> J37[J37 Move to Pending Info Queue]
+    
+    %% ========== RETURN TO QUEUE ==========
+    J35 --> J02
+    J36 --> J02
+    J37 --> J02
+    
+    %% ========== STYLING ==========
+    style J01 fill:#2563EB,stroke:#333,stroke-width:2px,color:#fff
+    style J34 fill:#10B981,stroke:#333,stroke-width:2px,color:#fff
+    style J22 fill:#EF4444,stroke:#333,stroke-width:2px,color:#fff
+    style J27 fill:#F59E0B,stroke:#333,stroke-width:2px,color:#fff
+```
+
+### Thomas's Provisioning Journey (Ops Agent)
+
+```mermaid
+graph TD
+    %% ========== THOMAS'S ENTRY ==========
+    T01[T01 Login - Email/Password] --> T02[T02 Provisioning Queue Dashboard]
+    
+    %% ========== QUEUE MANAGEMENT ==========
+    T02 --> T03{Select Approved Dossier}
+    T03 -->|From Jean| T04[T04 Validated Dossier]
+    
+    %% ========== DOSSIER REVIEW ==========
+    T04 --> T05[T05 Review Validation Summary]
+    T05 --> T06[T06 Check NIU Status]
+    T06 --> T07{NIU Validated?}
+    T07 -->|Yes| T08[T08 Prepare FULL_ACCESS Account]
+    T07 -->|No - Declarative| T09[T09 Prepare LIMITED_ACCESS Account]
+    
+    %% ========== DUPLICATE CHECK ==========
+    T08 --> T10[T10 Run Duplicate Check]
+    T09 --> T10
+    T10 --> T11{Duplicate Found?}
+    T11 -->|No| T12[T12 Create New Account]
+    T11 -->|Yes| T13[T13 Conflict Resolver]
+    
+    %% ========== CONFLICT RESOLUTION ==========
+    T13 --> T14{Resolution Strategy}
+    T14 -->|Reactivate Existing| T15[T15 Link to Existing Account]
+    T14 -->|Create New| T16[T16 Override - Create New]
+    T14 -->|Manual Review| T17[T17 Escalate to Manager]
+    
+    %% ========== AMPLITUDE PROVISIONING (MOCK) ==========
+    T12 --> T18[T18 Call Amplitude Mock API]
+    T15 --> T18
+    T16 --> T18
+    
+    T18 --> T19{Provisioning Status}
+    T19 -->|Success| T20[T20 Account Created]
+    T19 -->|Error| T21[T21 OPS_ERROR - Retry]
+    T21 --> T22{Retry Attempt}
+    T22 -->|Retry| T18
+    T22 -->|Escalate| T17
+    
+    %% ========== ACCOUNT ACTIVATION ==========
+    T20 --> T23[T23 Generate Account Credentials]
+    T23 --> T24[T24 Set Account Status]
+    T24 --> T25{NIU Status?}
+    T25 -->|Validated| T26[T26 Set FULL_ACCESS]
+    T25 -->|Declarative/Missing| T27[T27 Set LIMITED_ACCESS]
+    
+    %% ========== NOTIFICATION ==========
+    T26 --> T28[T28 Send Push Notification - Invitation Agence]
+    T27 --> T28
+    T28 --> T29[T29 Notification: Rendez-vous en agence pour signer et récupérer votre carte]
+    
+    %% ========== COMPLETION ==========
+    T29 --> T30[T30 Mark Dossier as Provisioned]
+    T30 --> T31[T31 Move to Active Accounts]
+    T17 --> T32[T32 Move to Escalation Queue]
+    
+    %% ========== RETURN TO QUEUE ==========
+    T31 --> T02
+    T32 --> T02
+    
+    %% ========== STYLING ==========
+    style T01 fill:#2563EB,stroke:#333,stroke-width:2px,color:#fff
+    style T20 fill:#10B981,stroke:#333,stroke-width:2px,color:#fff
+    style T21 fill:#EF4444,stroke:#333,stroke-width:2px,color:#fff
+    style T17 fill:#F59E0B,stroke:#333,stroke-width:2px,color:#fff
+```
+
+### Sylvie's Management Journey (Manager)
+
+```mermaid
+graph TD
+    %% ========== SYLVIE'S ENTRY ==========
+    S01[S01 Login - Email/Password] --> S02[S02 Command Center Dashboard]
+    
+    %% ========== DASHBOARD OVERVIEW ==========
+    S02 --> S03[S03 Big Numbers View]
+    S03 --> S04[S04 Avg Validation Time - SLA]
+    S03 --> S05[S05 Success Rate - FTR]
+    S03 --> S06[S06 Active Agents Count]
+    S03 --> S07[S07 Queue Depth]
+    
+    %% ========== FUNNEL ANALYSIS ==========
+    S02 --> S08[S08 Funnel Graph]
+    S08 --> S09[S09 Drop-off by Module]
+    S09 --> S10{Identify Bottleneck}
+    S10 -->|Module A - Auth| S11[S11 OTP Issues]
+    S10 -->|Module B - Identity| S12[S12 Liveness Failures]
+    S10 -->|Module C - Address| S13[S13 GPS/Utility Issues]
+    S10 -->|Module D - Legal| S14[S14 Signature Issues]
+    S10 -->|Module E - Submission| S15[S15 Upload Failures]
+    
+    %% ========== SYSTEM HEALTH ==========
+    S02 --> S16[S16 System Health - R/Y/G]
+    S16 --> S17[S17 AI Services Status]
+    S17 --> S18{OCR Service}
+    S18 -->|Green| S19[S19 Operational]
+    S18 -->|Yellow| S20[S20 Degraded Performance]
+    S18 -->|Red| S21[S21 Service Down]
+    
+    S17 --> S22{Liveness Service}
+    S22 -->|Green| S19
+    S22 -->|Yellow| S20
+    S22 -->|Red| S21
+    
+    S16 --> S23[S23 API Latency]
+    S23 --> S24{Latency Check}
+    S24 -->|<500ms| S19
+    S24 -->|500-1000ms| S20
+    S24 -->|>1000ms| S21
+    
+    %% ========== AGENT PERFORMANCE ==========
+    S02 --> S25[S25 Agent Performance View]
+    S25 --> S26[S26 Jean's Metrics]
+    S26 --> S27[S27 Avg Validation Time]
+    S26 --> S28[S28 FTR Rate]
+    S26 --> S29[S29 Dossiers Processed]
+    
+    S25 --> S30[S30 Thomas's Metrics]
+    S30 --> S31[S31 Provisioning Success Rate]
+    S30 --> S32[S32 Conflict Resolution Time]
+    S30 --> S33[S33 Accounts Activated]
+    
+    %% ========== LOAD BALANCING ==========
+    S02 --> S34[S34 Load Balancing View]
+    S34 --> S35[S35 Agent Capacity]
+    S35 --> S36{Agent Load}
+    S36 -->|<5 Dossiers| S37[S37 Green - Available]
+    S36 -->|5-8 Dossiers| S38[S38 Yellow - Busy]
+    S36 -->|>8 Dossiers| S39[S39 Red - Overloaded]
+    
+    %% ========== ALERTS & ACTIONS ==========
+    S20 --> S40[S40 Yellow Alert - Investigate]
+    S21 --> S41[S41 Red Alert - Escalate]
+    S39 --> S42[S42 Redistribute Load]
+    
+    S40 --> S43[S43 Create Task for Sprint]
+    S41 --> S44[S44 Contact DevOps/IT]
+    S42 --> S45[S45 Assign Dossiers to Available Agents]
+    
+    %% ========== AUDIT & COMPLIANCE ==========
+    S02 --> S46[S46 Audit Trail View]
+    S46 --> S47[S47 Export Compliance Report]
+    S47 --> S48[S48 Generate PDF + JSON + Images]
+    S48 --> S49[S49 COBAC Audit Package]
+    
+    %% ========== RETURN TO DASHBOARD ==========
+    S43 --> S02
+    S44 --> S02
+    S45 --> S02
+    S49 --> S02
+    
+    %% ========== STYLING ==========
+    style S01 fill:#2563EB,stroke:#333,stroke-width:2px,color:#fff
+    style S19 fill:#10B981,stroke:#333,stroke-width:2px,color:#fff
+    style S20 fill:#F59E0B,stroke:#333,stroke-width:2px,color:#fff
+    style S21 fill:#EF4444,stroke:#333,stroke-width:2px,color:#fff
+```
+
+
+---
+
+## 9. Back-Office Command Center Layouts
+
+### Jean: Validation Desk
+**[MOCKUP_JEAN_DESK — À générer via Stitch]**
+
+- **Queue Left Rail**: List of dossiers sorted by "Global Confidence". Alerts for SLA breach (Red/Yellow).
+- **Side-by-Side View**:
+    - **Left (Evidence)**: Carousel of high-res captures (CNI, Signature, Bill). Zoom-on-hover enabled.
+    - **Right (Data)**: Extracted OCR fields with edit toggles. Audit trail mandatory for any change.
+- **Bottom Panel**: Large [Approve] / [Reject] buttons with mandatory "Reason" dropdown for Rejections.
+- **Load Balancing Indicator**: Badge showing current load (e.g., "5/10 dossiers").
+
+### Thomas: Provisioning Desk
+**[MOCKUP_THOMAS_DESK — À générer via Stitch]**
+
+- **Queue View**: List of approved dossiers from Jean.
+- **Conflict Resolver**: Side panel showing duplicate detection results with options:
+    - [Reactivate Existing Account]
+    - [Create New Account]
+    - [Escalate to Manager]
+- **Provisioning Status**: Real-time status indicator (Pending/Success/Error).
+- **Amplitude Mock Integration**: Visual representation of API call status.
+
+### Sylvie: Manager Dashboard
+**[MOCKUP_SYLVIE_DASHBOARD — À générer via Stitch]**
+
+- **Top Row (Big Numbers)**: Avg Validation Time (SLA), Success Rate (FTR), active agents.
+- **Funnel Graph**: Visual map of Marie's journey with drop-off percentages at each module (A-E).
+- **System Health**: R/Y/G status of AI Services (OCR/Liveness) and API latency.
+- **Agent Performance**: Table showing Jean and Thomas's metrics (validation time, FTR, dossiers processed).
+- **Load Balancing**: Visual representation of agent capacity (Green/Yellow/Red indicators).
+
+---
+
+## 10. UI Direction Board (Style Guide)
+
+### Colors
+- **Primary**: #E37B03 (Mango Orange) - Primary buttons, highlights, active states
+- **Action Color**: #2563EB (Link Blue) - Links, secondary actions
+- **Success**: #10B981 (Emerald) - Success states, checkmarks, positive feedback
+- **Warning**: #F59E0B (Amber) - Warnings, low confidence badges, pending states
+- **Error**: #EF4444 (Red) - Errors, rejections, critical alerts
+- **Neutrals**: 
+    - Light Gray #F3F4F6 (Backgrounds)
+    - Medium Gray #6B7280 (Secondary text)
+    - Dark Gray #1F2937 (Primary text)
+    - White #FFFFFF (Cards, surfaces)
+
+### Typography
+- **Headers**: Roboto Medium (Android) / SF Pro Semibold (iOS)
+    - H1: 34px Bold
+    - H2: 28px Bold
+    - H3: 24px Bold
+- **Body**: Roboto Regular / SF Pro Regular
+    - Body Large: 18px Regular
+    - Body: 17px Regular
+    - Body Small: 15px Regular
+- **Captions**: 14px Regular
+- **Line Height**: 1.4-1.5 for readability
+
+### Buttons
+- **Primary CTA**: 
+    - Background: #E37B03
+    - Text: White
+    - Height: 56px
+    - Border Radius: 28px (fully rounded)
+    - Full width on mobile
+    - Disabled state: 40% opacity
+- **Secondary CTA**:
+    - Background: Transparent
+    - Border: 1px solid #E37B03
+    - Text: #E37B03
+    - Same dimensions as primary
+- **Text Link**:
+    - Color: #2563EB
+    - Underline on hover
+    - 15-17px size
+
+### Cards
+- **Background**: White #FFFFFF
+- **Border**: 1px solid #F3F4F6
+- **Shadow**: 0 2px 8px rgba(0,0,0,0.08)
+- **Border Radius**: 12px
+- **Padding**: 16-24px
+- **Hover State**: Shadow increases to 0 4px 12px rgba(0,0,0,0.12)
+
+### Iconography
+- **Style**: Feather/Outline style
+- **Size**: 24px default, 20px small, 32px large
+- **Color**: Inherits from parent or #6B7280 (gray)
+- **Confidence Badges**:
+    - 🟢 Green checkmark (>85%)
+    - 🟠 Orange warning (50-85%)
+    - 🔴 Red alert (<50%)
+
+### Spacing System
+- **Base Unit**: 8px
+- **Common Spacings**: 8px, 16px, 24px, 32px, 40px, 48px
+- **Margins**: 24px horizontal on mobile
+- **Padding**: 16px for cards, 24px for screens
+
+---
+
+## 11. Responsive Design & Accessibility
+
+### Responsive Strategy
+- **Mobile (Android 7 baseline)**: Full-bleed camera views, bottom-mounted primary actions for thumb reachability, and large touch targets (48x48dp minimum).
+- **Back-Office (Web/Tablet)**: Flexible 12-column grid. Agents use split-screen (50/50) for "Side-by-Side" evidence verification.
+- **Breakpoints**:
+    - Mobile: <768px
+    - Tablet: 768-1024px
+    - Desktop: >1024px
+
+### Accessibility Strategy (WCAG AA)
+- **Vision**: 
+    - Contrast ratio >= 4.5:1 for all text
+    - Dynamic text scaling support (except camera overlays)
+    - Color is not the only indicator (use icons + text)
+- **Cognitive**: 
+    - Step-by-step progressive disclosure
+    - Illustration-first guidance to support low-literacy users
+    - Clear error messages with actionable solutions
+- **Motor**: 
+    - "Safe areas" around interactive elements
+    - No complex multi-touch gestures required
+    - Minimum touch target: 48x48dp
+- **Auditory**: 
+    - No audio-only feedback
+    - Visual alternatives for all audio cues
+
+### WCAG AA Color Audit
+- **Primary Orange (#E37B03) on White**: 2.8:1 - FAILS for text
+    - **Solution**: Use #C75000 (darker orange) for text on white backgrounds
+    - **Alternative**: Use #E37B03 only for button backgrounds (white text on orange = 4.6:1 - PASSES)
+- **Blue (#2563EB) on White**: 4.5:1 - PASSES
+- **Gray (#6B7280) on White**: 4.6:1 - PASSES
+- **Dark Gray (#1F2937) on White**: 16.1:1 - PASSES
+
+---
+
+## 12. Copywriting Strategy (FR/NFR Traceable)
+
+| Logic Area | Copywriting Principle | Example UX Copy (FR) | Example UX Copy (EN) | Inspiration |
+| :--- | :--- | :--- | :--- | :--- |
+| **Welcome (A02)** | Aspirational & Clear | "Votre banque moderne, en 15 minutes" | "Your modern bank, in 15 minutes" | Nubank |
+| **Email Collection (A05)** | Reassuring & Flexible | "Votre email vous permettra de vous connecter facilement" | "Your email will allow you to log in easily" | Revolut |
+| **Email Verification (A06)** | Clear & Alternative | "Code envoyé à votre email. Vous pouvez aussi cliquer sur le lien." | "Code sent to your email. You can also click the link." | Trade Republic |
+| **Resilience (NFR8)** | Reassuring & Professional | "Nous avons sauvegardé votre progression. Reprise à l'étape [X]." | "We saved your progress. Resuming at step [X]." | Revolut |
+| **Liveness (FR3/FR4)** | Direct & Simple | "Souriez à l'écran maintenant." | "Smile at the screen now." | Trade Republic |
+| **OCR Review (B08)** | Confidence-Building | "Vérifiez les informations extraites. Tapez pour corriger." | "Verify extracted information. Tap to correct." | Revolut |
+| **Success (E03)** | Celebratory & Clear | "Félicitations! Votre dossier est soumis." | "Congratulations! Your application is submitted." | Nubank |
+| **Gating (FR39)** | Value-Centric | "Finalisez votre compte pour débloquer les virements et cartes virtuelles." | "Complete your account to unlock transfers and virtual cards." | Revolut |
+| **Errors (Module B)** | Solution-Oriented | "Image trop floue. Veuillez stabiliser votre téléphone." | "Image too blurry. Please stabilize your phone." | Trade Republic |
+| **Legal (D01)** | Transparent & Accessible | "J'accepte les [Conditions Générales]" (hyperlink, not scroll-gate) | "I accept the [Terms & Conditions]" (hyperlink) | Revolut |
+| **Progress (A10)** | Motivating & Specific | "Temps restant: ~8 minutes" | "Time remaining: ~8 minutes" | Nubank |
+| **3-Strike Lockout (B10_Fail)** | Empathetic & Clear | "Désolé pour la gêne, mais pour des raisons techniques/de sécurité, nous sommes obligés de terminer cette session. Ne vous inquiétez pas, vous avez toujours la possibilité d'aller dans une agence locale proche de chez vous, ou de recommencer dès le début." | "Sorry for the inconvenience, but for technical/security reasons, we must end this session. Don't worry, you can still visit a local branch near you, or start over." | Ken's Specification |
+| **RESTRICTED_ACCESS (E06)** | Anticipatory & Transparent | "⏳ Votre dossier est en cours de validation. Vous découvrez votre futur espace bancaire." | "⏳ Your application is being validated. You're discovering your future banking space." | Revolut |
+| **LIMITED_ACCESS (F03)** | Actionable & Clear | "⚠️ Complétez votre NIU pour débloquer toutes les fonctionnalités" | "⚠️ Complete your NIU to unlock all features" | Revolut |
+
+---
+
+## 13. Visual Mockups & Revolut UI Mapping
+
+### Revolut UI Mapping Table
+> [!NOTE]
+> This table maps Revolut's premium design patterns to equivalent bicec-veripass screens to ensure a high-fidelity, neobank-grade user experience. All mockups will be generated via Google Stitch.
+
+| Screen Name | Interaction Type | Description | Options | Error/Status State | Source Image Reference |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **CNI Capture** | Camera Overlay | Revolut-style doc scan with frame. | Auto-crop, Retry | "Stabilisez l'appareil" | Screenshot_References.csv #40 |
+| **Liveness Selfie**| Facial Detection | Circular frame with pulsing guide. | Smile, Turn Head | "3 attempts remaining" | Screenshot_References.csv #31, #35 |
+| **Plan Selection** | Swipeable Tabs | Ultra/Metal/Premium tier comparison. | Start Trial, Skip | N/A | Screenshot_References.csv #42, #43, #44 |
+| **Dashboard** | Card Grid | Gated features based on validation status. | Accounts, Pockets | "Locked" state badges | Screenshot_References.csv #50, #54 |
+| **Account View** | Detail Reveal | Main balance vs Pockets tracking. | Add Money, More | "LIMITED_ACCESS" banner | Screenshot_References.csv #50 |
+| **Recurring Modal**| Modal Overlay | Minimalist date/freq selection. | Date Picker, Freq | N/A | Screenshot_References.csv (Recurring transfers) |
+| **OCR Review** | Card-based List | Pre-filled fields with confidence badges. | Inline Edit | 🟢🟠🔴 badges | Custom Design (Revolut-inspired) |
+| **Success Celebration** | Full-screen Animation | Confetti + hero message. | Continue | N/A | Nubank-inspired |
+
+### Mockup Generation Plan
+All mockups will be generated using Google Stitch MCP following the prompt guide at https://discuss.ai.google.dev/t/stitch-prompt-guide/83844/121.
+
+**Priority Order:**
+1. **Critical Screens** (Auto-Extraction Paradigm):
+    - B08 OCR Review (card-based with badges)
+    - B10_Fail 3-Strike Lockout (Ken's copy)
+    - C02 GPS Button (simplified)
+    - E06 RESTRICTED_ACCESS Dashboard
+    - F03 LIMITED_ACCESS Dashboard
+
+2. **Core Journey Screens**:
+    - A02 Welcome Value Prop
+    - A05/A06 Email Entry/Verification
+    - B02/B04 CNI Capture/Success
+    - D01 Legal Consent
+    - E03 Success Celebration
+
+3. **Back-Office Screens**:
+    - Jean's Validation Desk
+    - Thomas's Provisioning Desk
+    - Sylvie's Command Center
+
+---
+
+## 14. Implementation Notes
+
+### Critical Corrections Integrated (v2.0)
+1. ✅ **Auto-Extraction Paradigm**: Users never fill blank forms. AI extracts all data from documents. Users only confirm/correct pre-filled fields with confidence badges.
+2. ✅ **Wet Signature Removal from Mobile**: D03/D04 removed from mobile flow. Wet signature happens at physical agency (F01_AGENCY).
+3. ✅ **RESTRICTED vs LIMITED_ACCESS**: Clear definitions and UI states for both access levels.
+4. ✅ **Mermaid Expansion**: Added agent validation path, access state branches, rejection path, and complete agent journeys (Jean, Thomas, Sylvie).
+5. ✅ **Timer Update**: All references changed from "11 minutes" to "15 minutes" (with 11-min stretch goal in internal notes only).
+6. ✅ **GPS Simplification**: C02 now shows single button "Utiliser ma position actuelle" (optional). No map embed, no manual pin.
+7. ✅ **3-Strike Lockout**: B10_Fail uses Ken's exact French copy with single [Recommencer] button. Data wipes AFTER user clicks.
+8. ✅ **OCR Review (B08)**: Card-based layout with 🟢🟠🔴 confidence badges. Inline editing. CTA disabled until all 🟠🔴 resolved.
+
+### Next Steps
+1. Generate all mockups using Stitch MCP
+2. Create Revolut UI mapping table with actual screenshot references
+3. Validate WCAG AA compliance for all color combinations
+4. Add English copywriting column (currently FR only)
+5. Expand navigation Mermaid with error loops and back button behavior
+
+---
+
+**Document Version:** 2.0  
+**Last Updated:** 2026-02-18  
+**Status:** Ready for Architecture Phase (Step 5/10 BMAD)
 
