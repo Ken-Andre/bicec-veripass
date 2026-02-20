@@ -152,3 +152,8 @@ Use UI/UX Keywords: (e.g., “navigation bar,” “call-to-action button,” �
 Reference Elements Specifically: (e.g., “primary button on sign-up form,” “image in hero section”).
 Review & Refine: If a change isn’t right, rephrase or be more targeted."```)
 ---
+
+---
+Select count(*)
+From information_schema.columns
+Where table_schema='public' and table_name='university_professors'
