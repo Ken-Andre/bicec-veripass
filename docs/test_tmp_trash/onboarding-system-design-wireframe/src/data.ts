@@ -33,12 +33,18 @@ export const LANGUAGES = [
 // ── NIU validation (identifiant fiscal DGI Cameroun) ──────────────────────────
 // Le NIU est délivré par la DGI via Harmony (impots.cm).
 // Il figure sur l'attestation d'immatriculation fiscale — document distinct de la CNI.
-// Format prototype : 17 chiffres numériques
-export const NIU_REGEX = /^\d{17}$/;
-export const NIU_MASK = '00000000000000000'; // 17 digits
+// Format : 1 lettre majuscule + 12 chiffres + 1 lettre majuscule = 14 caractères
+// Exemple réel : P047217105784Y
+//
+// Le N° national CNI est différent :
+//   Code poste (2 lettres + 2 chiffres) + identifiant unique 17 chiffres
+//   (dont les 4 premiers = année de délivrance)
+//   Exemple : YA0120260000123456789
+export const NIU_REGEX = /^[A-Z]\d{12}[A-Z]$/;
+export const NIU_EXAMPLE = 'P047217105784Y'; // exemple officiel DGI
 
 export function validateNIU(value: string): boolean {
-  return NIU_REGEX.test(value.replace(/\s/g, ''));
+  return NIU_REGEX.test(value.trim().toUpperCase());
 }
 
 // ── Cameroonian administrative divisions ───────────────────────────────────────
@@ -179,7 +185,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     phone: '+237 6 74 12 34 56',
     email: 'mbarga.adjoua@gmail.com',
     nationalId: 'CNI-12000018542',
-    niuId: '12345678901234567',
+    niuId: 'P047217105784Y',
     dateOfBirth: '1992-06-14',
     address: 'Avenue Jean Paul II, Quartier Bastos',
     city: 'Yaoundé',
@@ -210,7 +216,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     phone: '+237 6 90 43 21 08',
     email: 'jp.ndam@yahoo.fr',
     nationalId: 'CNI-09870654321',
-    niuId: '98765432109876543',
+    niuId: 'M123456789012N',
     dateOfBirth: '1985-11-03',
     address: 'Rue 1.757, Nouvelle Route Bastos',
     city: 'Yaoundé',
@@ -241,7 +247,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     phone: '+237 6 55 78 90 12',
     email: 'm.fotso75@gmail.com',
     nationalId: 'CNI-07623409812',
-    niuId: '',
+    niuId: '',  // NIU non fourni — accès limité
     dateOfBirth: '1975-03-22',
     address: 'Avenue Jean Paul II Bis, Face Hôtel Hilton',
     city: 'Yaoundé',
@@ -272,7 +278,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     phone: '+237 6 21 65 43 87',
     email: 'patrick.ngono@bicec.cm',
     nationalId: 'CNI-04512367809',
-    niuId: '11223344556677889',
+    niuId: 'K567890123456L',
     dateOfBirth: '1990-09-17',
     address: 'Rue Nachtigal, Quartier Nlongkak',
     city: 'Yaoundé',
@@ -303,7 +309,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     phone: '+237 6 88 09 54 32',
     email: 'ines.bella@outlook.com',
     nationalId: 'CNI-03301290045',
-    niuId: '55667788990011223',
+    niuId: 'T890123456789U',
     dateOfBirth: '1998-12-05',
     address: 'Boulevard de la Réunification, Akwa',
     city: 'Douala',

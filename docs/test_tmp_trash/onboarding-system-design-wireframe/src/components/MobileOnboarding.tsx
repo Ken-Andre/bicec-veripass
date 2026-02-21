@@ -746,7 +746,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
             {/* Info banner */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 text-xs text-blue-700 leading-relaxed">
-              📋 Le NIU est votre identifiant fiscal délivré par la <strong>DGI (Direction Générale des Impôts)</strong>. Il figure sur votre <strong>attestation d'immatriculation fiscale</strong> (disponible sur <strong>impots.cm / Harmony</strong>). Il est distinct du numéro de série CNI.
+              📋 Le NIU est délivré par la <strong>DGI (Direction Générale des Impôts)</strong> — c'est un <strong>identifiant alphanumérique</strong> (ex : <span className="font-mono">P047217105784Y</span>) figurant sur votre <strong>attestation d'immatriculation fiscale</strong> (Harmony / impots.cm). <u>Il ne se trouve pas sur la CNI.</u>
             </div>
 
             {/* Mode selector */}
@@ -822,17 +822,17 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                     <strong>Accès limité :</strong> sans NIU validé, certaines fonctionnalités (crypto, investissements, épargne) restent bloquées jusqu'à validation en agence.
                   </p>
                 </div>
-                <label className="text-sm font-medium text-slate-700">NIU (17 chiffres)</label>
+                <label className="text-sm font-medium text-slate-700">NIU (ex : P047217105784Y)</label>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  maxLength={17}
+                  autoCapitalize="characters"
+                  maxLength={14}
                   value={niuValue}
-                  onChange={e => { setNiuValue(e.target.value.replace(/\D/g, '')); setFiscalType('niu'); }}
-                  placeholder="12345678901234567"
+                  onChange={e => { setNiuValue(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()); setFiscalType('niu'); }}
+                  placeholder="P047217105784Y"
                   className={cn(
-                    'w-full px-3 py-2.5 border rounded-xl text-sm font-mono focus:ring-2 outline-none transition-colors',
-                    niuValue.length === 17 && validateNIU(niuValue)
+                    'w-full px-3 py-2.5 border rounded-xl text-sm font-mono focus:ring-2 outline-none transition-colors tracking-widest',
+                    niuValue.length === 14 && validateNIU(niuValue)
                       ? 'border-emerald-500 focus:ring-emerald-300 bg-emerald-50'
                       : niuValue.length > 0
                         ? 'border-amber-400 focus:ring-amber-300'
@@ -840,8 +840,10 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   )}
                 />
                 {niuValue.length > 0 && (
-                  <p className={cn('text-xs', niuValue.length === 17 && validateNIU(niuValue) ? 'text-emerald-600' : 'text-amber-600')}>
-                    {niuValue.length === 17 && validateNIU(niuValue) ? '✓ Format NIU valide (17 chiffres)' : `${niuValue.length}/17 chiffres`}
+                  <p className={cn('text-xs', niuValue.length === 14 && validateNIU(niuValue) ? 'text-emerald-600' : 'text-amber-600')}>
+                    {niuValue.length === 14 && validateNIU(niuValue)
+                      ? '✓ Format NIU DGI valide'
+                      : `Format attendu : 1 letter + 12 chiffres + 1 letter (ex : P047217105784Y)`}
                   </p>
                 )}
               </div>

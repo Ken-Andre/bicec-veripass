@@ -27,8 +27,8 @@ export interface ApplicationData {
   fullName: string;
   phone: string;
   email: string;
-  nationalId: string;   // N° série CNI recto (9 chiffres) — identification civile
-  niuId: string;        // NIU fiscal DGI (attestation d'immatriculation Harmony/impots.cm)
+  nationalId: string;   // N° national CNI: code poste (2alpha+2chiffres) + 17 chiffres (4 premiers = année)
+  niuId: string;        // NIU fiscal DGI — alphanumérique ex: P047217105784Y (Harmony/impots.cm)
   dateOfBirth: string;
   address: string;
   city: string;
