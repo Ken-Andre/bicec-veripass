@@ -1,184 +1,329 @@
-import type { StepMeta, ApplicationData, OCRField } from './types';
+// ── BICEC VeriPass — Mock Data (Cameroon context) ──
 
+import type { StepMeta, OCRField, ApplicationData } from '@/types';
+
+// ── Step sequence ──────────────────────────────────────────────────────────────
 export const STEP_SEQUENCE: StepMeta[] = [
-  { id: 'welcome', label: 'Welcome', group: 'Entry', icon: 'Sparkles' },
-  { id: 'language', label: 'Language', group: 'Entry', icon: 'Globe' },
-  { id: 'phone-otp', label: 'Phone + OTP', group: 'Auth', icon: 'Smartphone' },
-  { id: 'email-verify', label: 'Email Verify', group: 'Auth', icon: 'Mail' },
-  { id: 'pin-setup', label: 'PIN Setup', group: 'Auth', icon: 'Lock' },
-  { id: 'biometrics', label: 'Biometrics', group: 'Auth', icon: 'Fingerprint' },
-  { id: 'id-front', label: 'ID Front', group: 'Identity', icon: 'CreditCard' },
-  { id: 'id-back', label: 'ID Back', group: 'Identity', icon: 'CreditCard' },
-  { id: 'ocr-review', label: 'OCR Review', group: 'Identity', icon: 'ScanLine' },
-  { id: 'liveness', label: 'Liveness Check', group: 'Identity', icon: 'Camera' },
-  { id: 'address', label: 'Address', group: 'Address', icon: 'MapPin' },
-  { id: 'address-proof', label: 'Proof Upload', group: 'Address', icon: 'FileCheck' },
-  { id: 'fiscal-id', label: 'Fiscal / Tax ID', group: 'Address', icon: 'FileText' },
-  { id: 'consent', label: 'Consent', group: 'Consent', icon: 'ShieldCheck' },
-  { id: 'signature', label: 'Signature', group: 'Consent', icon: 'PenTool' },
-  { id: 'review-summary', label: 'Review & Submit', group: 'Submit', icon: 'CheckCircle' },
-  { id: 'uploading', label: 'Uploading', group: 'Submit', icon: 'Upload' },
-  { id: 'success', label: 'Success!', group: 'Submit', icon: 'PartyPopper' },
+  { id: 'welcome', label: 'Bienvenue', group: 'Démarrage', icon: 'home' },
+  { id: 'language', label: 'Langue', group: 'Démarrage', icon: 'globe' },
+  { id: 'phone-otp', label: 'Téléphone & OTP', group: 'Auth', icon: 'smartphone' },
+  { id: 'email-verify', label: 'Email', group: 'Auth', icon: 'mail' },
+  { id: 'pin-setup', label: 'Code PIN', group: 'Auth', icon: 'lock' },
+  { id: 'biometrics', label: 'Biométrie', group: 'Auth', icon: 'fingerprint' },
+  { id: 'id-front', label: 'CNI Recto', group: 'Identité', icon: 'credit-card' },
+  { id: 'id-back', label: 'CNI Verso', group: 'Identité', icon: 'credit-card' },
+  { id: 'ocr-review', label: 'Vérification OCR', group: 'Identité', icon: 'search' },
+  { id: 'liveness', label: 'Détection Vivacité', group: 'Identité', icon: 'eye' },
+  { id: 'address', label: 'Adresse', group: 'Domicile', icon: 'map-pin' },
+  { id: 'address-proof', label: 'Justificatif', group: 'Domicile', icon: 'file-text' },
+  { id: 'fiscal-id', label: 'NIU', group: 'Fiscal', icon: 'hash' },
+  { id: 'consent', label: 'Consentement', group: 'Finalisation', icon: 'check-circle' },
+  { id: 'signature', label: 'Signature', group: 'Finalisation', icon: 'pen-tool' },
+  { id: 'review-summary', label: 'Récapitulatif', group: 'Finalisation', icon: 'clipboard' },
+  { id: 'uploading', label: 'Envoi sécurisé', group: 'Finalisation', icon: 'upload' },
+  { id: 'success', label: 'Soumis', group: 'Finalisation', icon: 'check' },
 ];
 
+// ── Languages ──────────────────────────────────────────────────────────────────
+export const LANGUAGES = [
+  { code: 'fr', label: 'Français', flag: '🇨🇲', sub: 'Langue officielle' },
+  { code: 'en', label: 'English', flag: '🇨🇲', sub: 'Official language' },
+];
+
+// ── NIU validation (17 chiffres — verso CNI biométrique) ──────────────────────
+// Format: 17 chiffres numériques consécutifs
+// Ex: 12345678901234567
+export const NIU_REGEX = /^\d{17}$/;
+export const NIU_MASK = '00000000000000000'; // 17 digits
+
+export function validateNIU(value: string): boolean {
+  return NIU_REGEX.test(value.replace(/\s/g, ''));
+}
+
+// ── Cameroonian administrative divisions ───────────────────────────────────────
+// Région → Villes → Quartiers → Communes
+export const REGIONS: Record<string, {
+  villes: Record<string, {
+    quartiers: string[];
+    communes: string[];
+  }>;
+}> = {
+  Centre: {
+    villes: {
+      Yaoundé: {
+        quartiers: ['Bastos', 'Nlongkak', 'Mvan', 'Biyem-Assi', 'Nsimeyong', 'Mvog-Ada', 'Mvog-Mbi', 'Elig-Edzoa', 'Ekounou', 'Nkomo'],
+        communes: ['Yaoundé I', 'Yaoundé II', 'Yaoundé III', 'Yaoundé IV', 'Yaoundé V', 'Yaoundé VI', 'Yaoundé VII'],
+      },
+      Mbalmayo: {
+        quartiers: ['Centre ville', 'Nkol Mébanga', 'Enongal'],
+        communes: ['Mbalmayo'],
+      },
+      Mfou: {
+        quartiers: ['Mfou centre', 'Nkol Bogo'],
+        communes: ['Mfou'],
+      },
+    },
+  },
+  Littoral: {
+    villes: {
+      Douala: {
+        quartiers: ['Akwa', 'Bonanjo', 'Bali', 'Deido', 'Bonapriso', 'Ndokotti', 'Logbaba', 'Makepe', 'Kotto', 'Pk8'],
+        communes: ["Douala I", "Douala II", "Douala III", "Douala IV", "Douala V", "Douala VI"],
+      },
+      Edéa: {
+        quartiers: ['Centre', 'Mbog Mbog'],
+        communes: ['Edéa I', 'Edéa II'],
+      },
+    },
+  },
+  Ouest: {
+    villes: {
+      Bafoussam: {
+        quartiers: ['Tamdja', 'Famla', 'Djeleng', 'Nylon'],
+        communes: ['Bafoussam I', 'Bafoussam II', 'Bafoussam III'],
+      },
+      Dschang: {
+        quartiers: ['Foreke', 'Tsinkop', 'Foto'],
+        communes: ['Dschang'],
+      },
+    },
+  },
+  'Nord-Ouest': {
+    villes: {
+      Bamenda: {
+        quartiers: ['Up Station', 'Mile 4', 'Nkwen', 'Mankon'],
+        communes: ['Bamenda I', 'Bamenda II', 'Bamenda III'],
+      },
+    },
+  },
+  'Sud-Ouest': {
+    villes: {
+      Buea: {
+        quartiers: ['Molyko', 'Bonduma', 'Great Soppo', 'Mile 16'],
+        communes: ['Buea'],
+      },
+      Limbé: {
+        quartiers: ['Down Beach', 'New Town', 'Church Street'],
+        communes: ['Limbé I', 'Limbé II', 'Limbé III'],
+      },
+    },
+  },
+  Adamaoua: {
+    villes: {
+      Ngaoundéré: {
+        quartiers: ['Dang', 'Baladji I', 'Baladji II', 'Joli Soir'],
+        communes: ['Ngaoundéré I', 'Ngaoundéré II', 'Ngaoundéré III'],
+      },
+    },
+  },
+  Nord: {
+    villes: {
+      Garoua: {
+        quartiers: ['Yelwa', 'Bibemi', 'Foulbéré'],
+        communes: ['Garoua I', 'Garoua II', 'Garoua III'],
+      },
+    },
+  },
+  'Extrême-Nord': {
+    villes: {
+      Maroua: {
+        quartiers: ['Domayo', 'Kakataré', 'Dougouré'],
+        communes: ['Maroua I', 'Maroua II', 'Maroua III'],
+      },
+    },
+  },
+  Est: {
+    villes: {
+      Bertoua: {
+        quartiers: ['Haoussa', 'Mokolo', 'Nkolbikon'],
+        communes: ['Bertoua I', 'Bertoua II'],
+      },
+    },
+  },
+  Sud: {
+    villes: {
+      Ebolowa: {
+        quartiers: ['Nko\'olong', 'Angalé', 'Mvangan'],
+        communes: ['Ebolowa I', 'Ebolowa II'],
+      },
+      Kribi: {
+        quartiers: ['Grand Batanga', 'Afan Ngok', 'Dombé'],
+        communes: ['Kribi I', 'Kribi II'],
+      },
+    },
+  },
+};
+
+// Flat list of region names for the selector
+export const REGION_NAMES = Object.keys(REGIONS);
+
+// ── Mock OCR fields (CNI Cameroun) ────────────────────────────────────────────
 export const MOCK_OCR_FIELDS: OCRField[] = [
-  { key: 'fullName', label: 'Full Name', value: 'María García López', confidence: 97, edited: false },
-  { key: 'nationalId', label: 'National ID', value: 'INE-1234567890', confidence: 94, edited: false },
-  { key: 'dateOfBirth', label: 'Date of Birth', value: '15/03/1990', confidence: 88, edited: false },
-  { key: 'address', label: 'Address', value: 'Av. Reforma 222, Col. Juárez', confidence: 72, edited: false },
-  { key: 'issuedDate', label: 'Issue Date', value: '01/06/2021', confidence: 91, edited: false },
-  { key: 'expiryDate', label: 'Expiry Date', value: '01/06/2031', confidence: 85, edited: false },
+  { key: 'nom', label: 'Nom de famille', value: 'MBARGA', confidence: 97, edited: false },
+  { key: 'prenom', label: 'Prénom(s)', value: 'Adjoua Cécile', confidence: 94, edited: false },
+  { key: 'niuId', label: 'NIU fiscal (DGI Harmony)', value: '12345678901234567', confidence: 82, edited: false },
+  { key: 'dateNaissance', label: 'Date de naissance', value: '14/06/1992', confidence: 91, edited: false },
+  { key: 'lieuNaissance', label: 'Lieu de naissance', value: 'Yaoundé', confidence: 88, edited: false },
+  { key: 'dateExpiration', label: 'Date d\'expiration', value: '14/06/2033', confidence: 96, edited: false },
+  { key: 'nationalite', label: 'Nationalité', value: 'Camerounaise', confidence: 99, edited: false },
 ];
 
+// ── Mock applications (Back Office) ───────────────────────────────────────────
 export const MOCK_APPLICATIONS: ApplicationData[] = [
   {
-    id: 'APP-2024-0001',
-    fullName: 'María García López',
-    phone: '+52 55 1234 5678',
-    email: 'maria.garcia@email.com',
-    nationalId: 'INE-1234567890',
-    dateOfBirth: '15/03/1990',
-    address: 'Av. Reforma 222, Col. Juárez',
-    city: 'Ciudad de México',
-    state: 'CDMX',
-    fiscalId: 'GALM900315HDF',
+    id: 'VRF-2026-0001',
+    fullName: 'Adjoua Cécile Mbarga',
+    phone: '+237 6 74 12 34 56',
+    email: 'mbarga.adjoua@gmail.com',
+    nationalId: 'CNI-12000018542',
+    niuId: '12345678901234567',
+    dateOfBirth: '1992-06-14',
+    address: 'Avenue Jean Paul II, Quartier Bastos',
+    city: 'Yaoundé',
+    region: 'Centre',
+    quartier: 'Bastos',
+    commune: 'Yaoundé I',
     status: 'pending',
-    submittedAt: '2024-01-15T14:32:00Z',
-    ocrFields: MOCK_OCR_FIELDS,
+    submittedAt: '2026-02-21T07:30:00Z',
     livenessScore: 96,
-    idFrontUrl: '',
-    idBackUrl: '',
-    selfieUrl: '',
-    proofUrl: '',
-    signatureUrl: '',
+    idFrontUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Recto',
+    idBackUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Verso',
+    selfieUrl: 'https://placehold.co/200x200/2d6a4f/ffffff?text=Selfie',
+    proofUrl: 'https://placehold.co/300x400/374151/ffffff?text=Facture+ENEO',
+    signatureUrl: 'https://placehold.co/260x80/374151/ffffff?text=Signature',
+    ocrFields: [
+      { key: 'nom', label: 'Nom de famille', value: 'MBARGA', confidence: 97, edited: false },
+      { key: 'prenom', label: 'Prénom(s)', value: 'Adjoua Cécile', confidence: 94, edited: false },
+      { key: 'niuId', label: 'NIU', value: '12345678901234567', confidence: 82, edited: false },
+      { key: 'dateNaissance', label: 'Date naissance', value: '14/06/1992', confidence: 91, edited: false },
+      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Yaoundé', confidence: 88, edited: false },
+      { key: 'dateExpiration', label: 'Date expiration', value: '14/06/2033', confidence: 96, edited: false },
+    ],
+    validatorNotes: '',
   },
   {
-    id: 'APP-2024-0002',
-    fullName: 'Carlos Hernández Ruiz',
-    phone: '+52 33 9876 5432',
-    email: 'carlos.hr@email.com',
-    nationalId: 'INE-0987654321',
-    dateOfBirth: '22/07/1985',
-    address: 'Calle Hidalgo 45, Centro',
-    city: 'Guadalajara',
-    state: 'Jalisco',
-    fiscalId: 'HERC850722MJC',
+    id: 'VRF-2026-0002',
+    fullName: 'Kouassi Jean-Pierre Ndam',
+    phone: '+237 6 90 43 21 08',
+    email: 'jp.ndam@yahoo.fr',
+    nationalId: 'CNI-09870654321',
+    niuId: '98765432109876543',
+    dateOfBirth: '1985-11-03',
+    address: 'Rue 1.757, Nouvelle Route Bastos',
+    city: 'Yaoundé',
+    region: 'Centre',
+    quartier: 'Nlongkak',
+    commune: 'Yaoundé II',
     status: 'pending',
-    submittedAt: '2024-01-15T15:10:00Z',
-    ocrFields: [
-      { key: 'fullName', label: 'Full Name', value: 'Carlos Hernández Ruiz', confidence: 99, edited: false },
-      { key: 'nationalId', label: 'National ID', value: 'INE-0987654321', confidence: 96, edited: false },
-      { key: 'dateOfBirth', label: 'Date of Birth', value: '22/07/1985', confidence: 92, edited: false },
-      { key: 'address', label: 'Address', value: 'Calle Hidalgo 45, Centro', confidence: 68, edited: false },
-      { key: 'issuedDate', label: 'Issue Date', value: '15/02/2020', confidence: 94, edited: false },
-      { key: 'expiryDate', label: 'Expiry Date', value: '15/02/2030', confidence: 90, edited: false },
-    ],
+    submittedAt: '2026-02-21T08:15:00Z',
     livenessScore: 91,
-    idFrontUrl: '',
-    idBackUrl: '',
-    selfieUrl: '',
-    proofUrl: '',
-    signatureUrl: '',
+    idFrontUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Recto',
+    idBackUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Verso',
+    selfieUrl: 'https://placehold.co/200x200/2d6a4f/ffffff?text=Selfie',
+    proofUrl: 'https://placehold.co/300x400/374151/ffffff?text=Facture+CAMWATER',
+    signatureUrl: 'https://placehold.co/260x80/374151/ffffff?text=Signature',
+    ocrFields: [
+      { key: 'nom', label: 'Nom de famille', value: 'NDAM', confidence: 99, edited: false },
+      { key: 'prenom', label: 'Prénom(s)', value: 'Kouassi Jean-Pierre', confidence: 95, edited: false },
+      { key: 'niuId', label: 'NIU', value: '98765432109876543', confidence: 90, edited: false },
+      { key: 'dateNaissance', label: 'Date naissance', value: '03/11/1985', confidence: 93, edited: false },
+      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Douala', confidence: 87, edited: false },
+      { key: 'dateExpiration', label: 'Date expiration', value: '03/11/2035', confidence: 97, edited: false },
+    ],
+    validatorNotes: '',
   },
   {
-    id: 'APP-2024-0003',
-    fullName: 'Ana Sofía Martínez',
-    phone: '+52 81 5555 1234',
-    email: 'ana.sofia@email.com',
-    nationalId: 'INE-1122334455',
-    dateOfBirth: '08/11/1995',
-    address: 'Blvd. Constitución 789',
-    city: 'Monterrey',
-    state: 'Nuevo León',
-    fiscalId: '',
+    id: 'VRF-2026-0003',
+    fullName: 'Epse Tchouamou Marie-Claire Fotso',
+    phone: '+237 6 55 78 90 12',
+    email: 'm.fotso75@gmail.com',
+    nationalId: 'CNI-07623409812',
+    niuId: '',
+    dateOfBirth: '1975-03-22',
+    address: 'Avenue Jean Paul II Bis, Face Hôtel Hilton',
+    city: 'Yaoundé',
+    region: 'Centre',
+    quartier: 'Bastos',
+    commune: 'Yaoundé I',
     status: 'limited',
-    submittedAt: '2024-01-14T09:22:00Z',
-    ocrFields: [
-      { key: 'fullName', label: 'Full Name', value: 'Ana Sofía Martínez', confidence: 95, edited: false },
-      { key: 'nationalId', label: 'National ID', value: 'INE-1122334455', confidence: 89, edited: false },
-      { key: 'dateOfBirth', label: 'Date of Birth', value: '08/11/1995', confidence: 93, edited: false },
-      { key: 'address', label: 'Address', value: 'Blvd. Constitución 789', confidence: 81, edited: false },
-      { key: 'issuedDate', label: 'Issue Date', value: '20/09/2022', confidence: 97, edited: false },
-      { key: 'expiryDate', label: 'Expiry Date', value: '20/09/2032', confidence: 95, edited: false },
-    ],
+    submittedAt: '2026-02-21T06:45:00Z',
     livenessScore: 88,
-    idFrontUrl: '',
-    idBackUrl: '',
-    selfieUrl: '',
-    proofUrl: '',
-    signatureUrl: '',
+    idFrontUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Recto',
+    idBackUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Verso',
+    selfieUrl: 'https://placehold.co/200x200/2d6a4f/ffffff?text=Selfie',
+    proofUrl: 'https://placehold.co/300x400/374151/ffffff?text=Facture+ENEO',
+    signatureUrl: 'https://placehold.co/260x80/374151/ffffff?text=Signature',
+    ocrFields: [
+      { key: 'nom', label: 'Nom de famille', value: 'FOTSO EPSE TCHOUAMOU', confidence: 78, edited: false },
+      { key: 'prenom', label: 'Prénom(s)', value: 'Marie-Claire', confidence: 82, edited: false },
+      { key: 'niuId', label: 'NIU', value: '', confidence: 0, edited: false },
+      { key: 'dateNaissance', label: 'Date naissance', value: '22/03/1975', confidence: 91, edited: false },
+      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Bafoussam', confidence: 72, edited: false },
+      { key: 'dateExpiration', label: 'Date expiration', value: '22/03/2035', confidence: 89, edited: false },
+    ],
+    validatorNotes: 'NIU absent sur verso CNI — image floue. Relance client requise.',
   },
   {
-    id: 'APP-2024-0004',
-    fullName: 'Roberto Díaz Flores',
-    phone: '+52 222 333 4444',
-    email: 'roberto.df@email.com',
-    nationalId: 'INE-5566778899',
-    dateOfBirth: '30/01/1988',
-    address: 'Calle 5 de Mayo 123',
-    city: 'Puebla',
-    state: 'Puebla',
-    fiscalId: 'DIFR880130HPB',
+    id: 'VRF-2026-0004',
+    fullName: 'Ngono Essomba Patrick',
+    phone: '+237 6 21 65 43 87',
+    email: 'patrick.ngono@bicec.cm',
+    nationalId: 'CNI-04512367809',
+    niuId: '11223344556677889',
+    dateOfBirth: '1990-09-17',
+    address: 'Rue Nachtigal, Quartier Nlongkak',
+    city: 'Yaoundé',
+    region: 'Centre',
+    quartier: 'Nlongkak',
+    commune: 'Yaoundé I',
     status: 'approved',
-    submittedAt: '2024-01-13T11:45:00Z',
-    ocrFields: [
-      { key: 'fullName', label: 'Full Name', value: 'Roberto Díaz Flores', confidence: 98, edited: false },
-      { key: 'nationalId', label: 'National ID', value: 'INE-5566778899', confidence: 97, edited: false },
-      { key: 'dateOfBirth', label: 'Date of Birth', value: '30/01/1988', confidence: 96, edited: false },
-      { key: 'address', label: 'Address', value: 'Calle 5 de Mayo 123', confidence: 90, edited: false },
-      { key: 'issuedDate', label: 'Issue Date', value: '10/03/2019', confidence: 95, edited: false },
-      { key: 'expiryDate', label: 'Expiry Date', value: '10/03/2029', confidence: 93, edited: false },
-    ],
+    submittedAt: '2026-02-20T15:22:00Z',
     livenessScore: 99,
-    idFrontUrl: '',
-    idBackUrl: '',
-    selfieUrl: '',
-    proofUrl: '',
-    signatureUrl: '',
+    idFrontUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Recto',
+    idBackUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Verso',
+    selfieUrl: 'https://placehold.co/200x200/2d6a4f/ffffff?text=Selfie',
+    proofUrl: 'https://placehold.co/300x400/374151/ffffff?text=Facture+ENEO',
+    signatureUrl: 'https://placehold.co/260x80/374151/ffffff?text=Signature',
+    ocrFields: [
+      { key: 'nom', label: 'Nom de famille', value: 'NGONO ESSOMBA', confidence: 99, edited: false },
+      { key: 'prenom', label: 'Prénom(s)', value: 'Patrick', confidence: 98, edited: false },
+      { key: 'niuId', label: 'NIU', value: '11223344556677889', confidence: 99, edited: false },
+      { key: 'dateNaissance', label: 'Date naissance', value: '17/09/1990', confidence: 99, edited: false },
+      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Ebolowa', confidence: 97, edited: false },
+      { key: 'dateExpiration', label: 'Date expiration', value: '17/09/2034', confidence: 99, edited: false },
+    ],
+    validatorNotes: 'Tous documents conformes. Approuvé.',
   },
   {
-    id: 'APP-2024-0005',
-    fullName: 'Lucía Fernández Torres',
-    phone: '+52 999 888 7777',
-    email: 'lucia.ft@email.com',
-    nationalId: 'INE-6677889900',
-    dateOfBirth: '12/05/1992',
-    address: 'Calle 60 #456, Centro',
-    city: 'Mérida',
-    state: 'Yucatán',
-    fiscalId: 'FETL920512MYU',
+    id: 'VRF-2026-0005',
+    fullName: 'Bella Njoya Inès',
+    phone: '+237 6 88 09 54 32',
+    email: 'ines.bella@outlook.com',
+    nationalId: 'CNI-03301290045',
+    niuId: '55667788990011223',
+    dateOfBirth: '1998-12-05',
+    address: 'Boulevard de la Réunification, Akwa',
+    city: 'Douala',
+    region: 'Littoral',
+    quartier: 'Akwa',
+    commune: 'Douala I',
     status: 'rejected',
-    submittedAt: '2024-01-12T16:20:00Z',
-    ocrFields: [
-      { key: 'fullName', label: 'Full Name', value: 'Lucía Fernández Torres', confidence: 45, edited: false },
-      { key: 'nationalId', label: 'National ID', value: 'INE-667788??00', confidence: 52, edited: false },
-      { key: 'dateOfBirth', label: 'Date of Birth', value: '12/05/19??', confidence: 38, edited: false },
-      { key: 'address', label: 'Address', value: 'Calle 60 #456', confidence: 55, edited: false },
-      { key: 'issuedDate', label: 'Issue Date', value: '??/??/2018', confidence: 30, edited: false },
-      { key: 'expiryDate', label: 'Expiry Date', value: '??/??/2028', confidence: 28, edited: false },
-    ],
+    submittedAt: '2026-02-20T09:10:00Z',
     livenessScore: 42,
-    idFrontUrl: '',
-    idBackUrl: '',
-    selfieUrl: '',
-    proofUrl: '',
-    signatureUrl: '',
-    rejectionReason: 'ID document severely damaged — unable to verify identity. Liveness check failed with low confidence score.',
+    idFrontUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Recto',
+    idBackUrl: 'https://placehold.co/300x190/1e3a5f/ffffff?text=CNI+Verso',
+    selfieUrl: 'https://placehold.co/200x200/2d6a4f/ffffff?text=Selfie',
+    proofUrl: 'https://placehold.co/300x400/374151/ffffff?text=Facture+CAMWATER',
+    signatureUrl: 'https://placehold.co/260x80/374151/ffffff?text=Signature',
+    rejectionReason: 'Score de vivacité insuffisant (42%). Correspondance visage non confirmée. Resoumettre avec une capture en lumière naturelle.',
+    ocrFields: [
+      { key: 'nom', label: 'Nom de famille', value: 'BELLA NJOYA', confidence: 55, edited: false },
+      { key: 'prenom', label: 'Prénom(s)', value: 'Inès', confidence: 28, edited: false },
+      { key: 'niuId', label: 'NIU', value: '55667788990011223', confidence: 41, edited: false },
+      { key: 'dateNaissance', label: 'Date naissance', value: '05/12/1998', confidence: 38, edited: false },
+      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Kumba', confidence: 47, edited: false },
+      { key: 'dateExpiration', label: 'Date expiration', value: '05/12/2033', confidence: 52, edited: false },
+    ],
+    validatorNotes: 'Vivacité échouée × 2. Score facial: 42%. Dossier rejeté.',
   },
-];
-
-export const LANGUAGES = [
-  { code: 'es', label: 'Español', flag: '🇲🇽' },
-  { code: 'en', label: 'English', flag: '🇺🇸' },
-  { code: 'pt', label: 'Português', flag: '🇧🇷' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
-];
-
-export const STATES = [
-  'Aguascalientes', 'Baja California', 'CDMX', 'Chiapas', 'Chihuahua',
-  'Coahuila', 'Colima', 'Durango', 'Guanajuato', 'Guerrero',
-  'Hidalgo', 'Jalisco', 'Estado de México', 'Michoacán', 'Morelos',
-  'Nayarit', 'Nuevo León', 'Oaxaca', 'Puebla', 'Querétaro',
-  'Quintana Roo', 'San Luis Potosí', 'Sinaloa', 'Sonora', 'Tabasco',
-  'Tamaulipas', 'Tlaxcala', 'Veracruz', 'Yucatán', 'Zacatecas',
 ];

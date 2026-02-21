@@ -25,7 +25,7 @@ export function BackOffice() {
   const filteredApps = applications.filter(a => {
     if (filterStatus !== 'all' && a.status !== filterStatus) return false;
     if (searchQuery && !a.fullName.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !a.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      !a.id.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
@@ -127,11 +127,11 @@ export function BackOffice() {
         <div className="p-5 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-md">
-              <span className="text-lg font-black text-white">B</span>
+              <span className="text-sm font-black text-white">BV</span>
             </div>
             <div>
-              <p className="font-bold text-slate-900 text-sm">BankCo</p>
-              <p className="text-xs text-slate-500">Back Office</p>
+              <p className="font-bold text-slate-900 text-sm">BICEC VeriPass</p>
+              <p className="text-xs text-slate-500">Portail KYC</p>
             </div>
           </div>
         </div>
@@ -173,8 +173,8 @@ export function BackOffice() {
               <User className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-900">Agent: Laura M.</p>
-              <p className="text-[10px] text-slate-500">KYC Validator</p>
+              <p className="text-xs font-semibold text-slate-900">Agent : Jean-Pierre K.</p>
+              <p className="text-[10px] text-slate-500">Chargé KYC</p>
             </div>
           </div>
         </div>
@@ -185,8 +185,8 @@ export function BackOffice() {
         {/* Top bar */}
         <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0">
           <div>
-            <h1 className="text-lg font-bold text-slate-900">KYC Application Review</h1>
-            <p className="text-xs text-slate-500">Review and validate customer onboarding submissions</p>
+            <h1 className="text-lg font-bold text-slate-900">Revue Dossiers KYC — BICEC VeriPass</h1>
+            <p className="text-xs text-slate-500">Vérification et validation des dossiers d'ouverture de compte</p>
           </div>
           <div className="flex items-center gap-3">
             <button className="relative p-2 rounded-xl hover:bg-slate-100 text-slate-500">
@@ -238,9 +238,9 @@ export function BackOffice() {
                     <div className="flex items-center gap-3">
                       <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold',
                         app.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                        app.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                        app.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                        'bg-orange-100 text-orange-700')}>
+                          app.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                            app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                              'bg-orange-100 text-orange-700')}>
                         {app.fullName.charAt(0)}
                       </div>
                       <div>
@@ -273,9 +273,9 @@ export function BackOffice() {
                 <div className="flex items-center gap-4">
                   <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold',
                     selectedApp.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                    selectedApp.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                    selectedApp.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                    'bg-orange-100 text-orange-700')}>
+                      selectedApp.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                        selectedApp.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-orange-100 text-orange-700')}>
                     {selectedApp.fullName.charAt(0)}
                   </div>
                   <div>
@@ -457,10 +457,10 @@ export function BackOffice() {
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                       {[
-                        { label: 'Street Address', value: selectedApp.address },
-                        { label: 'City', value: selectedApp.city },
-                        { label: 'State', value: selectedApp.state },
-                        { label: 'Country', value: 'México' },
+                        { label: 'Rue / Point de repère', value: selectedApp.address },
+                        { label: 'Ville', value: selectedApp.city },
+                        { label: 'Région', value: selectedApp.region },
+                        { label: 'Pays', value: 'Cameroun' },
                       ].map(f => (
                         <div key={f.label}>
                           <p className="text-xs text-slate-500">{f.label}</p>
@@ -487,21 +487,21 @@ export function BackOffice() {
 
                   <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
                     <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-600" /> Fiscal / Tax Information
+                      <FileText className="w-4 h-4 text-blue-600" /> NIU — Numéro d'Identifiant Unique
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-xs text-slate-500">Fiscal ID (RFC)</p>
-                        <p className={cn('text-sm font-mono mt-0.5', selectedApp.fiscalId ? 'font-medium text-slate-900' : 'text-orange-600 italic')}>
-                          {selectedApp.fiscalId || 'Not provided'}
+                        <p className="text-xs text-slate-500">NIU fiscal DGI (attestation d'immatriculation)</p>
+                        <p className={cn('text-sm font-mono mt-0.5', selectedApp.niuId ? 'font-medium text-slate-900' : 'text-orange-600 italic')}>
+                          {selectedApp.niuId || 'Non renseigné'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-slate-500">Status</p>
-                        {selectedApp.fiscalId ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600 mt-0.5"><Check className="w-3.5 h-3.5" /> Provided</span>
+                        <p className="text-xs text-slate-500">Statut</p>
+                        {selectedApp.niuId ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600 mt-0.5"><Check className="w-3.5 h-3.5" /> Fourni</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-orange-600 mt-0.5"><AlertTriangle className="w-3.5 h-3.5" /> Missing — Limited Access</span>
+                          <span className="inline-flex items-center gap-1 text-xs text-orange-600 mt-0.5"><AlertTriangle className="w-3.5 h-3.5" /> Manquant — Accès limité</span>
                         )}
                       </div>
                     </div>
@@ -515,16 +515,16 @@ export function BackOffice() {
                     <h3 className="text-sm font-semibold text-slate-700">Application Summary</h3>
                     <div className="grid grid-cols-2 gap-x-8 gap-y-3">
                       {[
-                        { label: 'Full Name', value: selectedApp.fullName },
-                        { label: 'Phone', value: selectedApp.phone },
+                        { label: 'Nom complet', value: selectedApp.fullName },
+                        { label: 'Téléphone', value: selectedApp.phone },
                         { label: 'Email', value: selectedApp.email },
-                        { label: 'National ID', value: selectedApp.nationalId },
-                        { label: 'Date of Birth', value: selectedApp.dateOfBirth },
-                        { label: 'Address', value: selectedApp.address },
-                        { label: 'City', value: selectedApp.city },
-                        { label: 'State', value: selectedApp.state },
-                        { label: 'Fiscal ID', value: selectedApp.fiscalId || '—' },
-                        { label: 'Submitted', value: new Date(selectedApp.submittedAt).toLocaleString() },
+                        { label: 'N° série CNI', value: selectedApp.nationalId },
+                        { label: 'Date de naissance', value: selectedApp.dateOfBirth },
+                        { label: 'Adresse', value: selectedApp.address },
+                        { label: 'Ville', value: selectedApp.city },
+                        { label: 'Région', value: selectedApp.region },
+                        { label: 'NIU', value: selectedApp.niuId || '—' },
+                        { label: 'Soumis le', value: new Date(selectedApp.submittedAt).toLocaleString() },
                       ].map(f => (
                         <div key={f.label} className="py-2 border-b border-slate-100">
                           <p className="text-xs text-slate-500">{f.label}</p>
@@ -539,25 +539,33 @@ export function BackOffice() {
                     <h3 className="text-sm font-semibold text-slate-700">Risk Assessment</h3>
                     <div className="grid grid-cols-4 gap-3">
                       {[
-                        { label: 'OCR Avg Confidence', value: `${Math.round(selectedApp.ocrFields.reduce((a, b) => a + b.confidence, 0) / selectedApp.ocrFields.length)}%`,
-                          color: selectedApp.ocrFields.reduce((a, b) => a + b.confidence, 0) / selectedApp.ocrFields.length >= 80 ? 'emerald' : 'amber' },
-                        { label: 'Liveness Score', value: `${selectedApp.livenessScore}%`,
-                          color: selectedApp.livenessScore >= 80 ? 'emerald' : selectedApp.livenessScore >= 60 ? 'amber' : 'red' },
-                        { label: 'Fiscal ID', value: selectedApp.fiscalId ? 'Complete' : 'Missing',
-                          color: selectedApp.fiscalId ? 'emerald' : 'orange' },
-                        { label: 'Overall Risk', value:
-                          selectedApp.livenessScore >= 80 && selectedApp.ocrFields.reduce((a, b) => a + b.confidence, 0) / selectedApp.ocrFields.length >= 80 ? 'Low' :
-                          selectedApp.livenessScore >= 60 ? 'Medium' : 'High',
-                          color: selectedApp.livenessScore >= 80 ? 'emerald' : selectedApp.livenessScore >= 60 ? 'amber' : 'red' },
+                        {
+                          label: 'OCR Avg Confidence', value: `${Math.round(selectedApp.ocrFields.reduce((a, b) => a + b.confidence, 0) / selectedApp.ocrFields.length)}%`,
+                          color: selectedApp.ocrFields.reduce((a, b) => a + b.confidence, 0) / selectedApp.ocrFields.length >= 80 ? 'emerald' : 'amber'
+                        },
+                        {
+                          label: 'Liveness Score', value: `${selectedApp.livenessScore}%`,
+                          color: selectedApp.livenessScore >= 80 ? 'emerald' : selectedApp.livenessScore >= 60 ? 'amber' : 'red'
+                        },
+                        {
+                          label: 'NIU', value: selectedApp.niuId ? 'Fourni' : 'Manquant',
+                          color: selectedApp.niuId ? 'emerald' : 'orange'
+                        },
+                        {
+                          label: 'Overall Risk', value:
+                            selectedApp.livenessScore >= 80 && selectedApp.ocrFields.reduce((a, b) => a + b.confidence, 0) / selectedApp.ocrFields.length >= 80 ? 'Low' :
+                              selectedApp.livenessScore >= 60 ? 'Medium' : 'High',
+                          color: selectedApp.livenessScore >= 80 ? 'emerald' : selectedApp.livenessScore >= 60 ? 'amber' : 'red'
+                        },
                       ].map(item => (
                         <div key={item.label} className={cn('rounded-xl p-4 text-center',
                           item.color === 'emerald' ? 'bg-emerald-50' :
-                          item.color === 'amber' ? 'bg-amber-50' :
-                          item.color === 'orange' ? 'bg-orange-50' : 'bg-red-50')}>
+                            item.color === 'amber' ? 'bg-amber-50' :
+                              item.color === 'orange' ? 'bg-orange-50' : 'bg-red-50')}>
                           <p className={cn('text-lg font-black',
                             item.color === 'emerald' ? 'text-emerald-600' :
-                            item.color === 'amber' ? 'text-amber-600' :
-                            item.color === 'orange' ? 'text-orange-600' : 'text-red-600')}>{item.value}</p>
+                              item.color === 'amber' ? 'text-amber-600' :
+                                item.color === 'orange' ? 'text-orange-600' : 'text-red-600')}>{item.value}</p>
                           <p className="text-[10px] text-slate-500 mt-1">{item.label}</p>
                         </div>
                       ))}

@@ -10,7 +10,7 @@ import {
   ArrowRight, Loader2, Shield
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { STEP_SEQUENCE, LANGUAGES, MOCK_OCR_FIELDS, STATES } from '@/data';
+import { STEP_SEQUENCE, LANGUAGES, MOCK_OCR_FIELDS, REGIONS, REGION_NAMES, validateNIU } from '@/data';
 import type { OCRField } from '@/types';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -31,7 +31,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
   const [pinConfirm, setPinConfirm] = useState(['', '', '', '', '', '']);
   const [pinStep, setPinStep] = useState<'create' | 'confirm'>('create');
   const [showPin, setShowPin] = useState(false);
-  const [selectedLang, setSelectedLang] = useState('es');
+  const [selectedLang, setSelectedLang] = useState('fr');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpSent, setOtpSent] = useState(false);
   const [ocrFields, setOcrFields] = useState<OCRField[]>(MOCK_OCR_FIELDS);
@@ -44,9 +44,12 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
   const [isSigning, setIsSigning] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
   const [postState, setPostState] = useState<'pending' | 'limited' | 'full' | null>(null);
-  const [selectedAddress, setSelectedAddress] = useState({ state: '', city: '', colony: '' });
+  const [selectedAddress, setSelectedAddress] = useState({ region: '', city: '', quartier: '', commune: '' });
   const [gpsAssist, setGpsAssist] = useState(false);
-  const [fiscalType, setFiscalType] = useState<'rfc' | 'curp' | 'other' | ''>('');
+  const [fiscalType, setFiscalType] = useState<'niu' | ''>('');
+  const [niuValue, setNiuValue] = useState('');
+  const [niuEntryMode, setNiuEntryMode] = useState<'scan' | 'upload' | 'manual' | null>(null);
+  const [niuUploaded, setNiuUploaded] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
@@ -178,23 +181,23 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             </div>
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Application Under Review</h2>
-            <p className="text-sm text-slate-500 mt-2">Your documents are being validated by our team. This usually takes 1-2 business days.</p>
+            <h2 className="text-xl font-bold text-slate-900">Dossier en cours de vérification</h2>
+            <p className="text-sm text-slate-500 mt-2">Vos documents sont en cours de validation par notre équipe BICEC. Délai habituel : 1 à 2 jours ouvrés.</p>
           </div>
-          <div className="w-full bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+          <div className="w-full bg-white rounded-xl border border-slate-200 p-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">Application ID</span>
-              <span className="font-mono text-slate-900 font-medium">APP-2024-0006</span>
+              <span className="text-slate-500">Dossier N°</span>
+              <span className="font-mono text-slate-900 font-medium">VRF-2026-0006</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">Status</span>
+              <span className="text-slate-500">Statut</span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
-                <Loader2 className="w-3 h-3 animate-spin" /> Pending Review
+                <Loader2 className="w-3 h-3 animate-spin" /> En cours de vérification
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">Submitted</span>
-              <span className="text-slate-900">Just now</span>
+              <span className="text-slate-500">Soumis</span>
+              <span className="text-slate-900">À l'instant</span>
             </div>
           </div>
           <div className="w-full space-y-3 pt-2">
@@ -240,7 +243,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               <AlertTriangle className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
               <div className="text-left">
                 <p className="text-sm font-medium text-orange-800">Action Required</p>
-                <p className="text-xs text-orange-600 mt-1">Please provide your RFC or CURP to unlock transfers and card issuance.</p>
+                <p className="text-xs text-orange-600 mt-1">Veuillez fournir votre NIU pour débloquer les virements et l'émission de carte.</p>
               </div>
             </div>
           </div>
@@ -302,17 +305,17 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-8">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}
-              className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-2xl shadow-blue-300">
-              <span className="text-4xl font-black text-white">B</span>
+              className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-700 to-indigo-800 flex items-center justify-center shadow-2xl shadow-blue-300">
+              <span className="text-3xl font-black text-white">BV</span>
             </motion.div>
             <div className="space-y-3">
-              <h1 className="text-2xl font-bold text-slate-900">Welcome to BankCo</h1>
+              <h1 className="text-2xl font-bold text-slate-900">Bienvenue sur BICEC VeriPass</h1>
               <p className="text-slate-500 text-sm leading-relaxed max-w-[260px] mx-auto">
-                Open your account in minutes. Secure, digital, and always with you.
+                Ouvrez votre compte en quelques minutes. Sécurisé, numérique, et toujours avec vous.
               </p>
             </div>
             <div className="space-y-2.5 w-full max-w-[260px]">
-              {['🔒 Bank-grade security', '⚡ Ready in 5 minutes', '📱 100% digital process'].map(t => (
+              {['🔒 Sécurité aux normes COBAC', '⚡ Prêt en 5 minutes', '📱 100% processus numérique'].map(t => (
                 <div key={t} className="flex items-center gap-2 text-left text-sm text-slate-600 bg-slate-50 rounded-lg px-4 py-2.5">
                   {t}
                 </div>
@@ -348,36 +351,32 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
               <Smartphone className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Phone Verification</h2>
-              <p className="text-sm text-slate-500">We'll send a code to verify your number</p>
+              <h2 className="text-xl font-bold text-slate-900">Vérification téléphone</h2>
+              <p className="text-sm text-slate-500">Nous enverrons un code pour vérifier votre numéro</p>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Phone Number</label>
+              <label className="text-sm font-medium text-slate-700">Numéro de téléphone</label>
               <div className="flex mt-1.5">
-                <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-slate-300 bg-slate-50 text-sm text-slate-500">+52</span>
-                <input type="tel" placeholder="55 1234 5678" defaultValue="55 1234 5678"
+                <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-slate-300 bg-slate-50 text-sm text-slate-500">+237</span>
+                <input type="tel" placeholder="6 XX XX XX XX" defaultValue="6 74 12 34 56"
                   className="flex-1 px-3 py-2.5 border border-slate-300 rounded-r-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
               </div>
             </div>
             {!otpSent ? (
               <button onClick={() => setOtpSent(true)} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
-                Send OTP Code
+                Envoyer le code OTP
               </button>
             ) : (
               <div className="space-y-4">
-                <label className="text-sm font-medium text-slate-700">Enter 6-digit code</label>
+                <label className="text-sm font-medium text-slate-700">Entrez le code à 6 chiffres</label>
                 <div className="flex justify-center gap-2">
                   {otp.map((d, i) => (
                     <input key={i} type="text" maxLength={1} value={d}
-                      onChange={e => {
-                        const newOtp = [...otp];
-                        newOtp[i] = e.target.value;
-                        setOtp(newOtp);
-                      }}
+                      onChange={e => { const newOtp = [...otp]; newOtp[i] = e.target.value; setOtp(newOtp); }}
                       className="w-10 h-12 text-center text-lg font-bold border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
                   ))}
                 </div>
-                <p className="text-xs text-slate-500 text-center">Didn't receive it? <button className="text-blue-600 font-medium">Resend</button></p>
+                <p className="text-xs text-slate-500 text-center">Pas reçu ? <button className="text-blue-600 font-medium">Renvoyer</button></p>
               </div>
             )}
           </div>
@@ -423,7 +422,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               {showPin ? 'Hide' : 'Show'} PIN
             </button>
             <div className="grid grid-cols-3 gap-2 max-w-[220px] mx-auto">
-              {[1,2,3,4,5,6,7,8,9,null,0,'⌫'].map((n, i) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, '⌫'].map((n, i) => (
                 <button key={i} disabled={n === null}
                   onClick={() => {
                     const arr = pinStep === 'create' ? [...pin] : [...pinConfirm];
@@ -478,9 +477,13 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             <div className="text-center space-y-2">
               <CreditCard className="w-12 h-12 text-blue-600 mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">
-                Capture ID — {currentStep.id === 'id-front' ? 'Front' : 'Back'}
+                CNI — {currentStep.id === 'id-front' ? 'Recto' : 'Verso (NIU)'}
               </h2>
-              <p className="text-sm text-slate-500">Place your national ID within the frame</p>
+              <p className="text-sm text-slate-500">
+                {currentStep.id === 'id-back'
+                  ? 'Assurez-vous que le NIU à 17 chiffres est lisible'
+                  : 'Placez votre CNI dans le cadre'}
+              </p>
             </div>
             <div className="relative aspect-[1.6/1] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center">
               <div className="absolute inset-4 border-2 border-dashed border-white/40 rounded-xl" />
@@ -490,20 +493,31 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-blue-400 rounded-br-lg" />
               <div className="text-center z-10">
                 <Camera className="w-8 h-8 text-white/60 mx-auto mb-2" />
-                <p className="text-white/60 text-xs">Camera preview</p>
+                <p className="text-white/60 text-xs">Aperçu caméra</p>
               </div>
               <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
                 <span className="text-xs text-white/80 bg-black/40 px-3 py-1 rounded-full">
-                  {currentStep.id === 'id-front' ? 'Front side' : 'Back side'}
+                  {currentStep.id === 'id-front' ? 'Recto CNI' : 'Verso CNI'}
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              Ensure good lighting and avoid glare
+              Bonne lumière requise — évitez les reflets
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-slate-500">Type de document :</p>
+              <div className="flex items-center gap-2 text-xs text-slate-700 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg">
+                <Check className="w-3.5 h-3.5 text-blue-600" /> CNI Biométrique (sélectionné)
+              </div>
+              {['Passeport', 'Permis de conduire'].map(doc => (
+                <div key={doc} className="flex items-center gap-2 text-xs text-slate-400 bg-slate-50 px-3 py-2 rounded-lg opacity-50 cursor-not-allowed">
+                  <X className="w-3.5 h-3.5" /> {doc} — disponible ultérieurement
+                </div>
+              ))}
             </div>
             <button onClick={goNext} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2">
-              <Camera className="w-5 h-5" /> Capture
+              <Camera className="w-5 h-5" /> Capturer
             </button>
           </div>
         );
@@ -563,10 +577,10 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             <div className="relative w-48 h-48 mx-auto">
               <div className={cn('w-full h-full rounded-full border-4 flex items-center justify-center',
                 livenessState === 'scanning' ? 'border-blue-500 animate-pulse' :
-                livenessState === 'success' ? 'border-emerald-500' :
-                livenessState === 'failed' ? 'border-red-500' :
-                livenessState === 'locked' ? 'border-red-500' :
-                'border-slate-300')}>
+                  livenessState === 'success' ? 'border-emerald-500' :
+                    livenessState === 'failed' ? 'border-red-500' :
+                      livenessState === 'locked' ? 'border-red-500' :
+                        'border-slate-300')}>
                 <div className="w-40 h-40 rounded-full bg-slate-800 flex items-center justify-center">
                   {livenessState === 'success' ? (
                     <Check className="w-16 h-16 text-emerald-400" />
@@ -623,40 +637,68 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
       case 'address':
         return (
-          <div className="px-6 space-y-5">
+          <div className="px-6 space-y-4">
             <div className="text-center space-y-2">
               <MapPin className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Your Address</h2>
-              <p className="text-sm text-slate-500">Cascade selection for your address</p>
+              <h2 className="text-xl font-bold text-slate-900">Votre Adresse</h2>
+              <p className="text-sm text-slate-500">Sélectionnez votre localisation</p>
             </div>
             <div className="space-y-3">
+              {/* Région */}
               <div>
-                <label className="text-sm font-medium text-slate-700">State</label>
-                <select value={selectedAddress.state} onChange={e => setSelectedAddress(p => ({ ...p, state: e.target.value, city: '', colony: '' }))}
+                <label className="text-sm font-medium text-slate-700">Région</label>
+                <select
+                  value={selectedAddress.region}
+                  onChange={e => setSelectedAddress({ region: e.target.value, city: '', quartier: '', commune: '' })}
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">Select state...</option>
-                  {STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  <option value="">Sélectionner la région...</option>
+                  {REGION_NAMES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
+              {/* Ville */}
               <div>
-                <label className="text-sm font-medium text-slate-700">City</label>
-                <select value={selectedAddress.city} onChange={e => setSelectedAddress(p => ({ ...p, city: e.target.value }))}
-                  disabled={!selectedAddress.state}
+                <label className="text-sm font-medium text-slate-700">Ville</label>
+                <select
+                  value={selectedAddress.city}
+                  onChange={e => setSelectedAddress(p => ({ ...p, city: e.target.value, quartier: '', commune: '' }))}
+                  disabled={!selectedAddress.region}
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">Select city...</option>
-                  {selectedAddress.state && <option value="Centro">Centro</option>}
-                  {selectedAddress.state && <option value="Norte">Norte</option>}
-                  {selectedAddress.state && <option value="Sur">Sur</option>}
+                  <option value="">Sélectionner la ville...</option>
+                  {selectedAddress.region && REGIONS[selectedAddress.region] &&
+                    Object.keys(REGIONS[selectedAddress.region].villes).map(v =>
+                      <option key={v} value={v}>{v}</option>)}
                 </select>
               </div>
+              {/* Quartier */}
               <div>
-                <label className="text-sm font-medium text-slate-700">Street & Number</label>
-                <input type="text" placeholder="Av. Reforma 222" defaultValue=""
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="text-sm font-medium text-slate-700">Quartier</label>
+                <select
+                  value={selectedAddress.quartier}
+                  onChange={e => setSelectedAddress(p => ({ ...p, quartier: e.target.value }))}
+                  disabled={!selectedAddress.city}
+                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
+                  <option value="">Sélectionner le quartier...</option>
+                  {selectedAddress.city && REGIONS[selectedAddress.region]?.villes[selectedAddress.city]?.quartiers.map(q =>
+                    <option key={q} value={q}>{q}</option>)}
+                </select>
               </div>
+              {/* Commune */}
               <div>
-                <label className="text-sm font-medium text-slate-700">Postal Code</label>
-                <input type="text" placeholder="06600" defaultValue=""
+                <label className="text-sm font-medium text-slate-700">Commune</label>
+                <select
+                  value={selectedAddress.commune}
+                  onChange={e => setSelectedAddress(p => ({ ...p, commune: e.target.value }))}
+                  disabled={!selectedAddress.city}
+                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
+                  <option value="">Sélectionner la commune...</option>
+                  {selectedAddress.city && REGIONS[selectedAddress.region]?.villes[selectedAddress.city]?.communes.map(c =>
+                    <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              {/* Rue */}
+              <div>
+                <label className="text-sm font-medium text-slate-700">Rue / Point de repère</label>
+                <input type="text" placeholder="Avenue Jean Paul II, face Hilton"
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
             </div>
@@ -664,7 +706,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               className={cn('w-full py-2.5 rounded-xl border-2 flex items-center justify-center gap-2 text-sm font-medium transition-all',
                 gpsAssist ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-600 hover:border-slate-400')}>
               <MapPin className="w-4 h-4" />
-              {gpsAssist ? '✓ GPS Location Detected' : 'Use GPS to Assist'}
+              {gpsAssist ? '✓ Localisation GPS détectée' : 'Utiliser le GPS pour m\'assister'}
             </button>
           </div>
         );
@@ -674,17 +716,17 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
               <FileCheck className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Proof of Address</h2>
-              <p className="text-sm text-slate-500">Upload a utility bill or bank statement</p>
+              <h2 className="text-xl font-bold text-slate-900">Justificatif de Domicile</h2>
+              <p className="text-sm text-slate-500">Uploadez une facture récente (‹ 3 mois)</p>
             </div>
             <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
               <Upload className="w-8 h-8 text-slate-400 mx-auto mb-3" />
-              <p className="text-sm font-medium text-slate-600">Tap to upload or take photo</p>
-              <p className="text-xs text-slate-400 mt-1">PDF, JPG, PNG · Max 10MB</p>
+              <p className="text-sm font-medium text-slate-600">Appuyer pour télécharger ou photographier</p>
+              <p className="text-xs text-slate-400 mt-1">PDF, JPG, PNG · Max 10 Mo</p>
             </div>
             <div className="space-y-2">
-              <p className="text-xs font-medium text-slate-500">Accepted documents:</p>
-              {['Utility bill (last 3 months)', 'Bank statement', 'Government letter'].map(d => (
+              <p className="text-xs font-medium text-slate-500">Documents acceptés :</p>
+              {['Facture ENEO (électricité, ‹ 3 mois)', 'Facture CAMWATER (eau, ‹ 3 mois)'].map(d => (
                 <div key={d} className="flex items-center gap-2 text-xs text-slate-600">
                   <Check className="w-3.5 h-3.5 text-emerald-500" /> {d}
                 </div>
@@ -695,35 +737,118 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
       case 'fiscal-id':
         return (
-          <div className="px-6 space-y-5">
-            <div className="text-center space-y-2">
-              <FileText className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Fiscal / Tax ID</h2>
-              <p className="text-sm text-slate-500">Choose your tax identifier type</p>
+          <div className="px-6 space-y-4">
+            <div className="text-center space-y-1">
+              <FileText className="w-10 h-10 text-blue-600 mx-auto" />
+              <h2 className="text-xl font-bold text-slate-900">NIU — Attestation Fiscale</h2>
+              <p className="text-xs text-slate-500">Numéro d'Identifiant Unique fiscal · DGI Cameroun</p>
             </div>
-            <div className="space-y-2">
-              {[
-                { id: 'rfc' as const, label: 'RFC (Registro Federal de Contribuyentes)', desc: '13-character tax ID' },
-                { id: 'curp' as const, label: 'CURP', desc: '18-character population ID' },
-                { id: 'other' as const, label: 'Other / Foreign Tax ID', desc: 'For non-Mexican residents' },
-              ].map(t => (
-                <button key={t.id} onClick={() => setFiscalType(t.id)}
-                  className={cn('w-full text-left px-4 py-3 rounded-xl border-2 transition-all',
-                    fiscalType === t.id ? 'border-blue-600 bg-blue-50' : 'border-slate-200 hover:border-slate-300')}>
-                  <p className={cn('text-sm font-medium', fiscalType === t.id ? 'text-blue-700' : 'text-slate-700')}>{t.label}</p>
-                  <p className="text-xs text-slate-500">{t.desc}</p>
+
+            {/* Info banner */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 text-xs text-blue-700 leading-relaxed">
+              📋 Le NIU est votre identifiant fiscal délivré par la <strong>DGI (Direction Générale des Impôts)</strong>. Il figure sur votre <strong>attestation d'immatriculation fiscale</strong> (disponible sur <strong>impots.cm / Harmony</strong>). Il est distinct du numéro de série CNI.
+            </div>
+
+            {/* Mode selector */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Comment souhaitez-vous fournir votre NIU ?</p>
+              <div className="grid grid-cols-3 gap-2">
+                {/* Scan — disabled (future) */}
+                <button disabled
+                  className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed">
+                  <ScanLine className="w-5 h-5 text-slate-400" />
+                  <span className="text-[10px] font-medium text-slate-400 text-center leading-tight">Scanner<br />(bientôt)</span>
                 </button>
-              ))}
+                {/* Upload photo */}
+                <button
+                  onClick={() => { setNiuEntryMode('upload'); setNiuUploaded(false); }}
+                  className={cn(
+                    'flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border-2 transition-all',
+                    niuEntryMode === 'upload'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-slate-200 hover:border-slate-300'
+                  )}>
+                  <Upload className="w-5 h-5 text-blue-600" />
+                  <span className="text-[10px] font-medium text-slate-700 text-center leading-tight">Photo /<br />Upload</span>
+                </button>
+                {/* Saisie manuelle */}
+                <button
+                  onClick={() => setNiuEntryMode('manual')}
+                  className={cn(
+                    'flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border-2 transition-all',
+                    niuEntryMode === 'manual'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-slate-200 hover:border-slate-300'
+                  )}>
+                  <Edit3 className="w-5 h-5 text-blue-600" />
+                  <span className="text-[10px] font-medium text-slate-700 text-center leading-tight">Saisie<br />manuelle</span>
+                </button>
+              </div>
             </div>
-            {fiscalType && (
-              <div>
-                <label className="text-sm font-medium text-slate-700">Enter your {fiscalType.toUpperCase()}</label>
-                <input type="text" placeholder={fiscalType === 'rfc' ? 'GALM900315HDF' : fiscalType === 'curp' ? 'GALM900315HDFRPL09' : 'Tax ID number'}
-                  className="w-full mt-1.5 px-3 py-2.5 border border-slate-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" />
+
+            {/* Upload panel */}
+            {niuEntryMode === 'upload' && (
+              <div className="space-y-3">
+                <div
+                  onClick={() => { setNiuUploaded(true); setFiscalType('niu'); }}
+                  className={cn(
+                    'border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-colors',
+                    niuUploaded ? 'border-emerald-400 bg-emerald-50' : 'border-slate-300 hover:border-blue-400'
+                  )}>
+                  {niuUploaded ? (
+                    <>
+                      <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                      <p className="text-sm font-medium text-emerald-700">Attestation fiscale reçue</p>
+                      <p className="text-xs text-emerald-600 mt-0.5">NIU extrait automatiquement</p>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                      <p className="text-sm font-medium text-slate-600">Importer l'attestation d'immatriculation DGI</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Disponible sur impots.cm · PDF · JPG · Max 10 Mo</p>
+                    </>
+                  )}
+                </div>
               </div>
             )}
-            <button onClick={goNext} className="text-sm text-slate-500 hover:text-slate-700 mx-auto block">
-              Skip — provide later (limited access)
+
+            {/* Manual entry panel */}
+            {niuEntryMode === 'manual' && (
+              <div className="space-y-2">
+                {/* LIMITED_ACCESS notice */}
+                <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5">
+                  <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-orange-700 leading-relaxed">
+                    <strong>Accès limité :</strong> sans NIU validé, certaines fonctionnalités (crypto, investissements, épargne) restent bloquées jusqu'à validation en agence.
+                  </p>
+                </div>
+                <label className="text-sm font-medium text-slate-700">NIU (17 chiffres)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={17}
+                  value={niuValue}
+                  onChange={e => { setNiuValue(e.target.value.replace(/\D/g, '')); setFiscalType('niu'); }}
+                  placeholder="12345678901234567"
+                  className={cn(
+                    'w-full px-3 py-2.5 border rounded-xl text-sm font-mono focus:ring-2 outline-none transition-colors',
+                    niuValue.length === 17 && validateNIU(niuValue)
+                      ? 'border-emerald-500 focus:ring-emerald-300 bg-emerald-50'
+                      : niuValue.length > 0
+                        ? 'border-amber-400 focus:ring-amber-300'
+                        : 'border-slate-300 focus:ring-blue-500'
+                  )}
+                />
+                {niuValue.length > 0 && (
+                  <p className={cn('text-xs', niuValue.length === 17 && validateNIU(niuValue) ? 'text-emerald-600' : 'text-amber-600')}>
+                    {niuValue.length === 17 && validateNIU(niuValue) ? '✓ Format NIU valide (17 chiffres)' : `${niuValue.length}/17 chiffres`}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <button onClick={goNext} className="text-xs text-slate-400 hover:text-slate-600 mx-auto block pt-1">
+              Ignorer — accès limité sans NIU
             </button>
           </div>
         );
@@ -804,19 +929,19 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-5">
             <div className="text-center space-y-2">
               <CheckCircle className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Review & Submit</h2>
-              <p className="text-sm text-slate-500">Please verify all information is correct</p>
+              <h2 className="text-xl font-bold text-slate-900">Récapitulatif & Soumettre</h2>
+              <p className="text-sm text-slate-500">Vérifiez que toutes les informations sont correctes</p>
             </div>
             <div className="space-y-3">
               {[
-                { label: 'Full Name', value: 'María García López' },
-                { label: 'Phone', value: '+52 55 1234 5678' },
-                { label: 'Email', value: 'maria.garcia@email.com' },
-                { label: 'National ID', value: 'INE-1234567890' },
-                { label: 'Address', value: 'Av. Reforma 222, Col. Juárez, CDMX' },
-                { label: 'Liveness', value: '✓ Verified' },
-                { label: 'Documents', value: '4 files attached' },
-                { label: 'Signature', value: hasSigned ? '✓ Signed' : '○ Not signed' },
+                { label: 'Nom complet', value: 'Adjoua Cécile Mbarga' },
+                { label: 'Téléphone', value: '+237 6 74 12 34 56' },
+                { label: 'Email', value: 'mbarga.adjoua@gmail.com' },
+                { label: 'N° CNI', value: 'CNI-12000018542' },
+                { label: 'Adresse', value: 'Av. Jean Paul II, Bastos, Yaoundé' },
+                { label: 'Vivacité', value: '✓ Vérifiée' },
+                { label: 'Documents', value: '4 fichiers joints' },
+                { label: 'Signature', value: hasSigned ? '✓ Signée' : '○ Non signée' },
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                   <span className="text-xs text-slate-500">{item.label}</span>
@@ -950,7 +1075,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               {renderPostSubmission()}
             </div>
           ) : (
-            <>
+            <div className="flex flex-col h-full">
               {/* Header bar */}
               <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
                 <button onClick={goBack} disabled={currentStepIdx === 0}
@@ -978,12 +1103,12 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                 </div>
               </div>
 
-              {/* Step content */}
-              <div className="h-[calc(100%-10.5rem)] overflow-y-auto pb-4">
+              {/* Step content — flex-1 so it fills remaining space and scrolls */}
+              <div className="flex-1 overflow-y-auto pb-24">
                 <AnimatePresence mode="wait">
                   <motion.div key={currentStep?.id}
                     initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }} className="h-full pt-4">
+                    transition={{ duration: 0.2 }} className="pt-4">
                     {renderStepContent()}
                   </motion.div>
                 </AnimatePresence>
@@ -1018,7 +1143,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   </button>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* Home indicator */}
@@ -1035,8 +1160,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               title={s.label}
               className={cn('w-7 h-7 rounded-lg flex items-center justify-center transition-all',
                 i === currentStepIdx ? 'bg-blue-600 text-white scale-110' :
-                i < currentStepIdx ? 'bg-emerald-100 text-emerald-600' :
-                'bg-slate-100 text-slate-400 hover:bg-slate-200')}>
+                  i < currentStepIdx ? 'bg-emerald-100 text-emerald-600' :
+                    'bg-slate-100 text-slate-400 hover:bg-slate-200')}>
               {Icon ? <Icon className="w-3.5 h-3.5" /> : <span className="text-[10px]">{i + 1}</span>}
             </button>
           );
