@@ -30,9 +30,10 @@ export const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇨🇲', sub: 'Official language' },
 ];
 
-// ── NIU validation (17 chiffres — verso CNI biométrique) ──────────────────────
-// Format: 17 chiffres numériques consécutifs
-// Ex: 12345678901234567
+// ── NIU validation (identifiant fiscal DGI Cameroun) ──────────────────────────
+// Le NIU est délivré par la DGI via Harmony (impots.cm).
+// Il figure sur l'attestation d'immatriculation fiscale — document distinct de la CNI.
+// Format prototype : 17 chiffres numériques
 export const NIU_REGEX = /^\d{17}$/;
 export const NIU_MASK = '00000000000000000'; // 17 digits
 
@@ -68,7 +69,7 @@ export const REGIONS: Record<string, {
     villes: {
       Douala: {
         quartiers: ['Akwa', 'Bonanjo', 'Bali', 'Deido', 'Bonapriso', 'Ndokotti', 'Logbaba', 'Makepe', 'Kotto', 'Pk8'],
-        communes: ["Douala I", "Douala II", "Douala III", "Douala IV", "Douala V", "Douala VI"],
+        communes: ['Douala I', 'Douala II', 'Douala III', 'Douala IV', 'Douala V', 'Douala VI'],
       },
       Edéa: {
         quartiers: ['Centre', 'Mbog Mbog'],
@@ -143,7 +144,7 @@ export const REGIONS: Record<string, {
   Sud: {
     villes: {
       Ebolowa: {
-        quartiers: ['Nko\'olong', 'Angalé', 'Mvangan'],
+        quartiers: ["Nko'olong", 'Angalé', 'Mvangan'],
         communes: ['Ebolowa I', 'Ebolowa II'],
       },
       Kribi: {
@@ -157,14 +158,16 @@ export const REGIONS: Record<string, {
 // Flat list of region names for the selector
 export const REGION_NAMES = Object.keys(REGIONS);
 
-// ── Mock OCR fields (CNI Cameroun) ────────────────────────────────────────────
+// ── Mock OCR fields (CNI Cameroun — recto seulement) ──────────────────────────
+// Note: le NIU ne figure PAS sur la CNI. Il vient de l'attestation DGI (Harmony).
+// Le champ niuId ci-dessous est fourni séparément via le step fiscal-id.
 export const MOCK_OCR_FIELDS: OCRField[] = [
   { key: 'nom', label: 'Nom de famille', value: 'MBARGA', confidence: 97, edited: false },
   { key: 'prenom', label: 'Prénom(s)', value: 'Adjoua Cécile', confidence: 94, edited: false },
-  { key: 'niuId', label: 'NIU fiscal (DGI Harmony)', value: '12345678901234567', confidence: 82, edited: false },
+  { key: 'numSerie', label: 'N° série CNI (recto)', value: '120000185', confidence: 92, edited: false },
   { key: 'dateNaissance', label: 'Date de naissance', value: '14/06/1992', confidence: 91, edited: false },
   { key: 'lieuNaissance', label: 'Lieu de naissance', value: 'Yaoundé', confidence: 88, edited: false },
-  { key: 'dateExpiration', label: 'Date d\'expiration', value: '14/06/2033', confidence: 96, edited: false },
+  { key: 'dateExpiration', label: "Date d'expiration", value: '14/06/2033', confidence: 96, edited: false },
   { key: 'nationalite', label: 'Nationalité', value: 'Camerounaise', confidence: 99, edited: false },
 ];
 
@@ -194,7 +197,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'MBARGA', confidence: 97, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Adjoua Cécile', confidence: 94, edited: false },
-      { key: 'niuId', label: 'NIU', value: '12345678901234567', confidence: 82, edited: false },
+      { key: 'numSerie', label: 'N° série CNI', value: '120000185', confidence: 92, edited: false },
       { key: 'dateNaissance', label: 'Date naissance', value: '14/06/1992', confidence: 91, edited: false },
       { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Yaoundé', confidence: 88, edited: false },
       { key: 'dateExpiration', label: 'Date expiration', value: '14/06/2033', confidence: 96, edited: false },
@@ -225,7 +228,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'NDAM', confidence: 99, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Kouassi Jean-Pierre', confidence: 95, edited: false },
-      { key: 'niuId', label: 'NIU', value: '98765432109876543', confidence: 90, edited: false },
+      { key: 'numSerie', label: 'N° série CNI', value: '098706543', confidence: 93, edited: false },
       { key: 'dateNaissance', label: 'Date naissance', value: '03/11/1985', confidence: 93, edited: false },
       { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Douala', confidence: 87, edited: false },
       { key: 'dateExpiration', label: 'Date expiration', value: '03/11/2035', confidence: 97, edited: false },
@@ -256,12 +259,12 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'FOTSO EPSE TCHOUAMOU', confidence: 78, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Marie-Claire', confidence: 82, edited: false },
-      { key: 'niuId', label: 'NIU', value: '', confidence: 0, edited: false },
+      { key: 'numSerie', label: 'N° série CNI', value: '076234098', confidence: 70, edited: false },
       { key: 'dateNaissance', label: 'Date naissance', value: '22/03/1975', confidence: 91, edited: false },
       { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Bafoussam', confidence: 72, edited: false },
       { key: 'dateExpiration', label: 'Date expiration', value: '22/03/2035', confidence: 89, edited: false },
     ],
-    validatorNotes: 'NIU absent sur verso CNI — image floue. Relance client requise.',
+    validatorNotes: 'NIU non fourni — attestation DGI manquante. Accès limité activé.',
   },
   {
     id: 'VRF-2026-0004',
@@ -287,12 +290,12 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'NGONO ESSOMBA', confidence: 99, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Patrick', confidence: 98, edited: false },
-      { key: 'niuId', label: 'NIU', value: '11223344556677889', confidence: 99, edited: false },
+      { key: 'numSerie', label: 'N° série CNI', value: '045123678', confidence: 99, edited: false },
       { key: 'dateNaissance', label: 'Date naissance', value: '17/09/1990', confidence: 99, edited: false },
       { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Ebolowa', confidence: 97, edited: false },
       { key: 'dateExpiration', label: 'Date expiration', value: '17/09/2034', confidence: 99, edited: false },
     ],
-    validatorNotes: 'Tous documents conformes. Approuvé.',
+    validatorNotes: 'Tous documents conformes. NIU DGI validé. Approuvé.',
   },
   {
     id: 'VRF-2026-0005',
@@ -319,7 +322,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'BELLA NJOYA', confidence: 55, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Inès', confidence: 28, edited: false },
-      { key: 'niuId', label: 'NIU', value: '55667788990011223', confidence: 41, edited: false },
+      { key: 'numSerie', label: 'N° série CNI', value: '033012900', confidence: 35, edited: false },
       { key: 'dateNaissance', label: 'Date naissance', value: '05/12/1998', confidence: 38, edited: false },
       { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Kumba', confidence: 47, edited: false },
       { key: 'dateExpiration', label: 'Date expiration', value: '05/12/2033', confidence: 52, edited: false },
