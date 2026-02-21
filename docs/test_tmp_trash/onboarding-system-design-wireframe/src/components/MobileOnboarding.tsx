@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, Globe, Smartphone, Mail, Lock, Fingerprint,
@@ -10,7 +10,7 @@ import {
   ArrowRight, Loader2, Shield
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { STEP_SEQUENCE, LANGUAGES, MOCK_OCR_FIELDS, REGIONS, REGION_NAMES, validateNIU } from '@/data';
+import { STEP_SEQUENCE, LANGUAGES, MOCK_OCR_FIELDS, REGIONS, REGION_NAMES, validateNIU, type QuartierEntry } from '@/data';
 import type { OCRField } from '@/types';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -46,6 +46,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
   const [postState, setPostState] = useState<'pending' | 'limited' | 'full' | null>(null);
   const [selectedAddress, setSelectedAddress] = useState({ region: '', city: '', quartier: '', commune: '' });
   const [gpsAssist, setGpsAssist] = useState(false);
+  const [showGpsModal, setShowGpsModal] = useState(false);
   const [fiscalType, setFiscalType] = useState<'niu' | ''>('');
   const [niuValue, setNiuValue] = useState('');
   const [niuEntryMode, setNiuEntryMode] = useState<'scan' | 'upload' | 'manual' | null>(null);
@@ -477,12 +478,12 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             <div className="text-center space-y-2">
               <CreditCard className="w-12 h-12 text-blue-600 mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">
-                CNI — {currentStep.id === 'id-front' ? 'Recto' : 'Verso (NIU)'}
+                CNI — {currentStep.id === 'id-front' ? 'Recto' : 'Verso'}
               </h2>
               <p className="text-sm text-slate-500">
                 {currentStep.id === 'id-back'
-                  ? 'Assurez-vous que le NIU à 17 chiffres est lisible'
-                  : 'Placez votre CNI dans le cadre'}
+                  ? 'Verso de votre CNI  N national camerounais'
+                  : 'Recto de votre CNI  numéro et informations civiles'}
               </p>
             </div>
             <div className="relative aspect-[1.6/1] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center">
@@ -641,20 +642,22 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             <div className="text-center space-y-2">
               <MapPin className="w-12 h-12 text-blue-600 mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Votre Adresse</h2>
-              <p className="text-sm text-slate-500">Sélectionnez votre localisation</p>
+              <p className="text-sm text-slate-500">S\u00e9lectionnez votre localisation</p>
             </div>
+
             <div className="space-y-3">
-              {/* Région */}
+              {/* R\u00e9gion */}
               <div>
-                <label className="text-sm font-medium text-slate-700">Région</label>
+                <label className="text-sm font-medium text-slate-700">R\u00e9gion</label>
                 <select
                   value={selectedAddress.region}
                   onChange={e => setSelectedAddress({ region: e.target.value, city: '', quartier: '', commune: '' })}
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">Sélectionner la région...</option>
+                  <option value="">S\u00e9lectionner la r\u00e9gion...</option>
                   {REGION_NAMES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
+
               {/* Ville */}
               <div>
                 <label className="text-sm font-medium text-slate-700">Ville</label>
@@ -663,51 +666,106 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   onChange={e => setSelectedAddress(p => ({ ...p, city: e.target.value, quartier: '', commune: '' }))}
                   disabled={!selectedAddress.region}
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">Sélectionner la ville...</option>
+                  <option value="">S\u00e9lectionner la ville...</option>
                   {selectedAddress.region && REGIONS[selectedAddress.region] &&
                     Object.keys(REGIONS[selectedAddress.region].villes).map(v =>
                       <option key={v} value={v}>{v}</option>)}
                 </select>
               </div>
-              {/* Quartier */}
+
+              {/* Quartier — auto-remplit la commune */}
               <div>
                 <label className="text-sm font-medium text-slate-700">Quartier</label>
                 <select
                   value={selectedAddress.quartier}
-                  onChange={e => setSelectedAddress(p => ({ ...p, quartier: e.target.value }))}
+                  onChange={e => {
+                    const qName = e.target.value;
+                    const quartierData = REGIONS[selectedAddress.region]?.villes[selectedAddress.city]?.quartiers
+                      .find((q: QuartierEntry) => q.name === qName);
+                    setSelectedAddress(p => ({ ...p, quartier: qName, commune: quartierData?.commune ?? '' }));
+                  }}
                   disabled={!selectedAddress.city}
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">Sélectionner le quartier...</option>
-                  {selectedAddress.city && REGIONS[selectedAddress.region]?.villes[selectedAddress.city]?.quartiers.map(q =>
-                    <option key={q} value={q}>{q}</option>)}
+                  <option value="">S\u00e9lectionner le quartier...</option>
+                  {selectedAddress.city && REGIONS[selectedAddress.region]?.villes[selectedAddress.city]?.quartiers
+                    .map((q: QuartierEntry) => <option key={q.name} value={q.name}>{q.name}</option>)}
                 </select>
               </div>
-              {/* Commune */}
+
+              {/* Commune — auto-remplie, read-only */}
               <div>
-                <label className="text-sm font-medium text-slate-700">Commune</label>
-                <select
-                  value={selectedAddress.commune}
-                  onChange={e => setSelectedAddress(p => ({ ...p, commune: e.target.value }))}
-                  disabled={!selectedAddress.city}
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">Sélectionner la commune...</option>
-                  {selectedAddress.city && REGIONS[selectedAddress.region]?.villes[selectedAddress.city]?.communes.map(c =>
-                    <option key={c} value={c}>{c}</option>)}
-                </select>
+                <label className="text-sm font-medium text-slate-700">
+                  Commune
+                  <span className="ml-1.5 text-xs text-slate-400 font-normal">(auto-remplie)</span>
+                </label>
+                <div className={cn(
+                  'w-full mt-1 px-3 py-2.5 border rounded-xl text-sm',
+                  selectedAddress.commune
+                    ? 'border-emerald-400 bg-emerald-50 text-emerald-800 font-medium'
+                    : 'border-slate-200 bg-slate-50 text-slate-400 italic'
+                )}>
+                  {selectedAddress.commune || 'Choisis un quartier pour auto-remplir'}
+                </div>
               </div>
+
               {/* Rue */}
               <div>
-                <label className="text-sm font-medium text-slate-700">Rue / Point de repère</label>
+                <label className="text-sm font-medium text-slate-700">Rue / Point de rep\u00e8re</label>
                 <input type="text" placeholder="Avenue Jean Paul II, face Hilton"
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
+
+              {/* GPS domicile */}
+              <div>
+                <label className="text-sm font-medium text-slate-700">
+                  GPS Domicile
+                  <span className="ml-1.5 text-xs text-slate-400 font-normal">(optionnel)</span>
+                </label>
+                <button
+                  onClick={() => { if (!gpsAssist) setShowGpsModal(true); }}
+                  className={cn(
+                    'w-full mt-1 py-2.5 rounded-xl border-2 flex items-center justify-center gap-2 text-sm font-medium transition-all',
+                    gpsAssist
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-300 text-slate-600 hover:border-blue-400'
+                  )}>
+                  <MapPin className="w-4 h-4" />
+                  {gpsAssist ? '\u2713 Localisation GPS d\u00e9tect\u00e9e (3.862 N, 11.520 E)' : 'D\u00e9tecter ma position GPS'}
+                </button>
+              </div>
             </div>
-            <button onClick={() => setGpsAssist(!gpsAssist)}
-              className={cn('w-full py-2.5 rounded-xl border-2 flex items-center justify-center gap-2 text-sm font-medium transition-all',
-                gpsAssist ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-600 hover:border-slate-400')}>
-              <MapPin className="w-4 h-4" />
-              {gpsAssist ? '✓ Localisation GPS détectée' : 'Utiliser le GPS pour m\'assister'}
-            </button>
+
+            {/* GPS Privacy Modal */}
+            {showGpsModal && (
+              <div className="fixed inset-0 bg-black/60 z-50 flex items-end px-4 pb-6" onClick={() => setShowGpsModal(false)}>
+                <div className="bg-white rounded-2xl w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                      <MapPin className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">Localisation GPS de votre domicile</h3>
+                      <p className="text-xs text-slate-500">Utilisation de votre position</p>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl px-3 py-3 text-xs text-slate-700 leading-relaxed space-y-2">
+                    <p><strong>Pourquoi&#160;?</strong> Nous enregistrons les coordonn\u00e9es GPS de votre domicile pour <strong>v\u00e9rifier la coh\u00e9rence de votre adresse d\u00e9clar\u00e9e</strong> et satisfaire aux exigences r\u00e9glementaires KYC de la COBAC.</p>
+                    <p><strong>Quand&#160;?</strong> La position est capt\u00e9e <strong>maintenant, une seule fois</strong>, au moment o\u00f9 vous cliquez sur \u00ab\u202fAccepter\u202f\u00bb.</p>
+                    <p><strong>S\u00e9curit\u00e9&#160;:</strong> Les coordonn\u00e9es sont <strong>chiffr\u00e9es, jamais partag\u00e9es</strong> avec des tiers et conserv\u00e9es conform\u00e9ment au cadre l\u00e9gal camerounais.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowGpsModal(false)}
+                      className="flex-1 py-2.5 border border-slate-300 rounded-xl text-sm font-medium text-slate-600">
+                      Annuler
+                    </button>
+                    <button onClick={() => { setGpsAssist(true); setShowGpsModal(false); }}
+                      className="flex-1 py-2.5 bg-blue-600 rounded-xl text-sm font-semibold text-white">
+                      Accepter
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 

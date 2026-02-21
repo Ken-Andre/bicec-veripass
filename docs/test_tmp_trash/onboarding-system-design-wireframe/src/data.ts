@@ -33,13 +33,13 @@ export const LANGUAGES = [
 // ── NIU validation (identifiant fiscal DGI Cameroun) ──────────────────────────
 // Le NIU est délivré par la DGI via Harmony (impots.cm).
 // Il figure sur l'attestation d'immatriculation fiscale — document distinct de la CNI.
-// Format : 1 lettre majuscule + 12 chiffres + 1 lettre majuscule = 14 caractères
+// Format réel : 1 lettre majuscule + 12 chiffres + 1 lettre majuscule = 14 caractères
 // Exemple réel : P047217105784Y
 //
 // Le N° national CNI est différent :
 //   Code poste (2 lettres + 2 chiffres) + identifiant unique 17 chiffres
 //   (dont les 4 premiers = année de délivrance)
-//   Exemple : YA0120260000123456789
+//   Exemple : YA01 2026 0012345678901
 export const NIU_REGEX = /^[A-Z]\d{12}[A-Z]$/;
 export const NIU_EXAMPLE = 'P047217105784Y'; // exemple officiel DGI
 
@@ -48,114 +48,180 @@ export function validateNIU(value: string): boolean {
 }
 
 // ── Cameroonian administrative divisions ───────────────────────────────────────
-// Région → Villes → Quartiers → Communes
+// Région → Villes → Quartiers (chaque quartier mappé à sa commune)
+// Un quartier n'appartient qu'à une seule commune — la commune est auto-sélectionnée.
+export type QuartierEntry = { name: string; commune: string };
+
 export const REGIONS: Record<string, {
   villes: Record<string, {
-    quartiers: string[];
-    communes: string[];
+    quartiers: QuartierEntry[];
   }>;
 }> = {
   Centre: {
     villes: {
       Yaoundé: {
-        quartiers: ['Bastos', 'Nlongkak', 'Mvan', 'Biyem-Assi', 'Nsimeyong', 'Mvog-Ada', 'Mvog-Mbi', 'Elig-Edzoa', 'Ekounou', 'Nkomo'],
-        communes: ['Yaoundé I', 'Yaoundé II', 'Yaoundé III', 'Yaoundé IV', 'Yaoundé V', 'Yaoundé VI', 'Yaoundé VII'],
+        quartiers: [
+          { name: 'Bastos', commune: 'Yaoundé I' },
+          { name: 'Elig-Edzoa', commune: 'Yaoundé II' },
+          { name: 'Nlongkak', commune: 'Yaoundé II' },
+          { name: 'Mvog-Mbi', commune: 'Yaoundé III' },
+          { name: 'Mvan', commune: 'Yaoundé III' },
+          { name: 'Mvog-Ada', commune: 'Yaoundé V' },
+          { name: 'Ekounou', commune: 'Yaoundé V' },
+          { name: 'Biyem-Assi', commune: 'Yaoundé VI' },
+          { name: 'Nsimeyong', commune: 'Yaoundé VI' },
+          { name: 'Nkomo', commune: 'Yaoundé VII' },
+        ],
       },
       Mbalmayo: {
-        quartiers: ['Centre ville', 'Nkol Mébanga', 'Enongal'],
-        communes: ['Mbalmayo'],
+        quartiers: [
+          { name: 'Centre ville', commune: 'Mbalmayo' },
+          { name: 'Nkol Mébanga', commune: 'Mbalmayo' },
+          { name: 'Enongal', commune: 'Mbalmayo' },
+        ],
       },
       Mfou: {
-        quartiers: ['Mfou centre', 'Nkol Bogo'],
-        communes: ['Mfou'],
+        quartiers: [
+          { name: 'Mfou centre', commune: 'Mfou' },
+          { name: 'Nkol Bogo', commune: 'Mfou' },
+        ],
       },
     },
   },
   Littoral: {
     villes: {
       Douala: {
-        quartiers: ['Akwa', 'Bonanjo', 'Bali', 'Deido', 'Bonapriso', 'Ndokotti', 'Logbaba', 'Makepe', 'Kotto', 'Pk8'],
-        communes: ['Douala I', 'Douala II', 'Douala III', 'Douala IV', 'Douala V', 'Douala VI'],
+        quartiers: [
+          { name: 'Akwa', commune: 'Douala I' },
+          { name: 'Bonanjo', commune: 'Douala I' },
+          { name: 'Bonapriso', commune: 'Douala I' },
+          { name: 'Deido', commune: 'Douala II' },
+          { name: 'Ndokotti', commune: 'Douala II' },
+          { name: 'Kotto', commune: 'Douala III' },
+          { name: 'Bali', commune: 'Douala V' },
+          { name: 'Logbaba', commune: 'Douala V' },
+          { name: 'Makepe', commune: 'Douala V' },
+          { name: 'Pk8', commune: 'Douala VI' },
+        ],
       },
       Edéa: {
-        quartiers: ['Centre', 'Mbog Mbog'],
-        communes: ['Edéa I', 'Edéa II'],
+        quartiers: [
+          { name: 'Centre', commune: 'Edéa I' },
+          { name: 'Mbog Mbog', commune: 'Edéa II' },
+        ],
       },
     },
   },
   Ouest: {
     villes: {
       Bafoussam: {
-        quartiers: ['Tamdja', 'Famla', 'Djeleng', 'Nylon'],
-        communes: ['Bafoussam I', 'Bafoussam II', 'Bafoussam III'],
+        quartiers: [
+          { name: 'Tamdja', commune: 'Bafoussam I' },
+          { name: 'Famla', commune: 'Bafoussam II' },
+          { name: 'Djeleng', commune: 'Bafoussam II' },
+          { name: 'Nylon', commune: 'Bafoussam III' },
+        ],
       },
       Dschang: {
-        quartiers: ['Foreke', 'Tsinkop', 'Foto'],
-        communes: ['Dschang'],
+        quartiers: [
+          { name: 'Foreke', commune: 'Dschang' },
+          { name: 'Tsinkop', commune: 'Dschang' },
+          { name: 'Foto', commune: 'Dschang' },
+        ],
       },
     },
   },
   'Nord-Ouest': {
     villes: {
       Bamenda: {
-        quartiers: ['Up Station', 'Mile 4', 'Nkwen', 'Mankon'],
-        communes: ['Bamenda I', 'Bamenda II', 'Bamenda III'],
+        quartiers: [
+          { name: 'Up Station', commune: 'Bamenda I' },
+          { name: 'Mile 4', commune: 'Bamenda II' },
+          { name: 'Nkwen', commune: 'Bamenda II' },
+          { name: 'Mankon', commune: 'Bamenda III' },
+        ],
       },
     },
   },
   'Sud-Ouest': {
     villes: {
       Buea: {
-        quartiers: ['Molyko', 'Bonduma', 'Great Soppo', 'Mile 16'],
-        communes: ['Buea'],
+        quartiers: [
+          { name: 'Molyko', commune: 'Buea' },
+          { name: 'Bonduma', commune: 'Buea' },
+          { name: 'Great Soppo', commune: 'Buea' },
+          { name: 'Mile 16', commune: 'Buea' },
+        ],
       },
       Limbé: {
-        quartiers: ['Down Beach', 'New Town', 'Church Street'],
-        communes: ['Limbé I', 'Limbé II', 'Limbé III'],
+        quartiers: [
+          { name: 'Down Beach', commune: 'Limbé I' },
+          { name: 'New Town', commune: 'Limbé II' },
+          { name: 'Church Street', commune: 'Limbé III' },
+        ],
       },
     },
   },
   Adamaoua: {
     villes: {
       Ngaoundéré: {
-        quartiers: ['Dang', 'Baladji I', 'Baladji II', 'Joli Soir'],
-        communes: ['Ngaoundéré I', 'Ngaoundéré II', 'Ngaoundéré III'],
+        quartiers: [
+          { name: 'Dang', commune: 'Ngaoundéré I' },
+          { name: 'Baladji I', commune: 'Ngaoundéré II' },
+          { name: 'Baladji II', commune: 'Ngaoundéré II' },
+          { name: 'Joli Soir', commune: 'Ngaoundéré III' },
+        ],
       },
     },
   },
   Nord: {
     villes: {
       Garoua: {
-        quartiers: ['Yelwa', 'Bibemi', 'Foulbéré'],
-        communes: ['Garoua I', 'Garoua II', 'Garoua III'],
+        quartiers: [
+          { name: 'Yelwa', commune: 'Garoua I' },
+          { name: 'Bibemi', commune: 'Garoua II' },
+          { name: 'Foulbéré', commune: 'Garoua III' },
+        ],
       },
     },
   },
   'Extrême-Nord': {
     villes: {
       Maroua: {
-        quartiers: ['Domayo', 'Kakataré', 'Dougouré'],
-        communes: ['Maroua I', 'Maroua II', 'Maroua III'],
+        quartiers: [
+          { name: 'Domayo', commune: 'Maroua I' },
+          { name: 'Kakataré', commune: 'Maroua II' },
+          { name: 'Dougouré', commune: 'Maroua III' },
+        ],
       },
     },
   },
   Est: {
     villes: {
       Bertoua: {
-        quartiers: ['Haoussa', 'Mokolo', 'Nkolbikon'],
-        communes: ['Bertoua I', 'Bertoua II'],
+        quartiers: [
+          { name: 'Haoussa', commune: 'Bertoua I' },
+          { name: 'Mokolo', commune: 'Bertoua II' },
+          { name: 'Nkolbikon', commune: 'Bertoua II' },
+        ],
       },
     },
   },
   Sud: {
     villes: {
       Ebolowa: {
-        quartiers: ["Nko'olong", 'Angalé', 'Mvangan'],
-        communes: ['Ebolowa I', 'Ebolowa II'],
+        quartiers: [
+          { name: "Nko'olong", commune: 'Ebolowa I' },
+          { name: 'Angalé', commune: 'Ebolowa I' },
+          { name: 'Mvangan', commune: 'Ebolowa II' },
+        ],
       },
       Kribi: {
-        quartiers: ['Grand Batanga', 'Afan Ngok', 'Dombé'],
-        communes: ['Kribi I', 'Kribi II'],
+        quartiers: [
+          { name: 'Grand Batanga', commune: 'Kribi I' },
+          { name: 'Afan Ngok', commune: 'Kribi I' },
+          { name: 'Dombé', commune: 'Kribi II' },
+        ],
       },
     },
   },
@@ -164,16 +230,17 @@ export const REGIONS: Record<string, {
 // Flat list of region names for the selector
 export const REGION_NAMES = Object.keys(REGIONS);
 
-// ── Mock OCR fields (CNI Cameroun — recto seulement) ──────────────────────────
-// Note: le NIU ne figure PAS sur la CNI. Il vient de l'attestation DGI (Harmony).
-// Le champ niuId ci-dessous est fourni séparément via le step fiscal-id.
+// ── Mock OCR fields (CNI Cameroun — recto) ────────────────────────────────────
+// N° national CNI = code poste (2 lettres + 2 chiffres) + 17 chiffres (4 premiers = année)
+// Exemple : YA01 — 20090012345678901
+// Le NIU ne figure PAS sur la CNI. Il vient de l'attestation DGI (Harmony).
 export const MOCK_OCR_FIELDS: OCRField[] = [
   { key: 'nom', label: 'Nom de famille', value: 'MBARGA', confidence: 97, edited: false },
   { key: 'prenom', label: 'Prénom(s)', value: 'Adjoua Cécile', confidence: 94, edited: false },
-  { key: 'numSerie', label: 'N° série CNI (recto)', value: '120000185', confidence: 92, edited: false },
-  { key: 'dateNaissance', label: 'Date de naissance', value: '14/06/1992', confidence: 91, edited: false },
-  { key: 'lieuNaissance', label: 'Lieu de naissance', value: 'Yaoundé', confidence: 88, edited: false },
-  { key: 'dateExpiration', label: "Date d'expiration", value: '14/06/2033', confidence: 96, edited: false },
+  { key: 'numNational', label: 'N° national CNI', value: 'YA01 2009 0012345678901', confidence: 91, edited: false },
+  { key: 'dateNais', label: 'Date de naissance', value: '14/06/1992', confidence: 91, edited: false },
+  { key: 'lieuNais', label: 'Lieu de naissance', value: 'Yaoundé', confidence: 88, edited: false },
+  { key: 'dateExp', label: "Date d'expiration CNI", value: '14/06/2033', confidence: 96, edited: false },
   { key: 'nationalite', label: 'Nationalité', value: 'Camerounaise', confidence: 99, edited: false },
 ];
 
@@ -184,7 +251,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     fullName: 'Adjoua Cécile Mbarga',
     phone: '+237 6 74 12 34 56',
     email: 'mbarga.adjoua@gmail.com',
-    nationalId: 'CNI-12000018542',
+    nationalId: 'YA01 2009 0012345678901',
     niuId: 'P047217105784Y',
     dateOfBirth: '1992-06-14',
     address: 'Avenue Jean Paul II, Quartier Bastos',
@@ -203,10 +270,10 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'MBARGA', confidence: 97, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Adjoua Cécile', confidence: 94, edited: false },
-      { key: 'numSerie', label: 'N° série CNI', value: '120000185', confidence: 92, edited: false },
-      { key: 'dateNaissance', label: 'Date naissance', value: '14/06/1992', confidence: 91, edited: false },
-      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Yaoundé', confidence: 88, edited: false },
-      { key: 'dateExpiration', label: 'Date expiration', value: '14/06/2033', confidence: 96, edited: false },
+      { key: 'numNational', label: 'N° national CNI', value: 'YA01 2009 0012345678901', confidence: 91, edited: false },
+      { key: 'dateNais', label: 'Date naissance', value: '14/06/1992', confidence: 91, edited: false },
+      { key: 'lieuNais', label: 'Lieu naissance', value: 'Yaoundé', confidence: 88, edited: false },
+      { key: 'dateExp', label: 'Expiration CNI', value: '14/06/2033', confidence: 96, edited: false },
     ],
     validatorNotes: '',
   },
@@ -215,7 +282,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     fullName: 'Kouassi Jean-Pierre Ndam',
     phone: '+237 6 90 43 21 08',
     email: 'jp.ndam@yahoo.fr',
-    nationalId: 'CNI-09870654321',
+    nationalId: 'DL03 1985 9870654321012',
     niuId: 'M123456789012N',
     dateOfBirth: '1985-11-03',
     address: 'Rue 1.757, Nouvelle Route Bastos',
@@ -234,10 +301,10 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'NDAM', confidence: 99, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Kouassi Jean-Pierre', confidence: 95, edited: false },
-      { key: 'numSerie', label: 'N° série CNI', value: '098706543', confidence: 93, edited: false },
-      { key: 'dateNaissance', label: 'Date naissance', value: '03/11/1985', confidence: 93, edited: false },
-      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Douala', confidence: 87, edited: false },
-      { key: 'dateExpiration', label: 'Date expiration', value: '03/11/2035', confidence: 97, edited: false },
+      { key: 'numNational', label: 'N° national CNI', value: 'DL03 1985 9870654321012', confidence: 90, edited: false },
+      { key: 'dateNais', label: 'Date naissance', value: '03/11/1985', confidence: 93, edited: false },
+      { key: 'lieuNais', label: 'Lieu naissance', value: 'Douala', confidence: 87, edited: false },
+      { key: 'dateExp', label: 'Expiration CNI', value: '03/11/2035', confidence: 97, edited: false },
     ],
     validatorNotes: '',
   },
@@ -246,7 +313,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     fullName: 'Epse Tchouamou Marie-Claire Fotso',
     phone: '+237 6 55 78 90 12',
     email: 'm.fotso75@gmail.com',
-    nationalId: 'CNI-07623409812',
+    nationalId: 'YA02 1975 7623409812034',
     niuId: '',  // NIU non fourni — accès limité
     dateOfBirth: '1975-03-22',
     address: 'Avenue Jean Paul II Bis, Face Hôtel Hilton',
@@ -265,10 +332,10 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'FOTSO EPSE TCHOUAMOU', confidence: 78, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Marie-Claire', confidence: 82, edited: false },
-      { key: 'numSerie', label: 'N° série CNI', value: '076234098', confidence: 70, edited: false },
-      { key: 'dateNaissance', label: 'Date naissance', value: '22/03/1975', confidence: 91, edited: false },
-      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Bafoussam', confidence: 72, edited: false },
-      { key: 'dateExpiration', label: 'Date expiration', value: '22/03/2035', confidence: 89, edited: false },
+      { key: 'numNational', label: 'N° national CNI', value: 'YA02 1975 7623409812034', confidence: 70, edited: false },
+      { key: 'dateNais', label: 'Date naissance', value: '22/03/1975', confidence: 91, edited: false },
+      { key: 'lieuNais', label: 'Lieu naissance', value: 'Bafoussam', confidence: 72, edited: false },
+      { key: 'dateExp', label: 'Expiration CNI', value: '22/03/2035', confidence: 89, edited: false },
     ],
     validatorNotes: 'NIU non fourni — attestation DGI manquante. Accès limité activé.',
   },
@@ -277,14 +344,14 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     fullName: 'Ngono Essomba Patrick',
     phone: '+237 6 21 65 43 87',
     email: 'patrick.ngono@bicec.cm',
-    nationalId: 'CNI-04512367809',
+    nationalId: 'EB01 1990 4512367809015',
     niuId: 'K567890123456L',
     dateOfBirth: '1990-09-17',
     address: 'Rue Nachtigal, Quartier Nlongkak',
     city: 'Yaoundé',
     region: 'Centre',
     quartier: 'Nlongkak',
-    commune: 'Yaoundé I',
+    commune: 'Yaoundé II',
     status: 'approved',
     submittedAt: '2026-02-20T15:22:00Z',
     livenessScore: 99,
@@ -296,10 +363,10 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'NGONO ESSOMBA', confidence: 99, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Patrick', confidence: 98, edited: false },
-      { key: 'numSerie', label: 'N° série CNI', value: '045123678', confidence: 99, edited: false },
-      { key: 'dateNaissance', label: 'Date naissance', value: '17/09/1990', confidence: 99, edited: false },
-      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Ebolowa', confidence: 97, edited: false },
-      { key: 'dateExpiration', label: 'Date expiration', value: '17/09/2034', confidence: 99, edited: false },
+      { key: 'numNational', label: 'N° national CNI', value: 'EB01 1990 4512367809015', confidence: 99, edited: false },
+      { key: 'dateNais', label: 'Date naissance', value: '17/09/1990', confidence: 99, edited: false },
+      { key: 'lieuNais', label: 'Lieu naissance', value: 'Ebolowa', confidence: 97, edited: false },
+      { key: 'dateExp', label: 'Expiration CNI', value: '17/09/2034', confidence: 99, edited: false },
     ],
     validatorNotes: 'Tous documents conformes. NIU DGI validé. Approuvé.',
   },
@@ -308,7 +375,7 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     fullName: 'Bella Njoya Inès',
     phone: '+237 6 88 09 54 32',
     email: 'ines.bella@outlook.com',
-    nationalId: 'CNI-03301290045',
+    nationalId: 'BU02 1998 3301290045007',
     niuId: 'T890123456789U',
     dateOfBirth: '1998-12-05',
     address: 'Boulevard de la Réunification, Akwa',
@@ -328,10 +395,10 @@ export const MOCK_APPLICATIONS: ApplicationData[] = [
     ocrFields: [
       { key: 'nom', label: 'Nom de famille', value: 'BELLA NJOYA', confidence: 55, edited: false },
       { key: 'prenom', label: 'Prénom(s)', value: 'Inès', confidence: 28, edited: false },
-      { key: 'numSerie', label: 'N° série CNI', value: '033012900', confidence: 35, edited: false },
-      { key: 'dateNaissance', label: 'Date naissance', value: '05/12/1998', confidence: 38, edited: false },
-      { key: 'lieuNaissance', label: 'Lieu naissance', value: 'Kumba', confidence: 47, edited: false },
-      { key: 'dateExpiration', label: 'Date expiration', value: '05/12/2033', confidence: 52, edited: false },
+      { key: 'numNational', label: 'N° national CNI', value: 'BU02 1998 3301290045007', confidence: 35, edited: false },
+      { key: 'dateNais', label: 'Date naissance', value: '05/12/1998', confidence: 38, edited: false },
+      { key: 'lieuNais', label: 'Lieu naissance', value: 'Kumba', confidence: 47, edited: false },
+      { key: 'dateExp', label: 'Expiration CNI', value: '05/12/2033', confidence: 52, edited: false },
     ],
     validatorNotes: 'Vivacité échouée × 2. Score facial: 42%. Dossier rejeté.',
   },
