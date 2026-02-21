@@ -121,7 +121,7 @@ export function BackOffice() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-full bg-slate-50">
       {/* Sidebar */}
       <div className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
         <div className="p-5 border-b border-slate-100">
@@ -136,7 +136,7 @@ export function BackOffice() {
           </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto min-h-0">
           {[
             { icon: BarChart3, label: 'Dashboard', active: false },
             { icon: Users, label: 'Applications', active: true },

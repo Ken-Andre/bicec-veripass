@@ -37,7 +37,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
   const [ocrFields, setOcrFields] = useState<OCRField[]>(MOCK_OCR_FIELDS);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [livenessAttempts, setLivenessAttempts] = useState(0);
-  const [livenessState, setLivenessState] = useState<'idle' | 'scanning' | 'success' | 'failed' | 'locked'>('idle');
+  const [livenessState, setLivenessState] = useState<'idle' | 'scanning' | 'success' | 'failed' | 'Bloqué'>('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadChunks, setUploadChunks] = useState({ total: 5, completed: 0 });
   const [consentChecks, setConsentChecks] = useState({ terms: false, privacy: false, data: false });
@@ -60,7 +60,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
   const totalSteps = STEP_SEQUENCE.length;
   const progress = ((currentStepIdx + 1) / totalSteps) * 100;
 
-  // Simulate offline toggle
+  // Simuler hors ligne toggle
   useEffect(() => {
     if (!isOnline) {
       setShowOfflineBanner(true);
@@ -202,27 +202,27 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             </div>
           </div>
           <div className="w-full space-y-3 pt-2">
-            <h3 className="text-sm font-semibold text-slate-700">Available while pending:</h3>
-            {['View account details', 'Explore plans', 'Contact support'].map((item) => (
+            <h3 className="text-sm font-semibold text-slate-700">Disponible pendant la vérification :</h3>
+            {['Consulter mon compte', 'Découvrir les offres', 'Contacter le support'].map((item) => (
               <div key={item} className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg border border-slate-200">
                 <Check className="w-4 h-4 text-emerald-500" />
                 <span className="text-sm text-slate-700">{item}</span>
               </div>
             ))}
-            {['Send transfers', 'Request debit card', 'Investments'].map((item) => (
+            {['Virements', 'Carte de débit', 'Investissements'].map((item) => (
               <div key={item} className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg border border-slate-200 opacity-60">
                 <Ban className="w-4 h-4 text-slate-400" />
                 <span className="text-sm text-slate-400">{item}</span>
-                <span className="ml-auto text-xs text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full">Locked</span>
+                <span className="ml-auto text-xs text-slate-400 bg-slate-200 px-2 py-0.5 rounded-full">Bloqué</span>
               </div>
             ))}
           </div>
           <div className="flex gap-2 w-full pt-2">
             <button onClick={() => setPostState('limited')} className="flex-1 py-2.5 bg-amber-500 text-white text-sm font-semibold rounded-xl hover:bg-amber-600 transition-colors">
-              Sim: Limited Access
+              Sim : Accès limité
             </button>
             <button onClick={() => setPostState('full')} className="flex-1 py-2.5 bg-emerald-500 text-white text-sm font-semibold rounded-xl hover:bg-emerald-600 transition-colors">
-              Sim: Full Access
+              Sim : Accès complet
             </button>
           </div>
         </div>
@@ -236,23 +236,23 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             <AlertTriangle className="w-10 h-10 text-orange-600" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Limited Access</h2>
-            <p className="text-sm text-slate-500 mt-2">Your fiscal/tax ID is missing. Complete it to unlock all features.</p>
+            <h2 className="text-xl font-bold text-slate-900">Accès limité</h2>
+            <p className="text-sm text-slate-500 mt-2">Votre NIU fiscal est manquant. Complétez-le pour débloquer toutes les fonctionnalités.</p>
           </div>
           <div className="w-full bg-orange-50 border border-orange-200 rounded-xl p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
               <div className="text-left">
-                <p className="text-sm font-medium text-orange-800">Action Required</p>
+                <p className="text-sm font-medium text-orange-800">Action requise</p>
                 <p className="text-xs text-orange-600 mt-1">Veuillez fournir votre NIU pour débloquer les virements et l'émission de carte.</p>
               </div>
             </div>
           </div>
           <button className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg transition-all">
-            <FileText className="w-5 h-5" /> Complete Fiscal Info
+            <FileText className="w-5 h-5" /> Compléter le NIU fiscal
           </button>
           <button onClick={() => setPostState('full')} className="w-full py-2.5 bg-emerald-500 text-white text-sm font-semibold rounded-xl hover:bg-emerald-600 transition-colors">
-            Simulate: Approved → Full Access
+            Sim : Approuvé → Accès complet
           </button>
         </div>
       );
@@ -270,15 +270,15 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             </div>
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Full Access Unlocked! 🎉</h2>
-            <p className="text-sm text-slate-500 mt-2">Your identity has been verified. All features are now available.</p>
+            <h2 className="text-xl font-bold text-slate-900">Accès complet débloqué ! 🎉</h2>
+            <p className="text-sm text-slate-500 mt-2">Votre identité a été vérifiée. Toutes les fonctionnalités sont désormais accessibles.</p>
           </div>
           <div className="w-full space-y-3">
             {[
-              { label: 'Send & Receive Transfers', icon: Send },
-              { label: 'Request Debit Card', icon: CardIcon },
-              { label: 'Investments & Savings', icon: Sparkles },
-              { label: 'Credit Pre-approval', icon: CheckCircle },
+              { label: 'Virements entrants et sortants', icon: Send },
+              { label: 'Demander la carte de débit', icon: CardIcon },
+              { label: 'Investissements et épargne', icon: Sparkles },
+              { label: 'Pré-approbation de crédit', icon: CheckCircle },
             ].map(({ label, icon: Icon }) => (
               <div key={label} className="flex items-center gap-3 px-4 py-3.5 bg-white rounded-xl border border-emerald-200 shadow-sm">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
@@ -290,7 +290,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             ))}
           </div>
           <button onClick={() => { setPostState(null); setCurrentStepIdx(0); onComplete?.(); }} className="w-full py-2.5 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors mt-2">
-            Restart Demo
+            Recommencer la démo
           </button>
         </div>
       );
@@ -330,8 +330,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
               <Globe className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Choose Language</h2>
-              <p className="text-sm text-slate-500">Select your preferred language</p>
+              <h2 className="text-xl font-bold text-slate-900">Choisir la langue</h2>
+              <p className="text-sm text-slate-500">Sélectionnez votre langue préférée</p>
             </div>
             <div className="space-y-2.5">
               {LANGUAGES.map(l => (
@@ -388,16 +388,16 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
               <Mail className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Email Verification</h2>
+              <h2 className="text-xl font-bold text-slate-900">Vérification e-mail</h2>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Email Address</label>
-              <input type="email" placeholder="your@email.com" defaultValue="maria.garcia@email.com"
+              <label className="text-sm font-medium text-slate-700">Adresse e-mail</label>
+              <input type="email" placeholder="votre@email.com" defaultValue="maria.garcia@email.com"
                 className="w-full mt-1.5 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
             </div>
             <div className="bg-blue-50 rounded-xl p-4 flex items-start gap-3">
               <Mail className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-blue-700">We'll send a verification link. Click it to confirm your email address.</p>
+              <p className="text-xs text-blue-700">We'll send a verification link. Click it to confirm your Adresse e-mail.</p>
             </div>
           </div>
         );
@@ -407,8 +407,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
               <Lock className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">{pinStep === 'create' ? 'Create PIN' : 'Confirm PIN'}</h2>
-              <p className="text-sm text-slate-500">{pinStep === 'create' ? 'Choose a 6-digit PIN' : 'Re-enter your PIN to confirm'}</p>
+              <h2 className="text-xl font-bold text-slate-900">{pinStep === 'create' ? 'Créer le code PIN' : 'Confirmer le code PIN'}</h2>
+              <p className="text-sm text-slate-500">{pinStep === 'create' ? 'Choisissez un PIN à 6 chiffres' : 'Ressaisissez votre PIN pour confirmer'}</p>
             </div>
             <div className="flex justify-center gap-2.5">
               {(pinStep === 'create' ? pin : pinConfirm).map((d, i) => (
@@ -420,7 +420,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             </div>
             <button onClick={() => setShowPin(!showPin)} className="mx-auto flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
               {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              {showPin ? 'Hide' : 'Show'} PIN
+              {showPin ? 'Masquer' : 'Afficher'} PIN
             </button>
             <div className="grid grid-cols-3 gap-2 max-w-[220px] mx-auto">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, '⌫'].map((n, i) => (
@@ -459,14 +459,14 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
                 <Fingerprint className="w-10 h-10 text-blue-600" />
               </div>
-              <h2 className="text-xl font-bold text-slate-900">Enable Biometrics</h2>
-              <p className="text-sm text-slate-500 max-w-[240px]">Use your fingerprint or face to sign in faster</p>
+              <h2 className="text-xl font-bold text-slate-900">Activer la biométrie</h2>
+              <p className="text-sm text-slate-500 max-w-[240px]">Utilisez votre empreinte ou visage pour vous connecter rapidement</p>
             </div>
             <button className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
-              Enable Biometrics
+              Activer la biométrie
             </button>
             <button onClick={goNext} className="text-sm text-slate-500 hover:text-slate-700">
-              Skip for now
+              Ignorer pour l'instant
             </button>
           </div>
         );
@@ -482,8 +482,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               </h2>
               <p className="text-sm text-slate-500">
                 {currentStep.id === 'id-back'
-                  ? 'Verso de votre CNI  N national camerounais'
-                  : 'Recto de votre CNI  numéro et informations civiles'}
+                  ? 'Verso de votre CNI — N° national camerounais'
+                  : 'Recto de votre CNI — numéro et informations civiles'}
               </p>
             </div>
             <div className="relative aspect-[1.6/1] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center">
@@ -528,8 +528,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-5">
             <div className="text-center space-y-2">
               <ScanLine className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Review Extracted Data</h2>
-              <p className="text-sm text-slate-500">Verify and correct the information below</p>
+              <h2 className="text-xl font-bold text-slate-900">Vérifier les données extraites</h2>
+              <p className="text-sm text-slate-500">Vérifiez et corrigez les informations ci-dessous</p>
             </div>
             <div className="space-y-2.5">
               {ocrFields.map(f => (
@@ -554,7 +554,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   ) : (
                     <div className="flex items-center justify-between">
                       <span className={cn('text-sm font-medium', f.edited ? 'text-blue-700' : 'text-slate-900')}>
-                        {f.value} {f.edited && <span className="text-xs text-blue-500">(edited)</span>}
+                        {f.value} {f.edited && <span className="text-xs text-blue-500">(modifié)</span>}
                       </span>
                       <button onClick={() => setEditingField(f.key)} className="text-slate-400 hover:text-blue-600">
                         <Edit3 className="w-4 h-4" />
@@ -572,22 +572,22 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
               <Camera className="w-12 h-12 text-blue-600 mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Liveness Check</h2>
-              <p className="text-sm text-slate-500">Look at the camera and follow instructions</p>
+              <h2 className="text-xl font-bold text-slate-900">Détection de vivacité</h2>
+              <p className="text-sm text-slate-500">Regardez la caméra et suivez les instructions</p>
             </div>
             <div className="relative w-48 h-48 mx-auto">
               <div className={cn('w-full h-full rounded-full border-4 flex items-center justify-center',
                 livenessState === 'scanning' ? 'border-blue-500 animate-pulse' :
                   livenessState === 'success' ? 'border-emerald-500' :
                     livenessState === 'failed' ? 'border-red-500' :
-                      livenessState === 'locked' ? 'border-red-500' :
+                      livenessState === 'Bloqué' ? 'border-red-500' :
                         'border-slate-300')}>
                 <div className="w-40 h-40 rounded-full bg-slate-800 flex items-center justify-center">
                   {livenessState === 'success' ? (
                     <Check className="w-16 h-16 text-emerald-400" />
                   ) : livenessState === 'failed' ? (
                     <X className="w-16 h-16 text-red-400" />
-                  ) : livenessState === 'locked' ? (
+                  ) : livenessState === 'Bloqué' ? (
                     <Ban className="w-16 h-16 text-red-400" />
                   ) : (
                     <Camera className="w-12 h-12 text-white/40" />
@@ -600,8 +600,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               )}
             </div>
             <div className="text-center text-sm text-slate-500">
-              Attempts: {livenessAttempts}/3
-              {livenessState === 'locked' && <p className="text-red-600 font-medium mt-1">Maximum attempts reached. Please contact support.</p>}
+              Tentatives : {livenessAttempts}/3
+              {livenessState === 'Bloqué' && <p className="text-red-600 font-medium mt-1">Nombre maximum de tentatives atteint. Contactez le support.</p>}
             </div>
             {livenessState === 'idle' && (
               <button onClick={() => {
@@ -613,24 +613,24 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   } else {
                     setLivenessAttempts(prev => {
                       const next = prev + 1;
-                      if (next >= 3) setLivenessState('locked');
+                      if (next >= 3) setLivenessState('Bloqué');
                       else setLivenessState('failed');
                       return next;
                     });
                   }
                 }, 2000);
               }} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl">
-                Start Liveness Check
+                Lancer la vérification
               </button>
             )}
             {livenessState === 'failed' && (
               <button onClick={() => setLivenessState('idle')} className="w-full py-3 bg-amber-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2">
-                <RotateCcw className="w-5 h-5" /> Try Again
+                <RotateCcw className="w-5 h-5" /> Réessayer
               </button>
             )}
             {livenessState === 'success' && (
               <div className="bg-emerald-50 rounded-xl p-4 text-center text-sm text-emerald-700 font-medium">
-                ✓ Liveness verified successfully
+                ✓ Vivacité vérifiée avec succès
               </div>
             )}
           </div>
@@ -642,18 +642,18 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             <div className="text-center space-y-2">
               <MapPin className="w-12 h-12 text-blue-600 mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Votre Adresse</h2>
-              <p className="text-sm text-slate-500">S\u00e9lectionnez votre localisation</p>
+              <p className="text-sm text-slate-500">Sélectionnez votre localisation</p>
             </div>
 
             <div className="space-y-3">
-              {/* R\u00e9gion */}
+              {/* Région */}
               <div>
-                <label className="text-sm font-medium text-slate-700">R\u00e9gion</label>
+                <label className="text-sm font-medium text-slate-700">Région</label>
                 <select
                   value={selectedAddress.region}
                   onChange={e => setSelectedAddress({ region: e.target.value, city: '', quartier: '', commune: '' })}
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">S\u00e9lectionner la r\u00e9gion...</option>
+                  <option value="">Sélectionner la région...</option>
                   {REGION_NAMES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
@@ -666,7 +666,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   onChange={e => setSelectedAddress(p => ({ ...p, city: e.target.value, quartier: '', commune: '' }))}
                   disabled={!selectedAddress.region}
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">S\u00e9lectionner la ville...</option>
+                  <option value="">Sélectionner la ville...</option>
                   {selectedAddress.region && REGIONS[selectedAddress.region] &&
                     Object.keys(REGIONS[selectedAddress.region].villes).map(v =>
                       <option key={v} value={v}>{v}</option>)}
@@ -686,7 +686,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   }}
                   disabled={!selectedAddress.city}
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">S\u00e9lectionner le quartier...</option>
+                  <option value="">Sélectionner le quartier...</option>
                   {selectedAddress.city && REGIONS[selectedAddress.region]?.villes[selectedAddress.city]?.quartiers
                     .map((q: QuartierEntry) => <option key={q.name} value={q.name}>{q.name}</option>)}
                 </select>
@@ -710,7 +710,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
               {/* Rue */}
               <div>
-                <label className="text-sm font-medium text-slate-700">Rue / Point de rep\u00e8re</label>
+                <label className="text-sm font-medium text-slate-700">Rue / Point de repère</label>
                 <input type="text" placeholder="Avenue Jean Paul II, face Hilton"
                   className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
@@ -730,14 +730,14 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                       : 'border-slate-300 text-slate-600 hover:border-blue-400'
                   )}>
                   <MapPin className="w-4 h-4" />
-                  {gpsAssist ? '\u2713 Localisation GPS d\u00e9tect\u00e9e (3.862 N, 11.520 E)' : 'D\u00e9tecter ma position GPS'}
+                  {gpsAssist ? '✓ Localisation GPS détectée (3.862 N, 11.520 E)' : 'Détecter ma position GPS'}
                 </button>
               </div>
             </div>
 
             {/* GPS Privacy Modal */}
             {showGpsModal && (
-              <div className="fixed inset-0 bg-black/60 z-50 flex items-end px-4 pb-6" onClick={() => setShowGpsModal(false)}>
+              <div className="absolute inset-0 bg-black/60 z-50 flex items-end px-4 pb-6 rounded-[44px] overflow-hidden" onClick={() => setShowGpsModal(false)}>
                 <div className="bg-white rounded-2xl w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
@@ -749,9 +749,9 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                     </div>
                   </div>
                   <div className="bg-slate-50 rounded-xl px-3 py-3 text-xs text-slate-700 leading-relaxed space-y-2">
-                    <p><strong>Pourquoi&#160;?</strong> Nous enregistrons les coordonn\u00e9es GPS de votre domicile pour <strong>v\u00e9rifier la coh\u00e9rence de votre adresse d\u00e9clar\u00e9e</strong> et satisfaire aux exigences r\u00e9glementaires KYC de la COBAC.</p>
-                    <p><strong>Quand&#160;?</strong> La position est capt\u00e9e <strong>maintenant, une seule fois</strong>, au moment o\u00f9 vous cliquez sur \u00ab\u202fAccepter\u202f\u00bb.</p>
-                    <p><strong>S\u00e9curit\u00e9&#160;:</strong> Les coordonn\u00e9es sont <strong>chiffr\u00e9es, jamais partag\u00e9es</strong> avec des tiers et conserv\u00e9es conform\u00e9ment au cadre l\u00e9gal camerounais.</p>
+                    <p><strong>Pourquoi ?</strong> Nous enregistrons les coordonnées GPS de votre domicile pour <strong>vérifier la cohérence de votre adresse déclarée</strong> et satisfaire aux exigences réglementaires KYC de la COBAC.</p>
+                    <p><strong>Quand ?</strong> La position est captée <strong>maintenant, une seule fois</strong>, au moment où vous cliquez sur « Accepter ».</p>
+                    <p><strong>Sécurité :</strong> Les coordonnées sont <strong>chiffrées, jamais partagées</strong> avec des tiers et conservées conformément au cadre légal camerounais.</p>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setShowGpsModal(false)}
@@ -1074,7 +1074,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               </div>
               <div className="flex items-start gap-2 text-slate-600">
                 <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">3</span>
-                Full account access unlocked
+                Full account access unBloqué
               </div>
             </div>
           </div>
@@ -1123,7 +1123,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                 className="overflow-hidden z-10 relative">
                 <div className="bg-amber-500 text-white text-xs text-center py-1.5 flex items-center justify-center gap-1.5">
                   <WifiOff className="w-3.5 h-3.5" />
-                  Offline — progress saved locally. Reconnecting...
+                  Mode hors ligne — progression sauvegardée. Reconnexion...
                 </div>
               </motion.div>
             )}
@@ -1146,7 +1146,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   <p className="text-xs text-slate-500">{currentStep?.group}</p>
                   <p className="text-sm font-semibold text-slate-900">{currentStep?.label}</p>
                 </div>
-                <button onClick={() => setIsOnline(false)} title="Simulate offline"
+                <button onClick={() => setIsOnline(false)} title="Simuler hors ligne"
                   className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                   <WifiOff className="w-4 h-4" />
                 </button>
@@ -1189,7 +1189,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                       canProceed()
                         ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200 hover:shadow-xl active:scale-[0.98]'
                         : 'bg-slate-200 text-slate-400 cursor-not-allowed')}>
-                    {currentStep?.id === 'review-summary' ? 'Submit Application' : 'Continue'}
+                    {currentStep?.id === 'review-summary' ? 'Soumettre le dossier' : 'Continuer'}
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
@@ -1199,7 +1199,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                 <div className="absolute bottom-0 left-0 right-0 px-5 py-4 bg-gradient-to-t from-white via-white to-white/0">
                   <button onClick={() => setPostState('pending')}
                     className="w-full py-3.5 rounded-2xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
-                    Go to Dashboard <ArrowRight className="w-5 h-5" />
+                    Aller au tableau de bord <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
               )}
@@ -1230,3 +1230,5 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
     </div>
   );
 }
+
+
