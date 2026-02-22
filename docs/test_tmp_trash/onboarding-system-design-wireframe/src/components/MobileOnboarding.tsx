@@ -306,7 +306,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-8">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}
-              className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-700 to-indigo-800 flex items-center justify-center shadow-2xl shadow-blue-300">
+              className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#E37B03] to-[#4A2205] flex items-center justify-center shadow-2xl shadow-orange-200">
               <span className="text-3xl font-black text-white">BV</span>
             </motion.div>
             <div className="space-y-3">
@@ -329,7 +329,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
-              <Globe className="w-12 h-12 text-blue-600 mx-auto" />
+              <Globe className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Choisir la langue</h2>
               <p className="text-sm text-slate-500">Sélectionnez votre langue préférée</p>
             </div>
@@ -337,10 +337,10 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               {LANGUAGES.map(l => (
                 <button key={l.code} onClick={() => setSelectedLang(l.code)}
                   className={cn('w-full flex items-center gap-4 px-4 py-3.5 rounded-xl border-2 transition-all',
-                    selectedLang === l.code ? 'border-blue-600 bg-blue-50' : 'border-slate-200 hover:border-slate-300')}>
+                    selectedLang === l.code ? 'border-[#E37B03] bg-orange-50' : 'border-slate-200 hover:border-slate-300')}>
                   <span className="text-2xl">{l.flag}</span>
-                  <span className={cn('font-medium', selectedLang === l.code ? 'text-blue-700' : 'text-slate-700')}>{l.label}</span>
-                  {selectedLang === l.code && <Check className="w-5 h-5 text-blue-600 ml-auto" />}
+                  <span className={cn('font-medium', selectedLang === l.code ? 'text-orange-800' : 'text-slate-700')}>{l.label}</span>
+                  {selectedLang === l.code && <Check className="w-5 h-5 text-[#E37B03] ml-auto" />}
                 </button>
               ))}
             </div>
@@ -351,7 +351,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
-              <Smartphone className="w-12 h-12 text-blue-600 mx-auto" />
+              <Smartphone className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Vérification téléphone</h2>
               <p className="text-sm text-slate-500">Nous enverrons un code pour vérifier votre numéro</p>
             </div>
@@ -360,11 +360,11 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               <div className="flex mt-1.5">
                 <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-slate-300 bg-slate-50 text-sm text-slate-500">+237</span>
                 <input type="tel" placeholder="6 XX XX XX XX" defaultValue="6 74 12 34 56"
-                  className="flex-1 px-3 py-2.5 border border-slate-300 rounded-r-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                  className="flex-1 px-3 py-2.5 border border-slate-300 rounded-r-xl text-sm focus:ring-2 focus:ring-[#E37B03] focus:border-[#E37B03] outline-none" />
               </div>
             </div>
             {!otpSent ? (
-              <button onClick={() => setOtpSent(true)} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
+              <button onClick={() => setOtpSent(true)} className="w-full py-3 bg-[#E37B03] text-white font-semibold rounded-xl hover:bg-[#c96c02] transition-colors">
                 Envoyer le code OTP
               </button>
             ) : (
@@ -374,10 +374,10 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   {otp.map((d, i) => (
                     <input key={i} type="text" maxLength={1} value={d}
                       onChange={e => { const newOtp = [...otp]; newOtp[i] = e.target.value; setOtp(newOtp); }}
-                      className="w-10 h-12 text-center text-lg font-bold border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+                      className="w-10 h-12 text-center text-lg font-bold border-2 border-slate-300 rounded-lg focus:border-[#E37B03] focus:ring-2 focus:ring-orange-100 outline-none" />
                   ))}
                 </div>
-                <p className="text-xs text-slate-500 text-center">Pas reçu ? <button className="text-blue-600 font-medium">Renvoyer</button></p>
+                <p className="text-xs text-slate-500 text-center">Pas reçu ? <button className="text-[#E37B03] font-medium">Renvoyer</button></p>
               </div>
             )}
           </div>
@@ -387,17 +387,17 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
-              <Mail className="w-12 h-12 text-blue-600 mx-auto" />
+              <Mail className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Vérification e-mail</h2>
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">Adresse e-mail</label>
               <input type="email" placeholder="votre@email.com" defaultValue="maria.garcia@email.com"
-                className="w-full mt-1.5 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                className="w-full mt-1.5 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#E37B03] focus:border-[#E37B03] outline-none" />
             </div>
-            <div className="bg-blue-50 rounded-xl p-4 flex items-start gap-3">
-              <Mail className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-blue-700">We'll send a verification link. Click it to confirm your Adresse e-mail.</p>
+            <div className="bg-orange-50 rounded-xl p-4 flex items-start gap-3 border border-orange-100">
+              <Mail className="w-5 h-5 text-[#E37B03] mt-0.5 shrink-0" />
+              <p className="text-xs text-orange-800">Nous enverrons un lien de vérification. Cliquez dessus pour confirmer votre adresse e-mail.</p>
             </div>
           </div>
         );
@@ -406,14 +406,14 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
-              <Lock className="w-12 h-12 text-blue-600 mx-auto" />
+              <Lock className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">{pinStep === 'create' ? 'Créer le code PIN' : 'Confirmer le code PIN'}</h2>
               <p className="text-sm text-slate-500">{pinStep === 'create' ? 'Choisissez un PIN à 6 chiffres' : 'Ressaisissez votre PIN pour confirmer'}</p>
             </div>
             <div className="flex justify-center gap-2.5">
               {(pinStep === 'create' ? pin : pinConfirm).map((d, i) => (
                 <div key={i} className={cn('w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all',
-                  d ? 'border-blue-600 bg-blue-600' : 'border-slate-300')}>
+                  d ? 'border-[#E37B03] bg-[#E37B03]' : 'border-slate-300')}>
                   {d && (showPin ? <span className="text-white font-bold text-sm">{d}</span> : <div className="w-3 h-3 rounded-full bg-white" />)}
                 </div>
               ))}
@@ -456,13 +456,13 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6 flex flex-col items-center">
             <div className="text-center space-y-2">
-              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
-                <Fingerprint className="w-10 h-10 text-blue-600" />
+              <div className="w-20 h-20 rounded-full bg-orange-50 flex items-center justify-center mx-auto border border-orange-100">
+                <Fingerprint className="w-10 h-10 text-[#E37B03]" />
               </div>
               <h2 className="text-xl font-bold text-slate-900">Activer la biométrie</h2>
               <p className="text-sm text-slate-500 max-w-[240px]">Utilisez votre empreinte ou visage pour vous connecter rapidement</p>
             </div>
-            <button className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
+            <button className="w-full py-3 bg-[#E37B03] text-white font-semibold rounded-xl hover:bg-[#c96c02] transition-colors">
               Activer la biométrie
             </button>
             <button onClick={goNext} className="text-sm text-slate-500 hover:text-slate-700">
@@ -476,7 +476,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
-              <CreditCard className="w-12 h-12 text-blue-600 mx-auto" />
+              <CreditCard className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">
                 CNI — {currentStep.id === 'id-front' ? 'Recto' : 'Verso'}
               </h2>
@@ -508,8 +508,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             </div>
             <div className="space-y-2">
               <p className="text-xs font-medium text-slate-500">Type de document :</p>
-              <div className="flex items-center gap-2 text-xs text-slate-700 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg">
-                <Check className="w-3.5 h-3.5 text-blue-600" /> CNI Biométrique (sélectionné)
+              <div className="flex items-center gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 px-3 py-2 rounded-lg">
+                <Check className="w-3.5 h-3.5 text-[#E37B03]" /> CNI Biométrique (sélectionné)
               </div>
               {['Passeport', 'Permis de conduire'].map(doc => (
                 <div key={doc} className="flex items-center gap-2 text-xs text-slate-400 bg-slate-50 px-3 py-2 rounded-lg opacity-50 cursor-not-allowed">
@@ -517,7 +517,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                 </div>
               ))}
             </div>
-            <button onClick={goNext} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2">
+            <button onClick={goNext} className="w-full py-3 bg-[#E37B03] text-white font-semibold rounded-xl flex items-center justify-center gap-2">
               <Camera className="w-5 h-5" /> Capturer
             </button>
           </div>
@@ -527,7 +527,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-5">
             <div className="text-center space-y-2">
-              <ScanLine className="w-12 h-12 text-blue-600 mx-auto" />
+              <ScanLine className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Vérifier les données extraites</h2>
               <p className="text-sm text-slate-500">Vérifiez et corrigez les informations ci-dessous</p>
             </div>
@@ -547,16 +547,16 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                           setOcrFields(prev => prev.map(fld => fld.key === f.key ? { ...fld, value: e.target.value, edited: true } : fld));
                           setEditingField(null);
                         }}
-                        className="flex-1 px-2 py-1 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 outline-none"
+                        className="flex-1 px-2 py-1 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-200 outline-none"
                         autoFocus />
                       <button onClick={() => setEditingField(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <span className={cn('text-sm font-medium', f.edited ? 'text-blue-700' : 'text-slate-900')}>
-                        {f.value} {f.edited && <span className="text-xs text-blue-500">(modifié)</span>}
+                      <span className={cn('text-sm font-medium', f.edited ? 'text-orange-800' : 'text-slate-900')}>
+                        {f.value} {f.edited && <span className="text-xs text-orange-500">(modifié)</span>}
                       </span>
-                      <button onClick={() => setEditingField(f.key)} className="text-slate-400 hover:text-blue-600">
+                      <button onClick={() => setEditingField(f.key)} className="text-slate-400 hover:text-orange-600">
                         <Edit3 className="w-4 h-4" />
                       </button>
                     </div>
@@ -571,13 +571,13 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
-              <Camera className="w-12 h-12 text-blue-600 mx-auto" />
+              <Camera className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Détection de vivacité</h2>
               <p className="text-sm text-slate-500">Regardez la caméra et suivez les instructions</p>
             </div>
             <div className="relative w-48 h-48 mx-auto">
               <div className={cn('w-full h-full rounded-full border-4 flex items-center justify-center',
-                livenessState === 'scanning' ? 'border-blue-500 animate-pulse' :
+                livenessState === 'scanning' ? 'border-[#E37B03] animate-pulse' :
                   livenessState === 'success' ? 'border-emerald-500' :
                     livenessState === 'failed' ? 'border-red-500' :
                       livenessState === 'Bloqué' ? 'border-red-500' :
@@ -595,7 +595,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                 </div>
               </div>
               {livenessState === 'scanning' && (
-                <motion.div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent"
+                <motion.div className="absolute inset-0 rounded-full border-4 border-t-[#E37B03] border-r-transparent border-b-transparent border-l-transparent"
                   animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }} />
               )}
             </div>
@@ -619,7 +619,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                     });
                   }
                 }, 2000);
-              }} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl">
+              }} className="w-full py-3 bg-[#E37B03] text-white font-semibold rounded-xl">
                 Lancer la vérification
               </button>
             )}
@@ -640,7 +640,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-4">
             <div className="text-center space-y-2">
-              <MapPin className="w-12 h-12 text-blue-600 mx-auto" />
+              <MapPin className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Votre Adresse</h2>
               <p className="text-sm text-slate-500">Sélectionnez votre localisation</p>
             </div>
@@ -652,7 +652,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                 <select
                   value={selectedAddress.region}
                   onChange={e => setSelectedAddress({ region: e.target.value, city: '', quartier: '', commune: '' })}
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#E37B03] outline-none">
                   <option value="">Sélectionner la région...</option>
                   {REGION_NAMES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -665,7 +665,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   value={selectedAddress.city}
                   onChange={e => setSelectedAddress(p => ({ ...p, city: e.target.value, quartier: '', commune: '' }))}
                   disabled={!selectedAddress.region}
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
+                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-[#E37B03] outline-none">
                   <option value="">Sélectionner la ville...</option>
                   {selectedAddress.region && REGIONS[selectedAddress.region] &&
                     Object.keys(REGIONS[selectedAddress.region].villes).map(v =>
@@ -685,7 +685,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                     setSelectedAddress(p => ({ ...p, quartier: qName, commune: quartierData?.commune ?? '' }));
                   }}
                   disabled={!selectedAddress.city}
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
+                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm bg-white disabled:bg-slate-100 focus:ring-2 focus:ring-[#E37B03] outline-none">
                   <option value="">Sélectionner le quartier...</option>
                   {selectedAddress.city && REGIONS[selectedAddress.region]?.villes[selectedAddress.city]?.quartiers
                     .map((q: QuartierEntry) => <option key={q.name} value={q.name}>{q.name}</option>)}
@@ -712,7 +712,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               <div>
                 <label className="text-sm font-medium text-slate-700">Rue / Point de repère</label>
                 <input type="text" placeholder="Avenue Jean Paul II, face Hilton"
-                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                  className="w-full mt-1 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#E37B03] outline-none" />
               </div>
 
               {/* GPS domicile */}
@@ -727,7 +727,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                     'w-full mt-1 py-2.5 rounded-xl border-2 flex items-center justify-center gap-2 text-sm font-medium transition-all',
                     gpsAssist
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-300 text-slate-600 hover:border-blue-400'
+                      : 'border-slate-300 text-slate-600 hover:border-[#E37B03]'
                   )}>
                   <MapPin className="w-4 h-4" />
                   {gpsAssist ? '✓ Localisation GPS détectée (3.862 N, 11.520 E)' : 'Détecter ma position GPS'}
@@ -740,8 +740,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               <div className="absolute inset-0 bg-black/60 z-50 flex items-end px-4 pb-6 rounded-[44px] overflow-hidden" onClick={() => setShowGpsModal(false)}>
                 <div className="bg-white rounded-2xl w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-                      <MapPin className="w-5 h-5 text-blue-600" />
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+                      <MapPin className="w-5 h-5 text-[#E37B03]" />
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-900 text-sm">Localisation GPS de votre domicile</h3>
@@ -773,7 +773,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6">
             <div className="text-center space-y-2">
-              <FileCheck className="w-12 h-12 text-blue-600 mx-auto" />
+              <FileCheck className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Justificatif de Domicile</h2>
               <p className="text-sm text-slate-500">Uploadez une facture récente (‹ 3 mois)</p>
             </div>
@@ -803,7 +803,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             </div>
 
             {/* Info banner */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5 text-xs text-blue-700 leading-relaxed">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5 text-xs text-orange-800 leading-relaxed">
               📋 Le NIU est délivré par la <strong>DGI (Direction Générale des Impôts)</strong> — c'est un <strong>identifiant alphanumérique</strong> (ex : <span className="font-mono">P047217105784Y</span>) figurant sur votre <strong>attestation d'immatriculation fiscale</strong> (Harmony / impots.cm). <u>Il ne se trouve pas sur la CNI.</u>
             </div>
 
@@ -823,10 +823,10 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   className={cn(
                     'flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border-2 transition-all',
                     niuEntryMode === 'upload'
-                      ? 'border-blue-600 bg-blue-50'
+                      ? 'border-[#E37B03] bg-orange-50'
                       : 'border-slate-200 hover:border-slate-300'
                   )}>
-                  <Upload className="w-5 h-5 text-blue-600" />
+                  <Upload className="w-5 h-5 text-[#E37B03]" />
                   <span className="text-[10px] font-medium text-slate-700 text-center leading-tight">Photo /<br />Upload</span>
                 </button>
                 {/* Saisie manuelle */}
@@ -835,10 +835,10 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   className={cn(
                     'flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border-2 transition-all',
                     niuEntryMode === 'manual'
-                      ? 'border-blue-600 bg-blue-50'
+                      ? 'border-[#E37B03] bg-orange-50'
                       : 'border-slate-200 hover:border-slate-300'
                   )}>
-                  <Edit3 className="w-5 h-5 text-blue-600" />
+                  <Edit3 className="w-5 h-5 text-[#E37B03]" />
                   <span className="text-[10px] font-medium text-slate-700 text-center leading-tight">Saisie<br />manuelle</span>
                 </button>
               </div>
@@ -917,7 +917,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-5">
             <div className="text-center space-y-2">
-              <ShieldCheck className="w-12 h-12 text-blue-600 mx-auto" />
+              <ShieldCheck className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Terms & Consent</h2>
             </div>
             <div className="space-y-3">
@@ -930,7 +930,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   className={cn('w-full flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all',
                     consentChecks[c.key] ? 'border-blue-600 bg-blue-50' : 'border-slate-200')}>
                   <div className={cn('w-5 h-5 mt-0.5 rounded border-2 flex items-center justify-center shrink-0 transition-all',
-                    consentChecks[c.key] ? 'border-blue-600 bg-blue-600' : 'border-slate-300')}>
+                    consentChecks[c.key] ? 'border-[#E37B03] bg-[#E37B03]' : 'border-slate-300')}>
                     {consentChecks[c.key] && <Check className="w-3.5 h-3.5 text-white" />}
                   </div>
                   <div>
@@ -947,7 +947,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-5">
             <div className="text-center space-y-2">
-              <PenTool className="w-12 h-12 text-blue-600 mx-auto" />
+              <PenTool className="w-12 h-12 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Digital Signature</h2>
               <p className="text-sm text-slate-500">Sign below to complete your agreement</p>
             </div>
@@ -975,7 +975,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   <button onClick={clearCanvas} className="flex-1 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-600 flex items-center justify-center gap-1">
                     <RotateCcw className="w-4 h-4" /> Clear
                   </button>
-                  <button onClick={() => setIsSigning(false)} className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium">
+                  <button onClick={() => setIsSigning(false)} className="flex-1 py-2 bg-[#E37B03] text-white rounded-xl text-sm font-medium">
                     Accept
                   </button>
                 </div>
@@ -1016,12 +1016,12 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return (
           <div className="px-6 space-y-6 flex flex-col items-center justify-center h-full">
             <div className="relative">
-              <div className="w-24 h-24 rounded-full border-4 border-blue-200 flex items-center justify-center">
-                <Upload className="w-10 h-10 text-blue-600" />
+              <div className="w-24 h-24 rounded-full border-4 border-orange-100 flex items-center justify-center">
+                <Upload className="w-10 h-10 text-[#E37B03]" />
               </div>
               <svg className="absolute inset-0 w-24 h-24" viewBox="0 0 96 96">
-                <circle cx="48" cy="48" r="44" fill="none" stroke="#dbeafe" strokeWidth="4" />
-                <circle cx="48" cy="48" r="44" fill="none" stroke="#2563eb" strokeWidth="4"
+                <circle cx="48" cy="48" r="44" fill="none" stroke="#ffedd5" strokeWidth="4" />
+                <circle cx="48" cy="48" r="44" fill="none" stroke="#E37B03" strokeWidth="4"
                   strokeDasharray={276.5} strokeDashoffset={276.5 * (1 - uploadProgress / 100)}
                   strokeLinecap="round" transform="rotate(-90 48 48)" className="transition-all duration-300" />
               </svg>
@@ -1031,12 +1031,12 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               <p className="text-sm text-slate-500">Secure upload with chunked transfer</p>
             </div>
             <div className="w-full max-w-[260px] space-y-3">
-              <div className="flex justify-between text-sm">
+              <div className="justify-between flex text-sm">
                 <span className="text-slate-600">Progress</span>
-                <span className="font-mono font-bold text-blue-600">{Math.round(uploadProgress)}%</span>
+                <span className="font-mono font-bold text-[#E37B03]">{Math.round(uploadProgress)}%</span>
               </div>
               <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-300"
+                <div className="h-full bg-gradient-to-r from-[#E37B03] to-[#4A2205] rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }} />
               </div>
               <div className="flex justify-between text-xs text-slate-500">
@@ -1065,16 +1065,16 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             <div className="w-full bg-slate-50 rounded-xl p-4 space-y-2 text-sm text-left">
               <p className="font-medium text-slate-700">What happens next?</p>
               <div className="flex items-start gap-2 text-slate-600">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">1</span>
                 Document review (1-2 business days)
               </div>
               <div className="flex items-start gap-2 text-slate-600">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">2</span>
                 Identity verification confirmation
               </div>
               <div className="flex items-start gap-2 text-slate-600">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">3</span>
-                Full account access unBloqué
+                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">3</span>
+                Full account access unblocked
               </div>
             </div>
           </div>
@@ -1156,7 +1156,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               <div className="px-5 py-2">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <motion.div className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"
+                    <motion.div className="h-full bg-gradient-to-r from-[#E37B03] to-[#4A2205] rounded-full"
                       animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }} />
                   </div>
                   <span className="text-[10px] font-mono text-slate-400">{currentStepIdx + 1}/{totalSteps}</span>
@@ -1187,7 +1187,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                     disabled={!canProceed()}
                     className={cn('w-full py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-all',
                       canProceed()
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200 hover:shadow-xl active:scale-[0.98]'
+                        ? 'bg-gradient-to-r from-[#E37B03] to-[#4A2205] text-white shadow-lg shadow-orange-200 hover:shadow-xl active:scale-[0.98]'
                         : 'bg-slate-200 text-slate-400 cursor-not-allowed')}>
                     {currentStep?.id === 'review-summary' ? 'Soumettre le dossier' : 'Continuer'}
                     <ChevronRight className="w-5 h-5" />
@@ -1198,7 +1198,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
               {currentStep?.id === 'success' && (
                 <div className="absolute bottom-0 left-0 right-0 px-5 py-4 bg-gradient-to-t from-white via-white to-white/0">
                   <button onClick={() => setPostState('pending')}
-                    className="w-full py-3.5 rounded-2xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
+                    className="w-full py-3.5 rounded-2xl font-semibold bg-gradient-to-r from-[#E37B03] to-[#4A2205] text-white shadow-lg shadow-orange-200 flex items-center justify-center gap-2">
                     Aller au tableau de bord <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>

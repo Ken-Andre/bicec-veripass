@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-orange: #E37B03;
+  --color-brand-brown: #4A2205;
+  --color-brand-blue: #2563EB;
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;

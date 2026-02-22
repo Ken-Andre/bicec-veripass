@@ -154,6 +154,7 @@ Review & Refine: If a change isn’t right, rephrase or be more targeted."```)
 ---
 
 ---
+> This for Datacamp
 Select count(*)
 From information_schema.columns
 Where table_schema='public' and table_name='university_professors'
