@@ -119,7 +119,7 @@
   > A mobile error bottom sheet overlaid on blurred background. Rounded top corners. Red Lucide shield-alert icon at top. Bold typography explaining failure. Red CTA button full width. Reassuring but serious tone.
 
 #### M-C01 : Adresse Structurée
-- **Layout** : 4 dropdowns cascadés (Région→Département→Ville→Commune) + champ libre quartier. CTA orange.
+- **Layout** : 4 dropdowns cascadés (Région→Ville→Quartier→Commune) + champ libre lieu dit. CTA orange.
 - **Prompt Stitch** :
   > A mobile address form screen. Abstract soft gradient background. Four stacked dropdown selectors using a frosted glassmorphism effect. Below, a free-text input 'Neighborhood' with an inner shadow skeuomorphic depth. Orange #E37B03 tactile 3D button at bottom 'Next'. Step indicator top. Inter font, Lucide chevron-down icons in dropdowns, BICEC VeriPass branding.
 
