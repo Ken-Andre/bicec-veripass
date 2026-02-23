@@ -19,6 +19,8 @@ classification:
 **Author:** Ken
 **Date:** 2026-02-07
 
+**Reconciliation Note (2026-02-23):** The interactive prototype at `docs/test_tmp_trash/onboarding-system-design-wireframe` and the UX Specification `_bmad-output/planning-artifacts/ux-design-specification-v2.md` (2026-02-18) have been reviewed and validated as the current UI/flow references. This PRD is now aligned to the prototype where discrepancies existed; see `docs/diagrams/adr-state-mapping.md` for the authoritative state mapping and the Mermaid diagrams in `docs/diagrams/` for flow/state/ER artifacts.
+
 ## 1. Executive Summary
 **bicec-veripass** is BICEC's **client relationship and service discovery platform**—a mobile-first ecosystem that transforms customer acquisition through digital KYC onboarding (**<15 minutes [11-minute stretch goal]** vs. 14 days), personalized banking service demonstrations, and account lifecycle management. Built on a 100% On-Premise, Open-Source AI stack (PaddleOCR, DeepFace), it serves as the **central touchpoint** for new customer relationships, bridging the "Trust Gap" for young entrepreneurs while maintaining COBAC-compliant "Human-in-the-Loop" validation.
 

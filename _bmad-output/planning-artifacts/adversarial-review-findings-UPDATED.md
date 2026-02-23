@@ -6,6 +6,8 @@
 **Updated with Ken's Context:** 2026-02-15 (3-day review feedback incorporated)  
 **Overall Assessment:** 🔴 NOT READY FOR IMPLEMENTATION - Paused at Step 4/10 (UX Specification)
 
+**Reconciliation Update (2026-02-23):** Following a thorough cross-check with the validated interactive prototype (`docs/test_tmp_trash/onboarding-system-design-wireframe`) and the updated UX Specification (`_bmad-output/planning-artifacts/ux-design-specification-v2.md`, 2026-02-18), several UX vs PRD inconsistencies have been reconciled. The prototype is treated as the minimal, validated implementation for UI/flow behaviour; outstanding architecture and epic-level artifacts remain and should proceed using the prototype + UX v2 as the source-of-truth. See `docs/diagrams/adr-state-mapping.md` for the canonical state mapping and `docs/diagrams/` for generated diagrams.
+
 ---
 
 ## 👤 Critical Context: Who is Ken & Why Work Stopped
