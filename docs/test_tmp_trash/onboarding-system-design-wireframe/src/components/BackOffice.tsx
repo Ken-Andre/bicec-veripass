@@ -29,7 +29,7 @@ const PERSONAS = {
     avatar: 'TN',
     color: 'orange',
     description: 'Gestion des risques, détection de fraude et supervision.',
-    permissions: ['applications', 'risk', 'fraud', 'dedup', 'agencies', 'national-metrics', 'settings']
+    permissions: ['thomas-dashboard', 'fraud', 'dedup', 'agencies', 'batch-amplitude', 'national-metrics', 'settings']
   },
   sylvie: {
     id: 'sylvie',
@@ -51,16 +51,17 @@ export function BackOffice() {
   const [activeTab, setActiveTab] = useState<'identity' | 'address' | 'liveness' | 'summary'>('identity');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showAddAgencyModal, setShowAddAgencyModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [validatorNote, setValidatorNote] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showImageZoom, setShowImageZoom] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<string>('applications');
+  const [currentView, setCurrentView] = useState<string>('thomas-dashboard');
 
   // Set default view based on persona when logging in
   useEffect(() => {
     if (currentPersona === 'sylvie') setCurrentView('dashboard');
-    else if (currentPersona === 'thomas') setCurrentView('risk');
+    else if (currentPersona === 'thomas') setCurrentView('thomas-dashboard');
     else setCurrentView('agent-dashboard');
   }, [currentPersona]);
 
@@ -231,10 +232,11 @@ export function BackOffice() {
             { icon: BarChart3, label: 'Dashboard', id: 'dashboard', access: ['dashboard'] },
             { icon: BarChart3, label: 'Dashboard Agent', id: 'agent-dashboard', access: ['agent-dashboard'] },
             { icon: Users, label: 'Applications', id: 'applications', access: ['applications'] },
-            { icon: Shield, label: 'Dashboard AML', id: 'risk', access: ['risk'] },
+            { icon: Shield, label: 'Dashboard National', id: 'thomas-dashboard', access: ['thomas-dashboard'] },
             { icon: AlertTriangle, label: 'Screening AML', id: 'fraud', access: ['fraud'] },
             { icon: ArrowRightLeft, label: 'Déduplication', id: 'dedup', access: ['dedup'] },
             { icon: Building2, label: 'Agences', id: 'agencies', access: ['agencies'] },
+            { icon: FileTerminal, label: 'Batch Amplitude', id: 'batch-amplitude', access: ['batch-amplitude'] },
             { icon: LineChart, label: 'Métriques', id: 'national-metrics', access: ['national-metrics'] },
             { icon: FileTerminal, label: 'Audit & Rapports', id: 'audit', access: ['audit', 'reports'] },
             { icon: Settings, label: 'Paramètres', id: 'settings', access: ['settings'] },
@@ -621,7 +623,7 @@ export function BackOffice() {
                   <h2 className="text-2xl font-bold text-slate-900">Administration des Agences</h2>
                   <p className="text-slate-500 text-sm">Gestion du réseau BICEC et affectation du routing</p>
                 </div>
-                <button className="bg-[#2563EB] text-white rounded-xl px-5 py-2.5 text-sm font-bold shadow-md shadow-blue-200 hover:bg-blue-700 transition-colors flex items-center gap-2">
+                <button onClick={() => setShowAddAgencyModal(true)} className="bg-[#2563EB] text-white rounded-xl px-5 py-2.5 text-sm font-bold shadow-md shadow-blue-200 hover:bg-blue-700 transition-colors flex items-center gap-2">
                   <Building2 className="w-4 h-4" />
                   Ajouter une agence
                 </button>
@@ -664,6 +666,114 @@ export function BackOffice() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              {/* Add Agency Modal */}
+              {showAddAgencyModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                    <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-[#2563EB]" /> Ajouter une Agence
+                      </h3>
+                      <button onClick={() => setShowAddAgencyModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Nom de l'agence</label>
+                        <input type="text" placeholder="Ex: Agence Bonanjo" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1.5">Code Agence</label>
+                          <input type="text" placeholder="Ex: B-020" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1.5">Ville</label>
+                          <input type="text" placeholder="Ex: Douala" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        </div>
+                      </div>
+                      <div className="pt-4 flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700">Activer le routing immédiat</span>
+                        <button className="w-10 h-6 bg-blue-600 rounded-full relative transition-colors focus:outline-none">
+                          <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform translate-x-4 shadow-sm" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+                      <button onClick={() => setShowAddAgencyModal(false)} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors">Annuler</button>
+                      <button onClick={() => setShowAddAgencyModal(false)} className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-[#2563EB] hover:bg-blue-700 shadow-sm transition-colors">Créer l'agence</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Batch Amplitude Monitor View — Thomas */}
+          {currentView === 'batch-amplitude' && (
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Monitorage Provisioning & Batch</h2>
+                  <p className="text-slate-500 text-sm">Synchronisation des profils validés vers le Core Banking (Amplitude)</p>
+                </div>
+                <button className="bg-white border border-slate-200 text-slate-700 rounded-xl px-5 py-2.5 text-sm font-bold shadow-sm hover:bg-slate-50 transition-colors flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" /> Relancer Échecs
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                  <h3 className="text-sm font-semibold text-slate-700">Chronologie des Batchs d'Intégration</h3>
+                </div>
+                <div className="divide-y divide-slate-100 p-2">
+                  {[
+                    { date: '22 Fév 2026, 14:00', total: 45, success: 45, failed: 0, status: 'success', id: 'BCH-8902' },
+                    { date: '22 Fév 2026, 13:00', total: 52, success: 50, failed: 2, status: 'warning', id: 'BCH-8901' },
+                    { date: '22 Fév 2026, 12:00', total: 38, success: 38, failed: 0, status: 'success', id: 'BCH-8900' },
+                    { date: '22 Fév 2026, 11:00', total: 61, success: 0, failed: 61, status: 'error', id: 'BCH-8899' },
+                  ].map((batch, i) => (
+                    <div key={i} className="px-4 py-4 flex items-center gap-6 hover:bg-slate-50 transition-colors rounded-xl m-2">
+                      <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border-2',
+                        batch.status === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
+                          batch.status === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-600' :
+                            'bg-red-50 border-red-100 text-red-600'
+                      )}>
+                        {batch.status === 'success' ? <CheckCircle className="w-6 h-6" /> :
+                          batch.status === 'warning' ? <AlertTriangle className="w-6 h-6" /> :
+                            <XCircle className="w-6 h-6" />}
+                      </div>
+
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <p className="text-sm font-bold text-slate-900">{batch.date}</p>
+                          <span className="text-[10px] uppercase font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded">{batch.id}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs font-semibold">
+                          <span className="text-slate-500">Total: {batch.total} dossiers</span>
+                          <span className="text-emerald-600">{batch.success} succès</span>
+                          {batch.failed > 0 && <span className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{batch.failed} échecs</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {batch.status !== 'success' && (
+                          <button className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                            Voir logs
+                          </button>
+                        )}
+                        {batch.status === 'error' && (
+                          <button className="px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm">
+                            Retry
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -802,119 +912,218 @@ export function BackOffice() {
             </div>
           )}
 
-          {/* Risk & AML View — Thomas (Responsable AML/Ops) */}
-          {currentView === 'risk' && (
+          {/* Deduplication & Conflict Resolver View — Thomas (A-T05) */}
+          {currentView === 'dedup' && (
             <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900">Analyse Risques & Conformité AML</h2>
-                <p className="text-slate-500 text-sm">Surveillance anti-blanchiment, screening PEP et anomalies documentaires</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Résolution des Conflits & Déduplication</h2>
+                  <p className="text-slate-500 text-sm">Gestion des doublons et similitudes biométriques</p>
+                </div>
+                <div className="bg-amber-100 text-amber-700 font-bold px-3 py-1.5 rounded-lg text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> 3 conflits urgents
+                </div>
               </div>
 
-              {/* AML Summary Cards */}
-              <div className="grid grid-cols-4 gap-4">
+              {/* Conflict queue */}
+              <div className="grid grid-cols-1 gap-6">
                 {[
-                  { label: 'Alertes Actives', value: '7', color: 'text-red-600', bg: 'bg-red-50', icon: AlertTriangle },
-                  { label: 'Screening PEP', value: '2 hits', color: 'text-amber-600', bg: 'bg-amber-50', icon: Shield },
-                  { label: 'Sanctions OFAC', value: '0 match', color: 'text-emerald-600', bg: 'bg-emerald-50', icon: CheckCircle },
-                  { label: 'Docs Suspects', value: '3', color: 'text-orange-600', bg: 'bg-orange-50', icon: Eye },
-                ].map(c => (
-                  <div key={c.label} className={cn('rounded-2xl border border-slate-200 p-5 shadow-sm', c.bg)}>
-                    <c.icon className={cn('w-5 h-5 mb-3', c.color)} />
-                    <h4 className={cn('text-2xl font-black', c.color)}>{c.value}</h4>
-                    <p className="text-xs text-slate-600 mt-1">{c.label}</p>
+                  {
+                    id: 'CONF-2026-0042',
+                    type: 'Similitude Faciale (89%)',
+                    status: 'pending',
+                    profileA: { id: 'VRF-2026-0005', name: 'Njoya Inès Bella', date: 'Aujourd\'hui, 10:15', dob: '14/05/1992', city: 'Douala', doc: 'CNI: 112233445' },
+                    profileB: { id: 'BCE-2019-8841', name: 'Bella Njoya Inès', date: 'Client Existant (Depuis 2019)', dob: '14/05/1992', city: 'Douala', doc: 'CNI: 112233445' }
+                  }
+                ].map((conf, i) => (
+                  <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] uppercase font-mono bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-bold">{conf.id}</span>
+                        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <Users className="w-4 h-4 text-[#E37B03]" /> {conf.type}
+                        </h3>
+                      </div>
+                      <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded">En attente</span>
+                    </div>
+
+                    <div className="p-6 grid grid-cols-2 divide-x divide-slate-100">
+                      {/* Profile A (New) */}
+                      <div className="pr-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Profil Entrant</span>
+                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-medium">{conf.profileA.date}</span>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="flex items-start gap-4">
+                            <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                              <img src="https://images.unsplash.com/photo-1531123897727-8f129e1bfff8?auto=format&fit=crop&q=80&w=150" alt="New Profile" className="w-full h-full object-cover" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">{conf.profileA.name}</p>
+                              <p className="text-xs font-mono text-slate-500 mt-0.5">{conf.profileA.id}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2 bg-slate-50 p-4 rounded-xl text-sm">
+                            <div className="flex justify-between"><span className="text-slate-500">Document</span><span className="font-medium bg-amber-100 text-amber-900 px-1 rounded">{conf.profileA.doc}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Naissance</span><span className="font-medium">{conf.profileA.dob}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Ville</span><span className="font-medium">{conf.profileA.city}</span></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Profile B (Existing) */}
+                      <div className="pl-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Profil Existant</span>
+                          <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded font-medium">{conf.profileB.date}</span>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="flex items-start gap-4">
+                            <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                              <img src="https://images.unsplash.com/photo-1531123897727-8f129e1bfff8?auto=format&fit=crop&q=80&w=150" alt="Existing Profile" className="w-full h-full object-cover filter grayscale" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">{conf.profileB.name}</p>
+                              <p className="text-xs font-mono text-slate-500 mt-0.5">{conf.profileB.id}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2 bg-slate-50 p-4 rounded-xl text-sm">
+                            <div className="flex justify-between"><span className="text-slate-500">Document</span><span className="font-medium bg-amber-100 text-amber-900 px-1 rounded">{conf.profileB.doc}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Naissance</span><span className="font-medium">{conf.profileB.dob}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Ville</span><span className="font-medium">{conf.profileB.city}</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <ZoomIn className="w-5 h-5 text-slate-400" />
+                        <span className="text-sm font-medium text-slate-600">Similitude CNI exacte détectée. Risque de compte doublon.</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                          Marquer Faux Positif
+                        </button>
+                        <button className="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2">
+                          <XCircle className="w-4 h-4" /> Rejeter Entrant
+                        </button>
+                        <button className="px-4 py-2 text-sm font-bold text-white bg-[#E37B03] rounded-xl hover:bg-orange-600 shadow-sm transition-colors flex items-center gap-2">
+                          <ArrowRightLeft className="w-4 h-4" /> Profils Liés (Merge)
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
+            </div>
+          )}
 
-              {/* Fraud Alerts Panel */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-700">🚨 Alertes Fraude en Cours</h3>
-                  <span className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-1 rounded-full">7 non résolues</span>
+          {/* Dashboard National — Thomas (Superviseur AML/CFT) A-T02 */}
+          {currentView === 'thomas-dashboard' && (
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Supervision Nationale</h2>
+                  <p className="text-slate-500 text-sm">Vue globale réseau et conformité AML/CFT</p>
                 </div>
-                <div className="divide-y divide-slate-50">
-                  {[
-                    { name: 'Bella Njoya Inès', alert: 'Liveness score critique (42%) — possible spoofing', severity: 'high', id: 'VRF-2026-0005' },
-                    { name: 'Epse Tchouamou M-C. Fotso', alert: 'Incohérence nom CNI / déclaration OCR', severity: 'medium', id: 'VRF-2026-0003' },
-                    { name: 'Client Anonyme #412', alert: 'Adresse IP géolocalisée hors Cameroun (Nigeria)', severity: 'high', id: 'VRF-2026-0412' },
-                    { name: 'Moussa Amadou B.', alert: 'Tentatives OTP multiples (>5 en 10min)', severity: 'medium', id: 'VRF-2026-0187' },
-                    { name: 'Jean-Claude Nkeng', alert: 'NIU format invalide — possible falsification', severity: 'low', id: 'VRF-2026-0299' },
-                  ].map((a, i) => (
-                    <div key={i} className="px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-                      <div className={cn('w-2.5 h-2.5 rounded-full mt-1.5 shrink-0',
-                        a.severity === 'high' ? 'bg-red-500' : a.severity === 'medium' ? 'bg-amber-500' : 'bg-slate-400')} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">{a.name}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{a.alert}</p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-1">{a.id}</p>
-                      </div>
-                      <span className={cn('text-[10px] font-bold uppercase px-2 py-1 rounded-md shrink-0',
-                        a.severity === 'high' ? 'bg-red-100 text-red-700' :
-                          a.severity === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600')}>
-                        {a.severity === 'high' ? 'Critique' : a.severity === 'medium' ? 'Moyen' : 'Faible'}
-                      </span>
-                      <button onClick={() => { setCurrentView('applications'); const found = applications.find(x => x.id === a.id); if (found) setSelectedApp(found); }}
-                        className="text-[#E37B03] text-xs font-bold hover:underline shrink-0">Investiguer</button>
-                    </div>
-                  ))}
+                <button onClick={() => setCurrentView('fraud')} className="bg-[#E37B03] text-white rounded-xl px-5 py-2.5 text-sm font-bold shadow-md shadow-orange-200 hover:bg-orange-600 transition-colors">
+                  Voir Alertes AML
+                </button>
+              </div>
+
+              {/* Banner */}
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-red-900">Alertes Critiques Actives</h3>
+                    <p className="text-xs text-red-700 mt-0.5">2 hits PEP majeurs et 5 dossiers suspects nécessitent votre validation.</p>
+                  </div>
+                </div>
+                <button onClick={() => setCurrentView('fraud')} className="text-sm font-bold text-red-700 bg-white px-4 py-2 rounded-xl shadow-sm hover:bg-red-50 transition-colors">
+                  Traiter (7)
+                </button>
+              </div>
+
+              {/* 3 Stat Cards */}
+              <div className="grid grid-cols-3 gap-6">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Agences Actives</p>
+                    <p className="text-2xl font-black text-slate-900 mt-1">42 <span className="text-xs text-emerald-600 font-medium ml-1">+1</span></p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Dossiers Nationaux (Jour)</p>
+                    <p className="text-2xl font-black text-slate-900 mt-1">1,204 <span className="text-xs text-emerald-600 font-medium ml-1">+14%</span></p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center">
+                    <Shield className="w-6 h-6 text-[#E37B03]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Alertes AML Ouvertes</p>
+                    <p className="text-2xl font-black text-slate-900 mt-1">7 <span className="text-xs text-red-600 font-medium ml-1">Urgent</span></p>
+                  </div>
                 </div>
               </div>
 
-              {/* Combined: Sanction Screening + Document Anomalies */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* PEP / Sanction Screening */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                  <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-amber-500" /> Screening PEP & Sanctions
-                  </h3>
-                  <div className="space-y-3">
+              {/* Charts */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Bar chart per agency */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-6">Répartition par Agence (Top 5)</h3>
+                  <div className="space-y-4">
                     {[
-                      { name: 'Ngono Essomba Patrick', match: 'PEP Tier 2 — Conseiller municipal Yaoundé V', conf: 78, status: 'review' },
-                      { name: 'Kouassi Jean-Pierre Ndam', match: 'Homonyme partiel liste CEMAC', conf: 34, status: 'cleared' },
-                    ].map((s, i) => (
-                      <div key={i} className="p-3 rounded-xl border border-slate-100 bg-slate-50">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs font-bold text-slate-900">{s.name}</p>
-                          <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
-                            s.status === 'review' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}>
-                            {s.status === 'review' ? 'À examiner' : 'Blanchi'}
-                          </span>
+                      { name: 'Bonanjo Principale', val: 450, pct: 100 },
+                      { name: 'Yaoundé Centre', val: 320, pct: 71 },
+                      { name: 'Akwa Liberté', val: 280, pct: 62 },
+                      { name: 'Bafoussam Marché', val: 190, pct: 42 },
+                      { name: 'Garoua Centre', val: 110, pct: 24 },
+                    ].map(ag => (
+                      <div key={ag.name}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-semibold text-slate-700">{ag.name}</span>
+                          <span className="font-bold text-slate-900">{ag.val}</span>
                         </div>
-                        <p className="text-[11px] text-slate-500">{s.match}</p>
-                        <div className="mt-2">{confidenceBar(s.conf)}</div>
+                        <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-[#2563EB] rounded-full" style={{ width: `${ag.pct}%` }} />
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Document Anomaly Detection */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                  <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                    <ScanLine className="w-4 h-4 text-red-500" /> Anomalies Documentaires
-                  </h3>
-                  <div className="space-y-3">
-                    {[
-                      { doc: 'CNI Recto — VRF-2026-0005', issue: 'Compression JPEG anormale (zones retouchées détectées)', sev: 'high' },
-                      { doc: 'Selfie — VRF-2026-0003', issue: 'Métadonnées EXIF absentes — possible screenshot', sev: 'medium' },
-                      { doc: 'Justificatif — VRF-2026-0412', issue: 'Date du document > 6 mois (périmé)', sev: 'low' },
-                    ].map((d, i) => (
-                      <div key={i} className="p-3 rounded-xl border border-slate-100 bg-slate-50">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs font-bold text-slate-900">{d.doc}</p>
-                          <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
-                            d.sev === 'high' ? 'bg-red-100 text-red-700' :
-                              d.sev === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500')}>
-                            {d.sev === 'high' ? 'Critique' : d.sev === 'medium' ? 'Moyen' : 'Info'}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500">{d.issue}</p>
-                      </div>
-                    ))}
+                {/* Approval Rate */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-center items-center">
+                  <h3 className="text-sm font-semibold text-slate-700 w-full text-left mb-6">Taux d'Approbation National</h3>
+                  <div className="w-32 h-32 relative mb-4">
+                    <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                      <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#f1f5f9" strokeWidth="4" />
+                      <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#E37B03" strokeWidth="4" strokeDasharray="76.4 100" strokeLinecap="round" className="drop-shadow-sm" />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center flex-col">
+                      <span className="text-2xl font-black text-slate-900">76%</span>
+                    </div>
                   </div>
+                  <p className="text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-1 rounded-full">+1.2% par rapport à hier</p>
                 </div>
               </div>
             </div>
           )}
+
 
 
           {/* Application list View (Jean/Thomas) */}

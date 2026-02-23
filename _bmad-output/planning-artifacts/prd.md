@@ -51,8 +51,8 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 ## 3. Product Scope
 
 ### MVP - Minimum Viable Product
-- **Mobile Journey**: SMS/Email OTP, Resilient AI Capture (PaddleOCR/DeepFace), Local Encryption, Offline Metadata Sync.
-- **Back-Office**: Jean's Validation Desk, Thomas's Provisioning Interface (Mocked), Sylvie's Command Dashboard.
+- **Mobile Journey**: SMS/Email OTP, PIN Setup, Resilient AI Capture (PaddleOCR/DeepFace), Local Encryption, Offline Metadata Sync.
+- **Back-Office**: Jean's Validation Desk, Thomas's AML & Compliance Dashboard, Sylvie's Command Dashboard.
 - **Core API**: Sovereign Python/FastAPI services for OCR, Biometrics, and KYC State Management.
 
 ### Growth Features (Post-MVP)
@@ -89,11 +89,11 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 - **Climax**: Jean spots a minor character error, manually corrects it, and confirms the identity.
 - **Resolution**: He completes the check in 3 minutes, protected by a full audit log of his manual correction.
 
-### 👤 Thomas: The "Identity Reincarnation" (Provisioning Desk)
-- **Opening Scene**: Thomas receives an `OPS_ERROR` for a validated dossier—an NIU collision exists.
-- **Rising Action**: He verifies that Marie had a dormant 2018 account with matching data.
-- **Climax**: He clicks **"Reactivate Existing Account"** instead of creating a duplicate in Amplitude.
-- **Resolution**: The system updates the legacy record with new biometrics. Marie is active, and the database remains clean.
+### 👤 Thomas: The AML Screening (Compliance Desk)
+- **Opening Scene**: Thomas receives an AML alert on the National Supervisor Dashboard indicating a PEP match for Marie's dossier.
+- **Rising Action**: He investigates the client profile against the sanction list details in a side-by-side view.
+- **Climax**: He confirms it's a false positive (homonym) and clears the alert, logging the mandatory justification.
+- **Resolution**: The dossier is unblocked and proceeds autonomously to the automated Amplitude provisioning batch.
 
 ### 👤 Sylvie: The "30-Second Morning Scan" (Management)
 - **Opening Scene**: Sylvie checks the **Command Center** dashboard over coffee.
@@ -104,8 +104,8 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 ### Journey Requirements Summary
 1. **Mobile**: Resilient Progressive Upload, Encrypted Session Persistence, 3-Strike Lockout Logic.
 2. **Back-Office (Jean)**: OCR Comparator, Manual Override, Decision Auditing.
-3. **Back-Office (Thomas)**: Conflict Resolver (Retry/Reactivate), State Machine Visualization.
-4. **Management**: Multi-color Grafana Monitoring, Segmented Funnel Analytics, SLA Alerting.
+3. **Back-Office (Thomas)**: AML Screening, Conflict Resolver (Déduplication), Agency & Batch Administration.
+4. **Management**: SLA Alerting, Command Center Dashboard. (Grafana Monitoring deferred to Phase 2).
 
 ## 5. Domain-Specific Requirements
 
@@ -126,7 +126,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 ### 🔄 Integration Requirements
 - **Core Banking Integration**: Direct integration point for Sopra Amplitude provisioning.
 - **Mock/Stub Layer**: Full simulation of external DGI (Tax) responses for the MVP pilot. Sopra Banking Amplitude handles IBU generation automatically.
-- **Provisioning States**: Automated lifecycle management between `PENDING_KYC` (Jean) and `PROVISIONING` (Thomas).
+- **Provisioning States**: Automated lifecycle management between `PENDING_KYC` (Jean), `COMPLIANCE_REVIEW` (Thomas - if alerted), and `PROVISIONING` (Automated).
 
 ### 🚩 Risk Mitigations
 1. **Biometric Drift**: Mitigated by the **Calibration Window** (tuning liveness/OCR thresholds during pilot).
@@ -200,8 +200,8 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 **Core User Journeys Supported**:
 - Marie's Resilient Onboarding (including "ENEO Blackout" and "3-Strike Lockout").
 - Jean's side-by-side Validation Desk + Audit Log.
-- Thomas's Conflict Resolver (Mocked Reactivation).
-- Sylvie's Dashboard (Red/Yellow/Green).
+- Thomas's AML/Compliance Dashboard & Conflict Resolver.
+- Sylvie's Dashboard (Red/Yellow/Green internal MVP metrics).
 
 **Must-Have Capabilities**:
 - **Resilient Mobile Capture**: Sequential upload, local encrypted cache.
@@ -235,7 +235,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 ## 9. Functional Requirements
 
 ### 👤 Identity & Capture (Mobile — Marie's Journey)
-- **FR1 (Auth)**: Users register/authenticate via OTP (SMS for Auth only).
+- **FR1 (Auth)**: Users register/authenticate via OTP (SMS or Email), and subsequently set up a local PIN/Biometrics for recurring access.
 - **FR2 (Deep Capture)**: The system enforces **Recto AND Verso** capture for CNI (mandatory). It also supports Passport (alternative) and NIU Attestation.
 - **FR3 (Quality Control)**: The app guides capture (auto-crop, blur detection, glare check) and rejects poor-quality images client-side before upload.
 - **FR4 (Liveness)**: Users perform a real-time "Liveness" video selfie with adaptive visual guidance (smile, turn left, etc.).
@@ -258,9 +258,9 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
   - **Allowed**: Cash-In (deposits), view balance, account settings, service discovery.
   - **Blocked**: Outbound transfers, Cash-Out, card issuance, crypto, savings, investment.
   - **Logic**: Durable state until Jean's manual validation transition to `FULL_ACCESS`.
-- **FR17 (Consent)**: Users must scroll through and accept Terms (CGU) and the Account Contract via a checkbox.
-- **FR18 (Digital Signature)**: Users sign the contract digitally on the touchscreen (timestamped & stored).
-- **FR19 (Wet Signature 3x - MANDATORY)**: Users must sign **3 times on a white paper**; the app captures this photo for the compliance "Signature Card." This is a BEAC/COBAC regulatory requirement confirmed by Ken's supervisor (2026-02-15).
+- **FR17 (Consent)**: Users must explicitly check 3 distinct checkboxes to accept: (1) CGU, (2) Privacy Policy, and (3) Data Processing Consent.
+- **FR18 (Digital Capture)**: Users authorize the contract submission digitally on the touchscreen (timestamped & stored).
+- **FR19 (Wet Signature 3x - MANDATORY IN-BRANCH)**: Users must sign **3 times on a white paper** during their final *in-branch* physical activation for the compliance "Signature Card". This is a BEAC/COBAC regulatory requirement confirmed by Ken's supervisor (2026-02-15) but is explicitly removed from the mobile self-care workflow to adhere to UX constraints.
 
 ### 🧠 Sovereign AI Engine (FastAPI)
 - **FR20 (OCR Engine)**: Local OCR extracts structured fields from CNI (Recto/Verso) and utility bills.
@@ -274,14 +274,12 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 - **FR26 (Queue)**: Agents view a prioritized queue based on FIFO, priority flags, and global confidence scores.
 - **FR26b (Load Balancing)**: The system distributes dossiers intelligently to agents based on: (1) Agent capacity (minimum 2, maximum 10 dossiers per agent), (2) Agent availability (online/offline status), (3) Current load (prefer agents with fewer active dossiers).
 - **FR27 (Deep Inspection)**: Agents compare High-Res Originals (Recto, Verso, Bill) side-by-side with extracted data.
-- **FR28 (Correction)**: Agents can correct OCR errors with a mandatory justification log (original value preserved).
 - **FR29 (Decision)**: Agents can Approve, Reject (with reason), or Request Info (Push Notification sent to user).
-- **FR30 (Signature Check)**: Agents verify the "3x Wet Signature" photo capture against the CNI signature for authenticity.
 
-### ⚙️ Ops & Provisioning (Thomas — Resolution)
-- **FR31 (Collision Handling)**: Ops can resolve duplicates by linking new dossiers to existing client records.
-- **FR32 (Mock Provisioning)**: The system triggers a mocked "Create Account" call to the Core Banking stub (Sopra Amplitude Mock).
-- **FR33 (Status View)**: Ops view real-time provisioning status (Pending/Success/Error).
+### ⚙️ AML & Compliance (Thomas — Supervision)
+- **FR31 (AML Screening)**: Thomas reviews active alerts against PEP and Sanction lists, with side-by-side profile matching and scoring. Actions (Clear, Confirm Match) require logged justifications.
+- **FR32 (Conflict Resolution)**: Thomas handles identity collisions (e.g., duplicate detection) by linking new dossiers to existing client records or rejecting them as fraud.
+- **FR33 (National Administration)**: Thomas manages Agency CRUD operations and monitors automated Amplitude batch provisioning statuses.
 
 ### 📈 Monitoring & Audit (Sylvie — Supervision)
 - **FR34 (SLA Dashboards)**: Managers view Red/Yellow/Green health status of queues and services.
@@ -417,10 +415,11 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
     - **Dimensional model**: User sessions (fact), Documents (dimension), Validation actions (fact), Agents (dimension)
     - **Storage**: PostgreSQL with indexed time-series for Grafana dashboards
   - **Exports**: CSV/JSON dumps for offline analysis, COBAC audit trail generation
-  - **Dashboards**: Pre-configured Grafana views for:
-    - **Operational**: Red/Yellow/Green service health, queue depths, SLA violations
-    - **Business**: Daily/weekly onboarding trends, CAC reduction tracking, Plan selection distribution
-    - **Compliance**: Audit log completeness, document retention status, access control violations
+  - **Dashboards (MVP)**: Internal back-office web views for Command Center and SLA monitoring.
+  - **Dashboards (Phase 2 - Grafana)**: Pre-configured Grafana views for deeper operational monitoring:
+    - **Operational**: Service health latency, queue depths, SLA violations
+    - **Business**: Daily/weekly onboarding trends, CAC reduction tracking
+    - **Compliance**: Audit log completeness, document retention status
 
 - **NFR14 (Data Governance & Compliance)**:
   - **Minimization**: Only collect data strictly necessary for KYC, plan personalization, and fraud prevention (Loi 2024-017 principles)
