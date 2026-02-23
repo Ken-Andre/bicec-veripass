@@ -158,3 +158,10 @@ Review & Refine: If a change isn’t right, rephrase or be more targeted."```)
 Select count(*)
 From information_schema.columns
 Where table_schema='public' and table_name='university_professors'
+---
+@workspace #codebase #docs\test_tmp_trash\onboarding-system-design-wireframe parcours tout le prototype/maquette qui n'est meme pas encore a la hauteur mais qui a le squelette du flow et du ux que l'on veut. Simple efficace rapide. Je voulais que tu parcours deja pour remarquer les incoherences, secondo pour voir les diagrammes qui manquent avant de passer a la section architecture ...
+En lisant #file:planning-artifacts tu n'as pas remarque entre eux les incoherences aussi. Prends surtout en compte la recence du document car plus il est recent plus c'est lui qui a la derniere vrai verite sur une info
+Ce n'est pas tout
+Recherche en profondeur. Regarde les maquettes du prototype plus au niveau structurel et joins le au design de ux-spec -v2. Je sais que par exemple les diagrames du ui-ux pas seulement Ux(et meme la ce ne'st pas toujours termine si l'on se fit aux users journeys de nos personas.) n'ont pas encore ete fait (state machine, flow...)
+Et tout nos diagrams actuel si tu etais intelligent sont en mermaid pas besoin de me le reposer comme question. Rellis donc bien #planning-artifacts, les md. Le processus Bmad et enfin de fond en comble le prototype visuel de nos 4 produits.
+non le prototype lui est une version minimaliste deja validee par d'autres c'est les autres documents qui sont anciencs avec des donnees outdated qui doivent etre a jour pour ne pas mettre en erreur d'autre durant le processus Bmad/ Agile.
