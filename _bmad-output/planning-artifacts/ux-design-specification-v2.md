@@ -179,83 +179,40 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 
 ```mermaid
 graph TD
-    %% ========== PHASE 1: Entry & Authentication ==========
-    A01[A01 Splash & Language] --> A02[A02 Welcome Value Prop]
-    A02 --> A03[A03 Phone Entry]
-    A03 --> A04[A04 OTP Verify Phone]
-    A04 --> A05[A05 Email Entry]
-    A05 --> A06[A06 Email Verification]
-    A06 --> A07[A07 App PIN Setup]
-    A07 --> A08[A08 Biometric Opt-in]
+    %% ========== PHASE 1: Démarrage ==========
+    S1[S1 Welcome] --> S2[S2 Language Selection]
     
-    %% ========== PHASE 2: Onboarding Context ==========
-    A08 --> A09[A09 What You Need]
-    A09 --> A10[A10 Progress Timeline]
+    %% ========== PHASE 2: Auth ==========
+    S2 --> S3[S3 Phone OTP]
+    S3 --> S4[S4 Email Verify]
+    S4 --> S5[S5 App PIN Setup]
+    S5 --> S6[S6 Biometric Opt-in]
     
-    %% ========== PHASE 3: Identity Capture ==========
-    A10 --> B01[B01 CNI Intro]
-    B01 --> B02[B02 CNI Recto Guidance]
-    B02 --> B03[B03 CNI Recto Capture]
-    B03 --> B04[B04 Capture Success]
-    B04 --> B05[B05 CNI Verso Guidance]
-    B05 --> B06[B06 CNI Verso Capture]
-    B06 --> B07[B07 OCR Processing]
-    B07 --> B08[B08 OCR Review & Edit]
+    %% ========== PHASE 3: Identité ==========
+    S6 --> S7[S7 CNI Recto Guidance & Capture]
+    S7 --> S8[S8 CNI Verso Guidance & Capture]
+    S8 --> S9[S9 OCR Processing & Review]
+    S9 --> S10[S10 Liveness Challenge]
+    S10 -->|3 Strikes| S10_Fail[Lockout & Fresh Start]
+    S10_Fail -->|Wipe Cache| S1
+    S10 -->|Success| S11
     
-    %% ========== PHASE 4: Liveness ==========
-    B08 --> B09[B09 Liveness Intro]
-    B09 --> B10[B10 Liveness Challenge]
-    B10 -->|3 Strikes| B10_Fail[B10_Fail Lockout & Fresh Start]
-    B10_Fail --> B10_Restart{User Clicks Recommencer?}
-    B10_Restart -->|Yes - Data Wiped| A01
-    B10_Restart -->|No - Exit App| Z01[Exit]
-    B10 -->|Success| B11[B11 Liveness Success]
+    %% ========== PHASE 4: Domicile & Fiscal ==========
+    S11[S11 Structured Address] --> S12[S12 Utility Capture / Address Proof]
+    S12 --> S13[S13 NIU Fiscal ID]
     
-    %% ========== PHASE 5: Address & Fiscal ==========
-    B11 --> C01[C01 Address Cascade]
-    C01 --> C02[C02 GPS Button Optional]
-    C02 --> C03[C03 Utility Proof Intro]
-    C03 --> C04[C04 Utility Capture]
-    C04 --> C05[C05 NIU Choice]
-    C05 --> C06[C06 NIU Entry/Upload]
-    
-    %% ========== PHASE 6: Legal & Consent (MOBILE ONLY) ==========
-    C06 --> D01[D01 CGU Acceptance]
-    D01 --> D02[D02 Digital Signature]
-    
-    %% ========== PHASE 7: Submission & Discovery ==========
-    D02 --> E01[E01 Review Summary]
-    E01 --> E02[E02 Secure Upload]
-    E02 --> E03[E03 Success Celebration]
-    E03 --> E04[E04 Plan Discovery]
-    E04 --> E05[E05 Personalization]
-    E05 --> E06[E06 RESTRICTED_ACCESS Dashboard]
+    %% ========== PHASE 5: Consentement & Finalisation ==========
+    S13 --> S14[S14 CGU Acceptance]
+    S14 --> S15[S15 Digital Signature]
+    S15 --> S16[S16 Review Summary]
+    S16 --> S17[S17 Secure Upload]
+    S17 --> S18[S18 Success Celebration]
     
     %% ========== AGENT VALIDATION PATH (BACKEND) ==========
-    E06 -.->|Dossier Submitted| WAIT_JEAN[Jean Validates Dossier]
-    WAIT_JEAN -->|Approved| WAIT_THOMAS[Thomas Provisions Account]
-    WAIT_THOMAS -->|Success| F00[F00 Push Notification - Invitation Agence]
-    
-    %% ========== PHYSICAL AGENCY PATH ==========
-    F00 --> F01_AGENCY[F01_AGENCY Physical Signature + Card Pickup]
-    F01_AGENCY -->|NIU Validated| F02[F02 Home Dashboard - FULL_ACCESS]
-    F01_AGENCY -->|NIU Missing/Declarative| F03[F03 Home Dashboard - LIMITED_ACCESS]
-    
-    %% ========== ACCESS STATE BRANCHES ==========
-    F02 --> G01[G01 All Features Unlocked]
-    F03 --> G02[G02 Transfers/Cards Locked]
-    G02 -.->|User Completes NIU| WAIT_JEAN_NIU[Jean Validates NIU]
-    WAIT_JEAN_NIU -->|Approved| F02
-    
-    %% ========== REJECTION PATH ==========
-    WAIT_JEAN -->|Rejected| E07[E07 Rejection Notification]
-    E07 --> E08{User Action?}
-    E08 -->|Retry| B01
-    E08 -->|Contact Support| Z02[Support Channel]
-    
-    %% ========== RESILIENCE & RECOVERY ==========
-    E02 -.->|Network Drop| E02_Retry[Auto Resume from Cache]
-    E02_Retry -.-> E02
+    S18 -.->|Dossier Submitted| WAIT_JEAN[Dashboard: En cours de vérification]
+    WAIT_JEAN -->|Validé (sans NIU)| D_LIMITED[Dashboard: Accès. limité]
+    WAIT_JEAN -->|Validé (Toutes pièces)| D_FULL[Dashboard: Accès Complet]
+    D_LIMITED -.->|Ajout NIU ultérieur| D_FULL
     
     %% ========== STYLING ==========
     style A01 fill:#E37B03,stroke:#333,stroke-width:2px,color:#fff
