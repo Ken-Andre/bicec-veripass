@@ -1,7 +1,7 @@
 [//]: # (---)
 [//]: # (version: 2.0)
-[//]: # (date: 2026-02-18)
-[//]: # (revisionNotes: "Critical corrections integrated from Ken's 2026-02-18 review: Auto-extraction paradigm, wet signature removal from mobile, RESTRICTED vs LIMITED_ACCESS clarification, Mermaid expansion, timer update to 15min")
+[//]: # (date: 2026-02-24)
+[//]: # (revisionNotes: "v2.1 reconciliation 2026-02-24 — Thomas role changed to AML/CFT Supervisor, consent 3 checkboxes, typography Inter, icons Lucide, Glassmorphism mobile aesthetic, LIMITED_ACCESS permissions corrected, Grafana deferred Phase 2")
 [//]: # (stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
 [//]: # (lastStep: 14)
 [//]: # (inputDocuments:)
@@ -12,11 +12,11 @@
 [//]: # (  - "docs/Fonctionnalité_Interaction_Erreurs.md")
 [//]: # (---)
 
-# UX Design Specification bicec-veripass v2.0
+# UX Design Specification bicec-veripass v2.1
 
 **Author:** Ken  
-**Date:** 2026-02-18  
-**Version:** 2.0 (Major Revision)
+**Date:** 2026-02-24  
+**Version:** 2.1 (Reconciliation with UX/UI Inventory v2.1)
 
 ---
 
@@ -27,8 +27,9 @@
 
 ### Target Users
 - **Marie (The Entrepreneur)**: Tech-savvy but resource-constrained. Fighting 3G drops and power cuts on an Android 7 device. Needs resilience and clear, non-jargon guidance.
-- **Jean (The Guardian)**: Internal validator needing "side-by-side" evidence to perform 3-minute sanity checks with total audit trails.He works usally in one of bicec agency.
-- **Sylvie (The Commander)**: Manager needing R/Y/G operational health visibility and funnel analytics. This can be manager of an agency, the central Bicec direction stakeholders.
+- **Jean (The Guardian)**: Internal validator needing "side-by-side" evidence to perform 3-minute sanity checks with total audit trails. He works usually in one of BICEC's agencies.
+- **Thomas (The AML/CFT Supervisor)**: National compliance officer reviewing PEP/Sanctions alerts, handling identity deduplication, managing agency CRUD, and monitoring automated Amplitude batch provisioning.
+- **Sylvie (The Commander)**: Manager needing R/Y/G operational health visibility and funnel analytics. This can be manager of an agency or the central BICEC direction stakeholders.
 
 ### Key Design Challenges
 - **The Hardware Ceiling**: Maintaining >15 FPS camera guidance on legacy Android 7 (NFR2).
@@ -68,7 +69,7 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 - **The "OCR Review" Confidence**: Seeing extracted data with confidence badges (🟢 High, 🟠 Low) builds trust in the AI system.
 
 ### Experience Principles
-1. **Revolut Structure, BICEC Soul**: Clean card layouts with vibrant #E37B03 highlights and premium neobank aesthetics.
+1. **Revolut Structure, BICEC Soul**: Clean card layouts with vibrant #E37B03 highlights, **Glassmorphism** (frosted glass, translucency) and **light Skeuomorphism** (soft 3D shadows, tactile buttons) for a premium mobile aesthetic.
 2. **Discovery during Validation**: The UI stays "alive" while KYC is being processed, showcasing future account capabilities.
 3. **Compliance-First, Evidence-First**: Designs that prioritize the creation of a bulletproof audit trail.
 4. **Resilience as a Safety Net**: Failures are framed as "We saved your spot," not errors.
@@ -98,7 +99,7 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 ### Design Implications
 - Use **illustrative icons** (svg like) to decouple from language barriers.
 - **Vibrant Orange (#E37B03)** for primary actions to drive energy.
-- **Soft card shadows** to provide depth and modern feel.
+- **Glassmorphism panels** (frosted glass, blur backdrop) and **soft 3D skeuomorphic shadows** for depth and premium mobile feel.
 - **Confidence badges** (🟢/🟠/🔴) to communicate AI extraction quality.
 
 
@@ -148,16 +149,18 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 ## 5. Design System Strategy
 
 ### Visual DNA
-- **Palette**: 
-    - Primary: #E37B03 (Mango Orange) for primary buttons/highlights
-    - Action Color: #2563EB (Link Blue)
+- **Palette** (BICEC Institutionnelle): 
+    - Primary: #E37B03 (Orange — Cercle logo) for primary buttons/highlights
+    - Secondary: #4A2205 (Brun Foncé — Cheval logo)
+    - Action Color: #2563EB (Bleu d'Action)
     - Success: #10B981 (Emerald)
     - Warning: #F59E0B (Amber)
     - Error: #EF4444 (Red)
     - Neutrals: Light Gray #F3F4F6, Dark Gray #1F2937 (WCAG AA-compliant)
-- **Typography**: SF Pro (iOS) / Roboto (Android) for maximum performance on legacy devices.
-- **Iconography**: Outline-style, high-contrast, easily identifiable.
+- **Typography**: **Inter** (Sans-serif) — Across all platforms for brand consistency.
+- **Iconography**: **Lucide** (outline style), high-contrast, easily identifiable.
 - **Illustrations**: Flat 2D, vibrant, focused on physical document alignment.
+- **Mobile Aesthetic**: **Glassmorphism** (frosted glass panels, translucent blurred backgrounds) + **light Skeuomorphism** (soft 3D shadows on buttons, embossed input fields).
 - **Confidence Badges**:
     - 🟢 High Confidence (>85%): Green checkmark, non-editable by default
     - 🟠 Low Confidence (50-85%): Orange warning, tap to edit inline
@@ -251,16 +254,16 @@ graph TD
 - View balance ✅
 - Account settings ✅
 - Service discovery ✅
-- Outbound transfers ✅
-- Cash-Out (withdrawals) ✅
-- Card issuance ✅
 
 **Blocked Actions**:
-
+- Outbound transfers ❌
+- Cash-Out (withdrawals) ❌
+- Card issuance ❌
 - Crypto ❌
 - Investments ❌
 - Savings products ❌
 - Credit issuance (Deeplink auth to Bi-Cresco) ❌
+
 **UI Indicators**:
 - Persistent banner: "⚠️ Complétez votre NIU pour débloquer toutes les fonctionnalités"
 - Locked features show padlock icon + "NIU requis" tooltip
@@ -304,7 +307,7 @@ graph TD
 ### Module C: Localization & Fiscal Identity
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
 | :--- | :--- | :--- | :--- |
-| **C01** | Address Cascade | Region → Ville → Quartier dropdowns (mandatory). | FR9, FR10 |
+| **C01** | Address Cascade | Région → Ville → Quartier → Commune dropdowns (mandatory) + champ libre lieu-dit. | FR9, FR10 |
 | **C02** | GPS Button (Optional) | **CRITICAL**: Single button "Utiliser ma position actuelle" (optional). NO map embed. If used, show privacy notice modal. If GPS distance > X km from Quartier, show non-blocking warning. | FR10, FR11 |
 | **C03** | Utility Proof Intro | ENEO/CAMWATER toggle, "Why we need this" explanation. | FR12, FR13 |
 | **C04** | Utility Capture | Camera capture with quality checks. | FR12, FR13 |
@@ -314,8 +317,8 @@ graph TD
 ### Module D: Consent & Signatures (MOBILE FLOW - WET SIGNATURE REMOVED)
 | ID | Screen Name | Key UX Elements | FR/NFR Traceability |
 | :--- | :--- | :--- | :--- |
-| **D01** | CGU Acceptance | **CRITICAL**: Checkbox consent with hyperlinks to legal docs (NO scroll-gate). Optional marketing opt-in checkbox (unchecked by default). | FR17 |
-| **D02** | Digital Signature | Sign-on-glass canvas with "Sign here" guidance. | FR18 |
+| **D01** | Consent (3 Checkboxes) | **CRITICAL**: 3 distinct checkboxes with hyperlinks: (1) CGU, (2) Privacy Policy, (3) Data Processing Consent. NO scroll-gate. CTA disabled until all 3 checked. | FR17 |
+| **D02** | Digital Capture | Users authorize the contract submission digitally on the touchscreen (timestamped & stored). | FR18 |
 
 **REMOVED FROM MOBILE FLOW:**
 - ~~D03 Wet Sign Intro~~ → Moved to physical agency visit (F01_AGENCY)
@@ -484,17 +487,16 @@ graph TD
 - **Skip Option**: "Passer cette étape" link at bottom.
 - **UX Note**: NO map embed. NO manual pin placement. Just a button.
 
-### D01: Legal Consent Layout (Improved - Nubank/Revolut Style)
+### D01: Consent Layout (3 Checkboxes — Improved - Nubank/Revolut Style)
 **[MOCKUP_D01 — À générer via Stitch]**
 
-- **Header**: "Dernière étape légale" with progress indicator.
+- **Header**: "Avant de soumettre" with progress indicator.
 - **Body**: Clean card layout with checkboxes (NOT scroll-gate).
     - **Checkbox 1**: "J'accepte les [Conditions Générales d'Utilisation](link)" (Hyperlink in blue #2563EB).
     - **Checkbox 2**: "J'accepte la [Politique de Confidentialité](link)" (Hyperlink).
-    - **Checkbox 3**: "J'accepte les [Conditions Tarifaires](link)" (Hyperlink).
-    - **Optional Checkbox**: "Je souhaite recevoir des offres personnalisées par email" (Marketing opt-in, unchecked by default).
-- **Legal Note**: Small gray text "En continuant, vous confirmez avoir lu et compris ces documents."
-- **Footer**: Sticky CTA [Accepter et Continuer] (Disabled until all required checkboxes checked).
+    - **Checkbox 3**: "Je consens au [Traitement de mes Données Personnelles](link)" (Hyperlink).
+- **Legal Note**: Small gray text "Lisez et acceptez chaque condition pour continuer."
+- **Footer**: Sticky CTA [Soumettre mon dossier] (Disabled until all 3 required checkboxes checked).
 - **UX Principle**: Following Revolut/Trade Republic pattern - NO forced scrolling, just clear consent with accessible links.
 
 ### E03: Success Celebration (New - Nubank Delight Pattern)
@@ -563,11 +565,13 @@ graph TD
 - **F03 (LIMITED_ACCESS)**:
     - **Banner**: Persistent warning banner: "⚠️ Complétez votre NIU pour débloquer toutes les fonctionnalités"
     - **Same UI as F02** but with locked features:
-        - Transfers: Padlock icon + "NIU requis" tooltip
+        - Outbound transfers: Padlock icon + "NIU requis" tooltip
+        - Cash-Out: Padlock icon + "NIU requis" tooltip
         - Cards: Padlock icon + "NIU requis" tooltip
         - Crypto: Padlock icon + "NIU requis" tooltip
         - Investments: Padlock icon + "NIU requis" tooltip
-    - **Unlocked**: Cash-In (deposits), View balance, Settings.
+        - Savings: Padlock icon + "NIU requis" tooltip
+    - **Unlocked**: Cash-In (deposits), View balance, Account settings, Service discovery.
 
 
 ---
@@ -658,75 +662,60 @@ graph TD
     style J27 fill:#F59E0B,stroke:#333,stroke-width:2px,color:#fff
 ```
 
-### Thomas's Provisioning Journey (Ops Agent)
+### Thomas's AML/CFT Supervision Journey (National Compliance Supervisor)
 
 ```mermaid
 graph TD
     %% ========== THOMAS'S ENTRY ==========
-    T01[T01 Login - Email/Password] --> T02[T02 Provisioning Queue Dashboard]
+    T01[T01 Login - Email/Password] --> T02[T02 National Supervisor Dashboard]
     
-    %% ========== QUEUE MANAGEMENT ==========
-    T02 --> T03{Select Approved Dossier}
-    T03 -->|From Jean| T04[T04 Validated Dossier]
+    %% ========== DASHBOARD OVERVIEW ==========
+    T02 --> T_AML[AML Screening Queue]
+    T02 --> T_DUP[Conflict Resolver - Déduplication]
+    T02 --> T_AGN[Agency Administration]
+    T02 --> T_BAT[Amplitude Batch Monitor]
+    T02 --> T_MET[National Metrics]
     
-    %% ========== DOSSIER REVIEW ==========
-    T04 --> T05[T05 Review Validation Summary]
-    T05 --> T06[T06 Check NIU Status]
-    T06 --> T07{NIU Validated?}
-    T07 -->|Yes| T08[T08 Prepare FULL_ACCESS Account]
-    T07 -->|No - Declarative| T09[T09 Prepare LIMITED_ACCESS Account]
+    %% ========== AML SCREENING ==========
+    T_AML --> T03{Select Alert}
+    T03 --> T04[T04 Screening Detail - Profile vs PEP/Sanction Hit]
+    T04 --> T05{Decision}
+    T05 -->|False Positive| T06[T06 Clear Alert - Log Justification]
+    T05 -->|Confirmed Match| T07[T07 Freeze Account - Escalate]
+    T05 -->|Uncertain| T08[T08 Escalate for Review]
     
-    %% ========== DUPLICATE CHECK ==========
-    T08 --> T10[T10 Run Duplicate Check]
-    T09 --> T10
-    T10 --> T11{Duplicate Found?}
-    T11 -->|No| T12[T12 Create New Account]
-    T11 -->|Yes| T13[T13 Conflict Resolver]
+    %% ========== DEDUPLICATION ==========
+    T_DUP --> T09[T09 Side-by-Side Profile Comparison]
+    T09 --> T10{Resolution}
+    T10 -->|Merge Profiles| T11[T11 Link to Existing Account]
+    T10 -->|Reject as Fraud| T12[T12 Flag & Block]
+    T10 -->|Escalate| T08
     
-    %% ========== CONFLICT RESOLUTION ==========
-    T13 --> T14{Resolution Strategy}
-    T14 -->|Reactivate Existing| T15[T15 Link to Existing Account]
-    T14 -->|Create New| T16[T16 Override - Create New]
-    T14 -->|Manual Review| T17[T17 Escalate to Manager]
+    %% ========== AGENCY ADMIN ==========
+    T_AGN --> T13[T13 Agency CRUD Table]
+    T13 --> T14[T14 Add/Edit/Deactivate Agency]
     
-    %% ========== AMPLITUDE PROVISIONING (MOCK) ==========
-    T12 --> T18[T18 Call Amplitude Mock API]
-    T15 --> T18
-    T16 --> T18
+    %% ========== BATCH MONITORING ==========
+    T_BAT --> T15[T15 Batch Timeline - Status ✓/⚠/✗]
+    T15 --> T16{Batch Error?}
+    T16 -->|Retry Failed Items| T17[T17 Retry Batch]
+    T16 -->|All OK| T18[T18 Mark Completed]
     
-    T18 --> T19{Provisioning Status}
-    T19 -->|Success| T20[T20 Account Created]
-    T19 -->|Error| T21[T21 OPS_ERROR - Retry]
-    T21 --> T22{Retry Attempt}
-    T22 -->|Retry| T18
-    T22 -->|Escalate| T17
-    
-    %% ========== ACCOUNT ACTIVATION ==========
-    T20 --> T23[T23 Generate Account Credentials]
-    T23 --> T24[T24 Set Account Status]
-    T24 --> T25{NIU Status?}
-    T25 -->|Validated| T26[T26 Set FULL_ACCESS]
-    T25 -->|Declarative/Missing| T27[T27 Set LIMITED_ACCESS]
-    
-    %% ========== NOTIFICATION ==========
-    T26 --> T28[T28 Send Push Notification - Invitation Agence]
-    T27 --> T28
-    T28 --> T29[T29 Notification: Rendez-vous en agence pour signer et récupérer votre carte]
-    
-    %% ========== COMPLETION ==========
-    T29 --> T30[T30 Mark Dossier as Provisioned]
-    T30 --> T31[T31 Move to Active Accounts]
-    T17 --> T32[T32 Move to Escalation Queue]
-    
-    %% ========== RETURN TO QUEUE ==========
-    T31 --> T02
-    T32 --> T02
+    %% ========== RETURN TO DASHBOARD ==========
+    T06 --> T02
+    T07 --> T02
+    T08 --> T02
+    T11 --> T02
+    T12 --> T02
+    T14 --> T02
+    T17 --> T02
+    T18 --> T02
     
     %% ========== STYLING ==========
     style T01 fill:#2563EB,stroke:#333,stroke-width:2px,color:#fff
-    style T20 fill:#10B981,stroke:#333,stroke-width:2px,color:#fff
-    style T21 fill:#EF4444,stroke:#333,stroke-width:2px,color:#fff
-    style T17 fill:#F59E0B,stroke:#333,stroke-width:2px,color:#fff
+    style T06 fill:#10B981,stroke:#333,stroke-width:2px,color:#fff
+    style T07 fill:#EF4444,stroke:#333,stroke-width:2px,color:#fff
+    style T08 fill:#F59E0B,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 ### Sylvie's Management Journey (Manager)
@@ -835,16 +824,15 @@ graph TD
 - **Bottom Panel**: Large [Approve] / [Reject] buttons with mandatory "Reason" dropdown for Rejections.
 - **Load Balancing Indicator**: Badge showing current load (e.g., "5/10 dossiers").
 
-### Thomas: Provisioning Desk
+### Thomas: AML & Compliance Desk
 **[MOCKUP_THOMAS_DESK — À générer via Stitch]**
 
-- **Queue View**: List of approved dossiers from Jean.
-- **Conflict Resolver**: Side panel showing duplicate detection results with options:
-    - [Reactivate Existing Account]
-    - [Create New Account]
-    - [Escalate to Manager]
-- **Provisioning Status**: Real-time status indicator (Pending/Success/Error).
-- **Amplitude Mock Integration**: Visual representation of API call status.
+- **Dashboard**: National supervision overview with active AML alerts count, active agencies, daily national cases.
+- **AML Screening Queue**: Table of PEP/Sanctions/Watchlist alerts sorted by severity (Red first). No bulk dismiss — individual treatment required.
+- **Screening Detail**: Split layout — Client profile (left) vs PEP/Sanction hit (right) with match score %. Actions: Clear / Confirm Match / Escalate.
+- **Conflict Resolver**: Side-by-side duplicate profiles with similarity heatmap. Actions: Merge / Reject as Fraud / Escalate.
+- **Agency Admin**: CRUD table for BICEC agencies (Code, Name, City, Status toggle, Agent count).
+- **Batch Monitor**: Timeline of Amplitude batch jobs with per-dossier status (✓/⚠/✗). Retry button for failed items only.
 
 ### Sylvie: Manager Dashboard
 **[MOCKUP_SYLVIE_DASHBOARD — À générer via Stitch]**
@@ -872,11 +860,11 @@ graph TD
     - White #FFFFFF (Cards, surfaces)
 
 ### Typography
-- **Headers**: Roboto Medium (Android) / SF Pro Semibold (iOS)
+- **Headers**: Inter Semibold
     - H1: 34px Bold
     - H2: 28px Bold
     - H3: 24px Bold
-- **Body**: Roboto Regular / SF Pro Regular
+- **Body**: Inter Regular
     - Body Large: 18px Regular
     - Body: 17px Regular
     - Body Small: 15px Regular
@@ -910,7 +898,7 @@ graph TD
 - **Hover State**: Shadow increases to 0 4px 12px rgba(0,0,0,0.12)
 
 ### Iconography
-- **Style**: Feather/Outline style
+- **Style**: **Lucide** (outline style)
 - **Size**: 24px default, 20px small, 32px large
 - **Color**: Inherits from parent or #6B7280 (gray)
 - **Confidence Badges**:
@@ -1021,7 +1009,7 @@ All mockups will be generated using Google Stitch MCP following the prompt guide
 
 3. **Back-Office Screens**:
     - Jean's Validation Desk
-    - Thomas's Provisioning Desk
+    - Thomas's AML & Compliance Desk
     - Sylvie's Command Center
 
 ---
@@ -1038,6 +1026,17 @@ All mockups will be generated using Google Stitch MCP following the prompt guide
 7. ✅ **3-Strike Lockout**: B10_Fail uses Ken's exact French copy with single [Recommencer] button. Data wipes AFTER user clicks.
 8. ✅ **OCR Review (B08)**: Card-based layout with 🟢🟠🔴 confidence badges. Inline editing. CTA disabled until all 🟠🔴 resolved.
 
+### Reconciliation v2.1 (2026-02-24)
+9. ✅ **Thomas Role Redefined**: Changed from "Provisioning Ops" to "AML/CFT National Supervisor" — AML screening, deduplication, agency admin, batch monitoring.
+10. ✅ **Consent Updated**: D01 now has 3 distinct checkboxes (CGU, Privacy Policy, Data Processing Consent) instead of "Conditions Tarifaires".
+11. ✅ **Typography**: Changed from SF Pro/Roboto to **Inter** across all platforms.
+12. ✅ **Iconography**: Changed from "Feather/Outline" to **Lucide (outline)**.
+13. ✅ **Glassmorphism**: Added frosted glass + light skeuomorphism aesthetic for mobile UI.
+14. ✅ **LIMITED_ACCESS Permissions Corrected**: Outbound transfers, Cash-Out, Card issuance now **blocked** (previously listed as allowed).
+15. ✅ **BICEC Palette**: Added Brun Foncé #4A2205 as secondary brand color.
+16. ✅ **Address Cascade**: Updated to Région → Ville → Quartier → Commune + lieu-dit.
+17. ✅ **Grafana**: Explicitly deferred to Phase 2, MVP uses internal back-office metrics views.
+
 ### Next Steps
 1. Generate all mockups using Stitch MCP
 2. Create Revolut UI mapping table with actual screenshot references
@@ -1047,7 +1046,7 @@ All mockups will be generated using Google Stitch MCP following the prompt guide
 
 ---
 
-**Document Version:** 2.0  
-**Last Updated:** 2026-02-18  
-**Status:** Ready for Architecture Phase (Step 5/10 BMAD)
+**Document Version:** 2.1  
+**Last Updated:** 2026-02-24  
+**Status:** Reconciled with UX/UI Inventory v2.1 — Ready for Architecture Phase
 

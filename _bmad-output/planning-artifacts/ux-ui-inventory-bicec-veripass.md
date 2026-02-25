@@ -341,15 +341,14 @@ graph TD
 ### Desktop — Sidebar par persona
 
 ```
-Jean (Agent)                    Thomas (Superviseur AML)       Sylvie (Direction)
-├── Dashboard (A-J02)           ├── Dashboard (A-T02)          ├── Command Center (S-S01)
-│   ├── Mes stats + Agence      │   ├── Alertes AML actives    ├── Load Balancing (S-S02)
-├── Ma File (A-J03)             ├── Screening AML (A-T03)      ├── Qualité KYC (S-S03)
-│   └── Dossier (A-J04)        │   └── Détail (A-T04)         ├── SLA & Ops (S-S04)
-├── My Performance (A-J05)      ├── Déduplication (A-T05)      ├── Audit Log (S-S05)
-                                ├── Admin Agences (A-T06)      └── (Phase 2: Grafana)
-                                ├── Batch Amplitude (A-T07)
-                                └── Métriques (A-T08)
+Jean (Agent Agence)             Thomas (Superviseur National)  Sylvie (Direction)
+├── Dashboard Agent             ├── Dashboard National         ├── Dashboard Direction
+├── Applications                ├── Screening AML              ├── Audit & Rapports
+│   └── Revue Dossier Side-by-Side├── Déduplication              └── Paramètres
+                                ├── Agences
+                                ├── Batch Amplitude
+                                ├── Métriques
+                                └── Paramètres
 ```
 
 ---
