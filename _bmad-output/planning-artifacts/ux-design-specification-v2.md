@@ -28,7 +28,7 @@
 **The Client Relationship Hub**: We are building a modern Client Relationship and Service Discovery platform (Revolut-styled) that transforms KYC onboarding into a premium entry point for personal banking. Our goal is to bridge the "Trust Gap" by turning a 14-day manual process into a **15-minute digital breakthrough (11-minute stretch goal)**, while educating users on BICEC's modern service ecosystem (Plans, Savings, Cards) during the validation period.
 
 ### Target Users
-- **Marie (The Entrepreneur)**: Tech-savvy but resource-constrained. Fighting 3G drops and power cuts on an Android 7 device. Needs resilience and clear, non-jargon guidance.
+- **Marie (The Entrepreneur)**: Tech-savvy but resource-constrained. Fighting 3G drops and power cuts on an Android 8 device. Needs resilience and clear, non-jargon guidance.
 - **Jean (The Guardian)**: Internal validator needing "side-by-side" evidence to perform 3-minute sanity checks with total audit trails. He works usually in one of BICEC's agencies.
 - **Thomas (The AML/CFT Supervisor)**: National compliance officer reviewing PEP/Sanctions alerts, handling identity deduplication, managing agency CRUD, and monitoring automated Amplitude batch provisioning.
 - **Sylvie (The Commander)**: Manager needing R/Y/G operational health visibility and funnel analytics. This can be manager of an agency or the central BICEC direction stakeholders.
@@ -440,7 +440,7 @@ graph TD
     - Animated alignment corners (Pulse Orange #E37B03 when aligned).
     - Top Banner: "Recto du CNI" / "Back of CNI".
     - Bottom Tip: "Alignez la carte dans le cadre. Évitez les reflets."
-- **NFR Note**: Guidance overlays stay >15 FPS on Android 7 by using lean Flutter CustomPainters.
+- **NFR Note**: Guidance overlays stay >15 FPS on Android 8 by using lean Flutter CustomPainters.
 
 ### B04: Capture Success (New - Revolut Feedback Pattern)
 **[MOCKUP_B04 — À générer via Stitch]**
@@ -919,7 +919,7 @@ graph TD
 ## 11. Responsive Design & Accessibility
 
 ### Responsive Strategy
-- **Mobile (Android 7 baseline)**: Full-bleed camera views, bottom-mounted primary actions for thumb reachability, and large touch targets (48x48dp minimum).
+- **Mobile (Android 8 baseline)**: Full-bleed camera views, bottom-mounted primary actions for thumb reachability, and large touch targets (48x48dp minimum).
 - **Back-Office (Web/Tablet)**: Flexible 12-column grid. Agents use split-screen (50/50) for "Side-by-Side" evidence verification.
 - **Breakpoints**:
     - Mobile: <768px

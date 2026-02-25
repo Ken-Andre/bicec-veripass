@@ -23,3 +23,5 @@ stateDiagram-v2
   LIVENESS_FAILED --> LOCKOUT : 3 strikes
   LOCKOUT --> DRAFT : user restarts (data wiped on explicit restart)
 ```
+
+[Draft Statechart](https://shd101wyy.gallerycdn.vsassets.io/extensions/shd101wyy/markdown-preview-enhanced/0.8.20/1761999371305/Microsoft.VisualStudio.Services.VSIXPackage)

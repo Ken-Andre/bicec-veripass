@@ -22,7 +22,7 @@
 
 ## 2. Diagramme Principal — Système KYC Onboarding Mobile (Marie)
 
-```mermaid
+```mmd
 graph LR
     %% ========== ACTEUR ==========
     Marie((Marie<br/>Cliente))
