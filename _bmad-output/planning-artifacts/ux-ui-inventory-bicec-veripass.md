@@ -302,44 +302,53 @@
 
 ```mermaid
 graph TD
-    A01[M-A01 Welcome] --> A02[M-A02 Phone OTP]
-    A02 --> A03[M-A03 OTP Verify]
-    A03 --> A04[M-A04 Email Magic Link]
-    A04 --> A05[M-A05 PIN Setup]
-    A05 --> B01[M-B01 Onboarding Intro]
-    B01 --> B02[M-B02 CNI Recto]
-    B02 --> B03[M-B03 CNI Verso]
-    B03 --> B04[M-B04 Processing]
-    B04 --> B05[M-B05 OCR Review]
-    B05 --> B06[M-B06 Liveness]
-    B06 -->|Success| B07[M-B07 Liveness OK]
-    B06 -->|3 Strikes| B08[M-B08 Fresh Start]
-    B08 -->|Wipe| A01
-    B07 --> C01[M-C01 Adresse]
-    C01 --> C02[M-C02 ENEO Capture]
-    C02 --> C03[M-C03 ENEO Review]
-    C03 --> D01[M-D01 NIU]
-    D01 --> E01[M-E01 Récapitulatif]
-    E01 --> E01b[M-E01b Consentement CGU]
-    E01b --> E02[M-E02 Upload]
-    E02 --> E03[M-E03 Confirmé]
-    E03 --> F01[M-F01 RESTRICTED]
-    F01 -->|Agent valide| F02[M-F02 LIMITED]
-    F02 -->|NIU ajouté| F03[M-F03 FULL]
+    %% Démarrage
+    S1[welcome - Bienvenue] --> S2[language - Langue]
+    
+    %% Auth
+    S2 --> S3[phone-otp - Téléphone & OTP]
+    S3 --> S4[email-verify - Email]
+    S4 --> S5[pin-setup - Code PIN]
+    S5 --> S6[biometrics - Biométrie]
+    
+    %% Identité
+    S6 --> S7[id-front - CNI Recto]
+    S7 --> S8[id-back - CNI Verso]
+    S8 --> S9[ocr-review - Vérification OCR]
+    S9 --> S10[liveness - Détection Vivacité]
+    
+    %% Domicile
+    S10 --> S11[address - Adresse]
+    S11 --> S12[address-proof - Justificatif]
+    
+    %% Fiscal
+    S12 --> S13[fiscal-id - NIU]
+    
+    %% Finalisation
+    S13 --> S14[consent - Consentement]
+    S14 --> S15[signature - Signature]
+    S15 --> S16[review-summary - Récapitulatif]
+    S16 --> S17[uploading - Envoi sécurisé]
+    S17 --> S18[success - Soumis]
+    
+    %% Post-Submission Dashboard States
+    S18 --> D_PENDING[Dashboard: En cours de vérification]
+    D_PENDING -.->|Validation Agent Mismatch| D_LIMITED[Dashboard: Accès limité - NIU manquant]
+    D_PENDING -.->|Validation Totale| D_FULL[Dashboard: Accès Complet]
+    D_LIMITED -.->|Ajout NIU ultérieur| D_FULL
 ```
 
 ### Desktop — Sidebar par persona
 
 ```
-Jean (Agent)                    Thomas (Superviseur AML)       Sylvie (Direction)
-├── Dashboard (A-J02)           ├── Dashboard (A-T02)          ├── Command Center (S-S01)
-│   ├── Mes stats + Agence      │   ├── Alertes AML actives    ├── Load Balancing (S-S02)
-├── Ma File (A-J03)             ├── Screening AML (A-T03)      ├── Qualité KYC (S-S03)
-│   └── Dossier (A-J04)        │   └── Détail (A-T04)         ├── SLA & Ops (S-S04)
-├── My Performance (A-J05)      ├── Déduplication (A-T05)      ├── Audit Log (S-S05)
-                                ├── Admin Agences (A-T06)      └── (Phase 2: Grafana)
-                                ├── Batch Amplitude (A-T07)
-                                └── Métriques (A-T08)
+Jean (Agent Agence)             Thomas (Superviseur National)  Sylvie (Direction)
+├── Dashboard Agent             ├── Dashboard National         ├── Dashboard Direction
+├── Applications                ├── Screening AML              ├── Audit & Rapports
+│   └── Revue Dossier Side-by-Side├── Déduplication              └── Paramètres
+                                ├── Agences
+                                ├── Batch Amplitude
+                                ├── Métriques
+                                └── Paramètres
 ```
 
 ---

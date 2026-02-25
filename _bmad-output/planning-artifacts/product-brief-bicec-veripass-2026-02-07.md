@@ -63,10 +63,10 @@ Furthermore, the **"Trust Gap"** presents a dual challenge: younger users find b
 ### Secondary Users
 
 #### Sylvie (The Strategic Manager)
-*   **Context**: Regional Director, monitors ROI/CAG reduction via 30-second Grafana scans.
+*   **Context**: Regional Director, monitors ROI/CAC reduction via 30-second scans on the internal Command Center dashboard (MVP). Grafana OSS dashboards deferred to Phase 2.
 
-#### Thomas (The Ops Specialist)
-*   **Context**: Integration expert, ensures error-free bulk provisioning to Amplitude.
+#### Thomas (The AML/CFT Supervisor)
+*   **Context**: National compliance officer overseeing AML screening (PEP/Sanctions alerts), identity deduplication, agency administration, and automated Amplitude batch provisioning monitoring.
 
 ### Out of Scope (Anti-Personas for MVP)
 - ❌ **Corporate Accounts**: SMEs/SARLs requiring complex registration and a longer phase (Phase 2).
@@ -98,7 +98,7 @@ A benchmark journey assuming stable 3G and documents ready. *Reality Buffer: 15 
 ### Problem Impact
 
 - **Financial Exclusion**: Entrepreneurs like "Marie" are pushed towards foreign Mobile Money providers, missing out on formal banking services.
-- **Operational Backlog**: Agents like **"Jean" (KYC)** are overwhelmed by manual data entry from low-quality photocopies, while **"Thomas" (Ops)** handles manual account creation in Amplitude.
+- **Operational Backlog**: Agents like **"Jean" (KYC)** are overwhelmed by manual data entry from low-quality photocopies, while **"Thomas" (AML/CFT)** handles compliance screening and monitors automated provisioning to Amplitude.
 - **Regulatory Pressure**: After recent CEMAC scandals, the **COBAC** is increasingly severe. A lack of a robust, "human-in-the-loop" audit trail makes compliance (AML/CFT) a critical risk point.
 - **Trust Deficiency**: Banks are losing ground to "faster" competitors because they can't match the 24/7 accessibility and speed of digital-first players.
 
@@ -112,8 +112,8 @@ A benchmark journey assuming stable 3G and documents ready. *Reality Buffer: 15 
 
 A resilient, biometric-first app with **mandatory local session persistence** to handle power and network failures. It features a seamless **multi-persona workflow**:
 1.  **Jean (KYC Agent)**: Visually validates originals in high-res via a dedicated portal.
-2.  **Thomas (Operations)**: Triggers bulk account creation in *Sopra Banking Amplitude* once validated.
-3.  **Sylvie (Manager)**: Monitors the entire funnel and ops health through a **PostgreSQL + Grafana pipeline**.
+2.  **Thomas (AML/CFT Supervisor)**: Reviews PEP/Sanctions alerts, handles identity deduplication, and monitors automated Amplitude batch provisioning.
+3.  **Sylvie (Manager)**: Monitors the entire funnel and ops health through a built-in Command Center (Phase 2: Grafana OSS).
 
 Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional identity simulation) ensure that "Marie" can open a restricted account instantly, which then scales to full access (BiPay/CRESCO) once human validation is cleared.
 
@@ -196,8 +196,8 @@ Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional
 
 #### 🏛️ Back-Office Portal (Ops & KYC)
 - **Jean's Validation Desk**: High-resolution side-by-side comparison of CNI original vs. OCR results.
-- **Thomas's Provisioning Desk**: Integration bridge to *Amplitude*, featuring the "Retry" and "Reactivate Identity" buttons for MOCKED flows.
-- **Sylvie's Command Center**: The "Red/Yellow/Green" Grafana dashboard for real-time funnel and SLA monitoring.
+- **Thomas's AML & Compliance Desk**: AML screening queue, conflict resolver (deduplication), agency administration, and Amplitude batch monitoring.
+- **Sylvie's Command Center**: Built-in R/Y/G dashboard for real-time funnel and SLA monitoring (Grafana deferred to Phase 2).
 
 ---
 
@@ -236,19 +236,19 @@ Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional
 
 ## Operational Handoff & Exception Handling
 
-### 1. Provisioning Lifecycle (Jean → Thomas)
-*   **Workflow**: `PENDING_KYC` (Jean) → `READY_FOR_OPS` → `PROVISIONING` (Thomas).
-*   **Action**: If the provisioning service fails to create the account in Amplitude, the state becomes `OPS_ERROR`.
-*   **Resolution**: Thomas handles re-provisioning via a **"Retry"** button; Jean is not disturbed for technical failures.
+### 1. Provisioning Lifecycle (Jean → Automated + Thomas AML Check)
+*   **Workflow**: `PENDING_KYC` (Jean) → `READY_FOR_OPS` → `COMPLIANCE_REVIEW` (Thomas, if AML alert) → `PROVISIONING` (Automated batch).
+*   **Action**: If the automated provisioning service fails to create the account in Amplitude, the state becomes `OPS_ERROR`.
+*   **Resolution**: Thomas monitors batch statuses and can retry failed items. Jean is not disturbed for technical failures.
 
 ### 2. Amplitude Rejection Protocols
 *   **Type A: Technical/Format Error** (e.g., character limit): 
     *   **Action**: Status `OPS_CORRECTION`. Thomas fixes and retries.
 *   **Type B: Identity Conflict (NIU Collision)**:
     *   **B1 (Data Match)**: If NIU exists and Name/Surname matches (existing client). 
-        *   **Action**: Thomas clicks **"Reactivate Existing Account"**. Client is notified.
+        *   **Action**: Handled by Thomas in his **Conflict Resolver** view. Client record is linked/merged.
     *   **B2 (Data Conflict)**: If NIU exists but Names do NOT match (potential fraud). 
-        *   **Action**: Dossier bounces back to Jean with `IDENTITY_CONFLICT` flag for deep manual investigation.
+        *   **Action**: Thomas flags as fraud in his **AML Screening** queue for deep investigation.
 
 ### 3. SLA Escalation & Load Balancing (Sylvie)
 *   **Level 1 (Manual)**: Sylvie clicks **"Escalate"** for dossiers exceeding 2h SLA. 
