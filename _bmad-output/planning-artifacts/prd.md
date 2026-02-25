@@ -22,12 +22,12 @@ classification:
 **Reconciliation Note (2026-02-23):** The interactive prototype at `docs/test_tmp_trash/onboarding-system-design-wireframe` and the UX Specification `_bmad-output/planning-artifacts/ux-design-specification-v2.md` (2026-02-18) have been reviewed and validated as the current UI/flow references. This PRD is now aligned to the prototype where discrepancies existed; see `docs/diagrams/adr-state-mapping.md` for the authoritative state mapping and the Mermaid diagrams in `docs/diagrams/` for flow/state/ER artifacts.
 
 ## 1. Executive Summary
-**bicec-veripass** is BICEC's **client relationship and service discovery platform**—a mobile-first ecosystem that transforms customer acquisition through digital KYC onboarding (**<15 minutes [11-minute stretch goal]** vs. 14 days), personalized banking service demonstrations, and account lifecycle management. Built on a 100% On-Premise, Open-Source AI stack (PaddleOCR, DeepFace), it serves as the **central touchpoint** for new customer relationships, bridging the "Trust Gap" for young entrepreneurs while maintaining COBAC-compliant "Human-in-the-Loop" validation.
+**bicec-veripass** is BICEC's **client relationship and service discovery platform**—a mobile-first ecosystem that transforms customer acquisition through digital KYC onboarding (**<15 minutes [11-minute stretch goal]** vs. 14 days), personalized banking service demonstrations, and account lifecycle management. Built on a 100% On-Premise, Open-Source AI stack, it serves as the **central touchpoint** for new customer relationships, bridging the "Trust Gap" for young entrepreneurs while maintaining COBAC-compliant "Human-in-the-Loop" validation.
 
 The platform combines:
 1. **Client Acquisition**: Streamlined digital KYC (CNI, NIU, Liveness) feeding verified identities into Sopra Banking Amplitude
 2. **Service Discovery**: Frontend banking feature demonstrations (Accounts, Savings, Cards, Transfers) adapted to user account status
-3. **Relationship Management**: Plan personalization (Standard/Premium/Ultra tiers) and use-case based onboarding (Everyday needs, Global spending, Investments)
+3. **Relationship Management**: Plan personalization (Standard(Free)/Premium/Ultra tiers) and use-case based onboarding (Everyday needs, Global spending, Investments)
 4. **Future Integration Foundation (Phase 2)**: Positioned as central authentication gateway for BiPay and broader BICEC digital ecosystem
 
 By using a Mock-First integration strategy, the MVP proves the business value (3x CAC reduction, 80% backlog reduction) before scaling to live DGI/Amplitude integration in Phase 2.
@@ -53,7 +53,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 ## 3. Product Scope
 
 ### MVP - Minimum Viable Product
-- **Mobile Journey**: SMS/Email OTP, PIN Setup, Resilient AI Capture (PaddleOCR/DeepFace), Local Encryption, Offline Metadata Sync.
+- **Mobile Journey**: SMS/Email OTP, PIN Setup, Resilient AI Capture , Local Encryption, Offline Metadata Sync.
 - **Back-Office**: Jean's Validation Desk, Thomas's AML & Compliance Dashboard, Sylvie's Command Dashboard.
 - **Core API**: Sovereign Python/FastAPI services for OCR, Biometrics, and KYC State Management.
 
@@ -159,7 +159,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 
 ### 📱 Mobile App Requirements (Flutter)
 - **Compatibility Strategy**:
-    - **Minimum SDK**: Android 24 (7.0), iOS 15.
+    - **Minimum SDK**: Android 26 (8.0), iOS 15.
     - **Target SDK**: Latest supported by current Flutter stable tooling.
 - **Device Permissions**: 
     - `CAMERA`: Mandatory for high-res CNI/Passport capture and Liveness.
@@ -176,7 +176,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
     - `/kyc/capture`: Sequential image upload with immediate OCR feedback.
     - `/kyc/verify`: Biometric comparison (DeepFace) and state management.
     - `/backoffice/dossiers`: Queue management for Jean, Thomas, and Sylvie.
-- **Authentication Model**: **OTP-based session management** for Mobile (SMS/Email); strict refresh/expiry hierarchy. Back-office uses Email/Password (No AD).
+- **Authentication Model**: **OTP-based session management** for Mobile (SMS/Email for the login in the mobile, then their pin for regular use access); strict refresh/expiry hierarchy. Back-office uses Email/Password (No AD).
 - **Data Schemas**: Strict Pydantic models for OCR extraction and BICEC-standard KYC profiles.
 - **Mock Integration Hierarchy**: High-fidelity stubs for `DGI_MOCK` (tax validation) and `AMPLITUDE_MOCK` (account provisioning). Sopra Banking Amplitude handles IBU generation automatically.
 
@@ -215,7 +215,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
   - **Plan Personalization**: Premium/Standard/Ultra tier presentation with feature comparison (interest rates, transaction fees, purchase protection)
   - **Use-Case Selection**: Everyday needs (Transfers, Budgeting, Cards), Global spending (Forex, Airport lounge), Investments (Trading, Crypto)
   - **Account Management UI**: Home dashboard with Main account, Pockets, Savings goals, Linked accounts (frontend-only, no backend)
-  - **Banking Feature Shells**: Cards management, Recurring transfers, Add money/Withdraw interfaces adapted to account status (FULL_ACCESS, LIMITED_ACCESS, PENDING, DISABLED)
+  - **Banking Feature Shells**: Cards management, Recurring transfers, Add money/Withdraw interfaces adapted to account status (FULL_ACCESS, LIMITED_ACCESS, RESTRICTED_ACCESS, PENDING, DISABLED)
   - **Purpose**: Demonstrate service capabilities and educate users on available banking features while KYC is validated
 
 ### 📈 Post-MVP Features (Phases 2 & 3)
@@ -262,7 +262,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
   - **Logic**: Durable state until Jean's manual validation transition to `FULL_ACCESS`.
 - **FR17 (Consent)**: Users must explicitly check 3 distinct checkboxes to accept: (1) CGU, (2) Privacy Policy, and (3) Data Processing Consent.
 - **FR18 (Digital Capture)**: Users authorize the contract submission digitally on the touchscreen (timestamped & stored).
-- **FR19 (Wet Signature 3x - MANDATORY IN-BRANCH)**: Users must sign **3 times on a white paper** during their final *in-branch* physical activation for the compliance "Signature Card". This is a BEAC/COBAC regulatory requirement confirmed by Ken's supervisor (2026-02-15) but is explicitly removed from the mobile self-care workflow to adhere to UX constraints.
+- **FR19 (Wet Signature 3x - MANDATORY IN-BRANCH)**: Users must sign **3 times on a white paper** during their final *in-branch* physical activation for the compliance "Signature Card". This is a BEAC/COBAC regulatory requirement confirmed by Ken's supervisor, Mr Jackson (2026-02-15) and is explicitly removed from the mobile self-care workflow to adhere to UX constraints.
 
 ### 🧠 Sovereign AI Engine (FastAPI)
 - **FR20 (OCR Engine)**: Local OCR extracts structured fields from CNI (Recto/Verso) and utility bills.
@@ -292,7 +292,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 
 ### 🏦 Client Relationship \u0026 Banking Discovery (Frontend Only)
 > [!IMPORTANT]
-> **FR39-47 describe frontend-only demonstrations** of banking capabilities to establish client relationships and educate users on service offerings. These interfaces adapt based on account validation status (PENDING/LIMITED_ACCESS/FULL_ACCESS/DISABLED) to demonstrate the value proposition while KYC is being validated. **No backend banking operations are implemented in MVP.**
+> **FR39-47 describe frontend-only demonstrations** of banking capabilities to establish client relationships and educate users on service offerings. These interfaces adapt based on account validation status (PENDING|RESTRICTED_ACCESS/LIMITED_ACCESS/FULL_ACCESS/DISABLED) to demonstrate the value proposition while KYC is being validated. **No backend banking operations are implemented in MVP.**
 
 - **FR39 (Plan Personalization)**:
   - **Premium/Standard/Ultra Tier Presentation**: Users see detailed plan comparisons with:
@@ -342,33 +342,33 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
     - **Find ATMs nearby**: Map icon button with chevron
     - **Reactivate terminated card**: Link at bottom
     - **Add new** button for requesting additional cards
-  - **Status-based UX**: Cards show error states for PENDING/LIMITED_ACCESS, unlock with FULL_ACCESS
+  - **Status-based UX**: Cards show error states for PENDING|RESTRICTED_ACCESS, unlock with LIMITED_ACCESS/FULL_ACCESS
 
 - **FR45 (Gating Logic & Account Status)**:
   - **PENDING** (KYC submitted, awaiting validation):
     - All banking features show "locked" state with "⏳ Your account is being validated" message
     - Users can browse Plans, see feature descriptions, but cannot interact
   - **LIMITED_ACCESS** (Account active but NIU missing or declarative):
-    - **Unlocked**: Cash-In (deposits/receiving), View balance, Account settings, Service discovery demo
-    - **Locked** (padlock icon + error banner): Outbound transfers, Cash-Out, card issuance, crypto, savings, investment, credit
+    - **Unlocked**: Cash-In (deposits/receiving), View balance, Account settings, Outbound transfers, Cash-Out, card issuance, Service discovery demo
+    - **Locked** (padlock icon + error banner):  crypto, savings, investment, credit
     - **Warning banner**: "⚠️ Complétez votre NIU pour débloquer toutes les fonctionnalités"
   - **FULL_ACCESS** (Complete KYC + NIU validated):
     - All UI elements unlocked (frontend-only demos for MVP)
   - **DISABLED** (Account suspended):
-    - Login blocked with message: "Votre compte a été désactivé. Contactez votre agence."
+    - Login blocked with message: "Votre compte a été désactivé. Contactez votre agence ou notre support client par mail help_desk@bicec.com, ou mobile +237612345678 ."
 
-- **FR46 (Notification Strategy)**: SMS is used strictly for OTP; all status updates (validation complete, account activated, features unlocked, KYC rejection) use **Push Notifications** (zero marginal cost).
+- **FR46 (Notification Strategy)**: SMS is used strictly for OTP; all status updates (validation complete, account activated, features unlocked, KYC rejection) use **Push Notifications** or, **In-app Notifications** (zero marginal cost).
 
 - **FR47 (Purpose of Frontend Demos)**: These interfaces serve three strategic goals:
   1. **Educate users** on BICEC's digital banking value proposition during KYC delays
-  2. **Reduce abandonment** by showing "what's coming" even when account is PENDING
+  2. **Reduce abandonment** by showing "what's coming" even when account is PENDING|RESTRICTED_ACCESS
   3. **Test UI/UX** for future backend integration without blocking MVP delivery
 
 ## 10. Non-Functional Requirements
 
 ### ⚡ Performance (Snappy AI Standards)
 - **NFR1 (Inference Latency)**: Total AI processing must be **<15 seconds** (Target: OCR <5s, Liveness <10s) on the 12GB i3 benchmark node.
-- **NFR2 (Mobile Fluidity)**: Capture guidance must operate at **>15 FPS** on mid-range Android 7.0 devices to ensure image quality.
+- **NFR2 (Mobile Fluidity)**: Capture guidance must operate at **>15 FPS** on mid-range Android 8.0 devices to ensure image quality.
 - **NFR3 (Mobile Footprint)**: Total app size must be **<40MB** (Target: <20MB for initial download) to respect Cameroonian data constraints. Cold start time must be **<4 seconds**.
 
 ### 🛡️ Security & Sovereignty
@@ -415,7 +415,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
     - **Error frequency**: Liveness failures by time-of-day/lighting conditions, OCR extraction confidence distributions
   - **Data Warehouse Structure**:
     - **Dimensional model**: User sessions (fact), Documents (dimension), Validation actions (fact), Agents (dimension)
-    - **Storage**: PostgreSQL with indexed time-series for Grafana dashboards
+    - **Storage**: PostgreSQL with indexed time-series for Grafana dashboards(Grafana postponed to the phase 2. Now 'll be used on a web Jean's like platform [Back-Office])
   - **Exports**: CSV/JSON dumps for offline analysis, COBAC audit trail generation
   - **Dashboards (MVP)**: Internal back-office web views for Command Center and SLA monitoring.
   - **Dashboards (Phase 2 - Grafana)**: Pre-configured Grafana views for deeper operational monitoring:

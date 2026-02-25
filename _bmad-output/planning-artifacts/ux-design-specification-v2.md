@@ -1,3 +1,4 @@
+```text
 [//]: # (---)
 [//]: # (version: 2.0)
 [//]: # (date: 2026-02-18)
@@ -11,6 +12,7 @@
 [//]: # (  - "docs/Screenshot_References.csv")
 [//]: # (  - "docs/Fonctionnalité_Interaction_Erreurs.md")
 [//]: # (---)
+```
 
 # UX Design Specification bicec-veripass v2.0
 
@@ -31,7 +33,7 @@
 - **Sylvie (The Commander)**: Manager needing R/Y/G operational health visibility and funnel analytics. This can be manager of an agency, the central Bicec direction stakeholders.
 
 ### Key Design Challenges
-- **The Hardware Ceiling**: Maintaining >15 FPS camera guidance on legacy Android 7 (NFR2).
+- **The Hardware Ceiling**: Maintaining >15 FPS camera guidance on legacy Android 8 (NFR2).
 - **The Resilience Paradox**: Managing session persistence (NFR8) and chunked uploads (FR6) without adding UX friction.
 - **The Compliance Burden**: Capturing CNI recto/verso, liveness, and proof of address without overwhelming the user.
 - **The Auto-Extraction Paradigm**: Users upload documents; AI extracts data. Users only confirm/correct, never fill blank forms.
@@ -108,7 +110,7 @@ The bicec-veripass experience is defined by **Resilient Speed & Anticipated Valu
 
 ### Inspiring Products Analysis
 - **Revolut iOS (Latest)**: The "Gold Standard" for digital-first financial onboarding.
-    - **Successes**: Card-based layouts, seamless transitions, immediate feedback loops.
+    - **Successes**: Card-based layouts, seamless transitions, immediate feedback loops, **✓ Industry-leading validation: $75B valuation (2025) — doubling since 2021 — with €395M net profit (2023)**.
     - **Innovative Interactions**: Progressive disclosure, confidence-building status toasts, celebration moments.
     - **Adopted Patterns**: Success animations after each capture, inline editing, biometric opt-in.
     
