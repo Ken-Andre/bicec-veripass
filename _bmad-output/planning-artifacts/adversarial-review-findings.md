@@ -458,9 +458,9 @@ Date de Facturation: 21/08/2020
 | Simplify Wet Signature (Option 3) | PRD (PM) | ⏳ Pending |
 | Simplify GPS strategy | PRD (PM) | ⏳ Pending |
 | Simplify Utility Bill validation | PRD (PM) | ⏳ Pending |
-| Clarify Shadow IBU wording | Implementation Plan | ⏳ Pending |
+| Clarify Shadow IBU wording | Implementation Plan | ⏳ Done | >Removed because no more mock for even the MVP, too much complexity.
 | Create UX Mockups with Google Stitch | UX Designer | ⏳ Pending |
-| Clarify Iwomi Core + Back-Office Tech Stack | Implementation Plan | ⏳ Pending |
+| Clarify Iwomi Core + Back-Office Tech Stack | Implementation Plan | ⏳ Done | -> Iwomi not anymore in the scope
 | **Create Architecture Documentation** | **Architect** | ⏳ Pending |
 
 ---

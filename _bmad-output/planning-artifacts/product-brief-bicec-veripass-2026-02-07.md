@@ -206,7 +206,7 @@ Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional
 - **Infrastructure**: **100% On-Premise**. No cloud/staging allowed (Law 2024-017 & Security Policy).
 - **Hardware Profile**: Must operate on standard hardware (Target: **16GB RAM** for development/production nodes).
 - **Development Model**: Internalized execution (Interns/Junior devs) using **Docker/Compose** for all environments.
-- **Integrations (MVP Phase)**: **Mock/Stub Strategy** for DGI (Tax), BEAC (IBU), and Sopra Amplitude. Real production integrations are deferred to Phase 2.
+- **Integrations (MVP Phase)**: **Mock/Stub Strategy** for DGI (Tax), BEAC (IBU), and Sopra Amplitude. Real production integrations are deferred to Phase 2. >Removed because no more mock for even the MVP, too much complexity, so we will see other way.
 - **Licensing**: 0 FCFA in per-user SaaS fees. 100% Open Source stack to ensure technological sovereignty.
 
 ---
@@ -222,7 +222,7 @@ Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional
 ### Future Vision
 - **BICEC ID Rail**: Reusing bicec-veripass identity to one-click open BiPay, CRESCO, or Credit products.
 - **CEMAC Expansion**: Deploying the same sovereign stack to other countries in the region.
-- **Real Integration Transition**: Phasing out Mocks for live BEAC/DGI/Sopra APIs.
+- **Real Integration Transition**: Phasing out Mocks for live BEAC/DGI/Sopra APIs. 
 
 
 ### Key Differentiators

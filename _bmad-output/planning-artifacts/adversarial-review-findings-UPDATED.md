@@ -27,11 +27,11 @@
 
 **Ken's Pragmatic Constraints:**
 - **Not a Dev specialist** - focus is Data/AI, so dev quality is secondary to demo functionality
-- **No access to real APIs** - will use mocks for DGI, BEAC, Amplitude (BICEC IT will replace post-internship)
+- **No access to real APIs** - even if it will not use mocks anymore for DGI, BEAC, it will still need to find docs for real integration to webservices Amplitude (BICEC IT will replace post-internship)
 - **Local Docker demo only** - not production deployment, just thesis presentation
-- **"Shadow IBU" is acceptable** - these are test accounts for demo purposes, clearly documented as non-production
+- **"Shadow IBU" is acceptable** - these are test accounts for demo purposes, clearly documented as non-production. Erratum:not needed anymore for the MVP.
 
-> **Ken's Request:** "Je t'ai pris pour que tu confirmes bien ce que je pensais et tu l'as bien fait." This review validates Ken's instinct to pause and fix foundational issues before proceeding.
+
 
 ---
 
@@ -41,7 +41,7 @@ The bicec-veripass planning phase shows ambition and vision but suffers from cri
 
 **Critical Blockers Found:** 27 issues, but many are **expected given Ken paused at Step 4** (Architecture, Epics, Implementation artifacts don't exist yet because they haven't been started).
 
-**Path Forward:** Fix PM (PRD) and UX Designer (UX Spec) documents, THEN proceed to Architecture → Epics → Implementation.
+**Path Forward:** Fix PM (PRD) [\\Done] and UX Designer (UX Spec) documents, THEN proceed to Architecture → Epics → Implementation.
 
 ---
 
@@ -50,21 +50,39 @@ The bicec-veripass planning phase shows ambition and vision but suffers from cri
 ### 1. Missing Architecture Documentation ⚠️ EXPECTED - Not Started Yet
 **Severity:** 🔴 CRITICAL | **Responsible Agent:** Architect (Winston) | **Status:** Pending - Step 5/10
 
-**Finding:** There is ZERO architectural documentation in the _bmad-output directory.
+**Finding:** There is ZERO architectural documentation in the _bmad-output directory. Also,Now that the **Hybrid OCR Strategy** is defined, the Architect must document the orchestration between **PaddleOCR** (ID-focus) and **GLM-OCR** (Structure-focus).
 
 > **Ken's Context:** *"En fait, actuellement je venais de finir les échanges avec Sally l'ux designer et je me suis rendue compte que son document etait tellement incomplet... c'est la que je me suis dit il ne faut pas que ca se propage plus loin on n'etait juste qu'a la 4e sur 10 etapes du core Bmad."*
 
 **Resolution:** This is **NOT a failure** - it's the correct BMAD sequence. Architecture comes AFTER UX (Step 5). Ken will create this after fixing UX issues.
 
 **What's Missing (to be created by Architect):**
+- [ ] Use case diagram
 - [ ] System architecture diagram (C4 Model Level 1-3)
 - [ ] Component interaction diagrams
 - [ ] Data flow diagrams (Marie's journey → Storage → Jean's validation)
-- [ ] Database schemas (PostgreSQL for back-office, SQLite for mobile)
+- [ ] **Database Schemas (PostgreSQL for Back-Office, SQLite for Mobile)**
+  - [ ] **Conceptual Data Model (CDM):** An overview of the main entities (e.g., `Customer`, `Application`, `Document`), their attributes, and their high-level relationships. This model is independent of any specific database technology.
+  - [ ] **Logical Data Model (LDM):** The normalized version of the CDM, detailing all tables, columns with their data types (e.g., `VARCHAR(255)`, `INTEGER`, `TIMESTAMP`), primary keys, foreign keys, and the relationships (One-to-One, One-to-Many, Many-to-Many) between tables.
+  - [ ] **Detailed Data Dictionary:** A comprehensive document or table listing every field in the database. For each field, it specifies:
+      - **Table Name:** The table it belongs to.
+      - **Field Name:** The column's name (e.g., `customer_id`, `submission_status`).
+      - **Data Type:** (e.g., `TEXT`, `BOOLEAN`, `BLOB` for images).
+      - **Description:** A clear explanation of the field's purpose (e.g., "Stores the customer's National Taxpayer Number (NIU)").
+      - **Constraints:** Rules like `NOT NULL`, `UNIQUE`, `DEFAULT value`, `CHECK constraint`.
+      - **Example:** A sample value (e.g., `"PENDING_KYC"`).
+  - [ ] **Legend/Symbol Explanation:** A guide that explains the notation used in the CDM and LDM diagrams (e.g., symbols for entities, relationships, cardinality like `1..*`, and primary/foreign keys).
+
+  <!-- [\\]:||--o{ : Relation "un à plusieurs" (1:N)
+  [\\]:}o--|| : Relation "plusieurs à un" (N:1) avec optionalité côté plusieurs
+  [\\]:PK : Clé Primaire (Primary Key)
+  [\\]:UK : Clé Unique (Unique Key)
+  [\\]:FK : Clé Étrangère (Foreign Key) -->
 - [ ] API contract specifications (FastAPI endpoints)
+- [ ] Sequence diagrams (For all)
 - [ ] Docker Compose service definitions
 - [ ] Security architecture (encryption at rest/in transit)
-- [ ] Integration architecture (Mocks for DGI, BEAC, Amplitude)
+- [ ] Integration architecture
 
 **Important Note from Ken:**
 > *"J'etais confu par tout les termes techniques qu'ils employaient, les technologies qu'ils parlaient sans avoir fait une etude comparative puis une justification du choix et meme pourquoi c'est la bas qu'ils le font ce n'est pas le gars de l'architecture qui le fera/est cense le faire?"*
@@ -99,7 +117,7 @@ The bicec-veripass planning phase shows ambition and vision but suffers from cri
 - Local Docker demo with mock APIs (DGI, BEAC, Amplitude)
 - Focus on Data/BI pipeline showcase for thesis defense
 - BICEC IT will replace mocks with real integrations post-internship
-- "Shadow IBU" test accounts acceptable for demo environment (clearly documented as non-production)
+- "Shadow IBU" test accounts not acceptable anymore even for demo environment (clearly documented as non-production, and Amplitude which is more known here will be adopted,which handle already real IBU of our bank)
 
 **Thesis Defense Focus Areas (Data/BI):**
 1. Funnel analytics pipeline
@@ -171,16 +189,35 @@ The bicec-veripass planning phase shows ambition and vision but suffers from cri
 
 ## 🟡 MAJOR DESIGN FLAWS (Tier 2)
 
+### 3. Hardware Resource Validation: GLM-OCR vs. 16GB RAM ⚠️ HIGH PRIORITY
+**Severity:** 🟡 HIGH | **Status:** Validated in Research, Awaiting Benchmarking
+**Finding:** Running a LLM-based OCR (0.9B parameters) on an Intel i3 was previously flagged as a risk.
+**Resolution:** The choice of **GLM-OCR (0.9B)** is pragmatically sound for a 16GB environment. We need to make a reel research to find which (between PaddleOcr and GLM-OCR) is the best suited for ours, wheter in CNI extraction or Bill for KYC documentation of the user. 
+- **Optimization Strategy:** Using **llama.cpp** or **ONNX** with **4-bit quantization (Q4_K_M)** reduces the RAM footprint to ~1.5GB - 2GB.
+
+
+### 4. Demo Account Strategy: Moving Beyond "Shadow IBU" 🛑 REVISED
+**Severity:** 🟡 HIGH | **Status:** Alignment with Sopra Amplitude
+**Finding:** "Shadow IBU" was previously proposed as a workaround.
+**Correction:** **Shadow IBU is no longer required.** - **New Strategy:** The MVP will use **Amplitude-compatible test accounts**. Since Amplitude already manages real IBUs for the bank, the simulation will mirror real production data structures.
+- **Benefit:** Reduces technical debt and simplifies the eventual transition from the Docker demo to BICEC’s staging environment.
+
+### 5. Utility Bill OCR: GLM-OCR Structural Advantage ✅ RESOLVED
+**Severity:** 🟡 MEDIUM | **Status:** Scope Optimized
+**Update:** Previous findings suggested that address matching was infeasible.  
+**Technical Pivot:** By using **GLM-OCR**, we can now extract **semantic layouts** from ENEO/CDE bills.  
+- **Logic:** Extract "Agency Name" and "Billing Date" to feed the **Intelligent Load Balancing** logic, routing dossiers to the nearest BICEC branch.
+
 ### 7. NIU Manual Entry: LIMITED_ACCESS Status Defined ✅ RESOLVED
 **Status:** PM (John) has defined the precise list of allowed/blocked features. STATUS is locked in PRD FR16/FR45 and UX SPEC. 
-- **Allowed**: Cash-In, balance view, settings.
-- **Blocked**: Transfers, cards, removals, savings, credit.
+- **Allowed**: Cash-In, balance view, transfers, cards, removals, settings.
+- **Blocked**:  Savings, credit.
 - **Process:** NIU Declarative → `LIMITED_ACCESS` (Auto-gated) → Jean's manual validation → `FULL_ACCESS`.
 
 ---
 
 ### 8. Wet Signature 3x Capture: Strategy Corrected ✅ RESOLVED
-**Status:** Requirement properly retained in mobile flow per supervisor instructions. All documents (PRD, UX Spec) verified for compliance. Logic for post-onboarding "ruse" documented.
+**Status:** Requirement properly retained in mobile flow per supervisor instructions. All documents (PRD, UX Spec) verified for compliance. Logic for post-onboarding "ruse" documented.But now this wet signature will be done directly in the agency where the user will achieves his journey.
 
 **Ken's Decision (Option 3 - Post-Activation):**
 > *"Merci, tu as raison ca n'a pas de sens. En fait la version numerique a ete une idee de nous mais ne sachant pas si la Beac l'apprecierait avec leurs regles restant encore un peu archaiques, ils preferent quand tu signe. Je valide donc ton option 3 ou l'on peut le faire apres par mail par exemple"*
@@ -329,7 +366,7 @@ The bicec-veripass planning phase shows ambition and vision but suffers from cri
 > In original review I mistakenly put "DevOps Engineer" as responsible. Ken corrected:
 > *"En suivant ce workflow ce n'est pas lui qui le fera, corrige. Et actuellement je ne me suis arrete qu'a l'etape du Ux"*
 
-**Action Required (AFTER Architecture):**
+**Action Required (AFTER Architecture -In the Phase 2 not MVP):**
 - **Architect:** Define Grafana data pipeline (FastAPI → Prometheus → Grafana)
 - **UX Designer:** Create Sylvie's dashboard wireframe using Stitch
   - Reference: https://discuss.ai.google.dev/t/stitch-prompt-guide/83844/121

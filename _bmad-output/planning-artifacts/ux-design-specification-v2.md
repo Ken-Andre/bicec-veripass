@@ -1,4 +1,3 @@
-```text
 [//]: # (---)
 [//]: # (version: 2.0)
 [//]: # (date: 2026-02-24)
@@ -12,7 +11,6 @@
 [//]: # (  - "docs/Screenshot_References.csv")
 [//]: # (  - "docs/Fonctionnalité_Interaction_Erreurs.md")
 [//]: # (---)
-```
 
 # UX Design Specification bicec-veripass v2.1
 

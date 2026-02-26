@@ -38,7 +38,7 @@ Project Complexity: Medium-High
 
 - **Hardware**: Strict deployment to legacy nodes (Intel i3 @ 2.5GHz, 16GB RAM, 200GB Disk).
 - **Infrastructure**: Air-gapped/On-premise deployment strictly mandated by Law 2024-017. Docker-compose monolith strategy for MVP.
-- **Dependencies**: Open-source sovereign stack only (PaddleOCR, DeepFace, FastAPI). Real web service integration with Sopra Amplitude is required for MVP. External API integration with DGI (Tax) is descoped for MVP.
+- **Dependencies**: Open-source sovereign stack only (PaddleOCR|GLM-OCR, DeepFace, FastAPI). Real web service integration with Sopra Amplitude is required for MVP. External API integration with DGI (Tax) is descoped for MVP.
 
 ### Cross-Cutting Concerns Identified
 

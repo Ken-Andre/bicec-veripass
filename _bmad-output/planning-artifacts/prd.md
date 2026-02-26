@@ -46,7 +46,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 
 ### 🛠️ Technical Success
 - **Sovereignty & Efficiency**: 100% dependency on open-source AI; execution on standard 16GB RAM hardware.
-- **Contract Integrity**: "API Contract Freeze" achieved for all third-party mocks (DGI/Sopra) to ensure Phase 2 compatibility.
+- **Contract Integrity**: "API Contract Freeze" achieved 
 - **Biometric Calibration**: Adaptive threshold tuning achieving <2% False Acceptance Rate (FAR).
 - **Audit Trail Completeness (Regulatory Shield)**: 100% traceability for every dossier action (capture, validation, activation) with point-in-time IP logs and SHA-256 integrity hashes.
 
@@ -127,7 +127,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 
 ### 🔄 Integration Requirements
 - **Core Banking Integration**: Direct integration point for Sopra Amplitude provisioning.
-- **Mock/Stub Layer**: Full simulation of external DGI (Tax) responses for the MVP pilot. Sopra Banking Amplitude handles IBU generation automatically.
+<!-- - **Mock/Stub Layer**: Full simulation of external DGI (Tax) responses for the MVP pilot. Sopra Banking Amplitude handles IBU generation automatically. -->
 - **Provisioning States**: Automated lifecycle management between `PENDING_KYC` (Jean), `COMPLIANCE_REVIEW` (Thomas - if alerted), and `PROVISIONING` (Automated).
 
 ### 🚩 Risk Mitigations
@@ -141,7 +141,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 - **Sovereign RegTech Blueprint**: A 100% On-Premise, Open-Source AI stack (PaddleOCR, DeepFace) that eliminates vendor lock-in and foreign SaaS dependency—a pioneering move for Tier-1 banks in Cameroon.
 - **Context-Aware Resilience (Mobile/Edge)**: The combination of **Encrypted Local Cache** + **Progressive Sequential Upload** + **Sovereign Biometric States** specifically engineered to survive "Délestage" (power cuts) and unstable 3G infrastructure.
 - **Hybrid "Audit-Impeccable" Workflow**: An innovative RegTech approach where the UX is designed strictly to "show the blood" (evidence) to COBAC regulators, turning a compliance burden into a competitive advantage (faster approval).
-- **Mock-First ROI Proof**: Using mock tax APIs to prove a 3x CAC reduction *before* committing to years of external integration overhead. Sopra Banking Amplitude handles IBU generation as part of core banking integration.
+<!-- - **Mock-First ROI Proof**: Using mock tax APIs to prove a 3x CAC reduction *before* committing to years of external integration overhead. Sopra Banking Amplitude handles IBU generation as part of core banking integration. -->
 
 ### 📊 Market Context & Competitive Landscape
 - **Local Reality**: Most competitors depend on foreign SaaS (Onfido, Jumio) which poses data locality risks (Law 2024-017) and high per-user costs.
@@ -178,7 +178,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
     - `/backoffice/dossiers`: Queue management for Jean, Thomas, and Sylvie.
 - **Authentication Model**: **OTP-based session management** for Mobile (SMS/Email for the login in the mobile, then their pin for regular use access); strict refresh/expiry hierarchy. Back-office uses Email/Password (No AD).
 - **Data Schemas**: Strict Pydantic models for OCR extraction and BICEC-standard KYC profiles.
-- **Mock Integration Hierarchy**: High-fidelity stubs for `DGI_MOCK` (tax validation) and `AMPLITUDE_MOCK` (account provisioning). Sopra Banking Amplitude handles IBU generation automatically.
+<!-- - **Mock Integration Hierarchy**: High-fidelity stubs for `DGI_MOCK` (tax validation) and `AMPLITUDE_MOCK` (account provisioning). Sopra Banking Amplitude handles IBU generation automatically. >Removed because no more mock for even the MVP, too much complexity.-->
 
 ### 🖥️ Back-Office Portal (Web-based SPA)
 - **"Zoom + Compare" Requirement**: Mandatory side-by-side high-res evidence viewer for manual OCR validation and fraud review.
@@ -209,7 +209,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 - **Resilient Mobile Capture**: Sequential upload, local encrypted cache.
 - **Sovereign AI Engine**: PaddleOCR + DeepFace running locally on Docker.
 - **Human-in-the-Loop Portal**: RBAC for Jean, Thomas, and Sylvie.
-- **Mock Service Layer**: High-fidelity stubs for DGI and Sopra Amplitude.
+<!-- - **Mock Service Layer**: High-fidelity stubs for DGI and Sopra Amplitude. >Removed because no more mock for even the MVP, too much complexity.-->
 - **Universal 16GB Optimization**: WSL2 RAM capping and auto-pruning scripts.
 - **Client Relationship Frontend (Banking Demos - UI Only)**:
   - **Plan Personalization**: Premium/Standard/Ultra tier presentation with feature comparison (interest rates, transaction fees, purchase protection)
@@ -220,7 +220,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 
 ### 📈 Post-MVP Features (Phases 2 & 3)
 **Phase 2 (Growth - Integration & Intelligence)**:
-- **Live Tunneling**: Replace mocks with real TLS-secured pipes to DGI and Sopra Amplitude.
+- **Live Tunneling**: Using real TLS-secured pipes to DGI and Sopra Amplitude.
 - **Multi-Agent Load Balancing**: Queue distribution for larger onboarding teams.
 - **Automated Fraud Scoring**: Pattern detection based on pilot data.
 
@@ -249,7 +249,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 ### 📍 Localization & Proof of Address
 - **FR9 (Cascade Address)**: Address input uses progressive dropdowns: *Ville → Commune → Quartier → Lieu-dit*.
 - **FR10 (GPS Location - Optional)**: Users can optionally use a "Utiliser ma position actuelle" button to auto-populate GPS coordinates.
-- **FR11 (Privacy Notice & Compliance)**: When GPS is used, the system displays a privacy notice: "We collect your GPS location to verify your address for compliance purposes. This data is encrypted and never shared (Enregistré pour des fins de contrôle réglementaire de KYC)." If GPS distance > X km from selected Quartier, show a warning (don't block).
+- **FR11 (Privacy Notice & Compliance)**: When GPS is used, the system displays a privacy notice: "We collect your GPS location to verify your address for compliance purposes. This data is encrypted and never shared (Enregistré pour des fins de contrôle réglementa1ire de KYC)." If GPS distance > X km from selected Quartier, show a warning (don't block).
 - **FR12 (Utility Choice)**: Users choose **Either ENEO Or CAMWATER** (toggle) to upload as proof of address.
 - **FR13 (Bill Validation)**: The system extracts the bill date and ENEO/CAMWATER agency name using PaddleOCR. The system uses the utility agency zone to assign the dossier to the nearest BICEC agency for load balancing. Address coherence validation is performed manually by Jean during back-office review.
 
@@ -311,7 +311,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 
 - **FR41 (Account Management Dashboard)**:
   - **Home Screen UI** (frontend mockup):
-    - **Main Account**: Balance display (£0 mockup), country selector (British pound flag), Accounts button
+    - **Main Account**: Balance display (0XAF mockup), country selector (British pound flag), Accounts button
     - **Pockets**: Custom savings pockets (e.g., "Salvation lies within" with checkmark icon) with individual balances
     - **Savings**: "Add Savings" card showing interest rate (4.75%), CTA to create savings goal
     - **Linked Accounts**: "Add Linked" card to connect external bank accounts ("See all your bank accounts in one place")
@@ -345,7 +345,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
   - **Status-based UX**: Cards show error states for PENDING|RESTRICTED_ACCESS, unlock with LIMITED_ACCESS/FULL_ACCESS
 
 - **FR45 (Gating Logic & Account Status)**:
-  - **PENDING** (KYC submitted, awaiting validation):
+  - **PENDING**/ ***RESTRICTED_ACCESS** (KYC submitted, awaiting validation):
     - All banking features show "locked" state with "⏳ Your account is being validated" message
     - Users can browse Plans, see feature descriptions, but cannot interact
   - **LIMITED_ACCESS** (Account active but NIU missing or declarative):

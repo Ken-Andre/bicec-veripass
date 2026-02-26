@@ -40,13 +40,13 @@ The implementation of a self-hosted KYC solution for the Cameroonian market requ
 
 - **Python (Backend & AI Logic):** The primary language for the OCR and Biometric core. Python's ecosystem (PaddleOCR, DeepFace, FastAPI) is the industry standard for rapid AI prototyping and deployment.
 - **Dart (Frontend - Flutter):** Confirmed as the choice for the mobile client. Dart's native compilation provides smooth UI performance, which is critical for "live" capture of documents and selfies.
-- **C++ (Performance optimization):** While not used directly by the student, the underlying engines (PaddlePaddle, OpenCV) rely on C++ and SIMD instructions for CPU acceleration on Windows.
+- **C++ (Performance optimization):** While not used directly by the student, the underlying engines (PaddlePaddle, OpenCV,...) rely on C++ and SIMD instructions for CPU acceleration on Windows.
 
 _Popular Languages: Python, Dart, SQL (for BI)_
 _Emerging Languages: Rust (for high-performance AI wrappers), but not recommended for this MVP due to complexity._
 _Language Evolution: Python remains dominant but is increasingly served via asynchronous frameworks like FastAPI to handle concurrent KYC requests._
 _Performance Characteristics: Python overhead is mitigated by offloading heavy computation to C++/ONNX runtimes._
-_Source: [PaddleOCR Inference Optimization](https://paddleocr.ai), [DeepFace Documentation](https://github.com/serengil/deepface)_
+_Source: [GLM-OCR GitHub Repository (README & SDK)](https://github.com/zai-org/GLM-OCR), [PaddleOCR Inference Optimization](https://paddleocr.ai), [DeepFace Documentation](https://github.com/serengil/deepface)_
 
 ### Development Frameworks and Libraries
 
@@ -81,7 +81,7 @@ _Source: [DuckDB for BI](https://duckdb.org), [BEAC AML/CFT Directives](https://
 
 - **Docker Desktop (Windows):** Essential for isolating the Python environment and its complex dependencies (CUDA/ONNX/Paddle). It simplifies deployment for a "demo" scenario.
 - **VS Code:** The industry-standard IDE for both Flutter and Python.
-- **ONNX Runtime:** The cross-platform engine used to run PaddleOCR and DeepFace models at peak performance on AMD/Intel CPUs under Windows.
+- **ONNX Runtime:** The cross-platform engine used to run PaddleOCR,GLM-OCR and DeepFace models at peak performance on AMD/Intel CPUs under Windows.
 
 _IDE and Editors: VS Code, Android Studio_
 _Version Control: Git_
@@ -105,7 +105,7 @@ _Source: [Banking Digital Onboarding Standards](https://voveid.com)_
 - **Sovereign identity:** Growing trend in CEMAC for local hosting of sensitive biometric data to comply with COBAC's data sovereignty concerns.
 - **Hybrid OCR:** Moving the first layer of OCR (e.g., card detection) to the mobile device (Flutter/TFLite) while the field extraction stays on the server for accuracy.
 
-_Migration Patterns: Moving away from global SaaS APIs (Onfido, Jumio) to local, open-source alternatives for cost and regulatory control._
+_Migration Patterns: Moving away from global SaaS APIs (Onfido, Jumio,VoveId) to local, open-source alternatives for cost and regulatory control._
 _Emerging Technologies: Silent Liveness Detection (Passive) replacing active challenges (Smile, blink) for better UX._
 _Source: [Fintech Trends in Africa](https://anqacompliance.com)_
 

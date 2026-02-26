@@ -12,16 +12,17 @@
 Ouvrir un compte bancaire professionnel en moins de 15 minutes sans se déplacer
 
 ### 👀 Ce qu'elle VOIT
-- Ses amis utilisent Mobile Money (Orange Money, MTN MoMo)
+- Ses amis utilisent les Mastercard Mobile Money (Orange Money, MTN MoMo)
 - Les banques traditionnelles avec de longues files d'attente
-- Des publicités pour des néobanques étrangères (Revolut, N26)
-- Son business qui grandit et nécessite un compte pro
+- Des publicités pour des néobanques étrangères de ses amis outre mer qui veulent l'encourager et/ou payer ses produits (Revolut, N26)
+- Son business qui grandit et nécessite un compte internationale plus securise contre les fraudes
 
 ### 👂 Ce qu'elle ENTEND
 - "Les banques sont trop lentes et bureaucratiques"
 - "Tu dois revenir 3-4 fois pour compléter ton dossier"
 - "Attention aux arnaques en ligne"
 - "BICEC est une banque sérieuse mais traditionnelle"
+- "BICEC a beaucoup eu de scandales et a beaucoup de frais"
 
 ### 💭 Ce qu'elle PENSE et RESSENT
 - **Frustration:** "Pourquoi ça prend 14 jours alors que je peux ouvrir un compte Mobile Money en 5 minutes?"
@@ -32,20 +33,20 @@ Ouvrir un compte bancaire professionnel en moins de 15 minutes sans se déplacer
 ### 🗣️ Ce qu'elle DIT
 - "Je n'ai pas le temps de faire des allers-retours"
 - "Mon forfait data est limité"
-- "J'ai besoin d'un compte pro pour mes factures"
-- "Les coupures de courant m'empêchent de finir mes démarches en ligne"
+- "J'ai besoin d'un compte pour mes factures"
+- "Les routes sont tres endomages et fatiguent pour y trouver du temps hors du moment de travail"
 
 ### 💪 Ce qu'elle FAIT
 - Utilise Instagram et WhatsApp Business pour son commerce
-- Gère ses transactions via Mobile Money
+- Gère ses transactions via Mobile Money pour le Cameroun et a l'etranger grace aux solutions comme TatapSend ou SendWave.
 - Évite les déplacements inutiles
 - Cherche des solutions rapides et efficaces
 
 ### 😰 DOULEURS (Pains)
 - **Temps perdu:** 14 jours de processus actuel
 - **Déplacements multiples:** 3-4 visites en agence
-- **Coût data:** 500 FCFA pour 500MB
-- **Coupures réseau:** Délestages fréquents
+- **Coût data:** 500 FCFA pour 1GB
+- **Coupures réseau:** Délestages fréquents ou zones a faible couverture reseau
 - **Complexité:** Formulaires papier incompréhensibles
 
 ### 🎁 GAINS (Gains)
@@ -66,7 +67,7 @@ Valider 15-25 dossiers/jour avec qualité et traçabilité pour protéger sa res
 - Des photocopies de CNI de mauvaise qualité
 - Des dossiers incomplets qui reviennent plusieurs fois
 - La pression des audits COBAC
-- Ses collègues débordés en fin de mois
+- Ses collègues parfois débordés en fin de mois
 
 ### 👂 Ce qu'il ENTEND
 - "L'audit COBAC arrive le mois prochain"
@@ -123,13 +124,13 @@ Protéger BICEC des fraudes et assurer la conformité COBAC nationale
 - "Une banque voisine a été sanctionnée pour blanchiment"
 - "On a activé un compte frauduleux le mois dernier"
 - "Les listes PEP sont mises à jour chaque semaine"
-- "Le provisioning Amplitude échoue souvent"
+- "Il n'y a pas souvent de provisionnement Amplitude lors des campagnes acquisition client"
 
 ### 💭 Ce qu'il PENSE et RESSENT
 - **Vigilance:** "Un seul compte frauduleux peut tout détruire"
 - **Frustration:** "Trop de faux positifs me font perdre du temps"
 - **Responsabilité:** "La réputation de BICEC dépend de mon travail"
-- **Surcharge:** "Je dois gérer 10 agences en même temps"
+- **Surcharge:** "Je dois gérer 40 agences en même temps"
 
 ### 🗣️ Ce qu'il DIT
 - "Cette alerte PEP est probablement un homonyme"
