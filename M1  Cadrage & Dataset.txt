@@ -4,7 +4,9 @@ Voici l'analyse détaillée de cette phase basée sur vos sources :
 1. Positionnement dans le Planning (Roadmap 5 Mois)
 La phase M1 s'étend sur les trois premières semaines du projet. Elle conditionne la réussite de l'ensemble du calendrier agile (Sprints de 2 semaines) en verrouillant les spécifications avant le début du codage intensif.
 • Objectif M1 : Livrer des spécifications validées, un environnement de développement opérationnel et un dataset anonymisé.
+• Standard Technique : Passage à Android 8+ (minSdk 26) pour garantir les performances de capture et la sécurité biométrique.
 • Livrable suivant (M2) : Ce travail permet d'entamer l'entraînement des modèles OCR et le calibrage de la détection de vivacité dès la semaine 4.
+
 2. La Stratégie de Données (Dataset Propriétaire)
 Le cœur de M1 réside dans la constitution d'un jeu de données local, car les modèles OCR génériques échouent souvent sur les spécificités des documents camerounais.
 • Volume et Diversité : L'objectif est de collecter environ 5 000 spécimens de CNI camerounaises pour réaliser un "fine-tuning" (ré-entraînement) du modèle PaddleOCR,.
@@ -12,13 +14,15 @@ Le cœur de M1 réside dans la constitution d'un jeu de données local, car les 
     ◦ L'ancienne CNI plastifiée : Nécessite un OCR robuste pour gérer l'usure et les fonds complexes.
     ◦ La nouvelle CNI (2024/Polycarbonate) : Le dataset doit permettre d'entraîner le système à détecter prioritairement le QR Code sécurisé au verso, plus fiable que la lecture optique traditionnelle,.
 • Privacy by Design (Loi 2024/017) : Dès cette phase, une contrainte majeure est l'anonymisation. Les données collectées pour l'entraînement doivent être traitées pour respecter la Loi n° 2024/017 sur la protection des données personnelles. Les images brutes ne doivent pas être conservées telles quelles pour l'exploitation, mais transformées en vecteurs mathématiques (hash),.
+
 3. Cadrage Réglementaire et Technique
 M1 sert à définir les règles du jeu pour éviter tout rejet futur par le régulateur (COBAC/BEAC) ou le service juridique de la banque.
 A. Architecture Technique (La "Boîte à Outils")
 L'environnement de développement est installé durant cette phase. Le choix se porte sur une approche "Lean Engineering" pour optimiser les coûts :
 • Matériel : Validation d'une station de travail performante (type Dell Inspiron 16 avec Ryzen 7 ou Mac Studio) capable de gérer la conteneurisation Docker et l'inférence IA locale.
 • Logiciels : Installation de la stack Python 3.10+, Flutter SDK, et des bibliothèques d'IA (PaddleOCR, PyTorch),.
-• Middleware : Validation de l'architecture d'intégration directe avec le Core Banking Sopra Amplitude.
+• Middleware : Validation de l'architecture d'intégration directe avec le Core Banking Sopra Amplitude et rôle de pivot d'identité (IdP) pour l'écosystème BICEC (Bi-Cresco).
+• Dispatching Intelligent : Load-balancing géographique via GPS ou Quartier (facture) pour assignation aux agences.
 B. Conformité Réglementaire (Les Règles Métier)
 Les spécifications fonctionnelles sont figées en collaboration avec le DPO (Data Protection Officer) :
 • Identifiant Bancaire Unique (IBU) : Intégration des exigences de l'Instruction BEAC 001/GR/2021 imposant la capture d'empreintes faciales conformes ISO.
@@ -55,7 +59,7 @@ B. Développement Mobile (Frontend)
 • Android SDK Tools (API 28 à 34) : Nécessaire pour assurer la compatibilité avec les téléphones Android courants au Cameroun.
 C. Intelligence Artificielle & Backend (Python Stack)
 L'environnement Python (v3.10+ LTS) doit inclure ces bibliothèques spécifiques pour le traitement OCR et biométrique, :
-• PaddleOCR : Pour l'extraction de texte (Modèle ultra-lightweight).
+• GLM-OCR & PaddleOCR : Pour l'extraction de texte (Modèle ultra-lightweight).
 • PyTorch & Torchvision : Moteur de Deep Learning pour faire tourner les modèles de biométrie.
 • Facenet-pytorch : Pour la reconnaissance faciale et la création d'embeddings (vecteurs mathématiques du visage).
 • FastAPI & Uvicorn : Pour créer les API qui feront le lien entre le mobile et l'IA.
@@ -86,10 +90,12 @@ Les sources structurent ces indicateurs en quatre piliers majeurs, pilotés via 
 L'objectif premier est de prouver la viabilité économique du modèle digital par rapport au modèle physique traditionnel.
 • Coût d'Acquisition Client (CAC) : C'est l'indicateur roi. L'objectif est de diviser par 3 le coût d'ouverture d'un compte par rapport au canal agence. Cela justifie l'investissement technologique par une rentabilité marginale immédiate.
 • Taux de Transformation (Funnel) : La cible est fixée à > 75% de taux de complétion. Cela signifie que sur 4 personnes commençant le processus, 3 doivent aller jusqu'à la signature électronique.
+• Taux de Conversion SSO : Pourcentage d'utilisateurs accédant à Bi-Cresco après l'onboarding.
 • Volume d'Onboarding : Les objectifs de montée en charge sont progressifs : 1 000 onboardings quotidiens visés en Phase 4, pour atteindre une vitesse de croisière de 10 000 onboardings mensuels en Phase 5.
 2. Expérience Utilisateur (UX Metrics)
 Le projet vise à rendre la BICEC compétitive face aux Mobile Money (MTN/Orange) et aux néobanques comme Revolut.
 • Le "North Star Metric" (11 Minutes) : Le temps total d'ouverture de compte doit passer de 48h-14j à moins de 15 minutes, avec un benchmark cible idéal de 11 minutes.
+• Drop-off points : Identification précise des étapes causant l'abandon (ex: Liveness).
 • Fluidité de Capture : Pour atteindre ce temps record, chaque étape est chronométrée : la capture de la CNI doit prendre moins de 30 secondes et la détection de vie (liveness) moins de 45 secondes.
 • Satisfaction Client (CSAT) : L'objectif est un score supérieur à 4.2/5, mesuré juste après l'onboarding, pour s'assurer que la technologie ne frustre pas l'utilisateur.
 3. Risque & Conformité (Regulatory Metrics)
@@ -99,6 +105,10 @@ C'est le pilier critique pour rassurer le régulateur (COBAC) et le service juri
 • Sécurité Biométrique :
     ◦ Faux Positifs : Moins de 2% d'utilisateurs légitimes doivent être bloqués par erreur.
     ◦ Fraude : L'objectif est de limiter la pénétration de la fraude à moins de 1%, avec un seuil de confiance de reconnaissance faciale (Face Matching) fixé à 98.5%.
+• First-Time-Right Rate : Mesure le pourcentage de dossiers valides dès la première tentative sans correction.
+• OCR Error Rates : Fréquence des corrections manuelles vs badges de confiance.
+• Charge par Agence : Monitoring du load-balancing géographique des dossiers vers les agents de l'agence.
+
 4. Performance Technique (System Health)
 Ces indicateurs garantissent que l'infrastructure tient la charge, surtout pour les usages hors horaires bancaires (soirées et week-ends).
 • Latence API : Le temps de réponse (p95) doit être inférieur à 3 secondes, notamment pour les appels vers les services externes comme le NIU (DGI) ou FindMe.
@@ -131,7 +141,6 @@ Lutte contre le Blanchiment (AML/CFT) : L'intégration de la "Liveness Detection
 3. Architecture Technique : Le choix de Sopra Amplitude
 L'intégration directe avec Sopra Banking Amplitude est la décision la plus sécurisante pour votre IT.
 Straight-Through Processing (STP) : C'est le Graal de l'onboarding. En automatisant l'écriture dans le Core Banking sans intervention humaine, vous passez d'une banque "de guichet" à une plateforme technologique.
-Identifiant Bancaire Unique (IBU) : Votre système doit impérativement interroger la base centrale de la BEAC pour vérifier l'existence d'autres comptes et respecter le plafonnement des comptes de paiement si nécessaire.
 4. Indicateurs de Performance (KPIs)
 Le benchmark de 11 minutes est ambitieux mais réaliste si la capture CNI est fluide.
 Le "First-time-right rate" : C'est votre KPI le plus critique. Si l'utilisateur échoue au scan CNI deux fois, il abandonne. L'implémentation de l'auto-framing (cadrage automatique) sera déterminante pour votre taux de conversion.
@@ -172,7 +181,6 @@ Validation de second niveau : Autoriser la complétion du parcours client sur l'
 Mise en file d'attente (Queuing) : Utiliser un middleware (comme un bus d'événements) pour stocker les requêtes IBU et les rejouer automatiquement dès que le service de la BEAC est rétabli.
 Ouverture de compte sous condition : Créer le compte dans Sopra Banking Amplitude, mais restreindre les opérations sortantes (débits) jusqu'à ce que l'IBU soit confirmé et rattaché au profil.
 2. Mécanisme de Fallback Technique
-Circuit-Breaker Pattern : Implémenter un "disjoncteur" logiciel qui détecte les pannes de l'API BEAC. S'il y a trop d'échecs, le système bascule automatiquement vers une procédure de vérification différée pour éviter de saturer les serveurs.
 Vérification de format locale : Tout comme pour le NIU, vérifiez la syntaxe de l'IBU (si déjà possédé par le client) localement pour éliminer les erreurs de saisie avant l'appel API.
 3. Conformité et Risque Opérationnel (Règles COBAC)
 En 2026, la surveillance de la continuité d'exploitation est renforcée : 
