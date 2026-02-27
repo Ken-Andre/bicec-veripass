@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, Globe, Smartphone, Mail, Lock, Fingerprint,
@@ -40,8 +40,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
   const [livenessState, setLivenessState] = useState<'idle' | 'scanning' | 'success' | 'failed' | 'Bloqué'>('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadChunks, setUploadChunks] = useState({ total: 5, completed: 0 });
-  const [consentChecks, setConsentChecks] = useState({ terms: false, privacy: false, data: false });
-  const [isSigning, setIsSigning] = useState(false);
+  const [consentChecks, setConsentChecks] = useState({ terms: false, privacy: false, data: false, signature: false });
   const [hasSigned, setHasSigned] = useState(false);
   const [postState, setPostState] = useState<'pending' | 'limited' | 'full' | null>(null);
   const [selectedAddress, setSelectedAddress] = useState({ region: '', city: '', quartier: '', commune: '' });
@@ -51,10 +50,6 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
   const [niuValue, setNiuValue] = useState('');
   const [niuEntryMode, setNiuEntryMode] = useState<'scan' | 'upload' | 'manual' | null>(null);
   const [niuUploaded, setNiuUploaded] = useState(false);
-
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const isDrawingRef = useRef(false);
-  const lastPosRef = useRef({ x: 0, y: 0 });
 
   const currentStep = STEP_SEQUENCE[currentStepIdx];
   const totalSteps = STEP_SEQUENCE.length;
@@ -105,7 +100,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
     }
   }, [currentStep?.id, goNext]);
 
-  // Canvas signature setup
+  /* REMOVED: Wet signature canvas logic (Moved to agency physical visit per FR19)
   useEffect(() => {
     if (currentStep?.id === 'signature' && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -121,7 +116,9 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
       }
     }
   }, [currentStep?.id, isSigning]);
+  */
 
+  /* REMOVED: Canvas drawing handlers
   const handleCanvasStart = (e: React.MouseEvent | React.TouchEvent) => {
     isDrawingRef.current = true;
     setHasSigned(true);
@@ -162,6 +159,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
     }
     setHasSigned(false);
   };
+  */
 
   const confidenceColor = (c: number) => {
     if (c >= 90) return 'text-emerald-600 bg-emerald-50';
@@ -918,13 +916,13 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-5">
             <div className="text-center space-y-2">
               <ShieldCheck className="w-12 h-12 text-[#E37B03] mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Terms & Consent</h2>
+              <h2 className="text-xl font-bold text-slate-900">Accords & Consentements</h2>
             </div>
             <div className="space-y-3">
               {[
-                { key: 'terms' as const, label: 'I accept the Terms and Conditions', desc: 'Including account agreement and fee schedule' },
-                { key: 'privacy' as const, label: 'I accept the Privacy Policy', desc: 'How we handle and protect your data' },
-                { key: 'data' as const, label: 'I consent to data processing', desc: 'For identity verification and regulatory compliance' },
+                { key: 'terms' as const, label: "J'accepte les Conditions Générales", desc: "Incluant la convention de compte et la grille tarifaire" },
+                { key: 'privacy' as const, label: "J'accepte la Politique de Confidentialité", desc: "Gestion et protection de vos données personnelles" },
+                { key: 'data' as const, label: "Je consens au traitement des données", desc: "Pour la vérification d'identité et la conformité KYC" },
               ].map(c => (
                 <button key={c.key} onClick={() => setConsentChecks(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
                   className={cn('w-full flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all',
@@ -948,39 +946,43 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
           <div className="px-6 space-y-5">
             <div className="text-center space-y-2">
               <PenTool className="w-12 h-12 text-[#E37B03] mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Digital Signature</h2>
-              <p className="text-sm text-slate-500">Sign below to complete your agreement</p>
+              <h2 className="text-xl font-bold text-slate-900">Signature Digitale</h2>
+              <p className="text-sm text-slate-500">Autorisez numériquement la création de votre compte</p>
             </div>
-            {!isSigning ? (
-              <div className="space-y-4">
-                <button onClick={() => setIsSigning(true)} className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2">
-                  <PenTool className="w-5 h-5" /> Draw Signature
+            <div className="space-y-4">
+              <div className="bg-slate-50 rounded-2xl p-6 border-2 border-slate-200 space-y-4">
+                <p className="text-xs text-slate-600 leading-relaxed italic">
+                  « En cochant cette case, je reconnais que ma signature numérique a la même valeur juridique qu'une signature manuscrite pour la soumission sécurisée de ce dossier KYC à la BICEC. »
+                </p>
+
+                <button onClick={() => {
+                  const newState = !consentChecks.signature;
+                  setConsentChecks(prev => ({ ...prev, signature: newState }));
+                  setHasSigned(newState);
+                }}
+                  className={cn('w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all',
+                    consentChecks.signature ? 'border-[#E37B03] bg-orange-50' : 'border-slate-200 bg-white')}>
+                  <div className={cn('w-6 h-6 mt-0.5 rounded border-2 flex items-center justify-center shrink-0 transition-all',
+                    consentChecks.signature ? 'border-[#E37B03] bg-[#E37B03]' : 'border-slate-300')}>
+                    {consentChecks.signature && <Check className="w-4 h-4 text-white" />}
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    Je confirme mon identité et consens au traitement de mes données personnelles.
+                  </p>
                 </button>
-                <p className="text-xs text-center text-slate-500">Your signature will be applied to the account agreement</p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="relative bg-white rounded-xl border-2 border-slate-300 overflow-hidden">
-                  <canvas ref={canvasRef} style={{ width: '100%', height: 160 }}
-                    onMouseDown={handleCanvasStart} onMouseMove={handleCanvasMove} onMouseUp={handleCanvasEnd} onMouseLeave={handleCanvasEnd}
-                    onTouchStart={handleCanvasStart} onTouchMove={handleCanvasMove} onTouchEnd={handleCanvasEnd}
-                    className="cursor-crosshair touch-none" />
-                  {!hasSigned && (
-                    <p className="absolute inset-0 flex items-center justify-center text-slate-300 text-sm pointer-events-none">
-                      Sign here
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={clearCanvas} className="flex-1 py-2 border border-slate-300 rounded-xl text-sm font-medium text-slate-600 flex items-center justify-center gap-1">
-                    <RotateCcw className="w-4 h-4" /> Clear
-                  </button>
-                  <button onClick={() => setIsSigning(false)} className="flex-1 py-2 bg-[#E37B03] text-white rounded-xl text-sm font-medium">
-                    Accept
-                  </button>
-                </div>
+
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+                <p className="text-[11px] text-amber-800 leading-tight">
+                  <strong>Note importante :</strong> Conformément à la réglementation COBAC (FR19), la signature manuscrite (humide) physique sur papier reste <strong>obligatoire</strong> lors de votre passage en agence pour la remise de votre carte.
+                </p>
               </div>
-            )}
+
+              <div className="text-center text-[10px] text-slate-400">
+                Horodatage numérique (Digital Capture) : {new Date().toLocaleString('fr-FR')}
+              </div>
+            </div>
           </div>
         );
 
@@ -1091,6 +1093,8 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
         return livenessState === 'success';
       case 'consent':
         return consentChecks.terms && consentChecks.privacy && consentChecks.data;
+      case 'signature':
+        return consentChecks.signature;
       case 'uploading':
         return false;
       default:
