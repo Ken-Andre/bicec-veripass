@@ -1,99 +1,86 @@
 # ADR-001 – États d’accès et transitions
 
-*   **Statut** : Accepté
-*   **Date** : 2026-02-26
-*   **Auteur** : Expert Product/UX Engineer
+**Statut :** ACCEPTÉ  
+**Auteur :** Ken / Junior Product-UX Engineer  
+**Date :** 2026-02-27  
 
-## 1. Contexte et Problématique
+## Contexte
+La conformité COBAC (R-2023/01) impose une validation humaine ("Human-in-the-Loop") pour toute ouverture de compte. Parallèlement, la loi 2024-017 (Cameroun) exige une souveraineté totale des données.  
+D'un point de vue UX, nous devons gérer la résilience locale (FR6, FR7), la découverte des services post-soumission (FR39-47) et les accès restreints (FR16).
 
-Le projet **bicec-veripass** doit digitaliser l'onboarding KYC de la BICEC tout en respectant des contraintes réglementaires et techniques strictes :
-*   **Contraintes COBAC (R-2023/01)** : Nécessité d'un "Human-in-the-Loop" (validation manuelle obligatoire) et traçabilité complète.
-*   **Contraintes UX** : Marie (l'entrepreneuse) doit pouvoir reprendre sa session en cas de coupure (Délestage/3G instable). Le parcours doit être fluide (<11 min) mais sécurisé (lockout après 3 échecs de liveness).
-*   **Contraintes d'Infrastructure** : Déploiement 100% On-Premise sur des machines i3/16GB, imposant une gestion efficace des données et des états.
-*   **Besoin métier** : Différencier les niveaux d'accès (RESTRICTED vs LIMITED vs FULL) pour offrir une valeur immédiate (découverte des services) tout en limitant les risques avant validation complète.
+## Décision
 
-## 2. Décision : Modélisation des États KYC
+Nous adoptons un modèle d'états hybride dissociant le **cycle de vie interne** (`lifecycle_state`) et les **paliers d'accès utilisateur** (`access_tier`).
 
-### 2.1. Définition des États
+### 1. Mapping Lifecycle vs Access Tier
 
-| État | Description |
-| :--- | :--- |
-| **DRAFT** | Session locale en cours sur le mobile. Données non encore soumises au backend. |
-| **PENDING_KYC** | Dossier soumis par l'utilisateur, en attente de revue par Jean (Agent KYC). |
-| **RESTRICTED_ACCESS** | État post-soumission (Marie découvre l'app en lecture seule) ou suite à une expiration de document. |
-| **LIMITED_ACCESS** | Dossier validé par Jean mais NIU non vérifié (déclaratif). Opérations de sortie bloquées. |
-| **FULL_ACCESS** | Dossier complet et NIU validé. Toutes les fonctionnalités bancaires sont actives. |
-| **REJECTED** | Dossier refusé par Jean ou Thomas (motif technique ou non-conformité). |
-| **FRAUD_SUSPECT** | Dossier marqué comme suspect par Thomas (AML/CFT) suite à une alerte PEP/Sanctions ou doublon. |
-| **ARCHIVED** | Client inactif ou dossier clôturé après une longue période. |
+| Lifecycle State (Interne) | Access Tier (Externe) | Description |
+| :--- | :--- | :--- |
+| `DRAFT` | `GUEST` | Session locale uniquement (Persistence local cache). |
+| `SUBMITTED` | `RESTRICTED_ACCESS` | Dossier reçu par le serveur, en cours de traitement initial. |
+| `PROCESSING` | `RESTRICTED_ACCESS` | AI Engine (OCR, Biométrie) en cours d'exécution. |
+| `PENDING_AGENT_REVIEW` | `RESTRICTED_ACCESS` | En attente de validation par Jean. Dashboard "Vitrine". |
+| `APPROVED` | `LIMITED_ACCESS` (par défaut) | Validé par Jean. Provisionné dans Amplitude. |
+| `ACCOUNT_CREATED` | `LIMITED_ACCESS` or `FULL_ACCESS` | Statut final basé sur la validité du NIU. |
+| `REJECTED` | `GUEST` | Dossier refusé. Redirection vers écran de relance (B10_Fail). |
+| `FRAUD_SUSPECT` | `DISABLED` | Alertes Thomas (AML, Collision). Accès bloqué. |
 
-### 2.2. Diagramme d'États (Mermaid)
+### 2. Diagramme d'états (Mermaid)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> DRAFT : Ouverture App / Inscription
-    DRAFT --> PENDING_KYC : Soumission Dossier (User)
-    PENDING_KYC --> RESTRICTED_ACCESS : Entrée en Mode Découverte (Système)
+    [*] --> DRAFT : OTP success
+    DRAFT --> DRAFT : Local cache (FR6)
+    DRAFT --> SUBMITTED : User Submit (E01)
     
-    state RESTRICTED_ACCESS {
-        [*] --> WAITING_FOR_JEAN
+    SUBMITTED --> PROCESSING : Server Ack
+    PROCESSING --> PENDING_AGENT_REVIEW : AI Analysis Complete
+    
+    state PENDING_AGENT_REVIEW {
+        RESTRICTED_ACCESS : Dashboard "Vitrine" (E06)
+    }
+
+    PENDING_AGENT_REVIEW --> APPROVED : Jean Approve
+    PENDING_AGENT_REVIEW --> REJECTED : Jean Reject (Motif requis)
+    PENDING_AGENT_REVIEW --> FRAUD_SUSPECT : AML Hit / Collision (Thomas)
+
+    APPROVED --> ACCOUNT_CREATED : Provisioning Automation
+    
+    state ACCOUNT_CREATED {
+        LIMITED_ACCESS : NIU Manquant / Déclaratif
+        FULL_ACCESS : NIU Validé
     }
     
-    RESTRICTED_ACCESS --> LIMITED_ACCESS : Validation Jean (Sans NIU)
-    RESTRICTED_ACCESS --> FULL_ACCESS : Validation Jean (Avec NIU)
-    RESTRICTED_ACCESS --> REJECTED : Refus Jean / Thomas (Motif)
+    LIMITED_ACCESS --> FULL_ACCESS : NIU Update (Jean/Thomas)
     
-    LIMITED_ACCESS --> FULL_ACCESS : Validation NIU (Jean/Thomas)
+    REJECTED --> DRAFT : Action "Recommencer" (FR7 - Wipe local)
+    FRAUD_SUSPECT --> REJECTED : Investigation Clear (Thomas)
     
-    LIMITED_ACCESS --> FRAUD_SUSPECT : Alerte AML / Doublon (Thomas)
-    FULL_ACCESS --> FRAUD_SUSPECT : Alerte AML tardive (Thomas)
-    
-    FRAUD_SUSPECT --> REJECTED : Confirmation Fraude (Thomas)
-    FRAUD_SUSPECT --> FULL_ACCESS : Levée de doute (Thomas)
-    
-    REJECTED --> DRAFT : Recommencer (User)
-    FULL_ACCESS --> ARCHIVED : Clôture Compte
-    LIMITED_ACCESS --> ARCHIVED : Clôture Compte
+    ANY_STATE --> DISABLED : Manual Admin Suspend (Thomas)
+    DISABLED --> ARCHIVED : Retention Policy (10 years)
 ```
 
-### 2.3. Matrice des Transitions
+### 3. Logique des Transitions (Détail)
 
-| Déclencheur | État Initial | État Final | Acteur | Condition / Pourquoi |
-| :--- | :--- | :--- | :--- | :--- |
-| **Soumission** | DRAFT | PENDING_KYC | Utilisateur | Fin du parcours mobile, signature digitale. |
-| **Passage Vitrine** | PENDING_KYC | RESTRICTED_ACCESS | Système | Permet à Marie d'explorer les offres BICEC. |
-| **Approbation Partielle** | RESTRICTED_ACCESS | LIMITED_ACCESS | Jean | Identité OK, mais NIU manquant ou déclaratif. |
-| **Approbation Totale** | RESTRICTED_ACCESS | FULL_ACCESS | Jean | Identité OK + NIU valide (attestation). |
-| **Vérification NIU** | LIMITED_ACCESS | FULL_ACCESS | Jean / Thomas | Le NIU est validé a posteriori. |
-| **Alerte AML** | N'importe lequel | FRAUD_SUSPECT | Thomas | Match PEP/Sanctions trouvé ou suspicion fraude. |
-| **Refus** | N'importe lequel | REJECTED | Jean / Thomas | Document illisible, usurpation, ou non-conformité. |
-| **Timeout / Expiration** | FULL_ACCESS | RESTRICTED_ACCESS | Système | Document KYC expiré (ex: CNI périmée). |
+| Transition | Acteur | Déclencheur | Justification Métier |
+| :--- | :--- | :--- | :--- |
+| **DRAFT → SUBMITTED** | Utilisateur | Bouton "Soumettre" | Consentements validés (D01) et données capturées. |
+| **PENDING → APPROVED** | Jean | Clic "Approuver" | Identité confirmée via comparateur side-by-side (J08). |
+| **APPROVED → LIMITED** | Système | Logic NIU | Si `niu_type` est 'declarative' (FR16). |
+| **REJECTED → DRAFT** | Utilisateur | Clic "Recommencer" | Autorise une nouvelle tentative propre (FR7). |
+| **PENDING → FRAUD** | Thomas | AML Alert | Empêche toute activation tant que Thomas n'a pas tranché. |
 
-## 3. Détails de Mise en Œuvre
+## Détails de mise en œuvre
 
-### 3.1. Mapping Base de Données (PostgreSQL)
+### Mapping Base de Données (PostgreSQL)
+- `lifecycle_state` (Enum) : Statut fin pour le queuing back-office.
+- `access_tier` (Enum) : Statut macro pour les permissions API/Front.
+- `niu_validated` (Boolean) : Flag déclencheur pour le passage LIMITED → FULL.
+- `last_transition_at` : Timestamp pour le monitoring SLA de Sylvie (FR34).
+- `metadata_integrity_hash` : SHA-256 du dossier pour l'audit COBAC (FR36).
 
-Le modèle de données doit intégrer les colonnes suivantes dans la table `clients` ou `kyc_dossiers` :
-*   `kyc_status` (ENUM) : `DRAFT`, `PENDING_KYC`, `VALIDATED`, `REJECTED`, `FRAUD`
-*   `access_level` (ENUM) : `RESTRICTED`, `LIMITED`, `FULL`
-*   `is_niu_verified` (BOOLEAN) : Pour distinguer LIMITED (false) de FULL (true).
-*   `validation_step` (STRING) : `JEAN_REVIEW`, `THOMAS_AML`, `PROVISIONING`.
-*   `timestamps` : `submitted_at`, `validated_at`, `rejected_at`.
-*   `audit_trail` (JSONB) : Log de toutes les actions (qui a changé l'état et pourquoi).
+## Conséquences
 
-### 3.2. Logique de Gating (Mobile & Back)
-
-*   **Mobile (Frontend)** :
-    *   `access_level == RESTRICTED` : Banner orange "⏳ En cours de validation". Boutons d'actions avec tooltips "Disponible après validation".
-    *   `access_level == LIMITED` : Banner jaune "⚠️ Complétez votre NIU". Blocage des opérations sortantes (Virements, Cash-Out) via un middleware API.
-*   **Back-Office (Portal)** :
-    *   **Jean** voit les dossiers en `PENDING_KYC`.
-    *   **Thomas** voit les dossiers en `FRAUD_SUSPECT` ou les erreurs de provisioning Amplitude.
-    *   **Système** automatise le passage en `PROVISIONING` vers Sopra Amplitude dès que l'approbation Jean est reçue.
-
-## 4. Conséquences
-
-*   **Impact API** : Chaque endpoint sensible (virements, cartes) doit vérifier le `access_level` en base avant exécution.
-*   **Compatibilité** : Ces états sont 100% cohérents avec la spec UX v2.1 et les FR16/FR45 du PRD.
-*   **Performance** : L'utilisation d'ENUMs et d'index sur `kyc_status` garantit des temps de réponse <3s pour les dashboards managers (Sylvie).
-*   **Audit** : Le SHA-256 integrity hash doit être recalculé à chaque changement d'état pour garantir l'immutabilité de l'historique réglementaire.
+- **Mobile** : Utilisation d'un `AccessTierProvider` pour gérer dynamiquement les bannières et le blocage des fonctions (épargne, virements si LIMITED).
+- **Back-Office** : Priorisation des files par `lifecycle_state`. Thomas gère les transitions complexes (FRAUD, Déduplication).
+- **API** : Les permissions sont calculées sur `access_tier`. Les opérations financières sont rejetées si `access_tier != FULL_ACCESS`.

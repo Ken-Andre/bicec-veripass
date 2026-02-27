@@ -401,7 +401,7 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
 | Risque | Impact | Probabilité | Mitigation |
 |--------|--------|-------------|------------|
 | Sous-estimation complexité biométrie | Élevé | Élevée | Utilisation de bibliothèques open source éprouvées (DeepFace, MiniFASNet), POC rapide mois 1, réduction périmètre si nécessaire |
-| Retards intégration Core Banking | Élevé | Moyenne | Mock/Stub pour développement parallèle, intégration réelle uniquement en mois 3, implication équipe IT dès mois 1 |
+| Retards intégration Core Banking | Élevé | Moyenne |  Intégration réelle uniquement en mois 3, ou dans la seconde phase implication équipe IT dès mois 1 |
 | Qualité dataset OCR insuffisante | Moyen | Moyenne | Constitution dataset dès mois 1 (collecter 500-1000 CNI anonymisées), crowdsourcing interne BICEC |
 
 ---
@@ -1021,9 +1021,9 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
 
 - **IBU (BEAC)** :
   * **MVP : Simulation factice réaliste**
-    - API mockée locale : POST /api/ibu/check avec payload {nom, prenom, date_naissance, sexe} → {ibu_exists: false, ibu_number: null} (pour nouveau client)
+    <!-- - API mockée locale : POST /api/ibu/check avec payload {nom, prenom, date_naissance, sexe} → {ibu_exists: false, ibu_number: null} (pour nouveau client)
     - Génération IBU factice selon format réaliste : CMX26BICEC + numéro séquentiel + clé Modulo 97
-    - Stockage en base locale des IBU générés
+    - Stockage en base locale des IBU générés not needed anymore cause when Amplitude will be integrated,it's done it already handles the real thing-->
   * **Phase 2 (post-MVP)** : Intégration vraie API BEAC avec VPN sécurisé ou mTLS
 
 - **Core Banking (Sopra Amplitude)** :
