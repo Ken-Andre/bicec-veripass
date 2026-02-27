@@ -29,9 +29,8 @@
 <!-- Content will be appended sequentially through collaborative workflow steps -->
 ## Executive Summary
 
-**bicec-veripass** is a sovereign, mobile-first digital onboarding platform designed to transform the banking experience in Cameroon. By replacing a manual process that currently takes **48 hours to 14 days** (depending on dossier completeness) with a secure **11-minute** biometric journey (target), the project aims to bridge the **"Trust Gap"** between tech-savvy youth and security-conscious older generations. 
-
-The primary business lever is a **3x reduction in Customer Acquisition Cost (CAC)** and the total elimination of the administrative backlog. Beyond these immediate gains, bicec-veripass serves as the foundational **"Digital Identity Rail"** for BICEC and the CEMAC zone, creating a sovereign, 100% open-source technical asset that ensures data locality and local expertise.
+**BICEC VeriPass** is not merely a customer-facing mobile application; it is fundamentally a **back-office enablement and client data digitization platform** designed to resolve critical audit and compliance bottlenecks.
+As a sovereign, mobile-first digital onboarding solution for Cameroon, it replaces a manual process taking **48 hours to 14 days** with a secure **11-minute biometric journey** (target), bridging the **"Trust Gap"** between tech-savvy youth and security-conscious generations. By automating structured data collection, it transforms an error-prone workflow into a digital, auditable process—delivering a **3x reduction in Customer Acquisition Cost (CAC)** and eliminating administrative backlog. Beyond these gains, VeriPass serves as the foundational **"Digital Identity Rail"** for BICEC and the CEMAC zone, creating a sovereign, 100% open-source technical asset that ensures data locality and local expertise.
 
 ---
 
@@ -41,7 +40,9 @@ The primary business lever is a **3x reduction in Customer Acquisition Cost (CAC
 
 The current account opening process at BICEC is a relic of a paper-based era, plagued by variability—taking from **48 hours up to 14 days** depending on the back-and-forth required for incomplete dossiers. This creates a barrier to financial inclusion, especially for the 18-35 age group ("Marie") who represent 60% of the demographic and prefer the instant accessibility of Mobile Money. 
 
-Furthermore, the **"Trust Gap"** presents a dual challenge: younger users find banks "bureaucratic," while older users fear digital insecurity. This is compounded by infrastructure instability (3G and power cuts) that breaks existing online processes without session recovery.
+Furthermore, the **"Trust Gap"** presents a dual challenge: younger users find banks "bureaucratic," while older users fear digital insecurity. This is compounded by infrastructure instability (3G) that breaks existing online processes without session recovery.
+
+Last, the platform resolves audit vulnerabilities by enabling rapid production of complete, structured digital dossiers for COBAC/BEAC & international finance compliance(KYC) with AML/CFT directives (Law 2024-017) and the **10-year data retention mandate**. By digitizing the "last mile," agents are freed from excessive data entry to focus on the physical signature and client relationship, while creating structured data that enables existing clients to be efficiently authenticated and onboarded to new digital services like **Bi-Cresco** without repeating manual checks.
 
 ## Target Users
 
@@ -110,12 +111,17 @@ A benchmark journey assuming stable 3G and documents ready. *Reality Buffer: 15 
 
 ### Proposed Solution
 
-A resilient, biometric-first app with **mandatory local session persistence** to handle power and network failures. It features a seamless **multi-persona workflow**:
-1.  **Jean (KYC Agent)**: Visually validates originals in high-res via a dedicated portal.
-2.  **Thomas (AML/CFT Supervisor)**: Reviews PEP/Sanctions alerts, handles identity deduplication, and monitors automated Amplitude batch provisioning.
-3.  **Sylvie (Manager)**: Monitors the entire funnel and ops health through a built-in Command Center (Phase 2: Grafana OSS).
+A resilient, biometric-first app with **mandatory local session persistence** to handle 3G outages and power failures. It features a seamless **multi-persona workflow**:
 
-Integrations like **NIU/DGI** (fiscal verification) and **Shadow IBU** (regional identity simulation) ensure that "Marie" can open a restricted account instantly, which then scales to full access (BiPay/CRESCO) once human validation is cleared.
+1.  **Marie (Prospective Client)**: Securely captures ID and selfie from home, auto-fills data via on-premise OCR, and completes most entry before branch arrival.
+2.  **Jean (KYC Agent)**: Retrieves pre-validated dossier, captures physical signature, and certifies identity via high-res "Human-in-the-Loop" comparison.
+3.  **Thomas (AML/CFT Supervisor)**: Reviews PEP/Sanctions alerts, handles identity deduplication, and monitors automated Amplitude batch provisioning.
+4.  **Sylvie (Manager)**: Monitors funnel health through analytical dashboards and oversees operational metrics for daily "prise de décision."
+5.  **Core Banking System (Sopra Amplitude)**: Receives structured, auditable PostgreSQL records with a single click for immediate integration.
+6.  **Directors & Shareholders (BICEC Leadership)**: Access real-time statistics and analysis diagrams to power strategic decision-making.
+7.  **VeriPass as Identity Rail**: Serves as the foundational authentication layer—stored digital identity enables future login and service access across BICEC's ecosystem (Bi-Cresco, BiPay) without repeated KYC, functioning as the sovereign "Google Auth" for the bank.
+
+Integrations like ~~**NIU/DGI** (fiscal verification) and **Shadow IBU** (regional identity simulation)~~ [](Removed%20because%20it%20was%20not%20on%20the%20scope.Amplitude%20already%20handles%20it%20and%20well) ensure that "Marie" can open a restricted account instantly, which then scales to full access (BiPay/CRESCO) once human validation is cleared.
 
 ---
 

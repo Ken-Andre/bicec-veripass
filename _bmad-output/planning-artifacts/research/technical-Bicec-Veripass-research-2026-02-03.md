@@ -40,9 +40,12 @@ The implementation of a self-hosted KYC solution for the Cameroonian market requ
 
 - **Python (Backend & AI Logic):** The primary language for the OCR and Biometric core. Python's ecosystem (PaddleOCR, DeepFace, FastAPI) is the industry standard for rapid AI prototyping and deployment.
 - **Dart (Frontend - Flutter):** Confirmed as the choice for the mobile client. Dart's native compilation provides smooth UI performance, which is critical for "live" capture of documents and selfies.
+- **TypeScript (Web Back-office):** Confirmed as the language for the administrative portals (**Validation Desk** and **Dashboard**).
+    - **Rationale:** Ensures strict type safety for handling complex KYC validation states and "Human-in-the-Loop" decision auditing.
+    - **Integration:** Facilitates reliable data synchronization with the FastAPI backend and supports the high-resolution "Evidence-First" document comparison UI.
 - **C++ (Performance optimization):** While not used directly by the student, the underlying engines (PaddlePaddle, OpenCV,...) rely on C++ and SIMD instructions for CPU acceleration on Windows.
 
-_Popular Languages: Python, Dart, SQL (for BI)_
+_Popular Languages: Python, Dart, Typescript, SQL (for BI)_
 _Emerging Languages: Rust (for high-performance AI wrappers), but not recommended for this MVP due to complexity._
 _Language Evolution: Python remains dominant but is increasingly served via asynchronous frameworks like FastAPI to handle concurrent KYC requests._
 _Performance Characteristics: Python overhead is mitigated by offloading heavy computation to C++/ONNX runtimes._
@@ -52,7 +55,8 @@ _Source: [GLM-OCR GitHub Repository (README & SDK)](https://github.com/zai-org/G
 
 For an autonomous KYC solution, the stack must prioritize open-source libraries that offer "on-premise" capabilities without hidden cloud dependencies.
 
-- **PaddleOCR:** The most robust open-source OCR choice. It can be optimized for CPU-only Windows environments using **ONNX Runtime** or **OpenVINO**, achieving sub-second extraction for identity documents.
+- **PaddleOCR:** One of the most robust open-source OCR choice. It can be optimized for CPU-only Windows environments using **ONNX Runtime** or **OpenVINO**, achieving sub-second extraction for identity documents.
+- **GLM-OCR:** A robust alternative built on Vision-Language Model (VLM) architectures. While PaddleOCR excels at raw text detection, GLM-OCR specializes in **semantic extraction**, capable of identifying and classifying key-value pairs (Name, ID Number) directly from the image without complex post-processing regex. This "intelligent" extraction is particularly valuable for handling the varied layouts of Cameroonian identity documents and integrates seamlessly with **ONNX Runtime** for high-performance CPU inference on the Windows server.
 - **DeepFace:** A multi-model wrapper that simplifies the integration of FaceNet, VGG-Face, and InsightFace. Crucially, it includes **MiniVision Silent-Face-Anti-Spoofing** for liveness detection, allowing for "live" check without external API calls.
 - **MediaPipe:** Developed by Google, it is highly optimized for CPUs. It can be used for real-time face detection and "landmarks" (to calculate Eye Aspect Ratio for blink detection) before sending high-quality frames to the Python backend.
 - **FastAPI:** A high-performance web framework for the Python backend, supporting asynchronous processing which is vital during heavy I/O tasks like image upload.
@@ -86,8 +90,19 @@ _Source: [DuckDB for BI](https://duckdb.org), [BEAC AML/CFT Directives](https://
 _IDE and Editors: VS Code, Android Studio_
 _Version Control: Git_
 _Build Systems: Docker, CMake (for underlying C++ dependencies)_
-_Testing Frameworks: Pytest (Backend logic), Flutter Test (UI flows)_
+_Testing Frameworks: Pytest (Backend logic), Flutter Test (UI flows), Vitest + React Testing library, Playwright(E2E tests)_
 _Source: [ONNX Runtime Performance](https://onnxruntime.ai)_
+
+### Hardware Sizing & Resource Constraints
+
+To validate the feasibility of the "On-Premise" simulation on a standard Windows workstation (Intel i3, 16GB RAM), the following resource allocation analysis was performed:
+
+- **Memory Footprint (RAM):** The dual-engine architecture is viable within a 16GB RAM environment. **PaddleOCR** remains lightweight (<2GB), whereas **GLM-OCR** (0.9B parameters) requires **2.5GB to 6GB** of memory during inference. The system allows concurrent execution, but memory management is critical to avoid OS swapping.
+- **Storage Requirements:** The model disk footprint is asymmetric. **PaddleOCR** is negligible (~15MB to 200MB), while **GLM-OCR** demands **~2.5GB**. The total AI stack (dependencies included) fits comfortably under **5GB**, preserving disk space for the BI database.
+- **Inference Bottleneck:** While PaddleOCR achieves sub-second latency on CPU, **GLM-OCR** on an Intel i3 will face latency limits (**~1-2 pages/sec**). This validates the architectural choice of **FastAPI** with asynchronous processing to prevent blocking the mobile frontend during heavy extraction tasks.
+
+_Resource Planning: CPU saturation risk identified for simultaneous model execution; recommends sequential processing queue._
+_Source: [ONNX Runtime Memory Profiling](https://onnxruntime.ai), [GLM-OCR Model Card](https://huggingface.co)_
 
 ### Cloud Infrastructure and Deployment (Local Simulation)
 
