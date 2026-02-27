@@ -45,3 +45,8 @@ Project Complexity: Medium-High
 - **Data Precision & Payload Integrity**: Ensuring OCR extraction meets strict quality thresholds before human review and subsequent transmission to Amplitude.
 - **Audit & Compliance**: Centralized, immutable logging for every validation decision and state change.
 - **Resource Throttling**: Preventing CPU pegging during concurrent OCR/Biometric workloads on low-spec hardware.
+
+## Architecture Deliverables
+
+The detailed use-case diagrams, key sequence diagrams, and the API Contract Outline have been generated and stored in a separate document for clarity:
+- [Architecture Deliverables](file:///C:/Users/yoann/Documents/School/Xp-X5/Stage/bicec-veripass/_bmad-output/planning-artifacts/architecture-deliverables.md)

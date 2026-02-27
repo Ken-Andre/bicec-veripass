@@ -1012,10 +1012,10 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
 - **NIU (DGI)** :
   * Validation syntaxique locale (regex : ^[A-Z][0-9]{12}[A-Z]$)
   * Algorithme clé de contrôle (si reverse-engineering réussi) pour validation hors-ligne
-  * Appel API DGI (si disponible) : POST /api/dgi/validate_niu avec payload {niu, nom, prenom} → {valid: true/false, details}
+  <!-- * Appel API DGI (si disponible) : POST /api/dgi/validate_niu avec payload {niu, nom, prenom} → {valid: true/false, details} -->
   * **Fallback si API indisponible** :
     - Validation format uniquement
-    - Flag dossier : "NIU non vérifié API DGI"
+    <!-- - Flag dossier : "NIU non vérifié API DGI" -->
     - Agent KYC doit **obligatoirement** vérifier visuellement l'attestation NIU uploadée
     - Réconciliation batch quotidienne quand API revient
 
