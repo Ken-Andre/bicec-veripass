@@ -30,7 +30,7 @@ Promulgated on December 23, 2024, this law is the "Cameroonian GDPR":
 | **MTN Mobile Money** | Fully Digital | Simplified registration, moving towards banking-grade KYC post-licensing. |
 | **Orange Money** | Fully Digital | High penetration, basic KYC evolving. |
 
-**Observation**: Most traditional banks still require a physical visit or a "hybrid" approach. BICEC can differentiate by being **100% remote** while maintaining higher trust scores than Mobile Money providers.
+**Observation**: Most traditional banks still require a physical visit or a "hybrid" approach. Based on the current target flow, BICEC is **primarily remote but hybrid**: **11 of 12 mandatory customer steps are remote (~91.7%)**, with one mandatory in-branch step (wet signature/final activation), while still aiming for higher trust scores than Mobile Money providers.
 
 ## 3. Technical Feasibility (Sovereign OCR & Biometrics)
 
