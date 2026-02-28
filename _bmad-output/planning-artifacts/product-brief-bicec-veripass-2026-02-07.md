@@ -195,7 +195,7 @@ Integrations like ~~**NIU/DGI** (fiscal verification) and **Shadow IBU** (region
 
 #### 📱 Mobile App (Marie's Journey)
 - **Multi-Factor Onboarding**: SMS/Email OTP verification.
-- **Resilient AI Capture**: Guidance-assisted CNI capture (PaddleOCR) and Liveness selfie (MiniFASNet + DeepFace).
+- **Resilient AI Capture**: Guidance-assisted CNI capture (PaddleOCR for structured fields) and utility bill extraction (GLM-OCR for semantic analysis), plus Liveness selfie (MiniFASNet + DeepFace).
 - **Context-First Persistence**: Mandatory encrypted local cache to handle 3G/Power drops.
 - **Document Suite**: Support for NIU Attestation, ENEO/CAMWATER bills, and GPS geolocation.
 - **Digital Closure**: Integrated CGU review and digital signature.
@@ -233,7 +233,7 @@ Integrations like ~~**NIU/DGI** (fiscal verification) and **Shadow IBU** (region
 
 ### Key Differentiators
 
-- **Technological Sovereignty**: 100% open-source core (PaddleOCR, DeepFace) for total control and cost efficiency.
+- **Technological Sovereignty**: 100% open-source core with **hybrid OCR strategy** (PaddleOCR for CNI structured extraction + GLM-OCR for semantic bill analysis) and DeepFace for biometrics, ensuring total control and cost efficiency.
 - **Context-Aware Resilience**: Encrypted local cache specifically for the Cameroonian infrastructure reality.
 - **Strategic Identity Rail**: Built to be the identity anchor for all BICEC services (BiPay, CRESCO, Crédit) and a model for the CEMAC region.
 - **Audit-Impeccable Compliance**: A workflow designed to "show blood" to the COBAC agents, proving every step was validated by a responsible human before the account "switch" was flipped.

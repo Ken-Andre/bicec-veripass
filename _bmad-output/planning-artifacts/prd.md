@@ -123,7 +123,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
     - **Docker Desktop (WSL2)**: Hard-capped at **8GB RAM** (via `.wslconfig`).
     - **Headroom**: 2GB buffer for OS/Management; 6GB for local development (IDEs/UI).
 - **Storage Hygiene**: Hard **200GB Disk Limit**. "Prune-First" policy: automated daily deletion of Docker build cache and logs required.
-- **Eco-System Sovereignty**: 100% Open-Source AI core (PaddleOCR, DeepFace, MiniFASNet). No 3rd-party SaaS licensing fees.
+- **Eco-System Sovereignty**: 100% Open-Source AI core with **hybrid OCR strategy** (PaddleOCR for structured CNI fields + GLM-OCR for semantic bill extraction) and DeepFace biometrics. No 3rd-party SaaS licensing fees.
 
 ### 🔄 Integration Requirements
 - **Core Banking Integration**: Direct integration point for Sopra Amplitude provisioning.
@@ -138,7 +138,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 ## 6. Innovation & Novel Patterns
 
 ### 💎 Detected Innovation Areas
-- **Sovereign RegTech Blueprint**: A 100% On-Premise, Open-Source AI stack (PaddleOCR, DeepFace) that eliminates vendor lock-in and foreign SaaS dependency—a pioneering move for Tier-1 banks in Cameroon.
+- **Sovereign RegTech Blueprint**: A 100% On-Premise, Open-Source AI stack with **hybrid OCR strategy** (PaddleOCR  /||+ GLM-OCR) combined with DeepFace biometrics that eliminates vendor lock-in and foreign SaaS dependency—a pioneering move for Tier-1 banks in Cameroon.
 - **Context-Aware Resilience (Mobile/Edge)**: The combination of **Encrypted Local Cache** + **Progressive Sequential Upload** + **Sovereign Biometric States** specifically engineered to survive "Délestage" (power cuts) and unstable 3G infrastructure.
 - **Hybrid "Audit-Impeccable" Workflow**: An innovative RegTech approach where the UX is designed strictly to "show the blood" (evidence) to COBAC regulators, turning a compliance burden into a competitive advantage (faster approval).
 <!-- - **Mock-First ROI Proof**: Using mock tax APIs to prove a 3x CAC reduction *before* committing to years of external integration overhead. Sopra Banking Amplitude handles IBU generation as part of core banking integration. -->
@@ -154,6 +154,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 ### 🛡️ Risk Mitigation
 - **The "Lowest Common Denominator" Shield**: Mitigating hardware bottlenecks on i3 machines by optimizing container loads and daily cache pruning.
 - **Fallback Hierarchy**: The "3-Strike Liveness Lockout" provides a graceful descent from Auto-Biometry to Manual Branch verification.
+- **Hybrid OCR Resilience**: Using GLM-OCR as complementary engine for complex semantic extraction (utility bills) can reduces dependency on single OCR approach and improves extraction accuracy for unstructured documents.
 
 ## 7. Project-Type Specific Requirements
 
@@ -207,7 +208,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 
 **Must-Have Capabilities**:
 - **Resilient Mobile Capture**: Sequential upload, local encrypted cache.
-- **Sovereign AI Engine**: PaddleOCR + DeepFace running locally on Docker.
+- **Sovereign AI Engine**: Hybrid OCR strategy (PaddleOCR for CNI structured extraction + GLM-OCR for semantic bill analysis) and DeepFace biometrics running locally on Docker.
 - **Human-in-the-Loop Portal**: RBAC for Jean, Thomas, and Sylvie.
 <!-- - **Mock Service Layer**: High-fidelity stubs for DGI and Sopra Amplitude. >Removed because no more mock for even the MVP, too much complexity.-->
 - **Universal 16GB Optimization**: WSL2 RAM capping and auto-pruning scripts.
@@ -251,7 +252,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 - **FR10 (GPS Location - Optional)**: Users can optionally use a "Utiliser ma position actuelle" button to auto-populate GPS coordinates.
 - **FR11 (Privacy Notice & Compliance)**: When GPS is used, the system displays a privacy notice: "We collect your GPS location to verify your address for compliance purposes. This data is encrypted and never shared (Enregistré pour des fins de contrôle réglementa1ire de KYC)." If GPS distance > X km from selected Quartier, show a warning (don't block).
 - **FR12 (Utility Choice)**: Users choose **Either ENEO Or CAMWATER** (toggle) to upload as proof of address.
-- **FR13 (Bill Validation)**: The system extracts the bill date and ENEO/CAMWATER agency name using PaddleOCR. The system uses the utility agency zone to assign the dossier to the nearest BICEC agency for load balancing. Address coherence validation is performed manually by Jean during back-office review.
+- **FR13 (Bill Validation)**: The system extracts the bill date and ENEO/CAMWATER agency name using **GLM-OCR** (optimized for unstructured bill layouts and semantic context askip). The system uses the utility agency zone to assign the dossier to the nearest BICEC agency for load balancing. Address coherence validation is performed manually by Jean during back-office review.
 
 ### ⚖️ NIU & Legal Consent
 - **FR14 (Flexible NIU)**: Users can upload the NIU Attestation **OR** manually declare the NIU number.
@@ -386,12 +387,18 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 > [!IMPORTANT]
 > **Critical for Thesis Evaluation**: The following requirements establish the Data/BI foundation necessary for performance validation, fraud detection,  and regulatory compliance. These components are evaluated as core thesis deliverables.
 
-- **NFR11 (OCR Training Dataset)**:
-  - **Requirement**: Curated dataset of **500-1000 Cameroonian CNI images** (mix of old plastified and new 2024 biometric versions) for PaddleOCR fine-tuning and validation
-  - **Composition**:
+- **NFR11 (Hybrid OCR Training Dataset)**:
+  - **Requirement**: Curated datasets for both OCR engines:
+    - **PaddleOCR Dataset**: 500-1000 Cameroonian CNI images (mix of old plastified and new 2024 biometric versions) for fine-tuning and validation [](wehavefewtimestomakethisSonotapplicableWewillfindawalkthroughbutcanthavethisnumberofcnifornowMaybedataaugmentationforthefewwewillhave)
+    - **GLM-OCR Dataset**: 300-500 ENEO/CAMWATER utility bills for semantic extraction calibration [](wehavefewtimestomakethisSonotapplicableWewillfindawalkthroughbutcanthavethisnumberofthisutilitybillsfornowMaybedataaugmentationforthefewwewillhaveOruseonlythecapacityocrmodelforthisandmakeagoodextractionononeandhopeitwillworkforothers)
+  - **Composition (CNI - PaddleOCR)**:
     - **60% Training**: Labeled ground truth (manual OCR verification of all fields: Nom, Prénom, Date Naissance, Numéro CNI, Date Délivrance, Lieu)
     - **20% Validation**: Held-out set for hyperparameter tuning and threshold calibration
     - **20% Test**: Unseen data for final accuracy metrics (target >90% field-level extraction accuracy)
+  - **Composition (Bills - GLM-OCR)**:
+    - **60% Training**: Labeled ground truth (agency name, date, address fields, semantic context)
+    - **20% Validation**: Threshold calibration for unstructured layouts
+    - **20% Test**: Final accuracy metrics for semantic extraction
   - **Acquisition Strategy**:
     - **Crowdsourcing interne BICEC**: Voluntary employee participation with anonymization (blur faces, mask personal data)
     - **Partnership agences**: Existing client consent for research use

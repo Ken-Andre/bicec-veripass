@@ -40,7 +40,7 @@
 ### Design Opportunities
 - **Revolut-Grade Experience**: Bringing premium, confidence-building UI to the Cameroonian banking sector.
 - **Evidence-First UX**: Turning a regulatory burden into a speed-to-market advantage by producing "evidence that screams."
-- **AI-Powered Efficiency**: PaddleOCR + DeepFace eliminate manual data entry, reducing completion time from 14 days to 15 minutes.
+- **AI-Powered Efficiency**: Hybrid OCR strategy (PaddleOCR /||+ GLM-OCR) combined with DeepFace biometrics eliminates manual data entry, reducing completion time from 14 days to 15 minutes.
 
 
 ---
