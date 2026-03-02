@@ -371,6 +371,8 @@ C4Container
     Rel(celery, amplitude, "Batch provision", "HTTPS")
 ```
 
+> **Note Redis :** L'API **pousse** les tâches dans Redis (PUSH/SET). Celery les **consomme** (POP). L'API lit aussi Redis directement pour vérifier les OTP et les tokens anti-replay liveness. Redis joue donc deux rôles distincts : **broker de messages** (pour Celery) et **cache sessions** (pour l'API).
+
 ---
 
 ### C4 Level 3 — Composants Backend FastAPI
@@ -656,7 +658,7 @@ sequenceDiagram
 
 ### SEQ-02 : Validation Jean (Evidence-First)
 
-```mermaid
+<!-- ```mermaid
 sequenceDiagram
     actor Jean
     participant BO as Back-Office SPA
@@ -701,6 +703,33 @@ sequenceDiagram
     API->>PG: INSERT analytics_events (event=Agent_Approved, validation_duration_ms)
     API->>PG: INSERT notifications (user_id=marie, type=DOSSIER_APPROVED)
     API-->>BO: 200 OK
+``` -->
+```mermaid
+sequenceDiagram
+    actor Agent as Jean / Thomas / Sylvie
+    participant BO as Back-Office SPA
+    participant API as FastAPI
+    participant PG as PostgreSQL
+
+    Agent->>BO: Ouvre l'URL back-office
+    BO->>BO: Vérifie JWT stocké (localStorage chiffré)
+    alt JWT valide
+        BO->>BO: Redirige vers dashboard selon rôle
+    else Pas de JWT / expiré
+        BO->>Agent: Affiche écran login (email + password)
+        Agent->>BO: Saisit identifiants
+        BO->>API: POST /auth/backoffice/login {email, password}
+        API->>PG: SELECT agent (email) → compare bcrypt hash
+        alt Identifiants valides
+            API->>PG: INSERT audit_log (action=LOGIN, agent_id, ip)
+            API-->>BO: {access_token, role: JEAN/THOMAS/SYLVIE, agency_id}
+            BO->>BO: Stocke JWT
+            BO->>BO: Redirige vers dashboard du rôle</br>(Jean→Queue, Thomas→AML, Sylvie→Command Center)
+        else Identifiants invalides
+            API-->>BO: 401 Unauthorized
+            BO->>Agent: Message erreur + compteur tentatives
+        end
+    end
 ```
 
 ---
@@ -848,6 +877,163 @@ sequenceDiagram
 ```
 
 ---
+
+### SEQ-06 : Messagerie Support — Marie ↔ Jean
+
+```mermaid
+sequenceDiagram
+    actor Marie
+    participant PWA
+    participant API as FastAPI
+    participant PG as PostgreSQL
+    actor Jean
+
+    Note over Marie,Jean: Marie est en RESTRICTED_ACCESS, dossier PENDING_INFO
+
+    Marie->>PWA: Ouvre messagerie support
+    PWA->>API: GET /support/threads?session_id={id}
+    API->>PG: SELECT messages du thread lié à la session
+    API-->>PWA: {thread_id, messages, attachments}
+    PWA->>PWA: Affiche historique messages + pièces jointes
+
+    Marie->>PWA: Écrit message + joint nouveau document
+    PWA->>API: POST /support/messages {thread_id, text, attachment_b64}
+    API->>PG: INSERT message (sender=MARIE, content, attachment_path)
+    API->>PG: INSERT notifications (agent_id=jean, type=NEW_MESSAGE)
+    API-->>PWA: 200 {message_id}
+
+    Note over API,Jean: [Système route le message vers Jean</br>(agent responsable du dossier)</br>ou agent disponible si Jean absent]
+
+    API->>PG: SELECT dossier_assignment (session_id) → agent responsable
+    alt Agent responsable disponible aujourd'hui
+        API->>PG: Notif → Jean (agent d'origine)
+    else Agent absent toute la journée
+        API->>PG: WRR → sélectionne agent disponible
+        API->>PG: Notif → nouvel agent assigné
+        API->>PG: UPDATE dossier_assignment (agent_id, with_full_dossier=true)
+    end
+
+    Jean->>BO: Ouvre notification message
+    BO->>API: GET /support/threads/{thread_id}
+    API->>PG: SELECT messages + dossier complet du client
+    API-->>BO: {messages, dossier_summary, documents_urls}
+    BO->>BO: Affiche message + pièces jointes</br>+ dossier complet Marie visible en sidebar
+
+    Jean->>BO: Rédige réponse
+    BO->>API: POST /support/messages {thread_id, text, sender=JEAN}
+    API->>PG: INSERT message (sender=JEAN)
+    API->>PG: INSERT notifications (user_id=marie, type=AGENT_REPLY)
+    API-->>BO: 200 OK
+
+    Marie->>PWA: [polling 15s] GET /notifications
+    API-->>PWA: {type: AGENT_REPLY}
+    PWA->>PWA: Affiche nouveau message Jean
+```
+
+---
+
+### SEQ-07 : Marie utilise l'App Post-Onboarding (États d'accès)
+
+> **Nouvelle séquence** — manquait dans la v1.
+
+```mermaid
+sequenceDiagram
+    actor Marie
+    participant PWA
+    participant API as FastAPI
+    participant PG as PostgreSQL
+
+    Marie->>PWA: Ouvre l'app (login PIN / biométrie)
+    PWA->>API: POST /auth/pin/verify {user_id, pin_hash}
+    API->>PG: SELECT user + kyc_session (access_level)
+    API-->>PWA: {access_token, access_level: RESTRICTED/LIMITED/FULL}
+
+    alt access_level = RESTRICTED_ACCESS
+        PWA->>PWA: Affiche dashboard VITRINE
+        PWA->>PWA: Banner: "⏳ Dossier en cours de validation"
+        PWA->>PWA: Fonctionnalités : read-only, plans, cartes verrouillées
+        PWA->>PWA: Messagerie support disponible
+    else access_level = LIMITED_ACCESS
+        PWA->>PWA: Affiche dashboard avec restrictions
+        PWA->>PWA: Banner: "⚠️ Complétez votre NIU pour débloquer tout"
+        PWA->>PWA: Dépôts : ✅ | Virements, retraits, cartes : 🔒
+    else access_level = FULL_ACCESS
+        PWA->>PWA: Affiche dashboard complet
+        PWA->>PWA: Tous services disponibles
+        PWA->>PWA: Auth Rail BICEC actif
+    end
+
+    Note over Marie,PWA: Auth Rail — Accès autres apps BICEC
+
+    Marie->>PWA: Clique sur icône "BiPay" dans section apps
+    alt App BiPay installée
+        PWA->>PWA: Ouvre BiPay avec token d'identité BICEC
+    else App non installée
+        PWA->>PWA: Redirige vers Play Store / App Store
+        Note over PWA: Dans BiPay, Marie se connecte</br>avec son email/phone + OTP</br>Amplitude reconnaît son identité KYC
+    end
+
+    Note over Marie,PWA: Polling notifications
+
+    loop Toutes les 15-30s (foreground)
+        PWA->>API: GET /notifications?since={last_timestamp}
+        API->>PG: SELECT notifications non lues
+        API-->>PWA: {notifications: [...]}
+        PWA->>PWA: Affiche badge + centre notifications
+    end
+```
+
+---
+
+### SEQ-08 : Expiration Document — Flow Jean + Marie
+
+```mermaid
+sequenceDiagram
+    participant SYS as Système (Celery beat)
+    participant PG as PostgreSQL
+    actor Jean
+    participant BO as Back-Office SPA
+    actor Marie
+    participant PWA
+
+    Note over SYS,PG: [Job cron quotidien — vérification expiration docs]
+
+    SYS->>PG: SELECT sessions FULL_ACCESS</br>où doc expiry < NOW() + 30 jours
+    PG-->>SYS: Liste sessions concernées
+    SYS->>PG: INSERT notifications (agent_id=jean, type=DOC_EXPIRY_WARNING)
+    SYS->>PG: UPDATE kyc_session (doc_expiry_flag=true)
+
+    Jean->>BO: Reçoit notification expiration
+    BO->>API: GET /backoffice/dossiers/{id}/expiry
+    API-->>BO: Détail doc expirant + date limite client
+
+    Jean->>BO: Envoie notice au client
+    BO->>API: POST /support/messages {text: "Votre CNI expire le XX, veuillez la renouveler"}
+    API->>PG: INSERT notification (user_id=marie, type=DOC_EXPIRY_NOTICE, deadline=30j)
+
+    Marie->>PWA: Reçoit notification expiration
+    Note over Marie,PWA: Marie a 30 jours pour soumettre nouveau doc
+
+    alt Marie soumet dans le délai
+        Marie->>PWA: Upload nouveau document CNI
+        PWA->>API: POST /kyc/capture/cni {session_id, new_doc}
+        API->>PG: INSERT document (status=PENDING_REVIEW)
+        API->>PG: INSERT notifications (agent_id=jean, type=NEW_DOC_SUBMITTED)
+        Jean->>BO: Revoit nouveau document
+        BO->>API: POST /backoffice/dossiers/{id}/reapprove
+        API->>PG: UPDATE kyc_session (doc_expiry_flag=false, status=FULL_ACCESS)
+        API->>PG: INSERT audit_log (action=DOC_REAPPROVED)
+    else Délai dépassé
+        SYS->>PG: UPDATE user (access_level=RESTRICTED_ACCESS)
+        SYS->>PG: INSERT notifications (user_id=marie, type=ACCOUNT_RESTRICTED)
+        Note over SYS: Jean peut lever la restriction</br>après nouveau doc validé (J12)
+    end
+```
+
+---
+
+
+
 
 ## 7. Modèle de Données (ERD)
 
