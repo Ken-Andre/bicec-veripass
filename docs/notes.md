@@ -165,3 +165,17 @@ Ce n'est pas tout
 Recherche en profondeur. Regarde les maquettes du prototype plus au niveau structurel et joins le au design de ux-spec -v2. Je sais que par exemple les diagrames du ui-ux pas seulement Ux(et meme la ce ne'st pas toujours termine si l'on se fit aux users journeys de nos personas.) n'ont pas encore ete fait (state machine, flow...)
 Et tout nos diagrams actuel si tu etais intelligent sont en mermaid pas besoin de me le reposer comme question. Rellis donc bien #planning-artifacts, les md. Le processus Bmad et enfin de fond en comble le prototype visuel de nos 4 produits.
 non le prototype lui est une version minimaliste deja validee par d'autres c'est les autres documents qui sont anciencs avec des donnees outdated qui doivent etre a jour pour ne pas mettre en erreur d'autre durant le processus Bmad/ Agile.
+
+---Il faudrait me montrer comment on lis ces diagrammes. 
+---
+C4 Level 1 — Contexte Système
+La pour moi, ca passe, je n'ai encore rien a dire.
+C4 Level 2 — Conteneurs
+Pas beaucoup a part les problemes de lisibilite.
+Maintenant aussi pour le lien entre le container Celery Workers et le container_db Redis 7;Le lien entre le container FastAPI Backend et le container_db Redis 7 -- Il n'y a qu'une legende Queue /Broker[6379] et on ne sait pas a qui ca appartient et si l'un l'a l'autre a quoi ?
+C4 Level 3 — Composants Backend FastAPI
+Celui ci alors c'est le grand frere!!! 
+---
+Quant au usecase diagrammes il y'a beaucoup qui manque. Pour Marie elle a besoin de pouvoir echanger avec le support client quand il y'a un probleme sur son compte, de pouvoir renvoyer des documents lorsqu'un agent le lui demande par ce canal de messagerie support client. Pour jean, il ne consulte pas la queue mais sa queue, inspecter dossier de chaque session soumis, de consulter les images a haute resolution, de pouvoir zoomer autant de fois qu'il veut, de voir un message du client d'un dossier qui lui a ete attribue d'y repondre de voir les pieces jointes a ce message , de pouvoir restreindre un compte apres l'expiration d'une piece officielle et la date limite de notice au client passe qui n'a rien renvoye, de pouvoir reapprouver un compte apres des nouvelles infos soumis par le client, le tout en plus de ce qui est deja la.
+Pour Thomas et Sylvie ca va je pense mais tu peux un peu faire mieux. 
+Pour le Systeme auto, il a en plus de ce qu'il a la possibilite d'allouer un dossier a une agence, d'ensuite l'allouer a un agent de la bas selon differents criteres, lorsque le client du dossier chat de pouvoir envoyer tout cela soit au meme agent qui avait eu son dossier soit a un autre s'il n'est pas disponible durant toute la journee(s'il n'a pas traite le cas de cette personne la) et d'envoyer ce chat avec une fois tout le dossier du client.

@@ -1,0 +1,1850 @@
+# Architecture Document — bicec-veripass
+
+**Auteur :** Ken-André  
+**Date :** 2026-02-28  
+**Version :** 1.0  
+**Statut :**  Approuvé pour implémentation  
+**Documents sources :** PRD v1, UX Spec v2.1, Product Brief, Research Reports (KYC + Technical + Architectural Foundations)
+
+---
+
+## Table des matières
+
+1. [Contexte & Contraintes](#1-contexte--contraintes)
+2. [Architecture Decisions Records (ADRs)](#2-architecture-decision-records-adrs)
+3. [Vue C4 — Architecture Système](#3-vue-c4--architecture-système)
+4. [Diagramme Use Case](#4-diagramme-use-case)
+5. [State Machine KYC](#5-state-machine-kyc)
+6. [Diagrammes de Séquence](#6-diagrammes-de-séquence)
+7. [Modèle de Données (ERD)](#7-modèle-de-données-erd)
+8. [API Contract (FastAPI)](#8-api-contract-fastapi)
+9. [Infrastructure Docker Compose](#9-infrastructure-docker-compose)
+10. [Budget RAM & Profil Hardware](#10-budget-ram--profil-hardware)
+11. [Sécurité Architecture](#11-sécurité-architecture)
+12. [Pipeline AI/ML](#12-pipeline-aiml)
+13. [Stratégie Analytics & Data Warehouse](#13-stratégie-analytics--data-warehouse)
+14. [Stratégie de Chiffrement (Phased)](#14-stratégie-de-chiffrement-phased)
+
+---
+
+## 1. Contexte & Contraintes
+
+### 1.1 Résumé du Projet
+
+**bicec-veripass** est une plateforme d'onboarding KYC digital souveraine pour BICEC (Cameroun), transformant un processus manuel de 14 jours en un parcours numérique de 15 minutes. Le système intègre de l'IA locale (OCR + biométrie), un back-office multi-rôles (Jean/Thomas/Sylvie), et une PWA mobile pour le client (Marie).
+
+C'est un **Projet de Fin d'Études** (PFE) en Data/IA Engineering, présenté à un jury. Les composants Data/BI (funnel analytics, OCR observability, agent load-balancing) sont les **livrables primaires** évalués.
+
+### 1.2 Contraintes Non-Négociables
+
+| Contrainte          | Détail                                                                     |
+| ------------------- | -------------------------------------------------------------------------- |
+| **Hardware**        | Intel Core i3 @ 2.5GHz, 16GB RAM, 200GB Disk (nœud principal)              |
+| **Docker WSL2**     | RAM cap **8GB** via `.wslconfig`                                           |
+| **Souveraineté**    | 100% On-Premise, zéro cloud SaaS pour données KYC (Loi 2024-017)           |
+| **Open Source**     | 0 FCFA en licences SaaS — stack 100% open-source                           |
+| **Timeline**        | 2 mois pour MVP fonctionnel (Mars : 21j, Avril : 22j, Mai début)           |
+| **Réglementaire**   | COBAC R-2019/01, COBAC R-2023/01, Law 2024-017 (effectif juin 2026)        |
+| **Stockage images** | 10 ans conservation COBAC — filesystem volume Docker, pas PostgreSQL BYTEA |
+
+### 1.3 Machine de Développement
+
+| Machine                          | Specs                                         | Rôle                                                     |
+| -------------------------------- | --------------------------------------------- | -------------------------------------------------------- |
+| **Machine principale (i3)**      | Intel Core i3 @ 2.5GHz, 16GB RAM              | Docker stack complet, dev quotidien                      |
+| **Machine secondaire (Ryzen 7)** | AMD Ryzen 7, iGPU Radeon 780M (VRAM partagée) | GLM-OCR worker accéléré (Vulkan/ROCm via Ollama) en nuit |
+
+---
+
+## 2. Architecture Decision Records (ADRs)
+
+### ADR-001 : PWA React/TypeScript vs Flutter (Frontend Mobile Marie)
+
+**Statut :**  DÉCIDÉ  
+**Date :** 2026-02-28
+
+**Contexte :**  
+Le PRD initial indiquait Flutter comme stack mobile. Contraintes réelles : développeur sur Windows, iPhone personnel, pas de Mac pour build iOS, 2 mois de timeline.
+
+**Options évaluées :**
+
+| Critère                 | PWA React/TS              | Flutter                  |
+| ----------------------- | ------------------------- | ------------------------ |
+| Build iOS sans Mac      |  Safari 15+ / WebRTC     |  Requiert macOS         |
+| Test sur iPhone perso   |  URL localhost           |  AVD virtuel uniquement |
+| RAM Docker + dev        |  Pas d'AVD               |  AVD = +2-4GB RAM       |
+| Stack cohérente         |  Même TS que back-office |  Dart = 4ème langage    |
+| Tests E2E               |  Playwright natif        |  Adaptation nécessaire  |
+| Time-to-market          |  Hot reload immédiat     |  Lent sur Windows       |
+| Caméra (KYC)            |  `getUserMedia` + WebRTC |  Camera plugin Flutter  |
+| Crédibilité banque prod |  Perçue inférieure       |  App native préférée    |
+| Post-MVP BICEC          |  API contract inchangé   | N/A                      |
+
+**Décision :** **PWA React/TypeScript**
+
+**Justification :**
+- L'API Contract FastAPI reste 100% identique — BICEC peut wraper en React Native ou Flutter post-internship sans modifier le backend.
+- `getUserMedia` + WebRTC est supporté sur iOS 15+ Safari, Android 8+ Chrome — la cible exacte du projet.
+- Une PWA installable (Add to Home Screen) est indiscernable d'une app native pour l'utilisateur final.
+- Des institutions financières comme Nubank (Brésil, $40B valorisation) et plusieurs néobanques africaines utilisent des PWA pour leurs flows d'onboarding.
+- **Référence :** LeanCode (2024), WEZOM (2025), Vofox Solutions (2026) — comparatifs Flutter vs PWA confirment 50-70% de réduction du time-to-market pour les PWA sur des timelines MVP contraintes.
+
+**Conséquences :**
+- MediaPipe WASM remplace MediaPipe Flutter pour le pre-check liveness côté client
+- Service Workers pour offline/résumption de session (scénario "ENEO Blackout")
+- Playwright pour les tests E2E (cohérent avec la stack TS)
+
+---
+
+### ADR-002 : Architecture Monolithe Modulaire (Modular Monolith)
+
+**Statut :**  DÉCIDÉ  
+**Date :** 2026-02-28
+
+**Contexte :**  
+Choix entre Monolithe, Microservices, ou Serverless pour le backend FastAPI.
+
+**Options évaluées :**
+
+| Critère           | Monolithe Modulaire            | Microservices                | Serverless               |
+| ----------------- | ------------------------------ | ---------------------------- | ------------------------ |
+| Setup initial     |  Faible                       |  30% du temps en infra      |  Non applicable on-prem |
+| Debug             |  Un process, logs centralisés |  Distributed tracing requis | N/A                      |
+| Déploiement       |  Un docker-compose            |  Orchestrateur (K8s)        | N/A                      |
+| Tests             |  Integration simple           |  Inter-service complexe     | N/A                      |
+| RAM i3 (16GB)     |  Optimisé                     |  Overhead par service       | N/A                      |
+| Évolution Phase 2 |  Modules extractibles         |  Déjà prêt                  | N/A                      |
+
+**Décision :** **Monolithe Modulaire déployé en Docker multi-containers**
+
+**Justification :**
+- Un monolithe modulaire = codebase unique avec des **modules internes à responsabilité unique** (`auth/`, `kyc/`, `backoffice/`, `aml/`, `analytics/`) — facilement découpable en microservices Phase 2.
+- Sur i3/16GB, les microservices introduiraient ~500MB RAM d'overhead par service (service mesh, health checks, etc.) sans bénéfice pour un pilote 20-50 utilisateurs.
+- **Référence :** AWS (2024) — "Monolithic architecture is often the right choice for early-stage products." SparxIT MVP Architecture Guide (2024).
+- Docker multi-containers (un container par responsabilité fonctionnelle) donne l'isolation réseau et la fault-tolerance sans la complexité d'un vrai microservice mesh.
+
+**Structure des modules FastAPI :**
+```
+app/
+ modules/
+    auth/          # OTP, PIN, sessions
+    kyc/           # Capture, OCR, biométrie, state machine
+    backoffice/    # Jean, Thomas, Sylvie
+    aml/           # Screening PEP/Sanctions, déduplication
+    analytics/     # Funnel, SLA, events
+    admin/         # Agences, agents
+    notifications/ # Polling, SMS, Email
+ core/              # Config, DB, security, logging
+ main.py
+```
+
+---
+
+### ADR-003 : Stratégie OCR Hybride (PaddleOCR Primaire + GLM-OCR Fallback)
+
+**Statut :**  DÉCIDÉ  
+**Date :** 2026-02-28
+
+**Décision :**
+- **PaddleOCR PP-OCRv5** : moteur primaire pour CNI (structured fields). CPU-only, <1s/image, ~2M params, Apache 2.0.
+- **GLM-OCR 0.9B** : fallback si confidence PaddleOCR <85%, et extraction sémantique de factures ENEO/CAMWATER. Version quantifiée, worker Celery dédié, séquentiel (10-30s/page acceptable en back-office async).
+
+**Pipeline :**
+```
+Image → PaddleOCR → confidence ≥85% → Résultat direct
+                  → confidence <85%  → Queue Celery → GLM-OCR → Résultat
+```
+
+**Orchestration :**
+- **Celery** comme orchestrateur de tâches asynchrones
+- **Redis** comme message broker Celery
+- Worker dédié `glm_ocr_worker` (concurrence=1, queue `glm_ocr_jobs`)
+- **Interdiction formelle** d'exécution simultanée PaddleOCR + GLM-OCR (CPU saturation sur i3)
+
+**GLM-OCR sur Ryzen 7 (nuit/batch) :**
+- iGPU Radeon 780M (VRAM ~2.5GB GLM-OCR) via Ollama/Vulkan ou ONNX DirectML
+- Worker Celery dédié sur cette machine pour traitements lourds batch
+
+**Limite connue (ADR) :**
+- PaddleOCR et GLM-OCR extraient et structurent les champs textuels. Ils ne vérifient **pas l'authenticité physique** du document (hologrammes, microprint, UV).
+- **MVP** : Jean (agent humain) assure la validation visuelle des originaux haute-résolution.
+- **Phase 2** : Étudier un modèle CNN entraîné sur CNI camerounaises légitimes (classification doc authentique vs frauduleux) — à noter comme limite dans le rapport PFE.
+
+---
+
+### ADR-004 : Stratégie de Notifications (Sans Firebase)
+
+**Statut :**  DÉCIDÉ  
+**Date :** 2026-02-28
+
+**Contexte :** Firebase Cloud Messaging = appel cloud externe → violation Loi 2024-017 potentielle + dépendance Google.
+
+**Décision : Polling Local + SMS/Email Fallback**
+
+**Mécanisme :**
+- Après login Marie, la PWA ouvre un polling périodique sur `GET /notifications?since={timestamp}`
+  - Foreground : toutes les **15-30 secondes**
+  - Background : toutes les **60-120 secondes**
+- Les notifications sont stockées dans PostgreSQL (table `notifications`)
+- L'app affiche un **centre de notifications interne** (badge compteur + liste)
+- **Fallback SMS** : Orange Cameroon SMS API pour notifications critiques (activation, rejet)
+- **Fallback Email** : SMTP local (ou Orange SMS) pour confirmations
+
+**Avantages :**
+- 100% on-premise, zéro cloud
+- Simple à implémenter et débugger
+- Fonctionnel même sans service worker actif
+
+---
+
+### ADR-005 : SMS OTP — Orange Cameroon SMS API
+
+**Statut :**  DÉCIDÉ
+
+**Décision :** Orange Cameroon SMS API (portail développeur, client_id/client_secret, bundles en ligne 50-50 000 SMS, paiement Orange Money).
+
+**Justification :** Opérateur local régulé ANTIC/ARPCE, friction administrative minimale pour un pilote, pas de dépendance à un gateway international.
+
+---
+
+### ADR-006 : Stockage Images (Filesystem Volume Docker)
+
+**Statut :**  DÉCIDÉ
+
+**Décision :** Filesystem chiffré (volume Docker monté) pour images haute-résolution (CNI recto/verso, selfie vidéo, factures). PostgreSQL stocke uniquement : chemin logique, SHA-256, métadonnées, dates.
+
+**Justification :**
+- COBAC exige conservation 10 ans des images/vidéos originales haute-résolution (pas uniquement les embeddings mathématiques).
+- PostgreSQL BYTEA/TOAST sur gros fichiers binaires dégrade performances requêtes métier, alourdit backups, complique rétention sélective.
+- Un volume Docker (LUKS/AES-256 Phase finale MVP) permet isolation physique, politique de sauvegarde dédiée (WORM, rotation), archivage froid après N années.
+
+**Stratégie chiffrement (Phased) :**
+- **Phase dev/debug** : pas de chiffrement au repos (itération rapide) — TLS en transit dès le départ
+- **Phase pré-pilote** : activation LUKS ou chiffrement applicatif niveau volume Docker
+- Voir ADR-014 (Stratégie Chiffrement) pour détail
+
+---
+
+### ADR-007 : PEP/Sanctions Screening Local
+
+**Statut :**  DÉCIDÉ
+
+**Décision : Screening offline sur tables PostgreSQL locales**
+
+**Sources :**
+- **ONU** : Consolidated Sanctions List (XML) — via OpenSanctions `targets.simple.csv`
+- **UE** : Financial Sanctions Files (FSF) — webgate.ec.europa.eu, export CSV via OpenSanctions
+- **OFAC/US** : SDN + Consolidated Lists (CSV/XML) — Treasury Sanctions List Service
+- **PEP interne** : `pep.csv` maintenu par conformité BICEC (registres officiels, informations publiques)
+
+**Implémentation :**
+
+*Étape 1 — Seed initial :*
+- Téléchargement manuel des listes UN/EU/OFAC
+- Script Python d'ingestion → table `pep_sanctions` PostgreSQL (normalisation noms, alias, pays, programmes, dates)
+
+*Étape 2 — Mises à jour :*
+- Job cron nocturne : re-télécharge + upsert (désactivations, nouveaux entrants)
+- **Fréquence cible MVP : hebdomadaire**
+
+*Étape 3 — Screening Thomas :*
+- Interface fuzzy search (nom + date naissance + pays) sur table locale
+- Scoring similarité + gestion faux positifs avec justification obligatoire
+
+**Phase 2 :** Migration possible vers API commerciale (Dow Jones, Refinitiv, OpenSanctions API) sous réserve Loi 2024-017 et contrats tiers.
+
+---
+
+### ADR-008 : Service Worker Offline — Périmètre MVP
+
+**Statut :**  DÉCIDÉ
+
+**Offline OBLIGATOIRE pour :**
+- Shell applicatif PWA (HTML/JS/CSS/icônes)
+- Métadonnées de session (étapes complétées, formulaires, flags OCR) → **IndexedDB**
+- Copies temporaires chiffrées des images capturées (jusqu'à confirmation upload serveur → purge locale)
+
+**Offline NON requis pour :**
+- Stockage long terme images haute-résolution (côté serveur uniquement)
+- Historique complet des transactions depuis mobile
+
+**Flow résumption session :**
+```
+Coupure réseau → Service Worker cache session locale (IndexedDB)
+Retour réseau → App détecte → "Reprise à l'étape [X]..." (< 2s)
+              → Progressive upload → Backend confirme réception (200 + SHA-256 match)
+              → App purge copie locale
+```
+
+---
+
+### ADR-009 : Authentification Back-Office (Email/Password Local)
+
+**Statut :**  DÉCIDÉ
+
+Pas d'Active Directory pour MVP. Email/Password hashé bcrypt/Argon2 dans PostgreSQL local. RBAC strict par rôle (JEAN, THOMAS, SYLVIE). Sessions JWT avec expiry.
+
+---
+
+### ADR-010 : Celery + Redis pour Tâches Asynchrones
+
+**Statut :**  DÉCIDÉ
+
+- **Celery** : orchestrateur de tâches (GLM-OCR, envoi SMS/Email, batch Amplitude, cron PEP/Sanctions)
+- **Redis** : message broker Celery + sessions OTP (TTL) + anti-replay liveness
+- Workers dédiés par queue : `glm_ocr_jobs`, `notifications`, `amplitude_batch`, `sanctions_sync`
+
+---
+
+## 3. Vue C4 — Architecture Système
+
+### C4 Level 1 — Contexte Système
+
+```mermaid
+C4Context
+    title bicec-veripass — Contexte Système
+
+    Person(marie, "Marie", "Cliente BICEC\nEntrepreneuse 24 ans\nDouala")
+    Person(jean, "Jean", "Agent KYC\nValidation dossiers\nAgence BICEC")
+    Person(thomas, "Thomas", "Superviseur AML/CFT\nConformité nationale")
+    Person(sylvie, "Sylvie", "Manager\nDirectrice régionale")
+
+    System(veripass, "bicec-veripass", "Plateforme KYC digitale souveraine\nOnboarding 15 min + Back-office multi-rôles")
+
+    System_Ext(orange, "Orange Cameroon SMS API", "Envoi OTP par SMS")
+    System_Ext(amplitude, "Sopra Amplitude", "Core Banking System\nProvisioning comptes")
+    System_Ext(sanctions, "OpenSanctions / UN / EU / OFAC", "Listes sanctions\nTéléchargées en batch")
+
+    Rel(marie, veripass, "Onboarding KYC", "HTTPS/PWA")
+    Rel(jean, veripass, "Validation dossiers", "HTTPS/SPA")
+    Rel(thomas, veripass, "AML/Conformité/Admin", "HTTPS/SPA")
+    Rel(sylvie, veripass, "Monitoring & SLA", "HTTPS/SPA")
+
+    Rel(veripass, orange, "Envoi SMS OTP", "HTTPS REST")
+    Rel(thomas, amplitude, "Provisioning batch", "HTTPS SOAP/REST")
+    Rel_Back(sanctions, veripass, "Sync hebdo listes\n(cron batch)", "HTTPS download")
+```
+
+---
+
+### C4 Level 2 — Conteneurs
+
+```mermaid
+C4Container
+    title bicec-veripass — Conteneurs Docker
+
+    Person(marie, "Marie", "PWA Browser")
+    Person(agent, "Jean/Thomas/Sylvie", "Desktop Chrome/Edge")
+
+    System_Boundary(veripass, "bicec-veripass (Docker Compose)") {
+        Container(nginx, "Nginx", "Reverse Proxy", "TLS 1.3 termination\nRoutage vers containers\nRate limiting")
+
+        Container(pwa, "PWA Marie", "React/TypeScript\nVite + Service Worker", "Onboarding KYC\nMediaPipe WASM\nIndexedDB offline")
+
+        Container(backoffice, "Back-Office SPA", "React/TypeScript\nVite", "Jean: Validation Desk\nThomas: AML/Compliance\nSylvie: Command Center")
+
+        Container(api, "FastAPI Backend", "Python 3.11\nFastAPI + Celery", "Modules: auth, kyc,\nbackoffice, aml,\nanalytics, admin,\nnotifications")
+
+        Container(celery, "Celery Workers", "Python\nCelery", "glm_ocr_worker\nnotifications_worker\namplitude_batch_worker\nsanctions_sync_worker")
+
+        ContainerDb(postgres, "PostgreSQL 16", "OLTP + DWH Analytics\nStar Schema", "KYC, audit, analytics\nPEP/Sanctions, agents")
+
+        ContainerDb(redis, "Redis 7", "In-memory", "Celery broker\nOTP sessions (TTL)\nAnti-replay liveness")
+
+        Container(storage, "Filesystem Volume", "Docker Volume\n/data/documents", "Images CNI, selfies\nFactures (10 ans COBAC)")
+    }
+
+    System_Ext(orange, "Orange SMS API")
+    System_Ext(amplitude, "Sopra Amplitude")
+
+    Rel(marie, nginx, "HTTPS", "443")
+    Rel(agent, nginx, "HTTPS", "443")
+    Rel(nginx, pwa, "HTTP", "3000")
+    Rel(nginx, backoffice, "HTTP", "3001")
+    Rel(nginx, api, "HTTP", "8000")
+    Rel(api, postgres, "SQL", "5432")
+    Rel(api, redis, "Redis Protocol", "6379")
+    Rel(api, storage, "Read/Write", "Filesystem")
+    Rel(celery, postgres, "SQL", "5432")
+    Rel(celery, redis, "Queue/Broker", "6379")
+    Rel(celery, orange, "SMS OTP", "HTTPS")
+    Rel(celery, amplitude, "Batch provision", "HTTPS")
+```
+
+---
+
+### C4 Level 3 — Composants Backend FastAPI
+
+```mermaid
+C4Component
+    title FastAPI Backend — Composants internes
+
+    System_Boundary(api, "FastAPI App (Modular Monolith)") {
+        Component(auth_mod, "Auth Module", "FastAPI Router", "OTP send/verify\nPIN setup/verify\nJWT sessions\nBack-office login")
+
+        Component(kyc_mod, "KYC Module", "FastAPI Router", "Session create/resume\nCapture CNI/Bill/NIU\nLiveness\nState machine\nSubmit dossier")
+
+        Component(ocr_svc, "OCR Service", "Python Service", "PaddleOCR primaire\nGLM-OCR fallback (Celery)\nQuality metrics\nConfidence scoring")
+
+        Component(bio_svc, "Biometrics Service", "Python Service", "MediaPipe landmarks\nMiniFASNet liveness\nDeepFace face match\nAnti-spoofing score")
+
+        Component(bo_mod, "Back-Office Module", "FastAPI Router", "Jean: queue, inspect\napprove/reject/info\nThomas: AML, conflicts\nSylvie: analytics, SLA")
+
+        Component(aml_mod, "AML Module", "FastAPI Router", "Fuzzy search PEP/Sanctions\nAlert management\nDeduplication\nFraud flagging")
+
+        Component(analytics_mod, "Analytics Module", "FastAPI Router", "Funnel events\nSLA dashboard\nSystem health\nEscalation\nLoad balancing")
+
+        Component(notif_mod, "Notifications Module", "FastAPI Router", "Polling endpoint\nCelery triggers\nSMS/Email dispatch")
+
+        Component(audit_svc, "Audit Service", "Python Service", "SHA-256 hashing\nAppend-only log\nIP tracking\nCOBAC export")
+
+        Component(core, "Core", "Config/DB/Security", "DB connection pool\nJWT utils\nbcrypt/Argon2\nSettings")
+    }
+
+    Rel(auth_mod, core, "uses")
+    Rel(kyc_mod, ocr_svc, "calls")
+    Rel(kyc_mod, bio_svc, "calls")
+    Rel(kyc_mod, audit_svc, "logs every action")
+    Rel(bo_mod, audit_svc, "logs every decision")
+    Rel(aml_mod, audit_svc, "logs every alert action")
+    Rel(analytics_mod, core, "queries DWH")
+```
+
+---
+
+## 4. Diagramme Use Case
+
+```mermaid
+graph TB
+    subgraph Acteurs
+        Marie((" Marie\nCliente"))
+        Jean((" Jean\nAgent KYC"))
+        Thomas((" Thomas\nSuperviseur AML"))
+        Sylvie((" Sylvie\nManager"))
+        System((" Système\nAutomatique"))
+    end
+
+    subgraph UC_Mobile[" Application Mobile (PWA Marie)"]
+        UC1[UC1: S'inscrire par OTP SMS/Email]
+        UC2[UC2: Configurer PIN & Biométrie]
+        UC3[UC3: Capturer CNI Recto/Verso]
+        UC4[UC4: Passer le test de liveness]
+        UC5[UC5: Saisir adresse & GPS optionnel]
+        UC6[UC6: Uploader facture utilitaire]
+        UC7[UC7: Déclarer ou uploader NIU]
+        UC8[UC8: Accepter CGU & Signer digitalement]
+        UC9[UC9: Soumettre le dossier KYC]
+        UC10[UC10: Suivre l'état du dossier]
+        UC11[UC11: Explorer les services BICEC]
+        UC12[UC12: Reprendre session après coupure]
+        UC13[UC13: Recevoir notifications]
+    end
+
+    subgraph UC_Jean[" Back-Office Jean (Validation)"]
+        UC14[UC14: Consulter la queue de dossiers]
+        UC15[UC15: Inspecter dossier haute-résolution]
+        UC16[UC16: Comparer selfie vs photo CNI]
+        UC17[UC17: Valider ou corriger données OCR]
+        UC18[UC18: Approuver le dossier]
+        UC19[UC19: Rejeter avec motif]
+        UC20[UC20: Demander info supplémentaire]
+    end
+
+    subgraph UC_Thomas[" Back-Office Thomas (AML/CFT)"]
+        UC21[UC21: Examiner alertes PEP/Sanctions]
+        UC22[UC22: Effacer faux positif AML]
+        UC23[UC23: Confirmer match & geler compte]
+        UC24[UC24: Résoudre conflits d'identité]
+        UC25[UC25: Gérer les agences CRUD]
+        UC26[UC26: Surveiller batch Amplitude]
+        UC27[UC27: Relancer batch en erreur]
+        UC28[UC28: Provisionner comptes Amplitude]
+    end
+
+    subgraph UC_Sylvie[" Command Center Sylvie"]
+        UC29[UC29: Consulter dashboard R/Y/G]
+        UC30[UC30: Analyser funnel drop-off]
+        UC31[UC31: Escalader dossier SLA dépassé]
+        UC32[UC32: Redistribuer charge agents]
+        UC33[UC33: Exporter pack conformité COBAC]
+        UC34[UC34: Surveiller santé système]
+    end
+
+    subgraph UC_System[" Système Automatique"]
+        UC35[UC35: Scorer dossier globalement]
+        UC36[UC36: Détecter doublons identité]
+        UC37[UC37: Déclencher alerte SLA 2h]
+        UC38[UC38: Sync listes PEP/Sanctions hebdo]
+        UC39[UC39: Purger cache session locale]
+        UC40[UC40: Backup DB quotidien]
+    end
+
+    Marie --> UC1 & UC2 & UC3 & UC4 & UC5 & UC6 & UC7 & UC8 & UC9 & UC10 & UC11 & UC12 & UC13
+    Jean --> UC14 & UC15 & UC16 & UC17 & UC18 & UC19 & UC20
+    Thomas --> UC21 & UC22 & UC23 & UC24 & UC25 & UC26 & UC27 & UC28
+    Sylvie --> UC29 & UC30 & UC31 & UC32 & UC33 & UC34
+    System --> UC35 & UC36 & UC37 & UC38 & UC39 & UC40
+```
+
+---
+
+## 5. State Machine KYC
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT : Marie crée session
+
+    DRAFT --> DRAFT : Étapes capture\n(CNI, Liveness, Adresse, NIU)
+    DRAFT --> LOCKED_LIVENESS : 3 échecs liveness consécutifs
+    LOCKED_LIVENESS --> DRAFT : Marie clique "Recommencer"\n(cache purgé, nouveau session ID)
+    LOCKED_LIVENESS --> [*] : Marie choisit "Aller en agence"
+
+    DRAFT --> PENDING_KYC : Marie soumet dossier (UC9)
+
+    PENDING_KYC --> PENDING_INFO : Jean demande info (UC20)
+    PENDING_INFO --> PENDING_KYC : Marie fournit document\n(nouveau upload)
+
+    PENDING_KYC --> COMPLIANCE_REVIEW : Alerte AML auto-détectée (UC35)
+    COMPLIANCE_REVIEW --> PENDING_KYC : Thomas efface faux positif (UC22)
+    COMPLIANCE_REVIEW --> REJECTED : Thomas confirme match (UC23)
+
+    PENDING_KYC --> REJECTED : Jean rejette (UC19)
+    REJECTED --> [*] : Notification Marie\n(motif de rejet)
+
+    PENDING_KYC --> READY_FOR_OPS : Jean approuve (UC18)
+
+    READY_FOR_OPS --> PROVISIONING : Thomas lance batch Amplitude (UC28)
+    PROVISIONING --> ACTIVATED : Amplitude confirme création compte
+    PROVISIONING --> OPS_ERROR : Echec technique Amplitude
+    OPS_ERROR --> PROVISIONING : Thomas retry (UC27)
+
+    PROVISIONING --> OPS_CORRECTION : Erreur format/NIU collision
+    OPS_CORRECTION --> PROVISIONING : Thomas corrige + retry
+
+    ACTIVATED --> RESTRICTED_ACCESS : Compte activé\n(en attente signature agence)
+    RESTRICTED_ACCESS --> LIMITED_ACCESS : NIU déclaratif\nJean valide manuellement
+    RESTRICTED_ACCESS --> FULL_ACCESS : Signature agence effectuée\n+ NIU validé
+
+    LIMITED_ACCESS --> FULL_ACCESS : NIU uploadé + Jean valide
+
+    FULL_ACCESS --> DISABLED : Thomas suspend compte (fraude)
+    RESTRICTED_ACCESS --> DISABLED : Thomas suspend
+    LIMITED_ACCESS --> DISABLED : Thomas suspend
+
+    note right of RESTRICTED_ACCESS
+        Vitrine mode : consultation
+        uniquement, pas de virement
+        ni émission carte
+    end note
+
+    note right of LIMITED_ACCESS
+        Dépôts OK, consultation OK
+        Virements, retraits, cartes: BLOQUÉS
+    end note
+
+    note right of FULL_ACCESS
+        Toutes fonctionnalités débloquées
+    end note
+```
+
+---
+
+## 6. Diagrammes de Séquence
+
+### SEQ-01 : Onboarding Marie (Parcours nominal)
+
+```mermaid
+sequenceDiagram
+    actor Marie
+    participant PWA
+    participant Nginx
+    participant API as FastAPI
+    participant OCR as OCR Service
+    participant BIO as Biometrics Service
+    participant Celery
+    participant Redis
+    participant PG as PostgreSQL
+    participant FS as Filesystem
+    participant Orange as Orange SMS API
+
+    Marie->>PWA: Ouvre l'app
+    PWA->>PWA: Service Worker vérifie session locale (IndexedDB)
+
+    Marie->>PWA: Saisit numéro téléphone
+    PWA->>API: POST /auth/otp/send {phone}
+    API->>Celery: Task: send_sms_otp
+    Celery->>Orange: SMS API: envoie OTP
+    API->>Redis: Stocke OTP hash (TTL 5min)
+    API-->>PWA: 200 OK
+
+    Marie->>PWA: Saisit code OTP
+    PWA->>API: POST /auth/otp/verify {phone, code}
+    API->>Redis: Vérifie OTP (anti-replay)
+    API->>PG: Crée/récupère user + kyc_session (status=DRAFT)
+    API-->>PWA: 200 JWT token + session_id
+
+    Note over Marie,PWA: Phase identité
+
+    Marie->>PWA: Capture CNI Recto
+    PWA->>PWA: MediaPipe WASM: qualité frame (blur, glare)
+    PWA->>API: POST /kyc/capture/cni {session_id, side=RECTO, image}
+    API->>FS: Stocke image chiffrée /data/documents/{session_id}/cni_recto.jpg
+    API->>PG: INSERT document (chemin, sha256, status=PROCESSING)
+    API->>OCR: extract(image, doc_type=CNI_RECTO)
+    OCR->>OCR: PaddleOCR → confidence par champ
+    alt confidence ≥ 85% tous champs
+        OCR-->>API: {fields, confidence_map, engine=PADDLE}
+    else confidence < 85%
+        OCR->>Celery: Queue glm_ocr_jobs {image, doc_type}
+        Celery->>OCR: GLM-OCR fallback (10-30s)
+        OCR-->>API: {fields, confidence_map, engine=GLM}
+    end
+    API->>PG: UPDATE document (ocr_raw_json, confidence_per_field)
+    API-->>PWA: OCR result + confidence badges ()
+
+    Marie->>PWA: Confirme/corrige champs OCR
+    PWA->>API: POST /kyc/ocr/confirm {session_id, corrected_fields}
+    API->>PG: INSERT ocr_fields (human_corrected si correction)
+    API-->>PWA: 200 OK
+
+    Note over Marie,PWA: Phase liveness
+
+    Marie->>PWA: Démarre liveness
+    PWA->>PWA: MediaPipe WASM: 478 landmarks en temps réel
+    PWA->>PWA: Calcul Yaw angle, EAR, présence visage
+    PWA->>API: POST /kyc/liveness {session_id, landmarks_data}
+    API->>BIO: MiniFASNet liveness check + DeepFace face match
+    BIO->>BIO: Score liveness (anti-spoofing)
+    BIO->>BIO: Score face match (selfie vs CNI photo)
+    API->>PG: INSERT biometric_results (scores, model_version)
+    alt liveness OK (score ≥ seuil)
+        API-->>PWA: {liveness: PASS, face_match_score: 0.92}
+    else échec (strike++)
+        API->>PG: UPDATE kyc_session (liveness_strike_count++)
+        alt strike_count < 3
+            API-->>PWA: {liveness: FAIL, strikes_remaining: N}
+        else strike_count = 3
+            API->>PG: UPDATE kyc_session (status=LOCKED_LIVENESS)
+            API->>Redis: Purge session token
+            API-->>PWA: {liveness: LOCKED}
+            PWA->>PWA: Affiche message lockout (FR19)\nAttend clic "Recommencer"
+        end
+    end
+
+    Note over Marie,PWA: Adresse, NIU, Consentement
+
+    Marie->>PWA: Upload facture ENEO/CAMWATER
+    PWA->>API: POST /kyc/capture/bill {session_id, image}
+    API->>FS: Stocke image facture
+    API->>Celery: Queue glm_ocr_jobs (factures = GLM-OCR direct)
+    Celery-->>API: {agence_utilitaire, date, adresse_extraite}
+    API->>PG: UPDATE kyc_session (agency_id basé agence utilitaire)
+    API-->>PWA: OCR résultat facture
+
+    Marie->>PWA: Accepte 3 checkboxes CGU + Privacy + DataProcessing
+    Marie->>PWA: Signature digitale
+    PWA->>API: POST /kyc/submit {session_id, consent_record}
+    API->>PG: INSERT consent_records
+    API->>PG: UPDATE kyc_session (status=PENDING_KYC)
+    API->>PG: INSERT analytics_events (event=KYC_Submitted, timestamp, step_durations)
+    API->>Celery: Task: check_duplicates + aml_screening
+    API-->>PWA: 200 {message: "Dossier soumis, notification < 2h"}
+    PWA->>PWA: Affiche écran célébration (E03)
+```
+
+---
+
+### SEQ-02 : Validation Jean (Evidence-First)
+
+```mermaid
+sequenceDiagram
+    actor Jean
+    participant BO as Back-Office SPA
+    participant API as FastAPI
+    participant PG as PostgreSQL
+    participant FS as Filesystem
+    participant Audit as Audit Service
+
+    Jean->>BO: Login Email/Password
+    BO->>API: POST /auth/login {email, password}
+    API->>PG: Vérifie bcrypt hash
+    API-->>BO: JWT (role=JEAN, agency_id)
+
+    Jean->>BO: Ouvre queue dossiers
+    BO->>API: GET /backoffice/dossiers?status=PENDING_KYC&agent_id=me
+    API->>PG: SELECT dossiers assignés + confidence_score_global + SLA_remaining
+    API-->>BO: Liste triée (FIFO + priority + confidence)
+
+    Jean->>BO: Sélectionne dossier Marie
+    BO->>API: GET /backoffice/dossiers/{id}
+    API->>PG: SELECT session + documents + ocr_fields + biometric_results
+    API->>FS: Génère URLs signées images haute-res
+    API->>Audit: LOG {agent_id, action=DOSSIER_OPENED, record_id, ip}
+    API-->>BO: Dossier complet (images URLs + OCR data + scores)
+
+    BO->>BO: Affiche Side-by-Side:\nCNI Recto/Verso haute-res | Données OCR\nSelfie | Photo CNI | Face match score
+    BO->>BO: Affiche confidence badges 
+
+    alt Jean détecte erreur OCR
+        Jean->>BO: Corrige champ (inline edit)
+        BO->>API: POST /backoffice/dossiers/{id}/override-ocr {field, corrected_value, justification}
+        API->>PG: UPDATE ocr_fields (corrected_value, human_corrected=true, corrected_by=jean_id)
+        API->>Audit: LOG {action=OCR_CORRECTED, old_value, new_value, justification, ip}
+        API-->>BO: 200 OK
+    end
+
+    Jean->>BO: Clique Approuver
+    BO->>API: POST /backoffice/dossiers/{id}/approve {niu_status}
+    API->>PG: UPDATE kyc_session (status=READY_FOR_OPS)
+    API->>PG: INSERT validation_decisions (decision=APPROVE, agent_id, timestamp)
+    API->>Audit: LOG {action=DOSSIER_APPROVED, agent_id, ip, sha256_state}
+    API->>PG: INSERT analytics_events (event=Agent_Approved, validation_duration_ms)
+    API->>PG: INSERT notifications (user_id=marie, type=DOSSIER_APPROVED)
+    API-->>BO: 200 OK
+```
+
+---
+
+### SEQ-03 : Screening AML Thomas
+
+```mermaid
+sequenceDiagram
+    actor Thomas
+    participant BO as Back-Office SPA
+    participant API as FastAPI
+    participant PG as PostgreSQL
+    participant Audit as Audit Service
+    participant Celery
+    participant Amplitude as Sopra Amplitude
+
+    Note over PG,Celery: [Tâche auto-déclenchée à soumission dossier]
+    Celery->>PG: Fuzzy search nom+DDN dans pep_sanctions
+    alt Match trouvé (score ≥ seuil)
+        Celery->>PG: INSERT aml_alerts (session_id, match_score, status=OPEN)
+        Celery->>PG: UPDATE kyc_session (status=COMPLIANCE_REVIEW)
+        Celery->>PG: INSERT notifications (user_id=thomas, type=AML_ALERT)
+    end
+
+    Thomas->>BO: Ouvre dashboard AML
+    BO->>API: GET /aml/alerts?status=OPEN
+    API->>PG: SELECT alertes actives
+    API-->>BO: Liste alertes PEP/Sanctions
+
+    Thomas->>BO: Sélectionne alerte Marie
+    BO->>API: GET /aml/alerts/{id}
+    API->>PG: SELECT alert + profil client + détail sanctions match
+    API-->>BO: Side-by-side: profil client | entrée liste sanctions
+
+    alt Thomas = Faux Positif (homonymat)
+        Thomas->>BO: Saisit justification + Clique "Effacer alerte"
+        BO->>API: POST /aml/alerts/{id}/clear {justification}
+        API->>PG: UPDATE aml_alert (status=CLEARED, justification, cleared_by=thomas)
+        API->>PG: UPDATE kyc_session (status=PENDING_KYC)
+        API->>Audit: LOG {action=AML_CLEARED, justification, ip}
+        API-->>BO: 200 OK
+    else Thomas = Match confirmé
+        Thomas->>BO: Clique "Confirmer match"
+        BO->>API: POST /aml/alerts/{id}/confirm {justification}
+        API->>PG: UPDATE kyc_session (status=REJECTED)
+        API->>Audit: LOG {action=AML_CONFIRMED_FRAUD}
+        API-->>BO: 200 OK
+    end
+
+    Note over Thomas,Amplitude: [Provisioning Amplitude — après tous feux verts]
+    Thomas->>BO: Lance batch provisioning
+    BO->>API: POST /admin/batch/create {dossier_ids}
+    API->>PG: INSERT amplitude_batches (status=PENDING)
+    API->>Celery: Task: amplitude_batch_worker {batch_id}
+    Celery->>Amplitude: HTTPS Webservice: créer comptes
+    alt Succès
+        Amplitude-->>Celery: 200 account_created
+        Celery->>PG: UPDATE batch_items (status=SUCCESS)
+        Celery->>PG: UPDATE kyc_session (status=ACTIVATED)
+        Celery->>PG: INSERT notifications (user_id=marie, type=ACCOUNT_ACTIVATED)
+    else Erreur technique
+        Amplitude-->>Celery: 4xx/5xx erreur
+        Celery->>PG: UPDATE batch_items (status=OPS_ERROR, error_detail)
+    end
+```
+
+---
+
+### SEQ-04 : Dashboard Sylvie (30-Second Scan)
+
+```mermaid
+sequenceDiagram
+    actor Sylvie
+    participant BO as Back-Office SPA
+    participant API as FastAPI
+    participant PG as PostgreSQL
+
+    Sylvie->>BO: Ouvre Command Center
+    BO->>API: GET /analytics/health
+    API->>PG: Agrège métriques temps réel
+    Note right of API: queue_depth, avg_validation_time\nsla_violations, system_uptime\nocr_accuracy_trend, active_agents
+    API-->>BO: {status: GREEN/YELLOW/RED, metrics}
+
+    BO->>API: GET /analytics/funnel?period=today
+    API->>PG: Query fact_analytics_events GROUP BY step
+    API-->>BO: {steps: [{name, entered, completed, drop_off_rate}]}
+
+    BO->>BO: Affiche dashboard R/Y/G\n+ Funnel graph\n+ Big Numbers
+
+    alt SLA violation détectée (dossier > 2h)
+        BO->>BO: Badge  sur dossier concerné
+        Sylvie->>BO: Clique "Escalader"
+        BO->>API: POST /analytics/escalate/{dossier_id}
+        API->>PG: UPDATE kyc_session (priority=HIGH, escalated_at=NOW())
+        API->>PG: INSERT notifications (agent_id=jean, type=ESCALATION, timer_minutes=30)
+        API-->>BO: 200 OK
+    end
+
+    alt Queue Jean > 10 dossiers
+        Sylvie->>BO: Clique "Redistribuer charge"
+        BO->>API: POST /analytics/redistribute
+        API->>PG: SELECT agents disponibles (load-balancing WRR)
+        API->>PG: UPDATE dossier_assignments (nouvelle répartition)
+        API-->>BO: {redistributed_count: N}
+    end
+```
+
+---
+
+### SEQ-05 : Résumption Session (Scénario ENEO Blackout)
+
+```mermaid
+sequenceDiagram
+    actor Marie
+    participant PWA
+    participant SW as Service Worker
+    participant IDB as IndexedDB
+    participant API as FastAPI
+    participant PG as PostgreSQL
+
+    Note over Marie,PG: [Coupure réseau en plein upload CNI Verso]
+
+    Marie->>PWA: Était à l'étape CNI Verso
+    PWA->>SW: Détecte perte réseau
+    SW->>IDB: Sauvegarde état session {session_id, step=CNI_VERSO, metadata}
+    SW->>IDB: Sauvegarde image capturée (temporaire, chiffrée)
+    PWA->>PWA: Affiche: "Connexion perdue. Votre progression est sauvegardée."
+
+    Note over Marie,API: [20 minutes plus tard - réseau rétabli]
+
+    Marie->>PWA: Rouvre l'app
+    PWA->>SW: Service Worker intercepte
+    SW->>IDB: Récupère session locale {session_id, step, images}
+    PWA->>API: GET /kyc/session/{session_id} [avec JWT existant]
+    API->>PG: SELECT kyc_session (status, last_step_completed)
+    API-->>PWA: {status: DRAFT, last_step: CNI_RECTO_DONE}
+
+    PWA->>PWA: Affiche: "Reprise à l'étape CNI Verso...  Nous avons sauvegardé votre progression."
+    Note over PWA: Résumption < 2s (NFR8) 
+
+    Marie->>PWA: Continue - Upload CNI Verso depuis cache local
+    PWA->>API: POST /kyc/capture/cni {session_id, side=VERSO, image} [depuis IDB]
+    API-->>PWA: 200 + sha256 confirmation
+    SW->>IDB: Purge image locale (upload confirmé)
+```
+
+---
+
+## 7. Modèle de Données (ERD)
+
+### 7.1 Modèle Conceptuel (CDM)
+
+```mermaid
+erDiagram
+    USER ||--o{ KYC_SESSION : "initie"
+    USER ||--o{ NOTIFICATION : "reçoit"
+    USER ||--o{ OTP_SESSION : "s'authentifie via"
+
+    KYC_SESSION ||--|{ DOCUMENT : "contient"
+    KYC_SESSION ||--o| BIOMETRIC_RESULT : "produit"
+    KYC_SESSION ||--o{ AML_ALERT : "génère"
+    KYC_SESSION ||--o{ DUPLICATE_CHECK : "déclenche"
+    KYC_SESSION ||--o| CONSENT_RECORD : "finalise par"
+    KYC_SESSION ||--o| DOSSIER_ASSIGNMENT : "assigné à"
+    KYC_SESSION ||--o{ VALIDATION_DECISION : "reçoit"
+    KYC_SESSION ||--o{ AMPLITUDE_BATCH_ITEM : "provisionné dans"
+
+    DOCUMENT ||--|{ OCR_FIELD : "extrait en"
+
+    AGENT ||--o{ DOSSIER_ASSIGNMENT : "traite"
+    AGENT ||--o{ VALIDATION_DECISION : "émet"
+    AGENT }|--|| AGENCY : "appartient à"
+
+    AMPLITUDE_BATCH ||--|{ AMPLITUDE_BATCH_ITEM : "contient"
+
+    PEP_SANCTIONS ||--o{ AML_ALERT : "déclenche"
+
+    AUDIT_LOG }|--|| USER : "tracé par"
+```
+
+---
+
+### 7.2 Modèle Logique (LDM) — Tables OLTP
+
+```mermaid
+erDiagram
+    users {
+        UUID id PK
+        VARCHAR(20) phone UK
+        VARCHAR(255) email UK
+        VARCHAR(255) pin_hash
+        BOOLEAN biometric_opt_in
+        VARCHAR(10) language
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    kyc_sessions {
+        UUID id PK
+        UUID user_id FK
+        UUID agency_id FK
+        TEXT status
+        TEXT access_level
+        TEXT niu_type
+        DECIMAL confidence_score_global
+        INT liveness_strike_count
+        BOOLEAN priority_flag
+        TIMESTAMPTZ escalated_at
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ submitted_at
+        TIMESTAMPTZ completed_at
+        TEXT last_step_completed
+        INET submission_ip
+    }
+
+    documents {
+        UUID id PK
+        UUID session_id FK
+        TEXT doc_type
+        TEXT file_path
+        TEXT sha256_hash
+        TEXT ocr_engine
+        JSONB ocr_raw_json
+        JSONB confidence_per_field
+        JSONB capture_quality_metrics
+        TIMESTAMPTZ captured_at
+        INT file_size_bytes
+    }
+
+    ocr_fields {
+        UUID id PK
+        UUID document_id FK
+        TEXT field_name
+        TEXT extracted_value
+        DECIMAL confidence_score
+        BOOLEAN human_corrected
+        TEXT corrected_value
+        UUID corrected_by_agent_id FK
+        TIMESTAMPTZ corrected_at
+    }
+
+    biometric_results {
+        UUID id PK
+        UUID session_id FK
+        DECIMAL face_match_score
+        DECIMAL liveness_score
+        DECIMAL anti_spoofing_score
+        TEXT model_version_face
+        TEXT model_version_liveness
+        TIMESTAMPTZ processed_at
+    }
+
+    agents {
+        UUID id PK
+        UUID agency_id FK
+        VARCHAR(100) name
+        VARCHAR(255) email UK
+        TEXT password_hash
+        TEXT role
+        INT static_weight
+        INT current_weight
+        BOOLEAN is_available
+        INT active_dossier_count
+        TIMESTAMPTZ last_activity_at
+    }
+
+    agencies {
+        UUID id PK
+        VARCHAR(100) name
+        VARCHAR(100) city
+        VARCHAR(100) region
+        VARCHAR(100) commune
+        VARCHAR(100) quartier
+        BOOLEAN is_active
+        TIMESTAMPTZ created_at
+    }
+
+    dossier_assignments {
+        UUID id PK
+        UUID session_id FK
+        UUID agent_id FK
+        TIMESTAMPTZ assigned_at
+        TIMESTAMPTZ completed_at
+        BOOLEAN is_current
+    }
+
+    validation_decisions {
+        UUID id PK
+        UUID session_id FK
+        UUID agent_id FK
+        TEXT decision
+        TEXT reason
+        INET agent_ip
+        TIMESTAMPTZ decided_at
+    }
+
+    aml_alerts {
+        UUID id PK
+        UUID session_id FK
+        UUID pep_sanctions_id FK
+        TEXT alert_type
+        DECIMAL match_score
+        TEXT status
+        UUID cleared_by FK
+        TEXT justification
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ resolved_at
+    }
+
+    pep_sanctions {
+        UUID id PK
+        TEXT source
+        TEXT entity_type
+        TEXT full_name
+        TEXT[] aliases
+        DATE date_of_birth
+        TEXT nationality
+        TEXT[] programs
+        BOOLEAN is_active
+        DATE last_synced_at
+    }
+
+    duplicate_checks {
+        UUID id PK
+        UUID session_id_new FK
+        UUID session_id_existing FK
+        TEXT match_type
+        TEXT resolution
+        UUID resolved_by FK
+        TIMESTAMPTZ resolved_at
+    }
+
+    consent_records {
+        UUID id PK
+        UUID session_id FK
+        BOOLEAN cgu_accepted
+        BOOLEAN privacy_accepted
+        BOOLEAN data_processing_accepted
+        TEXT digital_signature_path
+        TIMESTAMPTZ signed_at
+        INET client_ip
+    }
+
+    otp_sessions {
+        UUID id PK
+        VARCHAR(20) phone
+        VARCHAR(255) email
+        TEXT code_hash
+        TIMESTAMPTZ expires_at
+        INT attempts
+        BOOLEAN is_used
+        INET request_ip
+    }
+
+    amplitude_batches {
+        UUID id PK
+        UUID created_by FK
+        TIMESTAMPTZ created_at
+        TEXT status
+        TEXT error_type
+        TEXT error_detail
+        INT retry_count
+    }
+
+    amplitude_batch_items {
+        UUID id PK
+        UUID batch_id FK
+        UUID session_id FK
+        TEXT status
+        JSONB amplitude_response
+        TIMESTAMPTZ processed_at
+    }
+
+    notifications {
+        UUID id PK
+        UUID user_id FK
+        TEXT type
+        TEXT message
+        JSONB payload
+        BOOLEAN is_read
+        TIMESTAMPTZ sent_at
+        TIMESTAMPTZ read_at
+    }
+
+    audit_log {
+        BIGSERIAL id PK
+        TEXT table_name
+        TEXT record_id
+        TEXT action
+        JSONB old_data
+        JSONB new_data
+        TEXT changed_fields
+        TEXT performed_by
+        TIMESTAMPTZ performed_at
+        INET client_ip
+    }
+
+    users ||--o{ kyc_sessions : "user_id"
+    users ||--o{ notifications : "user_id"
+    users ||--o{ otp_sessions : "phone/email"
+    kyc_sessions ||--|{ documents : "session_id"
+    kyc_sessions ||--o| biometric_results : "session_id"
+    kyc_sessions ||--o{ aml_alerts : "session_id"
+    kyc_sessions ||--o{ duplicate_checks : "session_id_new"
+    kyc_sessions ||--o| consent_records : "session_id"
+    kyc_sessions ||--o{ dossier_assignments : "session_id"
+    kyc_sessions ||--o{ validation_decisions : "session_id"
+    kyc_sessions ||--o{ amplitude_batch_items : "session_id"
+    documents ||--|{ ocr_fields : "document_id"
+    agents ||--o{ dossier_assignments : "agent_id"
+    agents ||--o{ validation_decisions : "agent_id"
+    agencies ||--o{ agents : "agency_id"
+    agencies ||--o{ kyc_sessions : "agency_id"
+    amplitude_batches ||--|{ amplitude_batch_items : "batch_id"
+    pep_sanctions ||--o{ aml_alerts : "pep_sanctions_id"
+```
+
+---
+
+### 7.3 Data Dictionary (Champs critiques)
+
+| Table           | Champ                     | Type         | Contrainte           | Description                | Exemple                                                                   |
+| --------------- | ------------------------- | ------------ | -------------------- | -------------------------- | ------------------------------------------------------------------------- |
+| `kyc_sessions`  | `status`                  | TEXT         | NOT NULL             | État machine KYC           | `PENDING_KYC`                                                             |
+| `kyc_sessions`  | `access_level`            | TEXT         | DEFAULT 'RESTRICTED' | Niveau accès compte        | `LIMITED_ACCESS`                                                          |
+| `kyc_sessions`  | `niu_type`                | TEXT         | NULL                 | Mode NIU                   | `DECLARATIVE`, `UPLOADED`, `MISSING`                                      |
+| `kyc_sessions`  | `confidence_score_global` | DECIMAL(5,4) | NULL                 | Score global dossier (0-1) | `0.8750`                                                                  |
+| `kyc_sessions`  | `liveness_strike_count`   | INT          | DEFAULT 0            | Nombre échecs liveness     | `2`                                                                       |
+| `documents`     | `doc_type`                | TEXT         | NOT NULL             | Type document              | `CNI_RECTO`, `CNI_VERSO`, `BILL_ENEO`, `SELFIE`, `NIU`                    |
+| `documents`     | `ocr_engine`              | TEXT         | NULL                 | Moteur OCR utilisé         | `PADDLE`, `GLM`, `PADDLE_THEN_GLM`                                        |
+| `documents`     | `capture_quality_metrics` | JSONB        | NULL                 | Métriques qualité capture  | `{"laplacian": 145, "luminance_std": 0.32}`                               |
+| `ocr_fields`    | `confidence_score`        | DECIMAL(5,4) | NOT NULL             | Confiance extraction       | `0.9200` ( ≥0.85)                                                        |
+| `agents`        | `role`                    | TEXT         | NOT NULL             | Rôle agent back-office     | `JEAN`, `THOMAS`, `SYLVIE`                                                |
+| `agents`        | `static_weight`           | INT          | DEFAULT 1            | Poids WRR statique         | `2` (agent senior)                                                        |
+| `aml_alerts`    | `alert_type`              | TEXT         | NOT NULL             | Type alerte                | `PEP`, `SANCTIONS_UN`, `SANCTIONS_EU`, `SANCTIONS_OFAC`                   |
+| `aml_alerts`    | `status`                  | TEXT         | DEFAULT 'OPEN'       | État alerte                | `OPEN`, `CLEARED`, `CONFIRMED`, `ESCALATED`                               |
+| `pep_sanctions` | `entity_type`             | TEXT         | NOT NULL             | Type entité                | `INDIVIDUAL`, `ENTITY`                                                    |
+| `audit_log`     | `action`                  | TEXT         | NOT NULL             | Type action                | `INSERT`, `UPDATE`, `DELETE`, `VIEW`, `OCR_CORRECTED`, `DOSSIER_APPROVED` |
+| `audit_log`     | `old_data`                | JSONB        | NULL                 | État avant modification    | `{"status": "PENDING_KYC"}`                                               |
+
+---
+
+### 7.4 Star Schema Analytics (DWH)
+
+```mermaid
+erDiagram
+    fact_kyc_sessions {
+        UUID session_id PK
+        UUID user_dim_id FK
+        UUID agency_dim_id FK
+        UUID time_dim_id FK
+        TEXT final_status
+        INT total_duration_seconds
+        INT cni_capture_duration_s
+        INT liveness_duration_s
+        INT ocr_processing_duration_s
+        INT validation_duration_s
+        INT liveness_strikes
+        DECIMAL ocr_confidence_avg
+        DECIMAL face_match_score
+        TEXT niu_type
+        TEXT ocr_engine_used
+        BOOLEAN human_correction_needed
+        TEXT dropout_step
+    }
+
+    fact_analytics_events {
+        BIGSERIAL id PK
+        UUID session_id FK
+        UUID user_dim_id FK
+        UUID time_dim_id FK
+        TEXT event_name
+        TEXT step_name
+        INT duration_ms
+        TEXT device_info
+        TEXT error_code
+        JSONB extra_props
+    }
+
+    fact_validation_actions {
+        UUID id PK
+        UUID session_id FK
+        UUID agent_dim_id FK
+        UUID time_dim_id FK
+        TEXT decision
+        INT validation_duration_seconds
+        BOOLEAN sla_met
+        INT sla_remaining_minutes
+        BOOLEAN ocr_correction_made
+    }
+
+    dim_users {
+        UUID id PK
+        TEXT phone_prefix
+        TEXT city
+        TEXT region
+        TEXT language
+        DATE cohort_month
+    }
+
+    dim_agents {
+        UUID id PK
+        TEXT name
+        TEXT role
+        UUID agency_id FK
+        INT static_weight
+    }
+
+    dim_agencies {
+        UUID id PK
+        TEXT name
+        TEXT city
+        TEXT region
+    }
+
+    dim_time {
+        UUID id PK
+        TIMESTAMPTZ full_timestamp
+        DATE date
+        INT hour
+        INT day_of_week
+        INT week
+        INT month
+        INT year
+    }
+
+    fact_kyc_sessions }|--|| dim_users : "user_dim_id"
+    fact_kyc_sessions }|--|| dim_agencies : "agency_dim_id"
+    fact_kyc_sessions }|--|| dim_time : "time_dim_id"
+    fact_analytics_events }|--|| dim_users : "user_dim_id"
+    fact_analytics_events }|--|| dim_time : "time_dim_id"
+    fact_validation_actions }|--|| dim_agents : "agent_dim_id"
+    fact_validation_actions }|--|| dim_time : "time_dim_id"
+    dim_agents }|--|| dim_agencies : "agency_id"
+```
+
+---
+
+## 8. API Contract (FastAPI)
+
+### 8.1 Auth
+
+| Méthode | Endpoint                 | Body                        | Réponse                      | Description                     |
+| ------- | ------------------------ | --------------------------- | ---------------------------- | ------------------------------- |
+| POST    | `/auth/otp/send`         | `{phone?, email?, channel}` | `{expires_in: 300}`          | Envoi OTP (SMS Orange ou Email) |
+| POST    | `/auth/otp/verify`       | `{phone?, email?, code}`    | `{access_token, session_id}` | Vérifie OTP, crée session JWT   |
+| POST    | `/auth/pin/setup`        | `{session_id, pin_hash}`    | `{success}`                  | Setup PIN 6 chiffres            |
+| POST    | `/auth/pin/verify`       | `{user_id, pin_hash}`       | `{access_token}`             | Login récurrent par PIN         |
+| POST    | `/auth/backoffice/login` | `{email, password}`         | `{access_token, role}`       | Login agents back-office        |
+| POST    | `/auth/refresh`          | `{}`                        | `{access_token}`             | Refresh JWT                     |
+| POST    | `/auth/logout`           | `{}`                        | `{success}`                  | Invalide token                  |
+
+### 8.2 KYC — Marie
+
+| Méthode | Endpoint             | Body                                                             | Réponse                                                | Description                        |
+| ------- | -------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- |
+| POST    | `/kyc/session/start` | `{user_id}`                                                      | `{session_id, status}`                                 | Crée session KYC                   |
+| GET     | `/kyc/session/{id}`  | —                                                                | `{session, last_step, status}`                         | Récupère état session (résumption) |
+| POST    | `/kyc/capture/cni`   | `{session_id, side, image_b64}`                                  | `{ocr_fields, confidence_map, doc_id}`                 | Upload + OCR CNI                   |
+| POST    | `/kyc/capture/bill`  | `{session_id, bill_type, image_b64}`                             | `{agency_name, date, address, doc_id}`                 | Upload + GLM-OCR facture           |
+| POST    | `/kyc/capture/niu`   | `{session_id, mode, value/image_b64}`                            | `{niu_status, access_impact}`                          | Upload ou déclaration NIU          |
+| POST    | `/kyc/liveness`      | `{session_id, landmarks_json}`                                   | `{liveness_pass, face_match_score, strikes_remaining}` | Check liveness + face match        |
+| POST    | `/kyc/ocr/confirm`   | `{session_id, doc_id, fields}`                                   | `{success}`                                            | Confirme/corrige extraction OCR    |
+| POST    | `/kyc/address`       | `{session_id, region, ville, commune, quartier, lieu_dit, gps?}` | `{success}`                                            | Sauvegarde adresse                 |
+| POST    | `/kyc/submit`        | `{session_id, consent_record}`                                   | `{message, estimated_delay}`                           | Soumission finale dossier          |
+
+### 8.3 Back-Office — Jean
+
+| Méthode | Endpoint                                 | Description                                          |
+| ------- | ---------------------------------------- | ---------------------------------------------------- |
+| GET     | `/backoffice/dossiers`                   | Queue dossiers (filtres: status, priority, agent_id) |
+| GET     | `/backoffice/dossiers/{id}`              | Détail complet + images signed URLs                  |
+| POST    | `/backoffice/dossiers/{id}/approve`      | Approuve dossier (Jean)                              |
+| POST    | `/backoffice/dossiers/{id}/reject`       | Rejette avec motif (Jean)                            |
+| POST    | `/backoffice/dossiers/{id}/request-info` | Demande doc supplémentaire → notification Marie      |
+| POST    | `/backoffice/dossiers/{id}/override-ocr` | Correction manuelle champ OCR + justification        |
+
+### 8.4 AML — Thomas
+
+| Méthode | Endpoint                     | Description                                     |
+| ------- | ---------------------------- | ----------------------------------------------- |
+| GET     | `/aml/alerts`                | Liste alertes PEP/Sanctions actives             |
+| GET     | `/aml/alerts/{id}`           | Détail alerte (profil vs liste sanctions)       |
+| POST    | `/aml/alerts/{id}/clear`     | Efface faux positif + justification obligatoire |
+| POST    | `/aml/alerts/{id}/confirm`   | Confirme match → gel compte                     |
+| POST    | `/aml/alerts/{id}/escalate`  | Escalade pour revue supérieure                  |
+| GET     | `/aml/conflicts`             | File déduplication (doublons détectés)          |
+| POST    | `/aml/conflicts/{id}/merge`  | Fusionne profils (B1: même personne)            |
+| POST    | `/aml/conflicts/{id}/reject` | Flagge fraude (B2: noms différents)             |
+
+### 8.5 Admin — Thomas & Agencies
+
+| Méthode | Endpoint                  | Description               |
+| ------- | ------------------------- | ------------------------- |
+| GET     | `/admin/agencies`         | Liste agences             |
+| POST    | `/admin/agencies`         | Crée agence               |
+| PUT     | `/admin/agencies/{id}`    | Modifie agence            |
+| DELETE  | `/admin/agencies/{id}`    | Désactive agence          |
+| GET     | `/admin/batch`            | Statuts batches Amplitude |
+| POST    | `/admin/batch/create`     | Lance batch provisioning  |
+| POST    | `/admin/batch/{id}/retry` | Relance batch en erreur   |
+
+### 8.6 Analytics — Sylvie
+
+| Méthode | Endpoint                           | Description                                              |
+| ------- | ---------------------------------- | -------------------------------------------------------- |
+| GET     | `/analytics/health`                | Santé système R/Y/G (queue, SLA, uptime, OCR accuracy)   |
+| GET     | `/analytics/funnel`                | Funnel drop-off par étape (paramètre: period)            |
+| GET     | `/analytics/sla`                   | Dashboard SLA agents (violations, moyennes)              |
+| GET     | `/analytics/agents`                | Charge agents (WRR current weights, active counts)       |
+| POST    | `/analytics/escalate/{dossier_id}` | Escalade Sylvie → flag HIGH_PRIORITY + notif Jean        |
+| POST    | `/analytics/redistribute`          | Redistribue dossiers par load balancing WRR              |
+| GET     | `/analytics/ocr-quality`           | Métriques OCR (confidence distribution, engine accuracy) |
+| POST    | `/audit/export/{session_id}`       | Export pack COBAC (PDF + JSON + images)                  |
+
+### 8.7 Notifications — Marie
+
+| Méthode | Endpoint                           | Description                                |
+| ------- | ---------------------------------- | ------------------------------------------ |
+| GET     | `/notifications?since={timestamp}` | Polling — retourne nouvelles notifications |
+| POST    | `/notifications/{id}/read`         | Marque notification lue                    |
+
+---
+
+## 9. Infrastructure Docker Compose
+
+```yaml
+# docker-compose.yml — bicec-veripass MVP
+# WSL2 RAM cap: 8GB via .wslconfig
+
+version: '3.8'
+
+networks:
+  veripass-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  documents_storage:  # Images CNI, selfies, factures — 10 ans COBAC
+  nginx_certs:
+
+services:
+
+  #  REVERSE PROXY 
+  nginx:
+    image: nginx:alpine
+    container_name: vp_nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_certs:/etc/ssl/certs
+    depends_on:
+      - api
+      - pwa
+      - backoffice
+    networks:
+      - veripass-net
+    restart: unless-stopped
+
+  #  PWA MARIE 
+  pwa:
+    build:
+      context: ./frontend/pwa
+      dockerfile: Dockerfile
+    container_name: vp_pwa
+    environment:
+      - VITE_API_URL=https://localhost/api
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    # RAM: ~128MB (nginx serve static)
+
+  #  BACK-OFFICE SPA 
+  backoffice:
+    build:
+      context: ./frontend/backoffice
+      dockerfile: Dockerfile
+    container_name: vp_backoffice
+    environment:
+      - VITE_API_URL=https://localhost/api
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    # RAM: ~128MB
+
+  #  FASTAPI BACKEND 
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_api
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_PATH=/data/documents
+      - JWT_SECRET=${JWT_SECRET}
+      - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
+      - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
+      - OCR_CONFIDENCE_THRESHOLD=0.85
+    volumes:
+      - documents_storage:/data/documents
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 3g       # PaddleOCR (2GB) + FastAPI workers (512MB) + marge
+    # GLM-OCR via worker Celery séparé
+
+  #  CELERY WORKERS 
+  celery_ocr:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_celery_ocr
+    command: celery -A app.celery worker -Q glm_ocr_jobs --concurrency=1 -n ocr_worker@%h
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_PATH=/data/documents
+    volumes:
+      - documents_storage:/data/documents
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 4g       # GLM-OCR 0.9B quantifié: 2.5-3.5GB RAM
+    # Séquentiel obligatoire (concurrency=1)
+
+  celery_notifications:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_celery_notif
+    command: celery -A app.celery worker -Q notifications,amplitude_batch,sanctions_sync --concurrency=2 -n notif_worker@%h
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
+      - REDIS_URL=redis://redis:6379/0
+      - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
+      - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 512m
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_celery_beat
+    command: celery -A app.celery beat --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 128m
+    # Crons: sync PEP/Sanctions (hebdo), backup DB (quotidien), prune disk (si >85%)
+
+  #  POSTGRESQL 
+  postgres:
+    image: postgres:16-alpine
+    container_name: vp_postgres
+    environment:
+      - POSTGRES_DB=veripass
+      - POSTGRES_USER=vp_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 512m
+
+  #  REDIS 
+  redis:
+    image: redis:7-alpine
+    container_name: vp_redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 256m
+```
+
+---
+
+## 10. Budget RAM & Profil Hardware
+
+### 10.1 Allocation RAM (WSL2 — 8GB cap)
+
+| Service                       | RAM Allouée  | Notes                               |
+| ----------------------------- | ------------ | ----------------------------------- |
+| `nginx`                       | ~64MB        | Minimal                             |
+| `pwa` + `backoffice`          | ~256MB       | Static files                        |
+| `api` (FastAPI + PaddleOCR)   | 3GB (cap)    | PaddleOCR ONNX ~2GB, workers ~512MB |
+| `celery_ocr` (GLM-OCR)        | 4GB (cap)    | GLM-OCR 0.9B quantifié ~2.5-3.5GB   |
+| `celery_notifications`        | ~512MB       | Léger                               |
+| `celery_beat`                 | ~128MB       | Scheduler uniquement                |
+| `postgres`                    | ~512MB       |                                     |
+| `redis`                       | ~256MB       |                                     |
+| **TOTAL sans GLM actif**      | **~4.8GB**  |                                     |
+| **TOTAL GLM actif simultané** | **~8.8GB**  | Acceptable si séquentiel (GLM seul) |
+
+**Règle critique : PaddleOCR et GLM-OCR ne s'exécutent JAMAIS simultanément.**
+- `api` traite PaddleOCR synchrone
+- `celery_ocr` traite GLM-OCR en file d'attente (Celery queue), concurrence=1
+
+### 10.2 Politique Disk (200GB)
+
+| Partition                        | Taille allouée | Contenu                                            |
+| -------------------------------- | -------------- | -------------------------------------------------- |
+| Modèles AI (PaddleOCR + GLM-OCR) | ~5GB           | ONNX models                                        |
+| Documents KYC (filesystem)       | ~50GB          | Images CNI, selfies, factures — pilote 20-50 users |
+| PostgreSQL data                  | ~10GB          | OLTP + DWH                                         |
+| Docker images/layers             | ~15GB          | Builds                                             |
+| Logs                             | ~5GB           | JSON logs                                          |
+| Buffer libre                     | ~115GB         | Marge sécurité                                     |
+
+**Prune automatique :** Si disk >85% (170GB) → `docker system prune -f` + backup DB quotidien avant pruning.
+
+---
+
+## 11. Sécurité Architecture
+
+### 11.1 Couches de Défense (Defense in Depth)
+
+```
+Internet / Client
+    ↓ TLS 1.3 (Nginx)
+Nginx (Rate limiting, CSP headers, HTTPS forced)
+    ↓ HTTP interne (réseau Docker isolé)
+FastAPI (JWT auth, RBAC, parameterized queries, Pydantic validation)
+    ↓ SQLAlchemy parameterized
+PostgreSQL (roles least-privilege, audit_log append-only)
+    ↓ Filesystem chiffré (Phase pré-pilote)
+Docker Volume (AES-256 LUKS — activé en Phase finale)
+```
+
+### 11.2 Matrice RBAC
+
+| Permission               | Marie | Jean | Thomas | Sylvie |
+| ------------------------ | ----- | ---- | ------ | ------ |
+| Onboarding KYC           |   ✅   |  ❌   |   ❌    |   ❌    |
+| Voir ses notifications   |   ✅   |  ❌   |   ❌    |   ❌    |
+| Queue dossiers (agence)  |   ❌   |  ✅   |   ❌    |   ❌    |
+| Inspect + approve/reject |   ❌   |  ✅   |   ❌    |   ❌    |
+| Override OCR             |   ❌   |  ✅   |   ❌    |   ❌    |
+| AML screening            |   ❌   |  ❌   |   ✅    |   ❌    |
+| Agency CRUD              |   ❌   |  ❌   |   ✅    |   ❌    |
+| Batch Amplitude          |   ❌   |  ❌   |   ✅    |   ❌    |
+| Dashboard analytics      |   ❌   |  ❌   |   ❌    |   ✅    |
+| Escalade + redistribute  |   ❌   |  ❌   |   ❌    |   ✅    |
+| Export COBAC             |   ❌   |  ❌   |   ✅    |   ✅    |
+| Audit log (lecture)      |   ❌   |  ❌   |   ✅    |   ✅    |
+
+### 11.3 Audit Log — Implémentation PostgreSQL
+
+```sql
+-- Table append-only, partitionnée par mois
+CREATE TABLE audit_log (
+    id             BIGSERIAL,
+    table_name     TEXT NOT NULL,
+    record_id      TEXT NOT NULL,
+    action         TEXT NOT NULL, -- INSERT, UPDATE, DELETE, VIEW, OCR_CORRECTED, etc.
+    old_data       JSONB,
+    new_data       JSONB,
+    changed_fields TEXT,
+    performed_by   TEXT NOT NULL,
+    performed_at   TIMESTAMPTZ DEFAULT NOW(),
+    client_ip      INET
+) PARTITION BY RANGE (performed_at);
+
+-- Révocation des droits de modification (append-only)
+REVOKE UPDATE, DELETE ON audit_log FROM vp_user;
+REVOKE UPDATE, DELETE ON audit_log FROM vp_admin;
+
+-- Trigger générique sur tables critiques (kyc_sessions, documents, aml_alerts)
+CREATE OR REPLACE FUNCTION audit_trigger_fn() RETURNS trigger AS $$
+BEGIN
+    INSERT INTO audit_log (table_name, record_id, action, old_data, new_data, performed_by, client_ip)
+    VALUES (
+        TG_TABLE_NAME,
+        COALESCE(NEW.id::text, OLD.id::text),
+        TG_OP,
+        row_to_json(OLD)::jsonb,
+        row_to_json(NEW)::jsonb,
+        current_setting('app.current_user', true),
+        inet_client_addr()
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 11.4 OWASP Mobile Top 10 — Mitigations
+
+| Risque OWASP                 | Mitigation bicec-veripass                                          |
+| ---------------------------- | ------------------------------------------------------------------ |
+| M1 Broken Auth               | JWT avec expiry court + refresh, rate limit OTP, anti-replay Redis |
+| M2 Insecure Data Storage     | IndexedDB chiffré côté client (Phase finale), volume Docker LUKS   |
+| M3 Insecure Communication    | TLS 1.3 obligatoire, HSTS, aucun HTTP en production                |
+| M4 Insufficient Cryptography | AES-256 au repos, bcrypt/Argon2 passwords, SHA-256 intégrité       |
+| M7 Client Code Quality       | CSP strict, code obfuscation build production, no eval()           |
+| M9 Reverse Engineering       | Build minifié + obfusqué, pas de secrets dans le bundle            |
+| M10 Extraneous Functionality | Pas de debug endpoints en production, env vars séparées            |
+
+---
+
+## 12. Pipeline AI/ML
+
+### 12.1 Pipeline OCR (Détail)
+
+```mermaid
+flowchart TD
+    A[Image reçue\n/kyc/capture/cni ou /bill] --> B{Type document?}
+
+    B -->|CNI Recto/Verso| C[PaddleOCR PP-OCRv5\nCPU ONNX Runtime\n< 1s/image]
+    B -->|Facture ENEO/CAMWATER| D[Queue Celery\nglm_ocr_jobs]
+
+    C --> E{Confidence\npar champ ≥ 85%?}
+    E -->| Tous champs OK| F[Résultat direct\n{fields, confidence_map\nengine: PADDLE}]
+    E -->| Certains champs < 85%| G[Queue Celery\nglm_ocr_jobs]
+
+    G --> H[GLM-OCR 0.9B Quantifié\nCelery Worker Dédié\n10-30s/page\nconcurrence=1]
+    D --> H
+
+    H --> I[Résultat GLM\n{fields, confidence_map\nengine: GLM}]
+
+    F --> J[Métriques qualité\nLaplacian Variance\nLuminance Histogram]
+    I --> J
+
+    J --> K[Stockage PostgreSQL\nocr_fields + confidence_per_field\ncapture_quality_metrics]
+    K --> L[Réponse API\nConfidence badges ]
+```
+
+### 12.2 Pipeline Biométrique
+
+```mermaid
+flowchart TD
+    A[POST /kyc/liveness\n{session_id, landmarks_json}] --> B[MediaPipe WASM\ncôté client PWA]
+
+    B --> B1[478 landmarks 3D\nYaw angle calcul\nEAR blink detection\nQualité frame]
+    B1 -->|Frame valide| C[Envoi landmarks_json\nau backend FastAPI]
+    B1 -->|Frame invalide| B[Retry côté client]
+
+    C --> D[MiniFASNetV2\nSilent Anti-Spoofing\nScore liveness 0-1]
+    C --> E[DeepFace\nFace Match\nSelfie vs CNI Photo\nScore 0-1]
+
+    D --> F{Liveness\nScore ≥ seuil?}
+    E --> G{Face Match\nScore ≥ 0.85?}
+
+    F -->| PASS| H[AND Gate]
+    F -->| FAIL| I[Strike++\nAnti-replay Redis]
+    G -->| PASS| H
+    G -->| FAIL| I
+
+    H --> J[Biometric PASS\nStockage biometric_results]
+    I --> K{strike_count < 3?}
+    K -->|Oui| L[Réponse FAIL\n{strikes_remaining: N}]
+    K -->|Non: strike = 3| M[Status = LOCKED_LIVENESS\nPurge Redis session\nMessage lockout FR]
+```
+
+### 12.3 Agent Load Balancing — Smooth Weighted Round Robin
+
+```
+Algorithme Smooth WRR + Least Connections :
+
+Chaque agent a :
+  - static_weight  : capacité relative (ex: senior=2, junior=1)
+  - current_weight : poids courant (mis à jour à chaque assignment)
+  - active_count   : dossiers en cours
+
+À chaque nouveau dossier entrant :
+  1. Pour chaque agent disponible (is_available=true):
+       current_weight += static_weight
+  2. Sélectionne agent avec MAX(current_weight)
+     → En cas d'égalité: sélectionne MIN(active_count) [Least Connections]
+  3. current_weight[sélectionné] -= SUM(tous static_weights)
+  4. active_count[sélectionné]++
+  5. INSERT dossier_assignments
+
+Exemple (3 agents: Jean-A(w=2), Jean-B(w=1), Jean-C(w=1)):
+  Tour 1: CW=[2,1,1] → Jean-A (CW=[2-4,1,1]=[-2,1,1])
+  Tour 2: CW=[0,2,2] → Jean-B ou Jean-C par Least Connections
+  Tour 3: CW=[2,1,3] → Jean-C
+  Tour 4: CW=[4,2,0] → Jean-A
+  → Sur 4 tours: Jean-A=2, Jean-B=1, Jean-C=1  (ratio 2:1:1)
+```
+
+---
+
+## 13. Stratégie Analytics & Data Warehouse
+
+### 13.1 Events Instrumentés (Funnel Complet)
+
+| Event Name             | Step     | Données capturées                      |
+| ---------------------- | -------- | -------------------------------------- |
+| `App_Opened`           | A01      | device_info, os_version, network_type  |
+| `Language_Selected`    | A02      | language                               |
+| `Phone_OTP_Sent`       | A03      | phone_prefix, channel=SMS              |
+| `Phone_OTP_Verified`   | A03      | duration_ms                            |
+| `Email_Entered`        | A05      | email_domain                           |
+| `Email_OTP_Verified`   | A06      | duration_ms                            |
+| `PIN_Setup_Done`       | A07      | duration_ms                            |
+| `Biometric_OptIn`      | A08      | opted_in (bool)                        |
+| `CNI_Capture_Started`  | B02      | side=RECTO                             |
+| `CNI_Capture_Success`  | B03      | side, attempts, laplacian, luminance   |
+| `CNI_Capture_Failed`   | B03      | side, reason (blur/glare/timeout)      |
+| `OCR_Processing_Done`  | B07      | engine, duration_ms, confidence_avg    |
+| `OCR_Review_Confirmed` | B08      | corrections_made (int)                 |
+| `Liveness_Started`     | B09      |                                        |
+| `Liveness_Attempt`     | B10      | strike_number, score                   |
+| `Liveness_Pass`        | B11      | face_match_score, duration_ms          |
+| `Liveness_Lockout`     | B10_Fail | total_strikes=3                        |
+| `Address_Completed`    | C01      | gps_used (bool)                        |
+| `Bill_Uploaded`        | C04      | bill_type (ENEO/CAMWATER)              |
+| `NIU_Declared`         | C05      | mode (UPLOADED/DECLARATIVE)            |
+| `Consent_Completed`    | D01      | duration_ms                            |
+| `Digital_Signed`       | D02      |                                        |
+| `Dossier_Submitted`    | E02      | total_duration_s, niu_type, ocr_engine |
+| `Session_Resumed`      | —        | resume_step, gap_duration_s            |
+| `Session_Abandoned`    | —        | last_step, time_on_step_s              |
+
+### 13.2 Requêtes Analytics Clés (pour dashboards PFE)
+
+```sql
+-- 1. FUNNEL DROP-OFF par étape
+SELECT 
+    step_name,
+    COUNT(*) as entered,
+    COUNT(*) FILTER (WHERE event_name LIKE '%_Success' OR event_name LIKE '%_Done') as completed,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE event_name LIKE '%_Success') / COUNT(*), 1) as conversion_rate
+FROM fact_analytics_events
+WHERE date >= CURRENT_DATE - INTERVAL '7 days'
+GROUP BY step_name ORDER BY entered DESC;
+
+-- 2. OCR QUALITY OBSERVABILITY
+SELECT 
+    ocr_engine_used,
+    AVG(ocr_confidence_avg) as avg_confidence,
+    COUNT(*) FILTER (WHERE human_correction_needed) as manual_corrections,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE human_correction_needed) / COUNT(*), 1) as correction_rate
+FROM fact_kyc_sessions
+GROUP BY ocr_engine_used;
+
+-- 3. AGENT LOAD BALANCING INTELLIGENCE
+SELECT 
+    a.name,
+    a.agency_id,
+    COUNT(fva.id) as total_validations,
+    AVG(fva.validation_duration_seconds) as avg_duration_s,
+    SUM(CASE WHEN fva.sla_met THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as sla_rate
+FROM fact_validation_actions fva
+JOIN dim_agents a ON fva.agent_dim_id = a.id
+WHERE fva.time_dim_id IN (SELECT id FROM dim_time WHERE date >= CURRENT_DATE - 30)
+GROUP BY a.name, a.agency_id;
+
+-- 4. SLA MONITORING (Sylvie dashboard)
+SELECT
+    COUNT(*) FILTER (WHERE status = 'PENDING_KYC' 
+        AND submitted_at < NOW() - INTERVAL '2 hours') as sla_violations_2h,
+    COUNT(*) FILTER (WHERE status = 'PENDING_KYC') as total_pending,
+    AVG(EXTRACT(EPOCH FROM (completed_at - submitted_at))/3600) as avg_validation_hours
+FROM kyc_sessions
+WHERE submitted_at >= CURRENT_DATE;
+
+-- 5. LIVENESS FAILURE ANALYSIS (OCR/Biometrics Observability)
+SELECT 
+    DATE_TRUNC('hour', performed_at) as hour,
+    COUNT(*) as liveness_attempts,
+    AVG((new_data->>'liveness_score')::decimal) as avg_score,
+    COUNT(*) FILTER (WHERE (new_data->>'liveness_pass')::bool = false) as failures
+FROM audit_log
+WHERE action = 'LIVENESS_ATTEMPT'
+GROUP BY 1 ORDER BY 1 DESC;
+```
+
+### 13.3 Amplitude Python SDK (Thomas — Batch)
+
+```python
+# Événements envoyés à Amplitude lors du provisioning
+from amplitude import Amplitude, BaseEvent
+
+client = Amplitude(api_key=settings.AMPLITUDE_API_KEY)
+
+events = [
+    BaseEvent("KYC_Started",      user_id=session.user_id),
+    BaseEvent("Document_Processed", user_id=session.user_id, 
+              event_properties={"doc_type": "CNI", "ocr_engine": "PADDLE", "confidence": 0.92}),
+    BaseEvent("Liveness_Validated", user_id=session.user_id,
+              event_properties={"face_match_score": 0.88, "liveness_score": 0.95}),
+    BaseEvent("Dossier_Approved",   user_id=session.user_id,
+              event_properties={"validation_duration_h": 1.2, "agent_id": jean.id}),
+]
+client.flush()
+```
+
+---
+
+## 14. Stratégie de Chiffrement (Phased)
+
+### Phase 1 — Dev/Debug (maintenant → mi-MVP)
+-  Pas de chiffrement au repos sur les fichiers images (itération rapide, debug facile)
+-  **TLS 1.3** en transit (Nginx → clients) — **dès le départ**
+-  Passwords bcrypt/Argon2 — **dès le départ**
+-  SHA-256 intégrité documents — **dès le départ**
+-  JWT signé — **dès le départ**
+
+### Phase 2 — Pré-Pilote (mi-MVP → livraison)
+-  Activation chiffrement volume Docker (LUKS ou chiffrement applicatif niveau Python avec Fernet/AES-256 sur les fichiers sensibles avant écriture)
+-  IndexedDB côté PWA : chiffrement applicatif JS (Web Crypto API) pour les images temporaires locales
+-  AES-256 sur biometric_results en base (champ BYTEA si embeddings stockés)
+
+### Justification de l'approche phasée
+Chiffrer dès le départ sur filesystem Docker (LUKS) nécessite une configuration volume spécifique qui peut complexifier les premiers `docker-compose up`. Pour un PFE avec 2 mois de deadline, l'approche "TLS dès le départ + chiffrement au repos en pré-pilote" est un compromis pragmatique documenté explicitement dans les ADRs — ce qui est lui-même une preuve de maturité d'ingénieur.
+
+---
+
+## Légende ERD
+
+| Symbole      | Signification                                 |
+| ------------ | --------------------------------------------- |
+| `PK`         | Primary Key (Clé Primaire)                    |
+| `FK`         | Foreign Key (Clé Étrangère)                   |
+| `UK`         | Unique Key (Contrainte unicité)               |
+| `\|\|--o{`   | Relation 1:N (un à plusieurs)                 |
+| `\|\|--\|\|` | Relation 1:1 (un à un)                        |
+| `}o--\|\|`   | Relation N:1 (plusieurs à un, côté optionnel) |
+
+---
+
+*Document généré le 2026-02-28 | Version 1.0 | bicec-veripass MVP Architecture*
