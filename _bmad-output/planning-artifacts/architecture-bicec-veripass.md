@@ -304,16 +304,16 @@ Pas d'Active Directory pour MVP. Email/Password hashé bcrypt/Argon2 dans Postgr
 C4Context
     title bicec-veripass — Contexte Système
 
-    Person(marie, "Marie", "Cliente BICEC\nEntrepreneuse 24 ans\nDouala")
-    Person(jean, "Jean", "Agent KYC\nValidation dossiers\nAgence BICEC")
-    Person(thomas, "Thomas", "Superviseur AML/CFT\nConformité nationale")
-    Person(sylvie, "Sylvie", "Manager\nDirectrice régionale")
+    Person(marie, "Marie", "Cliente BICEC</br>Entrepreneuse 24 ans</br>Douala")
+    Person(jean, "Jean", "Agent KYC</br>Validation dossiers</br>Agence BICEC")
+    Person(thomas, "Thomas", "Superviseur AML/CFT</br>Conformité nationale")
+    Person(sylvie, "Sylvie", "Manager</br>Directrice régionale")
 
-    System(veripass, "bicec-veripass", "Plateforme KYC digitale souveraine\nOnboarding 15 min + Back-office multi-rôles")
+    System(veripass, "bicec-veripass", "Plateforme KYC digitale souveraine</br>Onboarding 15 min + Back-office multi-rôles")
 
     System_Ext(orange, "Orange Cameroon SMS API", "Envoi OTP par SMS")
-    System_Ext(amplitude, "Sopra Amplitude", "Core Banking System\nProvisioning comptes")
-    System_Ext(sanctions, "OpenSanctions / UN / EU / OFAC", "Listes sanctions\nTéléchargées en batch")
+    System_Ext(amplitude, "Sopra Amplitude", "Core Banking System</br>Provisioning comptes")
+    System_Ext(sanctions, "OpenSanctions / UN / EU / OFAC", "Listes sanctions</br>Téléchargées en batch")
 
     Rel(marie, veripass, "Onboarding KYC", "HTTPS/PWA")
     Rel(jean, veripass, "Validation dossiers", "HTTPS/SPA")
@@ -322,7 +322,7 @@ C4Context
 
     Rel(veripass, orange, "Envoi SMS OTP", "HTTPS REST")
     Rel(thomas, amplitude, "Provisioning batch", "HTTPS SOAP/REST")
-    Rel_Back(sanctions, veripass, "Sync hebdo listes\n(cron batch)", "HTTPS download")
+    Rel_Back(sanctions, veripass, "Sync hebdo listes</br>(cron batch)", "HTTPS download")
 ```
 
 ---
@@ -337,21 +337,21 @@ C4Container
     Person(agent, "Jean/Thomas/Sylvie", "Desktop Chrome/Edge")
 
     System_Boundary(veripass, "bicec-veripass (Docker Compose)") {
-        Container(nginx, "Nginx", "Reverse Proxy", "TLS 1.3 termination\nRoutage vers containers\nRate limiting")
+        Container(nginx, "Nginx", "Reverse Proxy", "TLS 1.3 termination</br>Routage vers containers</br>Rate limiting")
 
-        Container(pwa, "PWA Marie", "React/TypeScript\nVite + Service Worker", "Onboarding KYC\nMediaPipe WASM\nIndexedDB offline")
+        Container(pwa, "PWA Marie", "React/TypeScript</br>Vite + Service Worker", "Onboarding KYC</br>MediaPipe WASM</br>IndexedDB offline")
 
-        Container(backoffice, "Back-Office SPA", "React/TypeScript\nVite", "Jean: Validation Desk\nThomas: AML/Compliance\nSylvie: Command Center")
+        Container(backoffice, "Back-Office SPA", "React/TypeScript</br>Vite", "Jean: Validation Desk</br>Thomas: AML/Compliance</br>Sylvie: Command Center")
 
-        Container(api, "FastAPI Backend", "Python 3.11\nFastAPI + Celery", "Modules: auth, kyc,\nbackoffice, aml,\nanalytics, admin,\nnotifications")
+        Container(api, "FastAPI Backend", "Python 3.11</br>FastAPI + Celery", "Modules: auth, kyc,</br>backoffice, aml,</br>analytics, admin,</br>notifications")
 
-        Container(celery, "Celery Workers", "Python\nCelery", "glm_ocr_worker\nnotifications_worker\namplitude_batch_worker\nsanctions_sync_worker")
+        Container(celery, "Celery Workers", "Python</br>Celery", "glm_ocr_worker</br>notifications_worker</br>amplitude_batch_worker</br>sanctions_sync_worker")
 
-        ContainerDb(postgres, "PostgreSQL 16", "OLTP + DWH Analytics\nStar Schema", "KYC, audit, analytics\nPEP/Sanctions, agents")
+        ContainerDb(postgres, "PostgreSQL 16", "OLTP + DWH Analytics</br>Star Schema", "KYC, audit, analytics</br>PEP/Sanctions, agents")
 
-        ContainerDb(redis, "Redis 7", "In-memory", "Celery broker\nOTP sessions (TTL)\nAnti-replay liveness")
+        ContainerDb(redis, "Redis 7", "In-memory", "Celery broker</br>OTP sessions (TTL)</br>Anti-replay liveness")
 
-        Container(storage, "Filesystem Volume", "Docker Volume\n/data/documents", "Images CNI, selfies\nFactures (10 ans COBAC)")
+        Container(storage, "Filesystem Volume", "Docker Volume</br>/data/documents", "Images CNI, selfies</br>Factures (10 ans COBAC)")
     }
 
     System_Ext(orange, "Orange SMS API")
@@ -380,25 +380,25 @@ C4Component
     title FastAPI Backend — Composants internes
 
     System_Boundary(api, "FastAPI App (Modular Monolith)") {
-        Component(auth_mod, "Auth Module", "FastAPI Router", "OTP send/verify\nPIN setup/verify\nJWT sessions\nBack-office login")
+        Component(auth_mod, "Auth Module", "FastAPI Router", "OTP send/verify</br>PIN setup/verify</br>JWT sessions</br>Back-office login")
 
-        Component(kyc_mod, "KYC Module", "FastAPI Router", "Session create/resume\nCapture CNI/Bill/NIU\nLiveness\nState machine\nSubmit dossier")
+        Component(kyc_mod, "KYC Module", "FastAPI Router", "Session create/resume</br>Capture CNI/Bill/NIU</br>Liveness</br>State machine</br>Submit dossier")
 
-        Component(ocr_svc, "OCR Service", "Python Service", "PaddleOCR primaire\nGLM-OCR fallback (Celery)\nQuality metrics\nConfidence scoring")
+        Component(ocr_svc, "OCR Service", "Python Service", "PaddleOCR primaire</br>GLM-OCR fallback (Celery)</br>Quality metrics</br>Confidence scoring")
 
-        Component(bio_svc, "Biometrics Service", "Python Service", "MediaPipe landmarks\nMiniFASNet liveness\nDeepFace face match\nAnti-spoofing score")
+        Component(bio_svc, "Biometrics Service", "Python Service", "MediaPipe landmarks</br>MiniFASNet liveness</br>DeepFace face match</br>Anti-spoofing score")
 
-        Component(bo_mod, "Back-Office Module", "FastAPI Router", "Jean: queue, inspect\napprove/reject/info\nThomas: AML, conflicts\nSylvie: analytics, SLA")
+        Component(bo_mod, "Back-Office Module", "FastAPI Router", "Jean: queue, inspect</br>approve/reject/info</br>Thomas: AML, conflicts</br>Sylvie: analytics, SLA")
 
-        Component(aml_mod, "AML Module", "FastAPI Router", "Fuzzy search PEP/Sanctions\nAlert management\nDeduplication\nFraud flagging")
+        Component(aml_mod, "AML Module", "FastAPI Router", "Fuzzy search PEP/Sanctions</br>Alert management</br>Deduplication</br>Fraud flagging")
 
-        Component(analytics_mod, "Analytics Module", "FastAPI Router", "Funnel events\nSLA dashboard\nSystem health\nEscalation\nLoad balancing")
+        Component(analytics_mod, "Analytics Module", "FastAPI Router", "Funnel events</br>SLA dashboard</br>System health</br>Escalation</br>Load balancing")
 
-        Component(notif_mod, "Notifications Module", "FastAPI Router", "Polling endpoint\nCelery triggers\nSMS/Email dispatch")
+        Component(notif_mod, "Notifications Module", "FastAPI Router", "Polling endpoint</br>Celery triggers</br>SMS/Email dispatch")
 
-        Component(audit_svc, "Audit Service", "Python Service", "SHA-256 hashing\nAppend-only log\nIP tracking\nCOBAC export")
+        Component(audit_svc, "Audit Service", "Python Service", "SHA-256 hashing</br>Append-only log</br>IP tracking</br>COBAC export")
 
-        Component(core, "Core", "Config/DB/Security", "DB connection pool\nJWT utils\nbcrypt/Argon2\nSettings")
+        Component(core, "Core", "Config/DB/Security", "DB connection pool</br>JWT utils</br>bcrypt/Argon2</br>Settings")
     }
 
     Rel(auth_mod, core, "uses")
@@ -417,11 +417,11 @@ C4Component
 ```mermaid
 graph TB
     subgraph Acteurs
-        Marie((" Marie\nCliente"))
-        Jean((" Jean\nAgent KYC"))
-        Thomas((" Thomas\nSuperviseur AML"))
-        Sylvie((" Sylvie\nManager"))
-        System((" Système\nAutomatique"))
+        Marie((" Marie</br>Cliente"))
+        Jean((" Jean</br>Agent KYC"))
+        Thomas((" Thomas</br>Superviseur AML"))
+        Sylvie((" Sylvie</br>Manager"))
+        System((" Système</br>Automatique"))
     end
 
     subgraph UC_Mobile[" Application Mobile (PWA Marie)"]
@@ -494,22 +494,22 @@ graph TB
 stateDiagram-v2
     [*] --> DRAFT : Marie crée session
 
-    DRAFT --> DRAFT : Étapes capture\n(CNI, Liveness, Adresse, NIU)
+    DRAFT --> DRAFT : Étapes capture</br>(CNI, Liveness, Adresse, NIU)
     DRAFT --> LOCKED_LIVENESS : 3 échecs liveness consécutifs
-    LOCKED_LIVENESS --> DRAFT : Marie clique "Recommencer"\n(cache purgé, nouveau session ID)
+    LOCKED_LIVENESS --> DRAFT : Marie clique "Recommencer"</br>(cache purgé, nouveau session ID)
     LOCKED_LIVENESS --> [*] : Marie choisit "Aller en agence"
 
     DRAFT --> PENDING_KYC : Marie soumet dossier (UC9)
 
     PENDING_KYC --> PENDING_INFO : Jean demande info (UC20)
-    PENDING_INFO --> PENDING_KYC : Marie fournit document\n(nouveau upload)
+    PENDING_INFO --> PENDING_KYC : Marie fournit document</br>(nouveau upload)
 
     PENDING_KYC --> COMPLIANCE_REVIEW : Alerte AML auto-détectée (UC35)
     COMPLIANCE_REVIEW --> PENDING_KYC : Thomas efface faux positif (UC22)
     COMPLIANCE_REVIEW --> REJECTED : Thomas confirme match (UC23)
 
     PENDING_KYC --> REJECTED : Jean rejette (UC19)
-    REJECTED --> [*] : Notification Marie\n(motif de rejet)
+    REJECTED --> [*] : Notification Marie</br>(motif de rejet)
 
     PENDING_KYC --> READY_FOR_OPS : Jean approuve (UC18)
 
@@ -521,9 +521,9 @@ stateDiagram-v2
     PROVISIONING --> OPS_CORRECTION : Erreur format/NIU collision
     OPS_CORRECTION --> PROVISIONING : Thomas corrige + retry
 
-    ACTIVATED --> RESTRICTED_ACCESS : Compte activé\n(en attente signature agence)
-    RESTRICTED_ACCESS --> LIMITED_ACCESS : NIU déclaratif\nJean valide manuellement
-    RESTRICTED_ACCESS --> FULL_ACCESS : Signature agence effectuée\n+ NIU validé
+    ACTIVATED --> RESTRICTED_ACCESS : Compte activé</br>(en attente signature agence)
+    RESTRICTED_ACCESS --> LIMITED_ACCESS : NIU déclaratif</br>Jean valide manuellement
+    RESTRICTED_ACCESS --> FULL_ACCESS : Signature agence effectuée</br>+ NIU validé
 
     LIMITED_ACCESS --> FULL_ACCESS : NIU uploadé + Jean valide
 
@@ -627,7 +627,7 @@ sequenceDiagram
             API->>PG: UPDATE kyc_session (status=LOCKED_LIVENESS)
             API->>Redis: Purge session token
             API-->>PWA: {liveness: LOCKED}
-            PWA->>PWA: Affiche message lockout (FR19)\nAttend clic "Recommencer"
+            PWA->>PWA: Affiche message lockout (FR19)</br>Attend clic "Recommencer"
         end
     end
 
@@ -682,7 +682,7 @@ sequenceDiagram
     API->>Audit: LOG {agent_id, action=DOSSIER_OPENED, record_id, ip}
     API-->>BO: Dossier complet (images URLs + OCR data + scores)
 
-    BO->>BO: Affiche Side-by-Side:\nCNI Recto/Verso haute-res | Données OCR\nSelfie | Photo CNI | Face match score
+    BO->>BO: Affiche Side-by-Side:</br>CNI Recto/Verso haute-res | Données OCR</br>Selfie | Photo CNI | Face match score
     BO->>BO: Affiche confidence badges 
 
     alt Jean détecte erreur OCR
@@ -781,14 +781,14 @@ sequenceDiagram
     Sylvie->>BO: Ouvre Command Center
     BO->>API: GET /analytics/health
     API->>PG: Agrège métriques temps réel
-    Note right of API: queue_depth, avg_validation_time\nsla_violations, system_uptime\nocr_accuracy_trend, active_agents
+    Note right of API: queue_depth, avg_validation_time</br>sla_violations, system_uptime</br>ocr_accuracy_trend, active_agents
     API-->>BO: {status: GREEN/YELLOW/RED, metrics}
 
     BO->>API: GET /analytics/funnel?period=today
     API->>PG: Query fact_analytics_events GROUP BY step
     API-->>BO: {steps: [{name, entered, completed, drop_off_rate}]}
 
-    BO->>BO: Affiche dashboard R/Y/G\n+ Funnel graph\n+ Big Numbers
+    BO->>BO: Affiche dashboard R/Y/G</br>+ Funnel graph</br>+ Big Numbers
 
     alt SLA violation détectée (dossier > 2h)
         BO->>BO: Badge  sur dossier concerné
@@ -1630,52 +1630,52 @@ $$ LANGUAGE plpgsql;
 
 ```mermaid
 flowchart TD
-    A[Image reçue\n/kyc/capture/cni ou /bill] --> B{Type document?}
+    A[Image reçue</br>/kyc/capture/cni ou /bill] --> B{Type document?}
 
-    B -->|CNI Recto/Verso| C[PaddleOCR PP-OCRv5\nCPU ONNX Runtime\n< 1s/image]
-    B -->|Facture ENEO/CAMWATER| D[Queue Celery\nglm_ocr_jobs]
+    B -->|CNI Recto/Verso| C[PaddleOCR PP-OCRv5</br>CPU ONNX Runtime</br>< 1s/image]
+    B -->|Facture ENEO/CAMWATER| D[Queue Celery</br>glm_ocr_jobs]
 
-    C --> E{Confidence\npar champ ≥ 85%?}
-    E -->| Tous champs OK| F[Résultat direct\n{fields, confidence_map\nengine: PADDLE}]
-    E -->| Certains champs < 85%| G[Queue Celery\nglm_ocr_jobs]
+    C --> E{Confidence</br>par champ ≥ 85%?}
+    E -->| Tous champs OK| F[Résultat direct</br>{fields, confidence_map</br>engine: PADDLE}]
+    E -->| Certains champs < 85%| G[Queue Celery</br>glm_ocr_jobs]
 
-    G --> H[GLM-OCR 0.9B Quantifié\nCelery Worker Dédié\n10-30s/page\nconcurrence=1]
+    G --> H[GLM-OCR 0.9B Quantifié</br>Celery Worker Dédié</br>10-30s/page</br>concurrence=1]
     D --> H
 
-    H --> I[Résultat GLM\n{fields, confidence_map\nengine: GLM}]
+    H --> I[Résultat GLM</br>{fields, confidence_map</br>engine: GLM}]
 
-    F --> J[Métriques qualité\nLaplacian Variance\nLuminance Histogram]
+    F --> J[Métriques qualité</br>Laplacian Variance</br>Luminance Histogram]
     I --> J
 
-    J --> K[Stockage PostgreSQL\nocr_fields + confidence_per_field\ncapture_quality_metrics]
-    K --> L[Réponse API\nConfidence badges ]
+    J --> K[Stockage PostgreSQL</br>ocr_fields + confidence_per_field</br>capture_quality_metrics]
+    K --> L[Réponse API</br>Confidence badges ]
 ```
 
 ### 12.2 Pipeline Biométrique
 
 ```mermaid
 flowchart TD
-    A[POST /kyc/liveness\n{session_id, landmarks_json}] --> B[MediaPipe WASM\ncôté client PWA]
+    A[POST /kyc/liveness</br>{session_id, landmarks_json}] --> B[MediaPipe WASM</br>côté client PWA]
 
-    B --> B1[478 landmarks 3D\nYaw angle calcul\nEAR blink detection\nQualité frame]
-    B1 -->|Frame valide| C[Envoi landmarks_json\nau backend FastAPI]
+    B --> B1[478 landmarks 3D</br>Yaw angle calcul</br>EAR blink detection</br>Qualité frame]
+    B1 -->|Frame valide| C[Envoi landmarks_json</br>au backend FastAPI]
     B1 -->|Frame invalide| B[Retry côté client]
 
-    C --> D[MiniFASNetV2\nSilent Anti-Spoofing\nScore liveness 0-1]
-    C --> E[DeepFace\nFace Match\nSelfie vs CNI Photo\nScore 0-1]
+    C --> D[MiniFASNetV2</br>Silent Anti-Spoofing</br>Score liveness 0-1]
+    C --> E[DeepFace</br>Face Match</br>Selfie vs CNI Photo</br>Score 0-1]
 
-    D --> F{Liveness\nScore ≥ seuil?}
-    E --> G{Face Match\nScore ≥ 0.85?}
+    D --> F{Liveness</br>Score ≥ seuil?}
+    E --> G{Face Match</br>Score ≥ 0.85?}
 
     F -->| PASS| H[AND Gate]
-    F -->| FAIL| I[Strike++\nAnti-replay Redis]
+    F -->| FAIL| I[Strike++</br>Anti-replay Redis]
     G -->| PASS| H
     G -->| FAIL| I
 
-    H --> J[Biometric PASS\nStockage biometric_results]
+    H --> J[Biometric PASS</br>Stockage biometric_results]
     I --> K{strike_count < 3?}
-    K -->|Oui| L[Réponse FAIL\n{strikes_remaining: N}]
-    K -->|Non: strike = 3| M[Status = LOCKED_LIVENESS\nPurge Redis session\nMessage lockout FR]
+    K -->|Oui| L[Réponse FAIL</br>{strikes_remaining: N}]
+    K -->|Non: strike = 3| M[Status = LOCKED_LIVENESS</br>Purge Redis session</br>Message lockout FR]
 ```
 
 ### 12.3 Agent Load Balancing — Smooth Weighted Round Robin
