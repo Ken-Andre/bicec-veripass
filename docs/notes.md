@@ -182,3 +182,140 @@ Pour le Systeme auto, il a en plus de ce qu'il a la possibilite d'allouer un dos
 ---
 "||"
 ---
+https://developer.orange.com/apis/sms-cm/pricing
+
+***
+## Legal
+Orange Specific Terms for SMS Cameroon
+
+Service Provider:
+
+Orange Cameroon (“OCM”), a company registered in Cameroon having its registered office located at Rue Franqueville, P.O. BOX1864 Douala, Cameroon which is registered with the Douala Trade and Commercial Property Register under the number RC/DLA/2002/027585 (“Orange”)
+
+Version number: 2.0
+
+Date: Jan 25th 2016
+
+
+1 SMS Cameroon Description (the “Service” or “SMS Cameroon”)
+
+SMS Cameroon allows any clients of Orange (the “Client(s)” or “You” including “Your”) to buy, with their airtime credit, bundles of SMS on the following web site: developer.orange.com (the « Site »).
+
+This bundle of SMS allows You to send SMS including the possibility to request acknowledgment of receipt thereof as more described in the Overview page (https://developer.orange.com/apis/sms-cm/ ), through an application (the “API Client”) to subscribers of any operators located in Cameroon (the“Subscribers”).
+
+You have to be connected to the internet network and should be responsible for its internet access.
+
+The collection of Subscribers’ phone number (alsocalled “MSISDN”) shall be the sole responsibility of the Client notably regarding pre-existing contractual relationships and/or charitable activities.
+
+To benefit of the Service, You firstly haveto identify yourself.
+
+2 Price
+
+SMS Cameroon is provided by Orange according to the pricing described in section 4.7 below. New pricing may be introduced by Orange at any time, in accordance with the provisions of section 7 of the Orange APIs General Terms
+
+3 Contractual Documents
+
+The Terms, as defined in the Orange API General Terms, consist of (i) such Orange API General Terms and (ii) these Orange Specific Terms for SMS Cameroon including the Overview and Pricing pages as referenced here in. In case of any discrepancy between the Orange API General Terms and the Orange Specific Terms for SMS Cameroon, the latter shall prevail.
+
+4 Specific Conditions of SMS Cameroon
+
+4.1. Service Availability.
+
+Orange will use its best efforts to provide SMS Cameroon with reasonable care and skill. Orange willgrant no guarantee or warranty with respect to SMS Cameroon. In addition, Orangeinforms You that SMS Cameroon may be subject to (i) cancelation of SMS Cameroon at anytime for technical or operational reasons (in particular but not limited tomaintenance operation) or (ii) removal of SMS Cameroon for indefinite periods oftime for any reasons or events that are not under the control of Orange.
+
+4.2. Grant of Rights to Use.
+
+Orange retains all right, title and interestin and to Intellectual Property Rights related to SMS Cameroon and You are granted a limited right to use the SMS Cameroon under section 3 of the Orange API General Terms.
+
+4.3.Content of SMS MT (Mobile Terminated) (the “Content”).
+
+The SMS You sent to Subscribers may include informationwith respect to You and/or Your activities, and/or Your products and services,and/or Your contractual relationships with Your Subscribers (for instance, statistics,telemarketing). Those data have been developed and stored by You.
+
+4.4 Authorization of Subscribers:
+
+Sending SMS to any individuals (including end-users, customers and subscribers) shall not be considered as a spam therefore You represent and warrantthat the Subscribers have previously given their consent in compliance with any applicable law. Non-compliance with any applicable law with respect to the Subscribers’consent shall be Your sole responsibility of the Client.
+
+4.5. Transmission of SMS:
+
+In order to send SMS, the Client shall first enter a private code provided by Orange into the API Client and then send SMS to Subscribers.
+
+4.6. Reception of SMS.
+
+The Subscriber is able toreceive SMS, provided that Subscriber complies with the following:
+
+a. he/she owns or holds a device compatible with SMS features;
+
+b. his/her device is switched on and the memory card of the device is notfull;
+
+c. his/her device is located in an area that is covered by the network of itsmobile operator.
+
+4.7. Price and Validity of the bundles of SMS.
+
+Prices, volumes of SMS and periods of validity of bundles of SMS aredescribed on the pages of the Site dedicated to the SMS Cameroon.
+
+The Service is also limited to a maximum amount spent per MSISDN duringa specific period of time. Detailed information is available on the Site pagesdedicated to the SMS Cameroon (https://developer.orange.com/apis/sms-ml/pricing)
+
+If some SMS are not consumed within the period of validity mentioned onthe Site, such SMS are not cancelled but are only usable if the Client rechargewith a new bundle of SMS. Therefore, the new SMS are added to the previous bundleof SMS with a new period of validity.
+
+4.8. Confidentiality of the private(s) code(s):
+
+You are solely responsible for the preservation and usage of the private(s) code(s) provided by Orange. The Client undertakes to define and implement theappropriate and effective means in order to preserve confidentiality and his/herdisconnection at the end of each session.
+
+4.9. Usage and content of SMS.
+
+You are solely responsible with respect to the content of all sent SMSand notably You shall guarantee – with no liability cap whatsoever- Orange that You holds all rights as regards the content of the SMS. You warrant andrepresent that Orange shall not be held liable, directly or indirectly, in caseof any claim or dispute with regards to the SMS content.
+
+You shall comply with all applicable laws and regulations, in particularconcerning the provisions on personal data, including the collection of all Subscribersrequired consents.
+
+You shall be prohibited to organize any lottery, gambling, advertisingon lottery that may violate applicable laws and regulations.
+
+You agree not to make any of the following available to the public and Subscribers:
+
+· Violent or pornographic message, message that by their nature would be likely to violate respect forthe individual and human dignity, or the protection of children and adolescents;
+
+· Messages encouraging thecommission of crimes and/or misdemeanors or inciting the consumption ofprohibited substances;
+
+· Message inciting discrimination,hate, or violence, religious, sectarian, political, union, or racist messages,or those violating good character, the public order, or likely to violate humandignity or the protection of minors;
+
+· Messages likely to harm Orange.
+
+You may be held liable for messages or information made available to thepublic and/or Subscribers at any given time, and in particular, messages,information, lists of classified advertisements, and any other informationdisseminated through hereof.
+
+You shall only make a personal and private use of the acquired SMS.
+
+You shall communicate under Your own name, so that You are clearlyidentified to Your Subscribers, and You shall not make any reference to Orange andits Brand, as defined in section 5 below, in the SMS.
+
+You will not send any SMS to Subscribers between ten(10) PM and six (06)AM, unless it is a Receiver’s demand. In addition, the Client cannot send morethan three (03) SMS messages per day.
+
+You warrant and represent that Orange shall not be liable, directly orindirectly, in case of a claim or dispute with Subscribers for any defaultaffecting your API Client, your services or products and the Content and inparticular regarding the accuracy and validity of the phone number (also called“MSISDN”) of the Subscribers.
+
+4.10. Liability.
+
+You shall indemnify Orange Cameroon for all damages, costs and expenses (including fines, penalties, losses,costs, damages, claims, liabilities, settlements and expenses, attorney’s fees)for any violation of these Terms and/or any violation of applicable laws andregulations.
+
+Orange Cameroon shall only be responsible, through its SMS center (alsocalled “SMS-C”), for the transmission of the SMS sent by the Client. Orange Cameroon does not warrant actual receipt of the SMS by Subscribers as there are manytechnical reasons outside the control of Orange that may impede reception ofSMS by Subscribers.
+
+You acknowledge that the execution of the Service also depends on thirdparties, in particular other operators and/or internet providers. Orange shallnot be liable, directly or indirectly, for any default regarding internet accessand default of third parties.
+
+Each Party shall be considered liable and must indemnify the other Partyagainst all damages that such other Party may suffer resulting from the firstParty’s failure to execute and/or the poor execution of any of its obligationsset out in these Terms.
+
+Orange shall in no event be held liable for indirect damages such asloss of a contract, market injury, loss of clients, any commercial disruption,loss of profit, or economic loss that may result from the execution of theseTerms.
+
+However, The aggregate liability of Orange arising under or inconnection with these Terms for any cause whatsoever and regardless of the formof claim or dispute shall not exceed in the aggregate the total amount of feespaid to Orange by You for the purchase of bundles of SMS during the six (6)-monthperiod prior to the date of any harmful event.
+
+5 Orange Brands, Design Rules and Graphic Resources
+
+TheORANGE brand and any trademarks, brands or logos owned by Orange (the “Brands”) are subject to exclusiverights and You are granted a limited right to use the Brands under section 13of the Orange API General Terms. WhenOrange makes available, on Orange Developer website (www.developer.orange.com), (i)some rules with regard to, with no limitation, design, use of the Brands, (the“Design Rules”) and (ii) somegraphic resources (such as buttons, error messages, the Brands) (the “Graphic Resources”), You undertake tofully comply with such Design Rules and Graphic Resources.
+
+Anynon-compliance with section 13 of the Orange API General Terms, the DesignRules and/or the Graphic Resources may constitute a material breach of theseSpecific Terms. Therefore, Orange may either suspend these Specific Terms untilYou fully comply with the Design Rules and the Graphic Resources, or terminatethese Specific Terms if You do not fully comply with the Design Rules and theGraphic Resources within a reasonable time.
+
+6 Conditions of Withdrawal of SMS Cameroon
+
+Notwithstandingsection 9 of the Orange API General Terms, Orange will inform You of thetermination of SMS Cameroon one (1)-month in advance of the date of the termination,without prejudice to any claim for damages.
+
+7 Governing Law and Dispute Resolution
+
+Terms shall be governedby and interpreted in accordance with the laws of Cameroon.
+
+All disputes arising out of or in connection with those Terms which cannot be settled by the Parties within 30 (thirty) days thereafter shall be finally settled by the court (Tribunal de Commerce) in Douala, Cameroon.
+***
