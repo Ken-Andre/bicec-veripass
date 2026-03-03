@@ -492,63 +492,73 @@ graph TB
 
 ## 5. State Machine KYC
 
+![KYC / Onboarding State Diagram](https://mermaid.ink/svg/pako:eNqtWd1u2zgWfhWugGLjjZPYcZomxkwBx1YKt46dkd3MZOrCYGXaYStRHoryNA0C7NUAc7vYR9iLZq_3DfwmfZI9JCVZlGznZ9qLwYQiv3N4zsdzzpfcWG4wJlbdevYMhQIL0qJ4yrG_M98fMliT_8aUE1fQgKHByZCly-_-8R7t7LxELadxOkB1dIY5JcjlizuCQhKGcCCzmwWCIE6nVwIFE30m_Sb_xafxTEScoGa3XUYenRMGQGVjIx5zWCNl1G2_LSM3YCFhgvjwH2Pbt3_-G4kgEogw5AUu9vZmPJjKo3SSbiRsrBzL-KlvI-_V6TXf2K1Rp31hd-1-H25YQ4s794q4Yepaeiy_ORuYpkddNLQc4gY--OkSPrR-2PvAX265GODQLOLTxV0ZPInmBEdJ8FC7VdqILxOQojc8j3B5WTyVJobWyjud291Wu_tq9OaymWYsDCKfCOQRNA7AMHhXPOfY_YHTbg7AhUazqaPxDrvu4muI8GyGQupHnsBscacuNqeCU0aQD9xCGLgzX9y9X0uGAriRyJa0IX2kKirl2OsZicyEk88zL-AQA-_v0iOIROJF3dgnGSN9FQpsDBmVYedCkpbPqUtyfPMhGxBTFaloNgu42DW-NyI3kra44iBiFEgMaLubSJZNQzYt7e5pDyL7mmCGxsTHbExUPCmbBGgvJcg4cCOD8Mb5zXlWeHkgtHVWPShtcLDZOzvvtBvdpj1y7Iu2_TOgNjwVtcZZR2HiSAQ7EE4BtQJKQAaseLjo4uAq8HGIyGSCXX3nCY4-o1kQUiEf7D1gZ71ue9Bz7NYSCvI8odwnYOg8fm2BPxMpH5GPKRAr4nNCPW9xV7rXSKvdb5x0VtnQDnMcSboDNjcDkI-mYzdal6PTnjPqnfeTfANpuUyL8RBTCPOIip_Tu2j323Dx7qulRx5mcfw-YOFeoYY_86gAv7LuZE9KKIAc2Y7TcwDH5pxEHEEWrxj9LdJYGZQYY3lkvS-cCH59n91mz3Hs5gBWl8YnAfexZmoQyToPgfY8qjtKxoHM2fVeuAGHSkPQ9v3-NADroiHrUJKxxiu727yUZE8iYOZcdjtVSZAml1p8F16HYvEVqAfPnk7g6ekH2D_rgxeQ52wpXGtTtaD2WduouZopc0wFmmOPjuN62290-ypOapE8DPzcsUenbzude9EbF3bTQF9Tx9dZM8qlDoIKDKJsR5fqeXC9uAtzhXpoXQSCkziyiIQCzfjivwL9zdjmQH0lX3bmQRQu2x8Ujogb20I6ZbJBCgQpc6MZPFL4ca4t6IJtbSzZuWjJCJrR64MFrKYX7YMuOr-DxTD9UvtcUsvbugpp6kwow17WVi7tq5OlORVB08PASkhPDKySyInOFdp6Xa2V1mbMNJRru3ezxf9EiHpvykbPhAWzAV7ErS8sqxcG7IH_UyGFjKKTTu-nt4s_--aZE8xkNuqQ5Cak15Nt40ucDbjK5lSYd8hExTAxgOEPPJgETM2uEGIqJMmA1R-84LcISnSY7-TiCjmYegjmgRCd0HN8XUZNGE-avTIwx93Y0_PksH85bzuXo58bTlyP-klViJukJgiMLZTrwC678evq_l7_sl-tLAfAHFy2g4KDb08gkckLNqqOZiGY9DCFmUJ9dEmp0JtSkCKxjTExMzoYhIM6mDSwmHObDKyaJ1uxj0A8HIZx7fn2x7-AVSEMclqBwKQPIxgGymVCv-z-j2jTUEu-Lvu_bJsbklnEDKNwBizQ4Y0x9yAqEZCLJRbVVLH-Ua9FzbT9fJweds6MSK5OZa4MwwaMKzFJYFCC9JrOD2MNd0MZFXV0M7TEFbz2oSWf7pjAkOaJoVWGHzx8DS9OfyDeJ70IkpKLHutAjZJfBI9IOfmu0HzCp8QeT0koFybYC9UG99r1yAkn-BNl0z4UFUGm1xq73R3Yjmo19tC6vb199mzICsp1lWx9oGbVw6wLOiAcQXSIh37MpCEBepxM1LMCFFHZeuBxhhokV4xNIL1FTaNB4I2D3xk6rISyPbP4FYLiWwrtZPM2kvMnvH9XF5UIVM0uCOBPkJwRSB0mRvsHV-jbn_9BteWpLYhAKNWyXdkHCLvyvKQ_Lgvdk1Uu2orfmhvfQ3YHiI_-qMVvaT3-_Sr3oRK3mFlZWQhS68UUP1GkQWFUQhF6mizmulQ9WKRxOQzFVVsJgaQlLGVoaRV5suDLtA6oT2RW6zCCwLQlZ44JeoleoI8wHoXLfbLKNgmE9jptHup629qrlTw5KjBkddieIh2_l2r8foJxUjal4vdUiasl4mtbkjEhGicfiYhHhqTdLO7mMOIx8DBSUk0SJXYtPb58QV2V2Lgq6LQO2Tbyg1hfP1qoJoceJU3BZk6YosZ5O7W_SZkmZH7uUwYwIWahHDtm8jeAGZ07ZBmSHsfxeJRcfYJWBatFpfpXZepKPy4anXbroRoV3HonBZecmjxokanyysqu94mttdCmNo4HmZV6EQzmteiQ5ZppXnQ8wnSigtbZzivVgu2cjEpuvsKCaTg2mpd4kmxS4IGsK9raaCcJ4tr7FeSdeq2GuCuipp7fLz4ATnYqLT-gwfyAapWPGu-pUkNGIxYatYpuMSWzrhgaoBBdQ2cUdcWDoJbkzMuJfIIAWci_CGBJnTiS5thcTH9xcl51LtMBTnWlTifqtbpjTR43TPrr-fTgQwbZ7zl1n8aKN1tla8rp2KrrUV7O9z6WP1s3EmeNfNCfigpCr68SEfpLqiOY_oXRKjWRfHuopJD7b4fsFm4yw-zXIPCtujJpAQunV-nNotl4KTrSVS5_G8Wbcs626tVK5eBIwVj1G-szLNSe7x69ODw-qh4f1A5eVA7K1rVV36m-qO0e1qq1_eOjSqVyfHR0W7a-KMP7u8eVw-pB7eiwCp-OjgGNjKkI-Jn-q536493t_wGrD7bI)
 ```mermaid
+%%{init: {"theme": "default", "layout": "elk", "startOnLoad": true, "elk": {"mergeEdges": false, "cycleBreakingStrategy": "INTERACTIVE"}}}%%
 stateDiagram-v2
-    [*] --> DRAFT : Marie crée session
+    direction TB
 
-    DRAFT --> DRAFT : Étapes capture</br>(CNI, Liveness, Adresse, NIU)
-    DRAFT --> LOCKED_LIVENESS : 3 échecs liveness consécutifs
-    LOCKED_LIVENESS --> DRAFT : Marie clique "Recommencer"</br>(cache purgé, nouveau session ID)
-    LOCKED_LIVENESS --> [*] : Marie choisit "Aller en agence"
+    [*] --> DRAFT : Marie crée session</br>access_level = RESTRICTED
 
-    DRAFT --> PENDING_KYC : Marie soumet dossier (UC9)
+    DRAFT --> LOCKED_LIVENESS : 3 échecs liveness</br>consécutifs
+    note right of LOCKED_LIVENESS
+        Cooldown 60s avant nouvelle session
+        + vérification user.lockout_count_24h ≤ 3
+        (résout E02 + E05)
+    end note
+    LOCKED_LIVENESS --> DRAFT : Clic "Recommencer"</br> (après cooldown, cache</br> purgé)
+    LOCKED_LIVENESS --> [*] : Clic "Aller en agence"
 
-    PENDING_KYC --> PENDING_INFO : Jean demande info (UC20)
-    PENDING_INFO --> PENDING_KYC : Marie fournit document</br>(nouveau upload)
+    DRAFT --> PENDING_KYC : Marie soumet</br>access_level reste </br>RESTRICTED
 
-    PENDING_KYC --> COMPLIANCE_REVIEW : Alerte AML auto-détectée (UC35)
-    COMPLIANCE_REVIEW --> PENDING_KYC : Thomas efface faux positif (UC22)
-    COMPLIANCE_REVIEW --> REJECTED : Thomas confirme match (UC23)
+    PENDING_KYC --> PENDING_INFO : Jean demande</br>info / doc supplémentaire
+    PENDING_INFO --> PENDING_KYC : Marie renvoie</br>le document (messagerie)
+    note right of PENDING_INFO
+        Timeout : si inactif > 7 jours
+        → Celery notifie Jean + Marie
+        (résout E08)
+    end note
 
-    PENDING_KYC --> REJECTED : Jean rejette (UC19)
-    REJECTED --> [*] : Notification Marie</br>(motif de rejet)
+    PENDING_KYC --> COMPLIANCE_REVIEW : Alerte AML</br>auto-détectée
+    COMPLIANCE_REVIEW --> PENDING_KYC : Thomas efface</br>faux positif
+    COMPLIANCE_REVIEW --> MONITORED : Thomas confirme PEP</br>(compte actif, surveillé)
+    COMPLIANCE_REVIEW --> DISABLED : Thomas confirme</br>fraude avérée
 
-    PENDING_KYC --> READY_FOR_OPS : Jean approuve (UC18)
+    PENDING_KYC --> REJECTED : Jean rejette</br>(fraude évidente uniquement)
+    REJECTED --> [*] : Notification Marie</br>+ motif
 
-    READY_FOR_OPS --> PROVISIONING : Thomas lance batch Amplitude (UC28)
-    PROVISIONING --> ACTIVATED : Amplitude confirme création compte
-    PROVISIONING --> OPS_ERROR : Echec technique Amplitude
-    OPS_ERROR --> PROVISIONING : Thomas retry (UC27)
+    PENDING_KYC --> READY_FOR_OPS : Jean approuve
 
-    PROVISIONING --> OPS_CORRECTION : Erreur format/NIU collision
+    READY_FOR_OPS --> PROVISIONING : Thomas lance\nbatch Amplitude API
+
+    PROVISIONING --> OPS_ERROR : Timeout 5min\nsans réponse Amplitude</br>(résout E09)
+    OPS_ERROR --> PROVISIONING : Thomas retry
+
+    PROVISIONING --> OPS_CORRECTION : Erreur format\nou NIU collision
     OPS_CORRECTION --> PROVISIONING : Thomas corrige + retry
 
-    ACTIVATED --> RESTRICTED_ACCESS : Compte activé</br>(en attente signature agence)
-    RESTRICTED_ACCESS --> LIMITED_ACCESS : NIU déclaratif</br>Jean valide manuellement
-    RESTRICTED_ACCESS --> FULL_ACCESS : Signature agence effectuée</br>+ NIU validé
+    PROVISIONING --> VALIDATED_PENDING_AGENCY : Amplitude confirme</br>[SMS template + notif app envoyés]
 
-    LIMITED_ACCESS --> FULL_ACCESS : NIU uploadé + Jean valide
+    VALIDATED_PENDING_AGENCY --> ACTIVATED_LIMITED : Jean avait validé\nSANS NIU valide\naccess_level = LIMITED_ACCESS
+    VALIDATED_PENDING_AGENCY --> ACTIVATED_PRE_FULL : Jean avait validé\nAVEC NIU valide\naccess_level = PRE_FULL_ACCESS
 
-    FULL_ACCESS --> DISABLED : Thomas suspend compte (fraude)
-    RESTRICTED_ACCESS --> DISABLED : Thomas suspend
-    LIMITED_ACCESS --> DISABLED : Thomas suspend
+    ACTIVATED_PRE_FULL --> ACTIVATED_FULL : Signature agence</br>(wet 3x)\naccess_level = FULL_ACCESS
 
-    note right of RESTRICTED_ACCESS
-        Vitrine mode : consultation
-        uniquement, pas de virement
-        ni émission carte
-    end note
+    ACTIVATED_LIMITED --> ACTIVATED_PRE_FULL : Marie uploade NIU</br>+ Jean revalide
 
-    note right of LIMITED_ACCESS
-        Dépôts OK, consultation OK
-        Virements, retraits, cartes: BLOQUÉS
-    end note
+    ACTIVATED_FULL --> EXPIRY_WARNING : Système détecte\ndoc expirant < 30j
+    EXPIRY_WARNING --> PENDING_RESUBMIT : Jean notifie Marie</br>(délai 30 jours)
+    PENDING_RESUBMIT --> ACTIVATED_FULL : Marie soumet + Jean réapprouve
+    PENDING_RESUBMIT --> ACTIVATED_LIMITED : Délai dépassé\naccess_level rétrogradé
 
-    note right of FULL_ACCESS
-        Toutes fonctionnalités débloquées
-    end note
+    MONITORED --> ACTIVATED_FULL : Surveillance levée
+    MONITORED --> DISABLED : Fraude confirmée après surveillance
+
+    ACTIVATED_FULL --> DISABLED : Thomas suspend
+    ACTIVATED_LIMITED --> DISABLED : Thomas suspend
+    ACTIVATED_PRE_FULL --> DISABLED : Thomas suspend
+    MONITORED --> DISABLED : Thomas suspend
 ```
-
 ---
 
 ## 6. Diagrammes de Séquence
@@ -658,52 +668,7 @@ sequenceDiagram
 
 ### SEQ-02 : Validation Jean (Evidence-First)
 
-<!-- ```mermaid
-sequenceDiagram
-    actor Jean
-    participant BO as Back-Office SPA
-    participant API as FastAPI
-    participant PG as PostgreSQL
-    participant FS as Filesystem
-    participant Audit as Audit Service
 
-    Jean->>BO: Login Email/Password
-    BO->>API: POST /auth/login {email, password}
-    API->>PG: Vérifie bcrypt hash
-    API-->>BO: JWT (role=JEAN, agency_id)
-
-    Jean->>BO: Ouvre queue dossiers
-    BO->>API: GET /backoffice/dossiers?status=PENDING_KYC&agent_id=me
-    API->>PG: SELECT dossiers assignés + confidence_score_global + SLA_remaining
-    API-->>BO: Liste triée (FIFO + priority + confidence)
-
-    Jean->>BO: Sélectionne dossier Marie
-    BO->>API: GET /backoffice/dossiers/{id}
-    API->>PG: SELECT session + documents + ocr_fields + biometric_results
-    API->>FS: Génère URLs signées images haute-res
-    API->>Audit: LOG {agent_id, action=DOSSIER_OPENED, record_id, ip}
-    API-->>BO: Dossier complet (images URLs + OCR data + scores)
-
-    BO->>BO: Affiche Side-by-Side:</br>CNI Recto/Verso haute-res | Données OCR</br>Selfie | Photo CNI | Face match score
-    BO->>BO: Affiche confidence badges 
-
-    alt Jean détecte erreur OCR
-        Jean->>BO: Corrige champ (inline edit)
-        BO->>API: POST /backoffice/dossiers/{id}/override-ocr {field, corrected_value, justification}
-        API->>PG: UPDATE ocr_fields (corrected_value, human_corrected=true, corrected_by=jean_id)
-        API->>Audit: LOG {action=OCR_CORRECTED, old_value, new_value, justification, ip}
-        API-->>BO: 200 OK
-    end
-
-    Jean->>BO: Clique Approuver
-    BO->>API: POST /backoffice/dossiers/{id}/approve {niu_status}
-    API->>PG: UPDATE kyc_session (status=READY_FOR_OPS)
-    API->>PG: INSERT validation_decisions (decision=APPROVE, agent_id, timestamp)
-    API->>Audit: LOG {action=DOSSIER_APPROVED, agent_id, ip, sha256_state}
-    API->>PG: INSERT analytics_events (event=Agent_Approved, validation_duration_ms)
-    API->>PG: INSERT notifications (user_id=marie, type=DOSSIER_APPROVED)
-    API-->>BO: 200 OK
-``` -->
 ```mermaid
 sequenceDiagram
     actor Agent as Jean / Thomas / Sylvie
