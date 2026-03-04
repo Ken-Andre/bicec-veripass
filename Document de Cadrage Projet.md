@@ -380,29 +380,29 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
 
 ### Risques Techniques
 
-| Risque | Impact | Probabilité | Mitigation |
-|--------|--------|-------------|------------|
-| Espace de stockage insuffisant pour conservation des images
-| Élevé | Moyenne | Estimation préalable (15-20 MB/dossier × volume prévu), provisionnement infrastructure cloud/NAS avec encryption, archivage progressif |
-| Performance OCR insuffisante sur anciennes CNI usées | Élevé | Élevée | Fine-tuning PaddleOCR sur dataset local de CNI camerounaises, fallback validation humaine systématique, amélioration itérative |
-| Faux négatifs biométriques (rejet d'utilisateurs légitimes) | Moyen | Moyenne | Seuils ajustables, possibilité de retry avec meilleure guidance, escalade vers validation humaine |
-| Indisponibilité prolongée API DGI | Moyen | Moyenne | Validation format NIU locale + vérification visuelle obligatoire de l'attestation par agent, file d'attente de réconciliation quand API revient |
+| Risque                                                      | Impact  | Probabilité                                                                                                                            | Mitigation                                                                                                                                      |
+| ----------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Espace de stockage insuffisant pour conservation des images |
+| Élevé                                                       | Moyenne | Estimation préalable (15-20 MB/dossier × volume prévu), provisionnement infrastructure cloud/NAS avec encryption, archivage progressif |
+| Performance OCR insuffisante sur anciennes CNI usées        | Élevé   | Élevée                                                                                                                                 | Fine-tuning PaddleOCR sur dataset local de CNI camerounaises, fallback validation humaine systématique, amélioration itérative                  |
+| Faux négatifs biométriques (rejet d'utilisateurs légitimes) | Moyen   | Moyenne                                                                                                                                | Seuils ajustables, possibilité de retry avec meilleure guidance, escalade vers validation humaine                                               |
+| Indisponibilité prolongée API DGI                           | Moyen   | Moyenne                                                                                                                                | Validation format NIU locale + vérification visuelle obligatoire de l'attestation par agent, file d'attente de réconciliation quand API revient |
 
 ### Risques Réglementaires
 
-| Risque | Impact | Probabilité | Mitigation |
-|--------|--------|-------------|------------|
-| Conservation des images jugée non-conforme RGPD/Loi 2024-017 | Élevé | Faible | Validation juridique préalable avec DPO, consentement explicite client, chiffrement fort, politique de rétention documentée |
-| Audit COBAC négatif sur processus de validation | Élevé | Faible | Validation humaine obligatoire (pas de STP complet au MVP), audit trail exhaustif, tests en conditions réelles avec 50 pilotes |
-| IBU non-fonctionnel en production | Moyen | Moyenne | Simulation réaliste au MVP, migration progressive vers vraie API BEAC en Phase 2, pas de blocage client |
+| Risque                                                       | Impact | Probabilité | Mitigation                                                                                                                     |
+| ------------------------------------------------------------ | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Conservation des images jugée non-conforme RGPD/Loi 2024-017 | Élevé  | Faible      | Validation juridique préalable avec DPO, consentement explicite client, chiffrement fort, politique de rétention documentée    |
+| Audit COBAC négatif sur processus de validation              | Élevé  | Faible      | Validation humaine obligatoire (pas de STP complet au MVP), audit trail exhaustif, tests en conditions réelles avec 50 pilotes |
+| IBU non-fonctionnel en production                            | Moyen  | Moyenne     | Simulation réaliste au MVP, migration progressive vers vraie API BEAC en Phase 2, pas de blocage client                        |
 
 ### Risques Délais (3 mois)
 
-| Risque | Impact | Probabilité | Mitigation |
-|--------|--------|-------------|------------|
-| Sous-estimation complexité biométrie | Élevé | Élevée | Utilisation de bibliothèques open source éprouvées (DeepFace, MiniFASNet), POC rapide mois 1, réduction périmètre si nécessaire |
-| Retards intégration Core Banking | Élevé | Moyenne |  Intégration réelle uniquement en mois 3, ou dans la seconde phase implication équipe IT dès mois 1 |
-| Qualité dataset OCR insuffisante | Moyen | Moyenne | Constitution dataset dès mois 1 (collecter 500-1000 CNI anonymisées), crowdsourcing interne BICEC |
+| Risque                               | Impact | Probabilité | Mitigation                                                                                                                      |
+| ------------------------------------ | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Sous-estimation complexité biométrie | Élevé  | Élevée      | Utilisation de bibliothèques open source éprouvées (DeepFace, MiniFASNet), POC rapide mois 1, réduction périmètre si nécessaire |
+| Retards intégration Core Banking     | Élevé  | Moyenne     | Intégration réelle uniquement en mois 3, ou dans la seconde phase implication équipe IT dès mois 1                              |
+| Qualité dataset OCR insuffisante     | Moyen  | Moyenne     | Constitution dataset dès mois 1 (collecter 500-1000 CNI anonymisées), crowdsourcing interne BICEC                               |
 
 ---
 
@@ -996,7 +996,7 @@ Créer une **plateforme mobile-first d'onboarding digital 100% à distance** per
   * PROCESSING : Traitement OCR/biométrie en cours
   * PENDING_VALIDATION : Prêt pour validation agent KYC
   * VALIDATED : Validé par agent, en attente création compte
-  * ACCOUNT_CREATED : Compte créé dans Amplitude
+  * ACCOUNT_CREATED : Compte créé dans Sopra Amplitude(pas obligatoire pour les deux autres etat qui le suivent, il est comme l'etat rejected et expired, ca peut arriver a n'importe quel moment)
   * ACTIVE_FULL : Compte actif avec NIU (accès complet)
   * ACTIVE_LIMITED : Compte actif sans NIU (accès restreint)
   * REJECTED : Rejeté définitivement

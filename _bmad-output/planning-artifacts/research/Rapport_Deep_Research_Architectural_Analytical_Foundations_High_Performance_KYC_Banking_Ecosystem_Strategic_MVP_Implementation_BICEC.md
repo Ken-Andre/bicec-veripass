@@ -15,14 +15,14 @@ The choice of frontend technology serves as the primary interface between the ba
 
 In the context of BICEC, the selection process focused on three primary dimensions: time-to-market, development complexity, and the friction inherent in user acquisition. Native development, particularly using frameworks like Flutter, offers superior performance for graphics-intensive tasks and deeper system integration. However, the overhead of managing separate builds for iOS and Android, combined with the unpredictability of app store review cycles, presents a significant risk to the project's sixty-day timeline.
 
-| Decision Factor | Progressive Web App (PWA) | Flutter (Native-Like) | Native (iOS/Android) |
-|---|---|---|---|
-| Development Velocity | 50–70% reduction in initial time | Moderate to high | Low (Duplicated efforts) |
-| Deployment Mechanism | Instant via Web/URL | App Store/Play Store Review | App Store/Play Store Review |
-| Storage Footprint | Minimal (< 1 MB) | High (> 7 MB) | High |
-| Hardware Access | Sufficient (Camera, GPS, Notifications) | Full | Full |
-| SEO and Discoverability | High (Fully indexable) | Low (Web indexing is complex) | N/A (App Store only) |
-| Acquisition Friction | Zero download required | High (Store visit + download) | High |
+| Decision Factor         | Progressive Web App (PWA)               | Flutter (Native-Like)         | Native (iOS/Android)        |
+| ----------------------- | --------------------------------------- | ----------------------------- | --------------------------- |
+| Development Velocity    | 50–70% reduction in initial time        | Moderate to high              | Low (Duplicated efforts)    |
+| Deployment Mechanism    | Instant via Web/URL                     | App Store/Play Store Review   | App Store/Play Store Review |
+| Storage Footprint       | Minimal (< 1 MB)                        | High (> 7 MB)                 | High                        |
+| Hardware Access         | Sufficient (Camera, GPS, Notifications) | Full                          | Full                        |
+| SEO and Discoverability | High (Fully indexable)                  | Low (Web indexing is complex) | N/A (App Store only)        |
+| Acquisition Friction    | Zero download required                  | High (Store visit + download) | High                        |
 
 The architectural decision to favor PWA over Flutter is rooted in the "frictionless" nature of web-based entry points. For a banking client, the requirement to download a large application simply to begin an onboarding process can lead to significant drop-offs. PWAs allow users to launch the KYC workflow directly from a link, while service workers provide the caching mechanisms necessary to maintain functionality in low-bandwidth environments common in diverse markets. Furthermore, by utilizing a single codebase in TypeScript, the engineering team can ensure type safety and reduce debugging cycles, directly addressing the project's aggressive deadline.
 
@@ -42,13 +42,13 @@ The backend architecture of the BICEC KYC system must support complex AI/ML pipe
 
 While microservices are often lauded for their independent scaling and fault isolation, they introduce substantial infrastructure overhead, including service discovery, inter-service communication management, and distributed tracing requirements. For a sixty-day development window, such complexity is often counter-productive, potentially consuming **30% of the timeline** in non-functional setup.
 
-| Feature | Monolithic Architecture | Microservices Architecture |
-|---|---|---|
-| Initial Design | Unified, less planning required | Complex, high design effort |
-| Debugging | Tracing within a single environment | Requires advanced distributed tools |
-| Deployment | Single entity; straightforward | Multiple containerized services |
-| Testing | Simple integration testing | Complex inter-service testing |
-| Scaling | Horizontal (the whole app) | Selective (specific services) |
+| Feature        | Monolithic Architecture             | Microservices Architecture          |
+| -------------- | ----------------------------------- | ----------------------------------- |
+| Initial Design | Unified, less planning required     | Complex, high design effort         |
+| Debugging      | Tracing within a single environment | Requires advanced distributed tools |
+| Deployment     | Single entity; straightforward      | Multiple containerized services     |
+| Testing        | Simple integration testing          | Complex inter-service testing       |
+| Scaling        | Horizontal (the whole app)          | Selective (specific services)       |
 
 The BICEC system is implemented as a **modular monolith**. This approach utilizes a unified codebase but enforces strict separation of concerns through internal module boundaries. **Python** is selected as the primary backend language due to its unparalleled ecosystem for AI/ML and data processing. Frameworks such as **FastAPI** or **Django** allow for rapid development of asynchronous APIs that can handle the concurrent processing requirements of the KYC workflow. By deploying the system in **Docker multi-containers**, the architecture ensures environment consistency and prepares the system for a future transition to microservices should specific components — such as the AI liveness engine — require independent scaling as user volume increases.
 
@@ -86,12 +86,12 @@ Identity verification is only as accurate as the data extracted from the submitt
 
 In a banking environment, a blurry photo of a passport or a glary scan of an ID card is a significant operational risk. The system implements automated image quality checks at the point of capture.
 
-| Metric | Target Threshold | Analytical Relevance |
-|---|---|---|
-| Laplacian Variance | > 100 | Measures image sharpness; lower values trigger a blur warning. |
-| Luminance Histogram | Balanced distribution | Detects glare or underexposure that hides security features. |
-| Confidence Score | > 85% per field | The OCR engine's internal probability of character accuracy. |
-| CER (Character Error Rate) | < 3% in validation | Measures discrepancy between ground truth and extracted text. |
+| Metric                     | Target Threshold      | Analytical Relevance                                           |
+| -------------------------- | --------------------- | -------------------------------------------------------------- |
+| Laplacian Variance         | > 100                 | Measures image sharpness; lower values trigger a blur warning. |
+| Luminance Histogram        | Balanced distribution | Detects glare or underexposure that hides security features.   |
+| Confidence Score           | > 85% per field       | The OCR engine's internal probability of character accuracy.   |
+| CER (Character Error Rate) | < 3% in validation    | Measures discrepancy between ground truth and extracted text.  |
 
 The system utilizes a **two-stage OCR process**: a Visual Language Model (VLM) for field localization and an engine such as **GLM-OCR and/or PaddleOCR** for text extraction.
 
@@ -134,11 +134,11 @@ The funnel analytics engine tracks discrete transition points in the user journe
 3. **Liveness Verification** — A point of significant drop-off if the AI instructions are unclear or the processing time exceeds 3–5 seconds.
 4. **Final Submission** — The conversion point.
 
-| Funnel Stage | KPI to Measure | Action Trigger |
-|---|---|---|
-| Consent Screen | Acceptance Rate | If < 80%, refine copy for transparency and trust. |
-| Document Upload | Retry Rate | If > 15%, check for device-specific camera issues. |
-| Selfie Capture | Liveness Pass Rate | If < 70%, evaluate instructed vs. passive checks. |
+| Funnel Stage    | KPI to Measure       | Action Trigger                                      |
+| --------------- | -------------------- | --------------------------------------------------- |
+| Consent Screen  | Acceptance Rate      | If < 80%, refine copy for transparency and trust.   |
+| Document Upload | Retry Rate           | If > 15%, check for device-specific camera issues.  |
+| Selfie Capture  | Liveness Pass Rate   | If < 70%, evaluate instructed vs. passive checks.   |
 | Overall Journey | Time-to-Verify (p90) | If > 10 mins, simplify workflow or pre-fill fields. |
 
 Capturing device-level metrics allows the team to distinguish between **behavioral abandonment** and **technical friction**. For example, a high drop-off rate among users with older Android devices may indicate a WebRTC compatibility issue or memory exhaustion during the MediaPipe inference. These insights allow for iterative optimization, such as introducing a "save and resume" feature for users who struggle to complete the process in one session.
@@ -216,7 +216,7 @@ Both the application role in the database and the service accounts in the server
 
 ## 7. Simulation of Core Banking and Analytics Integration
 
-While the MVP focuses on the KYC workflow, it is designed as a modular component that will eventually integrate with the bank's core ledger and behavioral analytics platforms like **Amplitude**.
+While the MVP focuses on the KYC workflow, it is designed as a modular component that will eventually integrate with the bank's core ledger like **Sopra Banking Amplitude** and behavioral analytics platforms.
 
 ### 7.1 Event-Driven Simulation and Amplitude Provisioning
 
@@ -224,12 +224,12 @@ The system implements a core banking simulation layer that handles the transitio
 
 The **Amplitude Python SDK** is instrumented to track specific behavioral milestones:
 
-| Event | Description |
-|---|---|
-| `KYC_Started` | Fired when the user reaches the first verification screen. |
+| Event                | Description                                                   |
+| -------------------- | ------------------------------------------------------------- |
+| `KYC_Started`        | Fired when the user reaches the first verification screen.    |
 | `Document_Processed` | Fired after successful OCR extraction and quality validation. |
-| `Liveness_Validated` | Fired when the AI confirms human presence. |
-| `Dossier_Approved` | Fired upon final manual validation by a bank agent. |
+| `Liveness_Validated` | Fired when the AI confirms human presence.                    |
+| `Dossier_Approved`   | Fired upon final manual validation by a bank agent.           |
 
 These events are sent in batches to maintain high system performance, providing a "product analytics" perspective that complements the operational data engineering logs.
 
@@ -289,5 +289,4 @@ The technical core of the system — centered on **MediaPipe-powered liveness de
 42. [Audit trigger — PostgreSQL wiki](https://wiki.postgresql.org/wiki/Audit_trigger)
 43. [OWASP Top 10 Mobile in Detail & 8 Ways to Mitigate Them — Radware](https://www.radware.com/cyberpedia/application-security/owasp-top-10-mobile/)
 44. [Mobile Application Security — OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/Mobile_Application_Security_Cheat_Sheet.html)
-45. [Python SDK — Amplitude](https://amplitude.com/docs/sdks/analytics-sdks/python/python-sdk)
-46. [Python SDK Integration — Amplitude](https://amplitude.com/integrations/python-sdk)
+

@@ -279,14 +279,14 @@ graph TB
 > - Agents demandent info (pas de rejet direct sauf fraude avérée)
 
 ```mermaid
----
-  theme: "default",
-  layout: "elk",
-  startOnLoad: true,
-  elk
-    mergeEdges": false,
-    cycleBreakingStrategy: "INTERACTIVE"
----
+%% ---
+%% theme: "default",
+%%   layout: "elk",
+%%   startOnLoad: true,
+%%   elk
+%%     mergeEdges": false,
+%%     cycleBreakingStrategy: "INTERACTIVE"
+%% ---
 stateDiagram-v2
     direction TB
 

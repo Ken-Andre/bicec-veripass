@@ -1822,13 +1822,13 @@ flowchart TD
     B -->|Facture ENEO/CAMWATER| D[Queue Celery</br>glm_ocr_jobs]
 
     C --> E{Confidence</br>par champ ≥ 85%?}
-    E -->| Tous champs OK| F[Résultat direct</br>{fields, confidence_map</br>engine: PADDLE}]
-    E -->| Certains champs < 85%| G[Queue Celery</br>glm_ocr_jobs]
+    E -->|Tous champs OK| F["Résultat direct</br>fields, confidence_map</br>engine: PADDLE"]
+    E -->|Certains champs < 85%| G[Queue Celery</br>glm_ocr_jobs]
 
     G --> H[GLM-OCR 0.9B Quantifié</br>Celery Worker Dédié</br>10-30s/page</br>concurrence=1]
     D --> H
 
-    H --> I[Résultat GLM</br>{fields, confidence_map</br>engine: GLM}]
+    H --> I["Résultat GLM<br>#123;fields, confidence_map</br>engine: GLM#125;"]
 
     F --> J[Métriques qualité</br>Laplacian Variance</br>Luminance Histogram]
     I --> J
@@ -1841,7 +1841,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[POST /kyc/liveness</br>{session_id, landmarks_json}] --> B[MediaPipe WASM</br>côté client PWA]
+    A[POST /kyc/liveness<br>#123;session_id, landmarks_json#125;] --> B[MediaPipe WASM</br>côté client PWA]
 
     B --> B1[478 landmarks 3D</br>Yaw angle calcul</br>EAR blink detection</br>Qualité frame]
     B1 -->|Frame valide| C[Envoi landmarks_json</br>au backend FastAPI]
@@ -1860,7 +1860,7 @@ flowchart TD
 
     H --> J[Biometric PASS</br>Stockage biometric_results]
     I --> K{strike_count < 3?}
-    K -->|Oui| L[Réponse FAIL</br>{strikes_remaining: N}]
+    K -->|Oui| L[Réponse FAIL</br>#123;strikes_remaining: N#125;]
     K -->|Non: strike = 3| M[Status = LOCKED_LIVENESS</br>Purge Redis session</br>Message lockout FR]
 ```
 
@@ -2016,7 +2016,7 @@ client.flush()
 -  AES-256 sur biometric_results en base (champ BYTEA si embeddings stockés)
 
 ### Justification de l'approche phasée
-Chiffrer dès le départ sur filesystem Docker (LUKS) nécessite une configuration volume spécifique qui peut complexifier les premiers `docker-compose up`. Pour un PFE avec 2 mois de deadline, l'approche "TLS dès le départ + chiffrement au repos en pré-pilote" est un compromis pragmatique documenté explicitement dans les ADRs — ce qui est lui-même une preuve de maturité d'ingénieur.
+Chiffrer dès le départ sur filesystem Docker (LUKS) nécessite une configuration volume spécifique qui peut complexifier les premiers `docker-compose up`. Pour un PFE avec 2 mois de deadline, l'approche "TLS dès le départ + chiffrement au repos en pré-pilote" est un compromis pragmatique documenté explicitement dans les ADRs — ce qui est lui-même une preuve de maturité ingenieux.
 
 ---
 
@@ -2034,3 +2034,4 @@ Chiffrer dès le départ sur filesystem Docker (LUKS) nécessite une configurati
 ---
 
 *Document généré le 2026-02-28 | Version 1.0 | bicec-veripass MVP Architecture*
+*Document ratifié le 2026-03- | Version 1.1 | bicec-veripass MVP Architecture*
