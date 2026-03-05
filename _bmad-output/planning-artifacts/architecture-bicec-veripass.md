@@ -378,55 +378,64 @@ C4Container
 ### C4 Level 3 — Composants Backend FastAPI
 
 ```mermaid
-C4Component
-    title FastAPI Backend — Composants internes
+%%{init: {"theme": "base", "layout": "elk", "themeVariables": {"primaryColor": "#E3F2FD", "primaryTextColor": "#1A237E", "primaryBorderColor": "#1976D2", "lineColor": "#1976D2"}}}%%
+flowchart TD
+    subgraph api["**FastAPI App Modular Monolith** [SYSTEM]"]
 
-    System_Boundary(api, "FastAPI App (Modular Monolith)") {
-        Component(auth_mod, "Auth Module", "FastAPI Router", "OTP send/verify</br>PIN setup/verify</br>JWT sessions</br>Back-office login")
+        subgraph row1["API Layer"]
+            auth_mod["**Auth Module**<br>*FastAPI Router*<br>OTP send/verify<br>PIN setup/verify<br>JWT sessions<br>Back-office login"]
+            kyc_mod["**KYC Module**<br>*FastAPI Router*<br>Session create/resume<br>Capture CNI/Bill/NIU<br>Liveness<br>State machine<br>Submit dossier"]
+        end
 
-        Component(kyc_mod, "KYC Module", "FastAPI Router", "Session create/resume</br>Capture CNI/Bill/NIU</br>Liveness</br>State machine</br>Submit dossier")
+        subgraph row2["Processing Layer"]
+            ocr_svc["**OCR Service**<br>*Python Service*<br>PaddleOCR primaire<br>GLM-OCR fallback<br>Quality metrics<br>Confidence scoring"]
+            bio_svc["**Biometrics Service**<br>*Python Service*<br>MediaPipe landmarks<br>MiniFASNet liveness<br>DeepFace face match<br>Anti-spoofing score"]
+        end
 
-        Component(ocr_svc, "OCR Service", "Python Service", "PaddleOCR primaire</br>GLM-OCR fallback (Celery)</br>Quality metrics</br>Confidence scoring")
+        subgraph row3["Business Layer"]
+            bo_mod["**Back-Office Module**<br>*FastAPI Router*<br>Jean: queue, inspect<br>approve/reject/info<br>Thomas: AML, conflicts<br>Sylvie: analytics, SLA"]
+            aml_mod["**AML Module**<br>*FastAPI Router*<br>Fuzzy search PEP/Sanctions<br>Alert management<br>Deduplication<br>Fraud flagging"]
+        end
 
-        Component(bio_svc, "Biometrics Service", "Python Service", "MediaPipe landmarks</br>MiniFASNet liveness</br>DeepFace face match</br>Anti-spoofing score")
+        subgraph row4["Support Layer"]
+            analytics_mod["**Analytics Module**<br>*FastAPI Router*<br>Funnel events<br>SLA dashboard<br>System health<br>Escalation<br>Load balancing"]
+            notif_mod["**Notifications Module**<br>*FastAPI Router*<br>Polling endpoint<br>Celery triggers<br>SMS/Email dispatch"]
+        end
 
-        Component(bo_mod, "Back-Office Module", "FastAPI Router", "Jean: queue, inspect</br>approve/reject/info</br>Thomas: AML, conflicts</br>Sylvie: analytics, SLA")
+        subgraph row5["Infrastructure Layer"]
+            audit_svc["**Audit Service**<br>*Python Service*<br>SHA-256 hashing<br>Append-only log<br>IP tracking<br>COBAC export"]
+            core["**Core**<br>*Config/DB/Security*<br>DB connection pool<br>JWT utils<br>bcrypt/Argon2<br>Settings"]
+        end
 
-        Component(aml_mod, "AML Module", "FastAPI Router", "Fuzzy search PEP/Sanctions</br>Alert management</br>Deduplication</br>Fraud flagging")
+    end
 
-        Component(analytics_mod, "Analytics Module", "FastAPI Router", "Funnel events</br>SLA dashboard</br>System health</br>Escalation</br>Load balancing")
-
-        Component(notif_mod, "Notifications Module", "FastAPI Router", "Polling endpoint</br>Celery triggers</br>SMS/Email dispatch")
-
-        Component(audit_svc, "Audit Service", "Python Service", "SHA-256 hashing</br>Append-only log</br>IP tracking</br>COBAC export")
-
-        Component(core, "Core", "Config/DB/Security", "DB connection pool</br>JWT utils</br>bcrypt/Argon2</br>Settings")
-    }
-
-    Rel(auth_mod, core, "uses")
-    Rel(kyc_mod, ocr_svc, "calls")
-    Rel(kyc_mod, bio_svc, "calls")
-    Rel(kyc_mod, audit_svc, "logs every action")
-    Rel(bo_mod, audit_svc, "logs every decision")
-    Rel(aml_mod, audit_svc, "logs every alert action")
-    Rel(analytics_mod, core, "queries DWH")
+    auth_mod -->|uses| core
+    kyc_mod -->|calls| ocr_svc
+    kyc_mod -->|calls| bio_svc
+    kyc_mod -->|logs every action| audit_svc
+    bo_mod -->|logs every decision| audit_svc
+    aml_mod -->|logs every alert action| audit_svc
+    analytics_mod -->|queries DWH| core
 ```
-
+![C4-Container-Component-L3](https://mermaid.ink/svg/pako:eNqNVm1z2jgQ_isa3-RLBgLhJQnMTWcMmJQWCBdz1-mVTkbYi62LLPlkOa2b8t9vJRuSlHIpHxJ5dyU9--jZlR6dQIbg9J2Tk0cmmO6Tx5WjY0hg5fTJylnTDEc1HHFayFyXVuD3pdFG_kUVo2sOmXHi9FSxhKpiKLlUZfxvXnvcGo_KOZV7CV_185Bzt9W-9F6EDKQKQb0I6l1ejFoVICbgZ77tdntyshIbLr8EMVWaLEcrQfCX5etI0TQmNGWfVs7p6Zhm2l1MiJumZCbDnFOF_4XkTMenp-ST_9FferPPK-fzSpRLvFhGyS_nuI5ZYUoLUDaOPPvRXMd3iQztZi5-lLvA6enva_Vmv_0t8grK2m6WC5KBCBsPoNimMKbFZI4mnafPbO8-LNGWZUyKzHwPaHBfl5sNC4BwGTFxAOW-CPZI3n8cvgrEL1cngQKqoaEgyxMwjiFNda6ADOeTxoBx3phP_jT2KXsAgZPsZI1zSEKDGI_IGvJ1wjQJJS76A0-Y7DFyW4h2oWRgoIjoCMcyUHfZQ2ATuxneEh_UA9JQZbYodIxZ7IyWTxqGHEyoVRlTFuH1dFY3tg3lfI1sGtsfOUUlFCQBrVhgMxtKsWEhCOQ5C6RCWAeA1kzuAQ2YrCa_jmsGIaMLluIJUhGi_O_tjjOsyrHrz0ET_oziEUA6pghjY_4kVAexMbtCs3qWSrkxjBmI8KtstxHxIEemcYcjXK_lXkNWcTel4l7T0jugok_-zSGHGmEiSyHQxk7TVMkHI65_0NJgYiONeRnLhGZ94s6mNRIg4ZwFutRVwR8Y9AkVlBcaWa0Rf-oell3Cn6puNn0V3zj_9q3AeqIqiMnCWzR8KgK9qy2XA_aQBPeMsNcJXbIf5inCoibKLqFoHpINp1H0oyb-h_IOQvTzNJW4wZEOssv0KaGd5RfSEgI4ARRNRd_UJSHN4rWkKiz5zDQkJAbKtZWPlwWU75OaShqSNRpE8DOhC6nZZo9rbr4qRl7HtpCcG4UiOalkJalDQKYLguUSRaBKxDO_4WGNchKyLDUi_1VquwhqIjYKt1Z5YDvWsR4dMr0vWNd8vV6r_lu33upekBjZxDSsTNIU4dSl4IVpwcY0WWAyWCdVxPBm4A4JfDXHfQDDVKpFMMRBtbFtNlFjNGj4EOQKW5G1jwamKgRYiRKsdb67EnLNuOVtHagi1Q1XRVK0ynauNcLIjtH3bLi7tEi9_uZ7jrfMdwuudFbXiPWhVDg6qwZ81F_1w0M_spQZdeKZU5vL96fDKKPLfvNjcAgBy34WXtX9weK2gI9s8aLA7EzsU4pBRkYf3u4yd2pOpFjo9FFLUHMSUKhJ_HQezSIv3kshbGjO8Xxrpevw1VTa7di8liyKlVkzAi-MykcU3kIZ1HY-gS-0Bcc-b9qPj5LSEBUYtnKmk7nn3t753vXMmy_9anUzBxWS4UWlsBCB35hnVIlhceuNvds7b3TtvQgvAg4DvOuNWJ9tga7rW88bfVw5JnS7ElskI6XibymTHR9K5lHs9EvQTp6GOHvEKNbiUwgKzLzkcqGdfrvZ6tpFnP6j89Xp17u9s3an12me93rti1avfYXuwumfN3tnnYtes3nVOW9dNLuX25rzze57ftbsYmDn6qrbu-pddTqXNQevTy1tvngw9lG7_Q8cGY5L)
 ---
 
 ## 4. Diagramme Use Case
 
 ```mermaid
-graph TB
+%%{init: {"theme": "base", "flowchart": {"nodeSpacing": 30, "rankSpacing": 60, "useMaxWidth": false}, "themeVariables": {"primaryColor": "#E3F2FD", "primaryTextColor": "#1A237E", "primaryBorderColor": "#1976D2", "lineColor": "#1976D2"}}}%%
+graph LR
     subgraph Acteurs
-        Marie((" Marie</br>Cliente"))
-        Jean((" Jean</br>Agent KYC"))
-        Thomas((" Thomas</br>Superviseur AML"))
-        Sylvie((" Sylvie</br>Manager"))
-        System((" Système</br>Automatique"))
+        direction TB
+        Marie((" Marie<br>Cliente"))
+        Jean((" Jean<br>Agent KYC"))
+        Thomas((" Thomas<br>Superviseur AML"))
+        Sylvie((" Sylvie<br>Manager"))
+        System((" Système<br>Automatique"))
     end
 
-    subgraph UC_Mobile[" Application Mobile (PWA Marie)"]
+    subgraph UC_Mobile[" Application Mobile - PWA Marie"]
+        direction TB
         UC1[UC1: S'inscrire par OTP SMS/Email]
         UC2[UC2: Configurer PIN & Biométrie]
         UC3[UC3: Capturer CNI Recto/Verso]
@@ -442,7 +451,8 @@ graph TB
         UC13[UC13: Recevoir notifications]
     end
 
-    subgraph UC_Jean[" Back-Office Jean (Validation)"]
+    subgraph UC_Jean[" Back-Office Jean - Validation"]
+        direction TB
         UC14[UC14: Consulter la queue de dossiers]
         UC15[UC15: Inspecter dossier haute-résolution]
         UC16[UC16: Comparer selfie vs photo CNI]
@@ -452,7 +462,8 @@ graph TB
         UC20[UC20: Demander info supplémentaire]
     end
 
-    subgraph UC_Thomas[" Back-Office Thomas (AML/CFT)"]
+    subgraph UC_Thomas[" Back-Office Thomas - AML/CFT"]
+        direction TB
         UC21[UC21: Examiner alertes PEP/Sanctions]
         UC22[UC22: Effacer faux positif AML]
         UC23[UC23: Confirmer match & geler compte]
@@ -464,6 +475,7 @@ graph TB
     end
 
     subgraph UC_Sylvie[" Command Center Sylvie"]
+        direction TB
         UC29[UC29: Consulter dashboard R/Y/G]
         UC30[UC30: Analyser funnel drop-off]
         UC31[UC31: Escalader dossier SLA dépassé]
@@ -473,6 +485,7 @@ graph TB
     end
 
     subgraph UC_System[" Système Automatique"]
+        direction TB
         UC35[UC35: Scorer dossier globalement]
         UC36[UC36: Détecter doublons identité]
         UC37[UC37: Déclencher alerte SLA 2h]
@@ -486,8 +499,10 @@ graph TB
     Thomas --> UC21 & UC22 & UC23 & UC24 & UC25 & UC26 & UC27 & UC28
     Sylvie --> UC29 & UC30 & UC31 & UC32 & UC33 & UC34
     System --> UC35 & UC36 & UC37 & UC38 & UC39 & UC40
+
 ```
 
+![Use-Case Diagram](https://mermaid.ink/svg/pako:eNqNV41u2zYQfhVCQ9YWSBpL9E9sDAUcJw2yNY0RJy26uhhoiba5SqRGUl6ywO9TP4dfbHek1Zpu0iZAFIX67od3392R91GqMh71or29eyGF7ZH7cWTnvODjqEfG0YQZeNuHt2mu_k3nTFv8ACAJcqOSpULOcIU2EKSZ_Ly12HaLleEX7Pa9yOwcF6csN3yJH5ydd0wLNsm52egttSiYvhuoXGnvwy-n9HXy-sS7sfl8zW_tNiTuJ7RzGkCOlc64DkDdTvsk8aBcSP7Qt-Vyubc3ljPNyjl5czWWBH5MNfEL_dTyShu_ij-Z0Dy1Qklyffxt9QL2xJ8_H0f-7beJfjXIBZcWYvnixTfc75xJB8MXRPVnACJ_fBiEuOu5KphxSP-K2FFVcr0QBhwi_Ys3ocToLl9sXPCvKHHBJJtxvYs0lhcbpLHrL4XD9isLhqz4p9rymctsLHdCcjP460JNRM4_goZ-WeYiZS4gfpUckOH7vo_DOPr0s8jdDOKP8Nsjo2dCmlQDiJRMk8vrIRldjA5PCybyT9v4BPBJjwyUnIpZpbkmw_O35FdyLFSxXlkwG8ApwCnAWWkdePD2nFyBI-rwHddGBdgmYJs9MmTGABL2YrmxJOMkFwsuuTEBugXoFjjOhBGasEwDgIMjZ8MRUSXuVPLQ9TZItHvkpswVA6pCZaToFKmsyIVlsPcA3gF4p0dO1qs0Z-i7qkhVy749vwnARwA-6gFhU15a3OfZDfgyEjMJ_2RiBvpzqD5pA6kuSHVhD6oquLXgCmw6U8YIEAJWBti4gZlqALoSC4Q-g3AziE9Vi4Rwl1jI7Okt-KxdQA0xSOEUXo7PB6c7-jGzMaT2ipcamAcmDIQUGcNKvf5iSKqqstoJUowJjilKpXyhIBNSWTHdkLLO2CNExjJEGh-z9PPB5RSkuCtNIPE7lovM6Xgai5E7cdPx0lQ5ZiBnBIqp4kigTYBCAsXIoBgodC5NCVoxUZvYz1ll-YFer4zKKzQXCiKR4jYaK0rHDMPzqeBkYUg5V1Yhy0MJ5FIMZHLb8lRKldZi5oxKuV5BTi4HV6EUkipGVpWlVtXCF8WDyUYixV3Mwt8cN8IWPCUFZiIsXuRQAhw64QWT6IiQUwU5gT6yXiE9t6rgkaT5jribNr8KiYPWeDh4ff2krCXI0cRxlBUCKwWKREPVk-Hp8HDEZLpNoo2Ma0BA09Mp1K-r4uqWlMoI2CxaD9FIz4Ru-pUuAA9dNp1Dbc442IIsFFCvoQxyKQEuXWH-KyyEFKShRRiSPYP0SSvsehXKIJcS4NLZelXXGvR-iaU2uLo5CcHIn6SNlawXXOTox8R51S-gn9sq23EI2ZN0MLs5xOQrmkvCtYZ5FKKRNQmwZqgVjCvXB-t9mu8sPJJkP8QwycBxpAoZ4DjVm-n2tOwiKZPudk1mzMwniumMXB1-ODwLJwVykwI3-5LldzgBphW2cJJpVR6oachkitShSB2Tsty15Lp4R2_6JFuvShgjO1miyB3qWlwmDMyqSYWhgVPWjLt02ZBr1E0v6nqo0rgBOGt9dmxQukASkMHlcT_soxTpQ5tBdg2TCDabgf-z2OMJ4ePWAYEEp4MnhJ4iHSlOx9S1_jo0s1xNHppDFBlJ227Y2boVVpMcEkceJjxFTtJ6PALR51-r1yUgmYdwJCUFUo7uZArz3HxX5GTOJ1l4HqBIIAoEGlYaG2XKwMrXoZQrSHxYKE2kUBMohJ2pKsnJMYwAaIIZnAW_j7k7I5GDg1fYQKEhAFndk7pn0z1b7tl2z457Hrln1z3jhv_jpWMvHlOv3g8yr90ri7222KuLvb7YK4y9xqThhet26sSTjXdef-L9S7zOxOtMvM7E60yOvBZfrLUWb4F6n6nXSTdb9jpps5ZDBm7kqLdAvQXqLVDvNfU6m-B1tB_NtMiintUV34-g08LREf6N7lHnQ5ccv75zz3H2H7rt1F--v_LUXx669-C35f6WBzvXn43ojy5BO5hHb0I7uB9ch2rkY3ci5_RYLl1QSyb_VKqo4wrngNk86rnN7UdVCWckfiIYNI9vEC6d5UraqNei3cQpiXr30W3Ui5vJy06redRq0VYMjwbdj-6i3kESd-nLo1aTdmmn0Wm0k-V-9J-z23oZN9pHnTaNj9rtTjsBddA9rdIX_ibrLrTL_wFtQn0c)
 ---
 
 ## 5. State Machine KYC
@@ -1004,7 +1019,11 @@ sequenceDiagram
 
 ### 7.1 Modèle Conceptuel (CDM)
 
+
+
 ```mermaid
+%%{init: {"theme": "default", "layout": "elk", "themeVariables": {"primaryColor": "#E3F2FD", "primaryTextColor": "#1A237E", "primaryBorderColor": "#1976D2", "lineColor": "#1976D2"}}}%%
+
 erDiagram
     USER ||--o{ KYC_SESSION : "initie"
     USER ||--o{ NOTIFICATION : "reçoit"
@@ -1031,12 +1050,14 @@ erDiagram
 
     AUDIT_LOG }|--|| USER : "tracé par"
 ```
+![cdm](https://mermaid.ink/svg/pako:eNp9ld9uokAUxl-FzMbsjW2KaBXuKIwtqUoj2KQbEjKV0U4WZ8wATbvIu-zdrs_hi-3wz4qrGhMd5vudOeeb4zEFcxZgoIFWKyWUxJqUeiB-wyvsAU3yQIAXKAljD7TFIkSfLIk1D-DwZ_mkUD4jTtBriKMcEfiakxXinwYLGS-jfIPKsDM0S6badvFHfCiR9Y7Shw3JHeMB5g2R2r81O1U2hOJTe1mWtVoe9SjmJkFLjlYelcRr5sCptNlcXbFUenwxfAc6jmVPpBzOSyei5P-VE9u1hpahu7WU490fRuJTWtt9akSNvqNEOERjsiBYeicoh0rsMIGc3qSSaRuzMZy4BTpnghJkfcyxnm2kO8seQ3dqGf4UOrNRya05CxJyHkslfTzy9RGclvrlbkt3fzm-AJizp1FuAPSNB2g8Fliw285DTOdv-EKChj1xRD0iPcOemgW3IBSFJMLSGvELpGmLJZz6uvi4n-xNQVFElnS3lXa_L-T7rI8ss7gv34SG5Zy5uJPWiErdmQn9O901HnzLhePa1XcSEUbzwwNEo6-L3N9adYu2MfWHFhyV9Yoe54jEEqZfhH5fy3NzT1daUHtvG8S58nbbFY6bRJantCkWxkvp4FoYXzRW5WElbxZe13LWj8PuLCM8QdH6-sTI83JOt1qzZ6qDZ6bl-iP7vs61-DlVDsyF2UWfgDZYchIALeYJboMV5iuUL0GaR2nMq1cUiW_t8nk5r8qNcmQd6I-mVpHO5dl1pDk7wI50F6ZYrTw3yvL9zKPiLSxYI_qDsVXtAmfJ8g1oCxRGYpWsAxTjat7tJZgWJyc0BtptV-kVQYCWgg-gXfXU65vejdzrdJWuKquqfNsGn0CTB8p1ZyCrA0VWux2518_a4Fdxrnyt9AYDuT-Qu11VUeQbEQ8HJGZ8XP6HiLZYkCXI_gG5bfGX)
 
 ---
 
 ### 7.2 Modèle Logique (LDM) — Tables OLTP
 
 ```mermaid
+%%{init: {"theme": "default", "layout": "elk", "themeVariables": {"primaryColor": "#E3F2FD", "primaryTextColor": "#1A237E", "primaryBorderColor": "#1976D2", "lineColor": "#1976D2"}}}%%
 erDiagram
     users {
         UUID id PK
@@ -1059,6 +1080,9 @@ erDiagram
         DECIMAL confidence_score_global
         INT liveness_strike_count
         BOOLEAN priority_flag
+        BOOLEAN doc_expiry_flag
+        TIMESTAMPTZ doc_expiry_deadline
+        TIMESTAMPTZ doc_expiry_notified_at
         TIMESTAMPTZ escalated_at
         TIMESTAMPTZ started_at
         TIMESTAMPTZ submitted_at
@@ -1249,6 +1273,28 @@ erDiagram
         INET client_ip
     }
 
+    support_threads {
+        UUID id PK
+        UUID session_id FK
+        TIMESTAMPTZ created_at
+        TEXT status
+    }
+
+    support_messages {
+        UUID id PK
+        UUID thread_id FK
+        TEXT sender_type
+        UUID sender_id
+        TEXT content
+        TEXT attachment_path
+        TEXT attachment_sha256
+        TIMESTAMPTZ sent_at
+        TIMESTAMPTZ read_at
+    }
+
+    kyc_sessions ||--o{ support_threads : "session_id"
+    support_threads ||--|{ support_messages : "thread_id"
+
     users ||--o{ kyc_sessions : "user_id"
     users ||--o{ notifications : "user_id"
     users ||--o{ otp_sessions : "phone/email"
@@ -1269,6 +1315,7 @@ erDiagram
     pep_sanctions ||--o{ aml_alerts : "pep_sanctions_id"
 ```
 
+![LDM](mermaid.ink/svg/pako:eNrVWW1v2zYQ_iuGhgArkHaJ0ySOv-XF3bI1bdG6xdB5IGiJltlSpEpSSdwk_31HSoolknKUpl8WFCisO5J3z72TN1EsEhKNo62tG8qpHg9uZpFekozMovFgFiVkgQumZ9E2_GB4JQo9nkWEfS2_WM5PWFI8Z0SZJbA8lzTDcnUqmJDlLr9M9l4NX52VayrylFzrJsvu8XDvcNJiOREyIbLFdHR4cDaspKGchGh3d3dbWzM-4_1VKgn_B62IPKM4lTib8QH8FYpIBdLZH-bv48fzswFNBu_-Wn_7dPz-9I_j978Od54N8qXgZPAxRN3ffzYgGaasm5xTjpZYLdfkk7dvX0-O3wzmVGRESxojkWtEub_BLpzOME8LnJI1dXp-MfkwPb54N_08iCXBmiQI6zC9yJMW_W5WHfN1FSNFlKKCPwiG_WZgQ0B45RJANh6vXNJ08vd0oDTWhXI-4jiGcxEjl4Q5JE4LpFd5Q9ezyen5xfHrQSz4giZwEEEqFpKglIk5bqw_fzMdMHpJuNlbAapfCYpFwbWPO_iUkFSv0ILh1CcnIkbkOqfSZWji2mBKCE6MBz7IyIWmC7rBWETFmG00JwAqN9KLeUb1Jo5YZDkjHodBn2GlATqSo3umJr6Tabm99RlEc8ehQNEiI1z386bK9YJeYyBre4H9vKCMoBzrpetkSzzcP3BizFJELBHhacs2f354--bEUiS-Ql-U4C6t4Wo5uDxYjCUeD851AV74rcDMeFIZx6oD8pK5jbjxV6uRot8Jmq80UQ6gRkZ7eD9Ea_yDkNp9EMeZCyqkXolj4w6XmBU9As-Pl2WRYQ4uIyWJWy5jD7j_7h5ghV5T5ytkEokvfst3a24vna1zqSQKKtWTvLDWfYFB6wzreOnqXnOsM06YjrmmSOVCLChPXSaLTwatBEOXUJKMIObEjQz1gWGAcilMbg0BZMHth0o4oa9rEhSltic9UA6tGjlW6gqqeChOpWCkHRmmcIAtrwhNl07QxAU4AfiJS6vdkSqEL0EE04e0V4KfA3ooEWB0CGynOjRxtJnQspvgDmIZU9K7idgAmSXFcEoHSZKUCt61TmRZwbt2hdwkNSgahshi0a-naKT4EjkwJU35k5P9vbNtDPrysEdXtIaulcc4ykA6otAbGbkSEtP-jdDjtbFFrTrDdX2CWyXIltlql7yjo4CdkmCIZwxhRuRPsEoOTYDCPDbwqKA-9qCOZi2YMoMNYVkEGMHSlgD_mC-FMk1TbA31Yy0wFATBLkOAtbR8CLNSflFIL0ODsUyaCLUsBWOBqvvPvwAfxYo0kDg7nk4GpldHYoHmVHptDrcQ2HbD2w3yvplvVK9QtyeVvd4KynoozoucGcihg16S-Otj3QlxcuW7VINOrilYlae-uUvPCSBpjVi0ncBue29d13t6eQB0N8rEGrQVUJueFDc14nFaIDPi5K1eqDF7XGIort0c4AMYVYXcNA0-Z5lPaEo1ZsgkR2x7Uac1bk4FfgK1eSZmtJlo1p2nznvPht6gvKkt8HrDhLj9QHMcMmMTUV7bjGHAyXId9nYYU92pRZJvBVEBPTEUDqoLEGJu_I70s3-dbzY4XDAldQ7EREohQ05fEhKiW9AZCCT0uqtmB9OlE6KAVT-9Kv5kU-g-POKX89FaCjBgboLs0Q1rOS2Xif_HbyisjAFoMzi1dalSyp3jFRM4CXoW2DTpiC8TRd3lB4dqdZFQjZhIm5qdnP_-YfL-HCpoqPZo09GGZrgyeYHm3kVLO19Woy8MgibHuN8haTvfyxhdYp6CfcpJ1G3qiVwImdlg6DDwPUfv7KOKPBemt1ga6J52nfDYmPSEqPyknxSlxOEwITwhbpBXolsK9Qdnrgl3hYXch-OlnfMDVyENankr8tP8tXVdeHv7_Lm48Qxl7l7XhphFYXOaxbc3PsBje4lcAWgWN29rqxNbUpgFVcjXZ7WY2wnkIe5WzTPMtpj9VpatqAME0GN97RVW3wfuNnBZ0XftTbPJ77_Ia-jaS03Dtklet0t6xMGBibH_6uCI9hioQqUwvH5txsqujds3-wCyvl2rl1Q3Kg9oWk-E4VWdGoaW2SuHWre0dYK9runi9aLGX-E1QhUK3RDW3UK9RXuWCjurO1XOomg7SiVNorGWBdmOMiIh3uBnZNNt6wlqDvPSLNouv_tPUA1-5xXKirf5Lcrh6XyQcvg2vErVnF1PU4YOyRX-AQQ55p-FyGoUpCjSZTReYKbgV_mCU71g3X-VtmqcmgYwGh-MDvfsLtH4JrqOxs-Hh0cv9od7e6Ph7mj_6OUeUFfm887wxcHh7uHuy9HL4Q78N7zbjr7bk3dfjA6PRvujg4P9vcPhzsFotB0RaFGEvCjfOu2T591_zYjNqQ)
 ---
 
 ### 7.3 Data Dictionary (Champs critiques)
@@ -1387,6 +1434,14 @@ erDiagram
     fact_validation_actions }|--|| dim_time : "time_dim_id"
     dim_agents }|--|| dim_agencies : "agency_id"
 ```
+
+### 7.5 Legende
+Notation Mermaid :
+
+||--o{ signifie : un à plusieurs (0 ou plus)
+||--|{ signifie : un à au moins un (1 ou plus)
+||--o| signifie : un à zéro ou un
+}|--|| signifie : plusieurs à exactement un
 
 ---
 
