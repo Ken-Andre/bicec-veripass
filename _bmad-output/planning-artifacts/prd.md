@@ -8,7 +8,7 @@ inputDocuments:
   - "README-bmad.md"
 workflowType: 'prd'
 classification:
-  projectType: "Mobile App (Flutter) + API Backend (FastAPI) + Back-Office Portal (Web)"
+  projectType: "Mobile-first PWA (React/TypeScript) + API Backend (FastAPI) + Back-Office Portal (Web)"
   domain: "Fintech (Digital KYC/Banking)"
   complexity: "High"
   projectContext: "Brownfield"
@@ -20,6 +20,9 @@ classification:
 **Date:** 2026-02-07
 
 **Reconciliation Note (2026-02-23):** The interactive prototype at `docs/test_tmp_trash/onboarding-system-design-wireframe` and the UX Specification `_bmad-output/planning-artifacts/ux-design-specification-v2.md` (2026-02-18) have been reviewed and validated as the current UI/flow references. This PRD is now aligned to the prototype where discrepancies existed; see `docs/diagrams/adr-state-mapping.md` for the authoritative state mapping and the Mermaid diagrams in `docs/diagrams/` for flow/state/ER artifacts.
+
+> [!IMPORTANT]
+> **Stack reconciliation (ADR-001, 2026-03-04):** The `projectType` field above originally referenced Flutter. ADR-001 tranche en faveur d'une **PWA React/TypeScript** (vitesse de dev, cross-platform, pas de store). Pour tout choix technologique, **ADR-001 prime sur ce PRD**. La source de vérité technique est `_bmad-output/planning-artifacts/architecture-bicec-veripass.md`.
 
 ## 1. Executive Summary
 **bicec-veripass** is BICEC's **client relationship and service discovery platform**—a mobile-first ecosystem that transforms customer acquisition through digital KYC onboarding (**<15 minutes [11-minute stretch goal]** vs. 14 days), personalized banking service demonstrations, and account lifecycle management. Built on a 100% On-Premise, Open-Source AI stack, it serves as the **central touchpoint** for new customer relationships, bridging the "Trust Gap" for young entrepreneurs while maintaining COBAC-compliant "Human-in-the-Loop" validation.
@@ -441,13 +444,13 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 - **NFR12 (Language & Literacy)**: The interface must support **French and English** with regional terminology (NIU, ENEO) and vibrant illustrated guidance for lower digital literacy.
 ## Appendix C: Regulatory & Legal Compliance Matrix
 
-| Regulation | Key Theme | Summary Requirement | PRD Coverage |
-| :--- | :--- | :--- | :--- |
-| **COBAC R-2023/01** | LBC/FT | Identification, risk classification, and transaction monitoring. | FR1-FR6, FR14-FR16, FR20-FR30, NFR13-NFR14 |
-| **COBAC R-2023/01** | Retention | 10-year storage of KYC dossiers and transaction records. | NFR14, FR36-FR38 |
-| **COBAC R-2019/02** | Prudence | Functional gating for restricted/partially verified accounts. | FR16, FR45 (LIMITED_ACCESS logic) |
-| **Law 2024-017 (Cameroon)** | Data Protection | Sovereignty, minimization, and explicit consent for biometric data. | NFR6, NFR11-14, FR11, FR17-18 |
-| **Law 2024-017** | Data Subject Rights | Rights of access, rectification, and erasure. | FR5, FR28, FR36-FR38 |
+| Regulation                  | Key Theme           | Summary Requirement                                                 | PRD Coverage                               |
+| :-------------------------- | :------------------ | :------------------------------------------------------------------ | :----------------------------------------- |
+| **COBAC R-2023/01**         | LBC/FT              | Identification, risk classification, and transaction monitoring.    | FR1-FR6, FR14-FR16, FR20-FR30, NFR13-NFR14 |
+| **COBAC R-2023/01**         | Retention           | 10-year storage of KYC dossiers and transaction records.            | NFR14, FR36-FR38                           |
+| **COBAC R-2019/02**         | Prudence            | Functional gating for restricted/partially verified accounts.       | FR16, FR45 (LIMITED_ACCESS logic)          |
+| **Law 2024-017 (Cameroon)** | Data Protection     | Sovereignty, minimization, and explicit consent for biometric data. | NFR6, NFR11-14, FR11, FR17-18              |
+| **Law 2024-017**            | Data Subject Rights | Rights of access, rectification, and erasure.                       | FR5, FR28, FR36-FR38                       |
 
 > [!NOTE]
 > This matrix maps primary regulatory requirements to specific Functional (FR) and Non-Functional (NFR) requirements to streamline Compliance reviews and COBAC audits.
