@@ -138,65 +138,82 @@ export function App() {
 
       {/* Hero */}
       <main className="max-w-6xl mx-auto px-6 py-12">
-        <div className="text-center space-y-6 mb-16">
+        <div className="text-center space-y-6 mb-12">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-orange-50 rounded-full text-xs font-semibold text-[#E37B03] mb-4 border border-orange-100">
-              <Shield className="w-3.5 h-3.5" /> Sécurisé · Conforme COBAC · Mobile-First
+              <Shield className="w-3.5 h-3.5" /> Conforme COBAC · Mobile-First · KYC en temps réel
             </div>
             <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-              Ouverture de Compte
+              Ouvrir un compte BICEC
               <br />
-              <span className="bg-gradient-to-r from-[#E37B03] to-[#4A2205] bg-clip-text text-transparent">& Vérification KYC</span>
+              <span className="bg-gradient-to-r from-[#E37B03] to-[#4A2205] bg-clip-text text-transparent">en 15 minutes, pas 14 jours</span>
             </h1>
             <p className="text-lg text-slate-500 max-w-2xl mx-auto mt-4 leading-relaxed">
-              Vérification d'identité de bout en bout pour BICEC Cameroun. Explorez le parcours mobile client
-              et le workflow de validation interne côte à côte.
+              BICEC VeriPass — KYC numérique de bout en bout. De la capture CNI biométrique jusqu'au compte actif, sans visite obligatoire en agence.
             </p>
+          </motion.div>
+
+          {/* Hero metrics */}
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+            className="flex flex-wrap items-center justify-center gap-5 mt-2">
+            {[
+              { before: '14 jours', after: '15 min', label: 'Délai d’ouverture', emoji: '⚡' },
+              { before: 'Agence requise', after: '100% mobile', label: 'Parcours client', emoji: '📱' },
+              { before: '76%', after: '98.4%', label: 'Score vivacité IA', emoji: '🧠' },
+            ].map((m) => (
+              <div key={m.label} className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 shadow-sm">
+                <span className="text-2xl">{m.emoji}</span>
+                <div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-400 line-through">{m.before}</span>
+                    <ArrowRight className="w-3 h-3 text-slate-300" />
+                    <span className="font-black text-slate-900">{m.after}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">{m.label}</p>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+
+          {/* Demo CTAs */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+            className="flex items-center justify-center gap-3 pt-2">
+            <button onClick={() => setViewMode('mobile')}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#E37B03] to-[#4A2205] text-white font-bold rounded-2xl shadow-lg shadow-orange-200 hover:shadow-xl hover:scale-105 transition-all text-sm">
+              <Smartphone className="w-4 h-4" /> Lancer la Démo Mobile
+            </button>
+            <button onClick={() => setViewMode('backoffice')}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white font-bold rounded-2xl shadow-sm hover:bg-slate-800 transition-all text-sm">
+              <Monitor className="w-4 h-4" /> Portail Back Office
+            </button>
           </motion.div>
         </div>
 
-        {/* Two cards */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-16">
-          <motion.button onClick={() => setViewMode('mobile')}
-            initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
-            className="group relative bg-white rounded-3xl border border-slate-200 p-8 text-left hover:border-orange-300 hover:shadow-xl hover:shadow-orange-100/50 transition-all duration-300">
-            <div className="absolute top-6 right-6">
-              <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-[#E37B03] group-hover:translate-x-1 transition-all" />
-            </div>
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#E37B03] to-[#4A2205] flex items-center justify-center shadow-lg shadow-orange-200 mb-5">
-              <Smartphone className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Application Mobile Client</h2>
-            <p className="text-sm text-slate-500 leading-relaxed mb-5">
-              Vivez le parcours complet d'ouverture de compte — de l'écran d'accueil jusqu'à la capture CNI, la détection de vivacité et les états post-soumission.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {['18 Étapes', 'Offline-First', 'Revue OCR', 'Vivacité', 'Portails Post-Soumission'].map(tag => (
-                <span key={tag} className="px-2.5 py-1 bg-orange-50 text-[#E37B03] text-[10px] font-semibold rounded-full border border-orange-100">{tag}</span>
-              ))}
-            </div>
-          </motion.button>
-
-          <motion.button onClick={() => setViewMode('backoffice')}
-            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}
-            className="group relative bg-white rounded-3xl border border-slate-200 p-8 text-left hover:border-orange-300 hover:shadow-xl hover:shadow-orange-100/50 transition-all duration-300">
-            <div className="absolute top-6 right-6">
-              <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-[#4A2205] group-hover:translate-x-1 transition-all" />
-            </div>
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#4A2205] to-slate-900 flex items-center justify-center shadow-lg shadow-indigo-200 mb-5">
-              <Monitor className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Portail de Validation Back Office</h2>
-            <p className="text-sm text-slate-500 leading-relaxed mb-5">
-              Examinez les dossiers soumis en affichage côte à côte. Approuvez ou rejetez avec motifs. Visualisez OCR, vivacité et évaluation du risque.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {['Côte-à-Côte', 'Confiance OCR', 'Score Risque', 'Approuver/Rejeter', 'Traçabilité Audit'].map(tag => (
-                <span key={tag} className="px-2.5 py-1 bg-slate-50 text-slate-700 text-[10px] font-semibold rounded-full border border-slate-200">{tag}</span>
-              ))}
-            </div>
-          </motion.button>
-        </div>
+        {/* Three Personas */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+          className="max-w-4xl mx-auto mb-12">
+          <h3 className="text-center text-sm font-bold text-slate-500 uppercase tracking-wider mb-5">3 Rôles, 1 Plateforme</h3>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { name: 'Jean-Pierre K.', role: 'Chargé KYC', desc: 'Valide les dossiers, vérifie OCR et vivacité', avatar: 'JP', color: 'emerald', view: 'backoffice' },
+              { name: 'Thomas N.', role: 'Responsable AML/Ops', desc: 'Screening AML, déduplication, fráude', avatar: 'TN', color: 'orange', view: 'backoffice' },
+              { name: 'Sylvie E.', role: 'Directrice', desc: 'KPIs, métriques nationales, pilotage', avatar: 'SE', color: 'purple', view: 'backoffice' },
+            ].map((p) => (
+              <button key={p.name} onClick={() => setViewMode('backoffice')}
+                className="group bg-white rounded-2xl border border-slate-200 p-5 text-left hover:shadow-md hover:border-orange-200 transition-all">
+                <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black mb-4 shadow-sm',
+                  p.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
+                    p.color === 'orange' ? 'bg-orange-100 text-[#E37B03]' : 'bg-purple-100 text-purple-700')}>{p.avatar}</div>
+                <p className="font-bold text-slate-900 text-sm">{p.name}</p>
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-0.5 mb-2">{p.role}</p>
+                <p className="text-xs text-slate-400 leading-relaxed">{p.desc}</p>
+                <div className="flex items-center gap-1 text-[11px] font-bold text-[#E37B03] mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Se connecter <ArrowRight className="w-3 h-3" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </motion.div>
 
         {/* Feature highlights */}
         <div className="max-w-4xl mx-auto">

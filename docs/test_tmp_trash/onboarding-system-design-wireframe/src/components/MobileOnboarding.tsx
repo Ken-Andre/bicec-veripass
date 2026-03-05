@@ -258,38 +258,116 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
     if (postState === 'full') {
       return (
-        <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-6">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
-              <Shield className="w-10 h-10 text-emerald-600" />
-            </div>
-            <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-              <Check className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Accès complet débloqué ! 🎉</h2>
-            <p className="text-sm text-slate-500 mt-2">Votre identité a été vérifiée. Toutes les fonctionnalités sont désormais accessibles.</p>
-          </div>
-          <div className="w-full space-y-3">
-            {[
-              { label: 'Virements entrants et sortants', icon: Send },
-              { label: 'Demander la carte de débit', icon: CardIcon },
-              { label: 'Investissements et épargne', icon: Sparkles },
-              { label: 'Pré-approbation de crédit', icon: CheckCircle },
-            ].map(({ label, icon: Icon }) => (
-              <div key={label} className="flex items-center gap-3 px-4 py-3.5 bg-white rounded-xl border border-emerald-200 shadow-sm">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-emerald-600" />
-                </div>
-                <span className="text-sm font-medium text-slate-700">{label}</span>
-                <ArrowRight className="w-4 h-4 text-slate-400 ml-auto" />
+        <div className="flex flex-col h-full bg-slate-50">
+          {/* Banking Header */}
+          <div className="bg-gradient-to-br from-[#1a3a6b] to-[#0d2247] px-5 pt-6 pb-16">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-blue-300 text-xs">Bonjour,</p>
+                <p className="text-white font-bold text-base">Adjoua Cécile M.</p>
               </div>
-            ))}
+              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">AC</span>
+              </div>
+            </div>
+            {/* Balance card */}
+            <div className="text-center">
+              <p className="text-blue-300 text-xs mb-1">Solde disponible</p>
+              <p className="text-white text-4xl font-black tracking-tight">125 000 <span className="text-2xl text-blue-200">XAF</span></p>
+              <p className="text-blue-400 text-xs mt-1">≈ 190,55 EUR</p>
+            </div>
           </div>
-          <button onClick={() => { setPostState(null); setCurrentStepIdx(0); onComplete?.(); }} className="w-full py-2.5 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors mt-2">
-            Recommencer la démo
-          </button>
+
+          {/* Visa Card */}
+          <div className="px-5 -mt-10 mb-4">
+            <div className="relative">
+              <svg viewBox="0 0 340 200" className="w-full rounded-2xl" style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.2))' }} xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="card-bg" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#E37B03" />
+                    <stop offset="100%" stopColor="#4A2205" />
+                  </linearGradient>
+                </defs>
+                <rect width="340" height="200" fill="url(#card-bg)" rx="16" />
+                {/* Shine circles */}
+                <circle cx="280" cy="60" r="90" fill="white" opacity="0.06" />
+                <circle cx="60" cy="160" r="70" fill="white" opacity="0.06" />
+                {/* BICEC logo text */}
+                <text x="24" y="44" fill="white" fontSize="18" fontWeight="900" fontFamily="Arial" opacity="0.9">BICEC</text>
+                <text x="24" y="58" fill="white" fontSize="8" fontFamily="Arial" opacity="0.6">Banque Internationale du Cameroun</text>
+                {/* Chip */}
+                <rect x="24" y="72" width="42" height="32" fill="#d4a017" rx="5" />
+                <rect x="30" y="78" width="30" height="20" fill="#c8951a" rx="3" />
+                <line x1="38" y1="78" x2="38" y2="98" stroke="#d4a017" strokeWidth="1" />
+                <line x1="46" y1="78" x2="46" y2="98" stroke="#d4a017" strokeWidth="1" />
+                <line x1="30" y1="86" x2="60" y2="86" stroke="#d4a017" strokeWidth="1" />
+                {/* WiFi symbol */}
+                <path d="M82,82 Q90,74 98,82" fill="none" stroke="white" strokeWidth="2" opacity="0.7" />
+                <path d="M85,87 Q90,82 95,87" fill="none" stroke="white" strokeWidth="2" opacity="0.7" />
+                <circle cx="90" cy="93" r="2" fill="white" opacity="0.7" />
+                {/* Card number */}
+                <text x="24" y="142" fill="white" fontSize="14" fontFamily="monospace" letterSpacing="2" opacity="0.9">•••• •••• •••• 4521</text>
+                {/* Name */}
+                <text x="24" y="170" fill="white" fontSize="10" fontFamily="Arial" opacity="0.8">MBARGA ADJOUA CECILE</text>
+                {/* Expiry */}
+                <text x="24" y="184" fill="white" fontSize="9" fontFamily="Arial" opacity="0.6">Exp: 03/29</text>
+                {/* VISA logo */}
+                <text x="288" y="175" fill="white" fontSize="22" fontWeight="900" fontFamily="Arial" fontStyle="italic" opacity="0.9">VISA</text>
+                {/* Verified badge */}
+                <rect x="240" y="24" width="80" height="22" fill="rgba(16,185,129,0.3)" rx="11" />
+                <text x="280" y="39" textAnchor="middle" fill="#34d399" fontSize="9" fontWeight="bold" fontFamily="Arial">✓ KYC Validé</text>
+              </svg>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="px-5 mb-4">
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { icon: Send, label: 'Virement', color: 'bg-blue-100 text-blue-700' },
+                { icon: ArrowRight, label: 'Recharger', color: 'bg-emerald-100 text-emerald-700' },
+                { icon: CardIcon, label: 'Ma Carte', color: 'bg-orange-100 text-orange-700' },
+                { icon: Sparkles, label: 'Épargne', color: 'bg-purple-100 text-purple-700' },
+              ].map(({ icon: Icon, label, color }) => (
+                <button key={label} className="flex flex-col items-center gap-1.5">
+                  <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center shadow-sm`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-600">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Transactions */}
+          <div className="px-5 flex-1 overflow-y-auto">
+            <p className="text-xs font-semibold text-slate-500 mb-2">Dernières transactions</p>
+            <div className="space-y-2">
+              {[
+                { label: 'Recharge Orange Money', amount: '+50 000', date: 'Hier', type: 'in', icon: '📱' },
+                { label: 'Facture ENEO', amount: '-12 500', date: '20 févr.', type: 'out', icon: '⚡' },
+                { label: 'Transfert Camtel', amount: '-5 000', date: '19 févr.', type: 'out', icon: '📟' },
+                { label: 'Virement reçu', amount: '+200 000', date: '18 févr.', type: 'in', icon: '🏦' },
+              ].map((tx) => (
+                <div key={tx.label} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm">
+                  <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-base shrink-0">{tx.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{tx.label}</p>
+                    <p className="text-xs text-slate-400">{tx.date}</p>
+                  </div>
+                  <span className={`text-sm font-bold ${tx.type === 'in' ? 'text-emerald-600' : 'text-red-500'}`}>{tx.amount} XAF</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Demo restart */}
+          <div className="px-5 py-3">
+            <button onClick={() => { setPostState(null); setCurrentStepIdx(0); onComplete?.(); }}
+              className="w-full py-2 border border-slate-300 text-slate-500 text-xs font-medium rounded-xl hover:bg-slate-50">
+              ↺ Recommencer la démo
+            </button>
+          </div>
         </div>
       );
     }
@@ -390,7 +468,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">Adresse e-mail</label>
-              <input type="email" placeholder="votre@email.com" defaultValue="maria.garcia@email.com"
+              <input type="email" placeholder="votre@email.com" defaultValue="mbarga.adjoua@gmail.com"
                 className="w-full mt-1.5 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#E37B03] focus:border-[#E37B03] outline-none" />
             </div>
             <div className="bg-orange-50 rounded-xl p-4 flex items-start gap-3 border border-orange-100">
@@ -472,71 +550,224 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
       case 'id-front':
       case 'id-back':
         return (
-          <div className="px-6 space-y-6">
-            <div className="text-center space-y-2">
-              <CreditCard className="w-12 h-12 text-[#E37B03] mx-auto" />
+          <div className="px-6 space-y-4">
+            <div className="text-center space-y-1">
+              <CreditCard className="w-10 h-10 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">
-                CNI — {currentStep.id === 'id-front' ? 'Recto' : 'Verso'}
+                CNI Biométrique — {currentStep.id === 'id-front' ? 'Recto' : 'Verso'}
               </h2>
-              <p className="text-sm text-slate-500">
+              <p className="text-xs text-slate-500">
                 {currentStep.id === 'id-back'
-                  ? 'Verso de votre CNI — N° national camerounais'
-                  : 'Recto de votre CNI — numéro et informations civiles'}
+                  ? 'Placez le verso de votre CNI dans le cadre'
+                  : 'Placez le recto de votre CNI dans le cadre'}
               </p>
             </div>
-            <div className="relative aspect-[1.6/1] bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center">
-              <div className="absolute inset-4 border-2 border-dashed border-white/40 rounded-xl" />
-              <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-blue-400 rounded-tl-lg" />
-              <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-blue-400 rounded-tr-lg" />
-              <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-blue-400 rounded-bl-lg" />
-              <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-blue-400 rounded-br-lg" />
-              <div className="text-center z-10">
-                <Camera className="w-8 h-8 text-white/60 mx-auto mb-2" />
-                <p className="text-white/60 text-xs">Aperçu caméra</p>
-              </div>
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
-                <span className="text-xs text-white/80 bg-black/40 px-3 py-1 rounded-full">
-                  {currentStep.id === 'id-front' ? 'Recto CNI' : 'Verso CNI'}
-                </span>
-              </div>
+
+            {/* Realistic CNI SVG Preview */}
+            <div className="relative rounded-2xl overflow-hidden border-2 border-slate-200 bg-slate-50">
+              {/* Scan line animation */}
+              <motion.div
+                className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#E37B03] to-transparent z-20"
+                style={{ boxShadow: '0 0 8px 2px rgba(227,123,3,0.5)' }}
+                animate={{ top: ['8%', '90%', '8%'] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+              />
+              {/* Corner guides */}
+              <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-[#E37B03] rounded-tl z-10" />
+              <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-[#E37B03] rounded-tr z-10" />
+              <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-[#E37B03] rounded-bl z-10" />
+              <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-[#E37B03] rounded-br z-10" />
+
+              {currentStep.id === 'id-front' ? (
+                /* CNI Recto SVG */
+                <svg viewBox="0 0 320 200" className="w-full" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="cni-bg" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#1a3a6b" />
+                      <stop offset="100%" stopColor="#0d2247" />
+                    </linearGradient>
+                    <linearGradient id="stripe" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#22c55e" />
+                      <stop offset="100%" stopColor="#16a34a" />
+                    </linearGradient>
+                  </defs>
+                  <rect width="320" height="200" fill="url(#cni-bg)" rx="8" />
+                  {/* Green stripe top */}
+                  <rect x="0" y="0" width="320" height="18" fill="url(#stripe)" rx="8" />
+                  <rect x="0" y="10" width="320" height="8" fill="url(#stripe)" />
+                  {/* Red stripe bottom */}
+                  <rect x="0" y="182" width="320" height="18" fill="#dc2626" rx="0" />
+                  <rect x="0" y="182" width="320" height="8" fill="#dc2626" />
+                  {/* Country header */}
+                  <text x="160" y="14" textAnchor="middle" fill="white" fontSize="7" fontWeight="bold" fontFamily="Arial">RÉPUBLIQUE DU CAMEROUN / REPUBLIC OF CAMEROON</text>
+                  {/* Title */}
+                  <text x="160" y="32" textAnchor="middle" fill="#fcd34d" fontSize="10" fontWeight="bold" fontFamily="Arial">CARTE NATIONALE D'IDENTITÉ</text>
+                  <text x="160" y="43" textAnchor="middle" fill="#fcd34d" fontSize="8" fontFamily="Arial">BIOMÉTRIQUE / BIOMETRIC NATIONAL IDENTITY CARD</text>
+                  {/* Photo placeholder */}
+                  <rect x="14" y="52" width="72" height="90" fill="#2d5a9e" rx="4" />
+                  <rect x="16" y="54" width="68" height="86" fill="#1e3f6e" rx="3" />
+                  <circle cx="50" cy="82" r="18" fill="#4a7ab5" />
+                  <ellipse cx="50" cy="108" rx="22" ry="14" fill="#4a7ab5" />
+                  <text x="50" y="138" textAnchor="middle" fill="#93c5fd" fontSize="6" fontFamily="Arial">PHOTO</text>
+                  {/* MRZ strip at bottom of photo area */}
+                  <rect x="14" y="148" width="72" height="12" fill="#0f1f3d" rx="2" />
+                  <text x="50" y="157" textAnchor="middle" fill="#60a5fa" fontSize="4.5" fontFamily="monospace">MBARGA&lt;&lt;ADJOUA</text>
+                  {/* Fields */}
+                  <text x="100" y="62" fill="#93c5fd" fontSize="6" fontFamily="Arial">NOM / SURNAME</text>
+                  <text x="100" y="72" fill="white" fontSize="9" fontWeight="bold" fontFamily="Arial">MBARGA</text>
+                  <text x="100" y="86" fill="#93c5fd" fontSize="6" fontFamily="Arial">PRÉNOM / GIVEN NAMES</text>
+                  <text x="100" y="96" fill="white" fontSize="8" fontWeight="bold" fontFamily="Arial">Adjoua Cécile</text>
+                  <text x="100" y="110" fill="#93c5fd" fontSize="6" fontFamily="Arial">DATE DE NAISSANCE / DATE OF BIRTH</text>
+                  <text x="100" y="120" fill="white" fontSize="8" fontFamily="Arial">14/06/1992</text>
+                  <text x="100" y="133" fill="#93c5fd" fontSize="6" fontFamily="Arial">LIEU / PLACE OF BIRTH</text>
+                  <text x="100" y="143" fill="white" fontSize="8" fontFamily="Arial">YAOUNDÉ</text>
+                  <text x="210" y="62" fill="#93c5fd" fontSize="6" fontFamily="Arial">NATIONALITÉ</text>
+                  <text x="210" y="72" fill="white" fontSize="8" fontFamily="Arial">CAMEROUNAISE</text>
+                  <text x="210" y="86" fill="#93c5fd" fontSize="6" fontFamily="Arial">SEXE / SEX</text>
+                  <text x="210" y="96" fill="white" fontSize="8" fontFamily="Arial">F</text>
+                  <text x="230" y="86" fill="#93c5fd" fontSize="6" fontFamily="Arial">TAILLE</text>
+                  <text x="230" y="96" fill="white" fontSize="8" fontFamily="Arial">1m65</text>
+                  <text x="210" y="110" fill="#93c5fd" fontSize="6" fontFamily="Arial">EXPIRATION</text>
+                  <text x="210" y="120" fill="#fcd34d" fontSize="8" fontFamily="Arial">14/06/2033</text>
+                  {/* Coat of arms placeholder */}
+                  <circle cx="290" cy="40" r="14" fill="#2d5a9e" stroke="#4a7ab5" strokeWidth="1" />
+                  <text x="290" y="44" textAnchor="middle" fill="#fcd34d" fontSize="9">🦁</text>
+                  {/* MRZ bottom */}
+                  <rect x="0" y="162" width="320" height="20" fill="#0a1a3a" />
+                  <text x="10" y="172" fill="#60a5fa" fontSize="5" fontFamily="monospace">IDCMRMBARGA&lt;&lt;ADJOUA&lt;CECILE&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</text>
+                  <text x="10" y="180" fill="#60a5fa" fontSize="5" fontFamily="monospace">YA0120090012345&lt;5&lt;9206148F3306144CMR&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;4</text>
+                </svg>
+              ) : (
+                /* CNI Verso SVG */
+                <svg viewBox="0 0 320 200" className="w-full" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="cni-bg2" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#1a3a6b" />
+                      <stop offset="100%" stopColor="#0d2247" />
+                    </linearGradient>
+                  </defs>
+                  <rect width="320" height="200" fill="url(#cni-bg2)" rx="8" />
+                  <rect x="0" y="0" width="320" height="18" fill="#16a34a" rx="8" />
+                  <rect x="0" y="10" width="320" height="8" fill="#16a34a" />
+                  <rect x="0" y="182" width="320" height="18" fill="#dc2626" />
+                  <text x="160" y="14" textAnchor="middle" fill="white" fontSize="7" fontWeight="bold" fontFamily="Arial">REPÚBLICA DEL CAMERÚN / جمهورية الكاميرون</text>
+                  {/* N° National */}
+                  <text x="16" y="36" fill="#93c5fd" fontSize="7" fontFamily="Arial">N° NATIONAL / NATIONAL ID NO.</text>
+                  <rect x="14" y="40" width="200" height="18" fill="#0f1f3d" rx="3" />
+                  <text x="18" y="53" fill="#fcd34d" fontSize="10" fontWeight="bold" fontFamily="monospace">YA01 2009 0012345678901</text>
+                  {/* Fingerprint area */}
+                  <rect x="240" y="35" width="65" height="65" fill="#0f1f3d" rx="4" />
+                  <text x="272" y="58" textAnchor="middle" fill="#60a5fa" fontSize="7" fontFamily="Arial">EMPREINTE</text>
+                  {/* Concentric arcs simulating fingerprint */}
+                  {[8, 14, 20, 26, 32].map((r, i) => (
+                    <ellipse key={i} cx="272" cy="75" rx={r} ry={r * 0.8} fill="none" stroke="#60a5fa" strokeWidth="0.8" opacity="0.7" />
+                  ))}
+                  {/* Address */}
+                  <text x="16" y="78" fill="#93c5fd" fontSize="6" fontFamily="Arial">ADRESSE / ADDRESS</text>
+                  <text x="16" y="88" fill="white" fontSize="7.5" fontFamily="Arial">Avenue Jean Paul II, Bastos</text>
+                  <text x="16" y="98" fill="white" fontSize="7.5" fontFamily="Arial">YAOUNDÉ I — CENTRE</text>
+                  {/* Délivrance */}
+                  <text x="16" y="114" fill="#93c5fd" fontSize="6" fontFamily="Arial">DÉLIVRÉE LE / ISSUED</text>
+                  <text x="16" y="124" fill="white" fontSize="7.5" fontFamily="Arial">14/06/2023  à YAOUNDÉ</text>
+                  {/* Signature line */}
+                  <text x="16" y="142" fill="#93c5fd" fontSize="6" fontFamily="Arial">SIGNATURE DU TITULAIRE</text>
+                  <path d="M16,158 Q40,140 70,155 T110,150 Q130,145 150,152" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                  {/* Chip */}
+                  <rect x="240" y="115" width="50" height="38" fill="#d4a017" rx="4" />
+                  <rect x="246" y="121" width="38" height="26" fill="#c8951a" rx="2" />
+                  <line x1="258" y1="121" x2="258" y2="147" stroke="#d4a017" strokeWidth="0.8" />
+                  <line x1="270" y1="121" x2="270" y2="147" stroke="#d4a017" strokeWidth="0.8" />
+                  <line x1="246" y1="131" x2="284" y2="131" stroke="#d4a017" strokeWidth="0.8" />
+                  <line x1="246" y1="138" x2="284" y2="138" stroke="#d4a017" strokeWidth="0.8" />
+                  <text x="265" y="165" textAnchor="middle" fill="#93c5fd" fontSize="5.5" fontFamily="Arial">PUCE / CHIP</text>
+                  {/* MRZ */}
+                  <rect x="0" y="162" width="320" height="20" fill="#0a1a3a" />
+                  <text x="10" y="172" fill="#60a5fa" fontSize="5" fontFamily="monospace">YA0120090012345678901CMR9206148F3306144&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</text>
+                </svg>
+              )}
             </div>
-            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+
+            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              Bonne lumière requise — évitez les reflets
+              Bonne lumière requise · Évitez les reflets et les ombres
             </div>
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-slate-500">Type de document :</p>
-              <div className="flex items-center gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 px-3 py-2 rounded-lg">
-                <Check className="w-3.5 h-3.5 text-[#E37B03]" /> CNI Biométrique (sélectionné)
+
+            <div className="flex gap-2">
+              <div className="flex-1 flex items-center gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 px-3 py-2 rounded-lg">
+                <Check className="w-3.5 h-3.5 text-[#E37B03] shrink-0" /> CNI Biométrique
               </div>
-              {['Passeport', 'Permis de conduire'].map(doc => (
-                <div key={doc} className="flex items-center gap-2 text-xs text-slate-400 bg-slate-50 px-3 py-2 rounded-lg opacity-50 cursor-not-allowed">
-                  <X className="w-3.5 h-3.5" /> {doc} — disponible ultérieurement
-                </div>
-              ))}
+              <button onClick={goNext}
+                className="flex-1 py-2.5 bg-gradient-to-r from-[#E37B03] to-[#4A2205] text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm">
+                <Camera className="w-4 h-4" /> Capturer
+              </button>
             </div>
-            <button onClick={goNext} className="w-full py-3 bg-[#E37B03] text-white font-semibold rounded-xl flex items-center justify-center gap-2">
-              <Camera className="w-5 h-5" /> Capturer
-            </button>
           </div>
         );
 
       case 'ocr-review':
         return (
-          <div className="px-6 space-y-5">
-            <div className="text-center space-y-2">
-              <ScanLine className="w-12 h-12 text-[#E37B03] mx-auto" />
-              <h2 className="text-xl font-bold text-slate-900">Vérifier les données extraites</h2>
-              <p className="text-sm text-slate-500">Vérifiez et corrigez les informations ci-dessous</p>
+          <div className="px-6 space-y-4">
+            <div className="text-center space-y-1">
+              <ScanLine className="w-10 h-10 text-[#E37B03] mx-auto" />
+              <h2 className="text-xl font-bold text-slate-900">Données extraites par IA</h2>
+              <p className="text-xs text-slate-500">Vérifiez et corrigez si nécessaire</p>
             </div>
-            <div className="space-y-2.5">
+
+            {/* CNI Thumbnail + Engine badge */}
+            <div className="relative rounded-xl overflow-hidden border border-slate-200">
+              <svg viewBox="0 0 320 80" className="w-full" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="ocr-bg" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#1a3a6b" />
+                    <stop offset="100%" stopColor="#0d2247" />
+                  </linearGradient>
+                </defs>
+                <rect width="320" height="80" fill="url(#ocr-bg)" />
+                <rect x="0" y="0" width="320" height="7" fill="#16a34a" />
+                <rect x="0" y="73" width="320" height="7" fill="#dc2626" />
+                {/* Photo placeholder */}
+                <rect x="8" y="12" width="36" height="50" fill="#2d5a9e" rx="2" />
+                <circle cx="26" cy="30" r="9" fill="#4a7ab5" />
+                <ellipse cx="26" cy="50" rx="12" ry="8" fill="#4a7ab5" />
+                {/* Field highlights */}
+                <rect x="52" y="14" width="80" height="6" fill="#0f1f3d" rx="2" opacity="0.8" />
+                <rect x="52" y="24" width="60" height="6" fill="#0f1f3d" rx="2" opacity="0.8" />
+                <rect x="52" y="34" width="70" height="6" fill="#0f1f3d" rx="2" opacity="0.8" />
+                <rect x="52" y="44" width="55" height="6" fill="#0f1f3d" rx="2" opacity="0.8" />
+                <text x="56" y="20" fill="#fcd34d" fontSize="5" fontWeight="bold" fontFamily="monospace">MBARGA Adjoua Cécile</text>
+                <text x="56" y="30" fill="white" fontSize="4.5" fontFamily="monospace">née le 14/06/1992</text>
+                <text x="56" y="40" fill="white" fontSize="4.5" fontFamily="monospace">YA01 2009 0012345678901</text>
+                <text x="56" y="50" fill="#60a5fa" fontSize="4.5" fontFamily="monospace">exp. 14/06/2033</text>
+                {/* OCR scan lines */}
+                <line x1="0" y1="20" x2="320" y2="20" stroke="rgba(227,123,3,0.15)" strokeWidth="0.5" />
+                <line x1="0" y1="32" x2="320" y2="32" stroke="rgba(227,123,3,0.15)" strokeWidth="0.5" />
+                <line x1="0" y1="44" x2="320" y2="44" stroke="rgba(227,123,3,0.15)" strokeWidth="0.5" />
+                <line x1="0" y1="56" x2="320" y2="56" stroke="rgba(227,123,3,0.15)" strokeWidth="0.5" />
+                {/* Engine badge */}
+                <rect x="230" y="14" width="80" height="22" fill="#0f1f3d" rx="4" />
+                <text x="270" y="22" textAnchor="middle" fill="#E37B03" fontSize="5" fontWeight="bold" fontFamily="monospace">PaddleOCR v5</text>
+                <text x="270" y="30" textAnchor="middle" fill="#10b981" fontSize="4.5" fontFamily="monospace">✓ Confiance 93.6%</text>
+              </svg>
+              <div className="absolute top-2 right-2 flex items-center gap-1 bg-emerald-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                <Check className="w-2.5 h-2.5" /> OCR OK
+              </div>
+            </div>
+
+            {/* Fields */}
+            <div className="space-y-2">
               {ocrFields.map(f => (
                 <div key={f.key} className="bg-white rounded-xl border border-slate-200 p-3">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-slate-500">{f.label}</span>
-                    <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', confidenceColor(f.confidence))}>
-                      {f.confidence}%
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={cn('h-full rounded-full', f.confidence >= 90 ? 'bg-emerald-500' : f.confidence >= 70 ? 'bg-amber-500' : 'bg-red-500')}
+                          style={{ width: `${f.confidence}%` }} />
+                      </div>
+                      <span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded-full', confidenceColor(f.confidence))}>
+                        {f.confidence}%
+                      </span>
+                    </div>
                   </div>
                   {editingField === f.key ? (
                     <div className="flex gap-2">
@@ -552,7 +783,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   ) : (
                     <div className="flex items-center justify-between">
                       <span className={cn('text-sm font-medium', f.edited ? 'text-orange-800' : 'text-slate-900')}>
-                        {f.value} {f.edited && <span className="text-xs text-orange-500">(modifié)</span>}
+                        {f.value} {f.edited && <span className="text-xs text-orange-500">(corrigé)</span>}
                       </span>
                       <button onClick={() => setEditingField(f.key)} className="text-slate-400 hover:text-orange-600">
                         <Edit3 className="w-4 h-4" />
@@ -567,40 +798,113 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
       case 'liveness':
         return (
-          <div className="px-6 space-y-6">
-            <div className="text-center space-y-2">
-              <Camera className="w-12 h-12 text-[#E37B03] mx-auto" />
+          <div className="px-6 space-y-5">
+            <div className="text-center space-y-1">
+              <Camera className="w-10 h-10 text-[#E37B03] mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">Détection de vivacité</h2>
-              <p className="text-sm text-slate-500">Regardez la caméra et suivez les instructions</p>
+              <p className="text-xs text-slate-500">
+                {livenessState === 'idle' ? 'Regardez la caméra et suivez les instructions' :
+                  livenessState === 'scanning' ? '✨ Analyse en cours...' :
+                    livenessState === 'success' ? '✓ Vivacité confirmée' :
+                      livenessState === 'failed' ? 'Essai échoué — réessayez' : '⛔ Trop de tentatives'}
+              </p>
             </div>
-            <div className="relative w-48 h-48 mx-auto">
-              <div className={cn('w-full h-full rounded-full border-4 flex items-center justify-center',
-                livenessState === 'scanning' ? 'border-[#E37B03] animate-pulse' :
+
+            {/* Face illustration */}
+            <div className="relative w-52 h-52 mx-auto">
+              <div className={cn('w-full h-full rounded-full border-4 flex items-center justify-center overflow-hidden',
+                livenessState === 'scanning' ? 'border-[#E37B03]' :
                   livenessState === 'success' ? 'border-emerald-500' :
-                    livenessState === 'failed' ? 'border-red-500' :
-                      livenessState === 'Bloqué' ? 'border-red-500' :
-                        'border-slate-300')}>
-                <div className="w-40 h-40 rounded-full bg-slate-800 flex items-center justify-center">
+                    livenessState === 'failed' ? 'border-red-400' :
+                      livenessState === 'Bloqué' ? 'border-red-500' : 'border-slate-200')}>
+                {/* SVG Face */}
+                <svg viewBox="0 0 200 200" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                  {/* Background */}
+                  <rect width="200" height="200" fill={livenessState === 'success' ? '#f0fdf4' : livenessState === 'failed' || livenessState === 'Bloqué' ? '#fef2f2' : '#f8fafc'} />
+                  {/* Face oval */}
+                  <ellipse cx="100" cy="95" rx="52" ry="62" fill={livenessState === 'success' ? '#dcfce7' : '#e0f2fe'}
+                    stroke={livenessState === 'success' ? '#22c55e' : livenessState === 'scanning' ? '#E37B03' : '#94a3b8'} strokeWidth="2" />
+                  {/* Eyes */}
+                  <ellipse cx="82" cy="82" rx="8" ry="9" fill="white" stroke="#475569" strokeWidth="1.5" />
+                  <ellipse cx="118" cy="82" rx="8" ry="9" fill="white" stroke="#475569" strokeWidth="1.5" />
+                  <circle cx="82" cy="83" r="4.5" fill="#1e293b" />
+                  <circle cx="118" cy="83" r="4.5" fill="#1e293b" />
+                  <circle cx="84" cy="81" r="1.5" fill="white" />
+                  <circle cx="120" cy="81" r="1.5" fill="white" />
+                  {/* Nose */}
+                  <path d="M97,95 Q100,105 103,95" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
+                  {/* Mouth */}
                   {livenessState === 'success' ? (
-                    <Check className="w-16 h-16 text-emerald-400" />
-                  ) : livenessState === 'failed' ? (
-                    <X className="w-16 h-16 text-red-400" />
-                  ) : livenessState === 'Bloqué' ? (
-                    <Ban className="w-16 h-16 text-red-400" />
+                    <path d="M88,116 Q100,126 112,116" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" />
+                  ) : livenessState === 'failed' || livenessState === 'Bloqué' ? (
+                    <path d="M88,120 Q100,112 112,120" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
                   ) : (
-                    <Camera className="w-12 h-12 text-white/40" />
+                    <path d="M88,116 Q100,122 112,116" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
                   )}
-                </div>
+                  {/* Eyebrows */}
+                  <path d="M75,70 Q82,66 89,70" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M111,70 Q118,66 125,70" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" />
+                  {/* Hair */}
+                  <path d="M48,85 Q50,35 100,32 Q150,35 152,85" fill="#4a5568" />
+                  {/* Ear */}
+                  <ellipse cx="47" cy="98" rx="5" ry="9" fill="#fed7aa" stroke="#f97316" strokeWidth="0.5" />
+                  <ellipse cx="153" cy="98" rx="5" ry="9" fill="#fed7aa" stroke="#f97316" strokeWidth="0.5" />
+                  {/* Neck */}
+                  <rect x="88" y="155" width="24" height="18" fill="#e0f2fe" rx="4" />
+                  {/* Shoulders */}
+                  <path d="M40,185 Q60,165 88,160 L112,160 Q140,165 160,185" fill="#3b82f6" stroke="none" />
+                  {/* Success checkmark overlay */}
+                  {livenessState === 'success' && (
+                    <circle cx="155" cy="40" r="18" fill="#22c55e" />
+                  )}
+                  {livenessState === 'success' && (
+                    <path d="M145,40 L153,48 L165,32" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  )}
+                  {/* Scan points */}
+                  {livenessState === 'scanning' && [
+                    [82, 82], [118, 82], [100, 100], [88, 116], [112, 116], [100, 60]
+                  ].map(([x, y], i) => (
+                    <circle key={i} cx={x} cy={y} r="3" fill="#E37B03" opacity="0.8" />
+                  ))}
+                </svg>
               </div>
+              {/* Scanning ring */}
               {livenessState === 'scanning' && (
                 <motion.div className="absolute inset-0 rounded-full border-4 border-t-[#E37B03] border-r-transparent border-b-transparent border-l-transparent"
-                  animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }} />
+                  animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }} />
+              )}
+              {/* Dot indicators */}
+              {livenessState === 'idle' && [
+                { angle: 0, label: 'Haut' }, { angle: 90, label: 'Droite' }, { angle: 180, label: 'Bas' }, { angle: 270, label: 'Gauche' }
+              ].map((dir) => null)}
+            </div>
+
+            {/* Instructions */}
+            <div className="bg-slate-50 rounded-xl p-3 text-center">
+              {livenessState === 'idle' && (
+                <p className="text-xs text-slate-600">👁️ Restez immobile · Éclairage naturel requis · 3 tentatives max
+                </p>
+              )}
+              {livenessState === 'scanning' && (
+                <p className="text-xs text-[#E37B03] font-semibold animate-pulse">Analyse de 478 points de repère faciaux...</p>
+              )}
+              {livenessState === 'success' && (
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-emerald-700">✓ Vivacité vérifiée avec succès</p>
+                  <div className="flex items-center justify-center gap-4 text-xs text-slate-500">
+                    <span>Score vivacité : <strong className="text-emerald-600">98.4%</strong></span>
+                    <span>Correspondance : <strong className="text-emerald-600">96.1%</strong></span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Moteur : MiniFASNet v2 · MediaPipe 478 pts</p>
+                </div>
               )}
             </div>
-            <div className="text-center text-sm text-slate-500">
+
+            <div className="text-center text-xs text-slate-400">
               Tentatives : {livenessAttempts}/3
-              {livenessState === 'Bloqué' && <p className="text-red-600 font-medium mt-1">Nombre maximum de tentatives atteint. Contactez le support.</p>}
+              {livenessState === 'Bloqué' && <p className="text-red-600 font-medium mt-1">Nombre maximum atteint. Passez en agence.</p>}
             </div>
+
             {livenessState === 'idle' && (
               <button onClick={() => {
                 setLivenessState('scanning');
@@ -616,20 +920,15 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                       return next;
                     });
                   }
-                }, 2000);
-              }} className="w-full py-3 bg-[#E37B03] text-white font-semibold rounded-xl">
-                Lancer la vérification
+                }, 2500);
+              }} className="w-full py-3 bg-gradient-to-r from-[#E37B03] to-[#4A2205] text-white font-semibold rounded-xl">
+                Lancer la vérification de vivacité
               </button>
             )}
             {livenessState === 'failed' && (
               <button onClick={() => setLivenessState('idle')} className="w-full py-3 bg-amber-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2">
                 <RotateCcw className="w-5 h-5" /> Réessayer
               </button>
-            )}
-            {livenessState === 'success' && (
-              <div className="bg-emerald-50 rounded-xl p-4 text-center text-sm text-emerald-700 font-medium">
-                ✓ Vivacité vérifiée avec succès
-              </div>
             )}
           </div>
         );
@@ -1028,56 +1327,87 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                   strokeLinecap="round" transform="rotate(-90 48 48)" className="transition-all duration-300" />
               </svg>
             </div>
-            <div className="text-center space-y-2">
-              <h2 className="text-xl font-bold text-slate-900">Uploading Documents</h2>
-              <p className="text-sm text-slate-500">Secure upload with chunked transfer</p>
+            <div className="text-center space-y-1">
+              <h2 className="text-xl font-bold text-slate-900">Envoi sécurisé en cours</h2>
+              <p className="text-xs text-slate-500">Transfert chiffré AES-256 · par tranches</p>
             </div>
-            <div className="w-full max-w-[260px] space-y-3">
+            <div className="w-full max-w-[280px] space-y-3">
               <div className="justify-between flex text-sm">
-                <span className="text-slate-600">Progress</span>
+                <span className="text-slate-600">Progression</span>
                 <span className="font-mono font-bold text-[#E37B03]">{Math.round(uploadProgress)}%</span>
               </div>
               <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-[#E37B03] to-[#4A2205] rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }} />
               </div>
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Chunk {uploadChunks.completed}/{uploadChunks.total}</span>
-                <span>Retry: auto</span>
+              {/* File list */}
+              <div className="space-y-1.5">
+                {[
+                  { name: 'CNI_recto.jpg', size: '1.2 Mo', done: uploadChunks.completed >= 2 },
+                  { name: 'CNI_verso.jpg', size: '1.1 Mo', done: uploadChunks.completed >= 3 },
+                  { name: 'Selfie_vivacite.mp4', size: '3.4 Mo', done: uploadChunks.completed >= 4 },
+                  { name: 'Facture_ENEO.pdf', size: '0.8 Mo', done: uploadChunks.completed >= 5 },
+                ].map((file) => (
+                  <div key={file.name} className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-xs', file.done ? 'bg-emerald-50' : 'bg-slate-50')}>
+                    {file.done
+                      ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      : <Loader2 className="w-3.5 h-3.5 text-slate-400 shrink-0 animate-spin" />}
+                    <span className={cn('flex-1 font-medium', file.done ? 'text-emerald-700' : 'text-slate-500')}>{file.name}</span>
+                    <span className="text-slate-400">{file.size}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span>Tranche {uploadChunks.completed}/{uploadChunks.total}</span>
+                <span>Retry auto activé</span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
-              <ShieldCheck className="w-4 h-4" /> End-to-end encrypted
+              <ShieldCheck className="w-4 h-4" /> Chiffrement de bout en bout actif
             </div>
           </div>
         );
 
       case 'success':
         return (
-          <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-6">
+          <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-5">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}>
               <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center">
                 <PartyPopper className="w-12 h-12 text-emerald-600" />
               </div>
             </motion.div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-slate-900">Application Submitted! 🎉</h2>
-              <p className="text-sm text-slate-500">Your documents are being reviewed. We'll notify you once verification is complete.</p>
+              <h2 className="text-2xl font-bold text-slate-900">Dossier soumis ! 🎉</h2>
+              <p className="text-xs text-slate-500">Vos documents sont transmis. Notre équipe KYC vous contactera sous peu.</p>
             </div>
-            <div className="w-full bg-slate-50 rounded-xl p-4 space-y-2 text-sm text-left">
-              <p className="font-medium text-slate-700">What happens next?</p>
-              <div className="flex items-start gap-2 text-slate-600">
-                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">1</span>
-                Document review (1-2 business days)
+            <div className="w-full bg-emerald-50 rounded-xl border border-emerald-200 p-4 space-y-2 text-sm text-left">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">N° dossier</span>
+                <span className="font-mono font-bold text-slate-900">VRF-2026-0006</span>
               </div>
-              <div className="flex items-start gap-2 text-slate-600">
-                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">2</span>
-                Identity verification confirmation
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Statut</span>
+                <span className="flex items-center gap-1 text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full text-xs font-semibold">
+                  <Loader2 className="w-3 h-3 animate-spin" /> En vérification
+                </span>
               </div>
-              <div className="flex items-start gap-2 text-slate-600">
-                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">3</span>
-                Full account access unblocked
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Délai estimé</span>
+                <span className="text-slate-900 font-medium">1 à 2 jours ouvrés</span>
               </div>
+            </div>
+            <div className="w-full space-y-2 text-sm text-left">
+              <p className="text-xs font-semibold text-slate-500">Prochaines étapes :</p>
+              {[
+                { step: '1', text: 'Vérification de vos documents par un agent BICEC' },
+                { step: '2', text: 'Validation de votre identité et de domicile' },
+                { step: '3', text: 'Accès complet débloqué + notification SMS' },
+              ].map(item => (
+                <div key={item.step} className="flex items-start gap-2 text-slate-600">
+                  <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">{item.step}</span>
+                  {item.text}
+                </div>
+              ))}
             </div>
           </div>
         );

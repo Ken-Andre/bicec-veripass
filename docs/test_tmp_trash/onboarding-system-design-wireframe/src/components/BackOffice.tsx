@@ -129,16 +129,96 @@ export function BackOffice() {
   );
 
   const DocumentPlaceholder = ({ label, type }: { label: string; type: 'id-front' | 'id-back' | 'selfie' | 'proof' | 'signature' }) => {
+    if (type === 'id-front') {
+      return (
+        <button onClick={() => setShowImageZoom(label)}
+          className="group relative w-full rounded-xl overflow-hidden border border-slate-200 hover:border-[#E37B03] transition-all hover:shadow-lg cursor-pointer">
+          <svg viewBox="0 0 320 200" className="w-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bo-cni-bg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#1a3a6b" />
+                <stop offset="100%" stopColor="#0d2247" />
+              </linearGradient>
+            </defs>
+            <rect width="320" height="200" fill="url(#bo-cni-bg)" rx="6" />
+            <rect x="0" y="0" width="320" height="14" fill="#16a34a" rx="6" />
+            <rect x="0" y="8" width="320" height="6" fill="#16a34a" />
+            <rect x="0" y="186" width="320" height="14" fill="#dc2626" />
+            <text x="160" y="11" textAnchor="middle" fill="white" fontSize="5.5" fontWeight="bold" fontFamily="Arial">RÉPUBLIQUE DU CAMEROUN / REPUBLIC OF CAMEROON</text>
+            <text x="160" y="26" textAnchor="middle" fill="#fcd34d" fontSize="8" fontWeight="bold" fontFamily="Arial">CARTE NATIONALE D'IDENTITÉ BIOMÉTRIQUE</text>
+            <rect x="12" y="38" width="56" height="74" fill="#2d5a9e" rx="3" />
+            <circle cx="40" cy="62" r="14" fill="#4a7ab5" />
+            <ellipse cx="40" cy="84" rx="18" ry="11" fill="#4a7ab5" />
+            <rect x="12" y="118" width="56" height="10" fill="#0f1f3d" rx="1" />
+            <text x="40" y="126" textAnchor="middle" fill="#60a5fa" fontSize="3.5" fontFamily="monospace">MBARGA&lt;&lt;ADJOUA</text>
+            <text x="80" y="48" fill="#93c5fd" fontSize="5" fontFamily="Arial">NOM / SURNAME</text>
+            <text x="80" y="57" fill="white" fontSize="7.5" fontWeight="bold" fontFamily="Arial">MBARGA</text>
+            <text x="80" y="70" fill="#93c5fd" fontSize="5" fontFamily="Arial">PRÉNOM(S) / GIVEN NAMES</text>
+            <text x="80" y="79" fill="white" fontSize="7" fontWeight="bold" fontFamily="Arial">Adjoua Cécile</text>
+            <text x="80" y="92" fill="#93c5fd" fontSize="5" fontFamily="Arial">NÉ(E) LE / DATE OF BIRTH</text>
+            <text x="80" y="101" fill="white" fontSize="7" fontFamily="Arial">14/06/1992 — YAOUNDÉ</text>
+            <text x="80" y="113" fill="#93c5fd" fontSize="5" fontFamily="Arial">NATIONALITÉ</text>
+            <text x="80" y="122" fill="white" fontSize="7" fontFamily="Arial">CAMEROUNAISE  F</text>
+            <text x="200" y="48" fill="#93c5fd" fontSize="5" fontFamily="Arial">EXPIRATION</text>
+            <text x="200" y="58" fill="#fcd34d" fontSize="7" fontWeight="bold" fontFamily="Arial">14/06/2033</text>
+            <rect x="0" y="132" width="320" height="16" fill="#0a1a3a" />
+            <text x="8" y="141" fill="#60a5fa" fontSize="4" fontFamily="monospace">IDCMRMBARGA&lt;&lt;ADJOUA&lt;CECILE&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</text>
+            <text x="8" y="150" fill="#60a5fa" fontSize="4" fontFamily="monospace">YA0120090012345&lt;9206148F3306144CMR&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;4</text>
+          </svg>
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+            <ZoomIn className="w-6 h-6 text-white" />
+          </div>
+        </button>
+      );
+    }
+    if (type === 'id-back') {
+      return (
+        <button onClick={() => setShowImageZoom(label)}
+          className="group relative w-full rounded-xl overflow-hidden border border-slate-200 hover:border-[#E37B03] transition-all hover:shadow-lg cursor-pointer">
+          <svg viewBox="0 0 320 200" className="w-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bo-cni-bg2" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#1a3a6b" />
+                <stop offset="100%" stopColor="#0d2247" />
+              </linearGradient>
+            </defs>
+            <rect width="320" height="200" fill="url(#bo-cni-bg2)" rx="6" />
+            <rect x="0" y="0" width="320" height="14" fill="#16a34a" rx="6" />
+            <rect x="0" y="8" width="320" height="6" fill="#16a34a" />
+            <rect x="0" y="186" width="320" height="14" fill="#dc2626" />
+            <text x="8" y="30" fill="#93c5fd" fontSize="5.5" fontFamily="Arial">N° NATIONAL / NATIONAL ID NO.</text>
+            <rect x="8" y="33" width="170" height="15" fill="#0f1f3d" rx="2" />
+            <text x="12" y="44" fill="#fcd34d" fontSize="8.5" fontWeight="bold" fontFamily="monospace">YA01 2009 0012345678901</text>
+            <rect x="240" y="26" width="72" height="54" fill="#0f1f3d" rx="3" />
+            {[8, 13, 18, 23, 28].map((r, i) => <ellipse key={i} cx="276" cy="60" rx={r} ry={r * 0.75} fill="none" stroke="#60a5fa" strokeWidth="0.7" opacity="0.7" />)}
+            <text x="276" y="38" textAnchor="middle" fill="#60a5fa" fontSize="5.5" fontFamily="Arial">EMPREINTE</text>
+            <text x="8" y="64" fill="#93c5fd" fontSize="5.5" fontFamily="Arial">ADRESSE / ADDRESS</text>
+            <text x="8" y="73" fill="white" fontSize="7" fontFamily="Arial">Avenue Jean Paul II, Bastos — YAOUNDÉ I</text>
+            <text x="8" y="85" fill="#93c5fd" fontSize="5.5" fontFamily="Arial">DÉLIVREee LE / ISSUED ON</text>
+            <text x="8" y="94" fill="white" fontSize="7" fontFamily="Arial">14/06/2023 à YAOUNDÉ</text>
+            <path d="M8,115 Q32,98 58,112 T92,107 Q110,103 125,110" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            <rect x="220" y="100" width="50" height="36" fill="#d4a017" rx="4" />
+            <rect x="226" y="106" width="38" height="24" fill="#c8951a" rx="2" />
+            <line x1="234" y1="106" x2="234" y2="130" stroke="#d4a017" strokeWidth="0.8" />
+            <line x1="244" y1="106" x2="244" y2="130" stroke="#d4a017" strokeWidth="0.8" />
+            <line x1="226" y1="115" x2="264" y2="115" stroke="#d4a017" strokeWidth="0.8" />
+            <line x1="226" y1="122" x2="264" y2="122" stroke="#d4a017" strokeWidth="0.8" />
+            <rect x="0" y="145" width="320" height="16" fill="#0a1a3a" />
+            <text x="8" y="155" fill="#60a5fa" fontSize="4" fontFamily="monospace">YA0120090012345678901CMR9206148F3306144&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</text>
+          </svg>
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+            <ZoomIn className="w-6 h-6 text-white" />
+          </div>
+        </button>
+      );
+    }
+
     const bgColors: Record<string, string> = {
-      'id-front': 'from-slate-700 to-slate-800',
-      'id-back': 'from-slate-600 to-slate-700',
       'selfie': 'from-orange-800 to-orange-950',
       'proof': 'from-amber-700 to-orange-800',
       'signature': 'from-slate-100 to-white',
     };
     const icons: Record<string, React.ReactNode> = {
-      'id-front': <CreditCard className="w-8 h-8 text-white/50" />,
-      'id-back': <CreditCard className="w-8 h-8 text-white/50" />,
       'selfie': <Camera className="w-8 h-8 text-white/50" />,
       'proof': <FileText className="w-8 h-8 text-white/50" />,
       'signature': <FileText className="w-8 h-8 text-slate-300" />,
@@ -1242,11 +1322,11 @@ export function BackOffice() {
                         <>
                           <button onClick={() => handleApprove(selectedApp.id)}
                             className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 flex items-center gap-2 transition-colors">
-                            <ThumbsUp className="w-4 h-4" /> Approve
+                            <ThumbsUp className="w-4 h-4" /> Approuver
                           </button>
                           <button onClick={() => setShowRejectModal(true)}
                             className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 flex items-center gap-2 transition-colors">
-                            <ThumbsDown className="w-4 h-4" /> Reject
+                            <ThumbsDown className="w-4 h-4" /> Rejeter
                           </button>
                         </>
                       )}
@@ -1292,11 +1372,11 @@ export function BackOffice() {
                       {/* Side by side documents */}
                       <div>
                         <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-[#E37B03]" /> Document Captures
+                          <CreditCard className="w-4 h-4 text-[#E37B03]" /> Captures CNI biométrique
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
-                          <DocumentPlaceholder label="ID Front" type="id-front" />
-                          <DocumentPlaceholder label="ID Back" type="id-back" />
+                          <DocumentPlaceholder label="CNI Recto" type="id-front" />
+                          <DocumentPlaceholder label="CNI Verso" type="id-back" />
                         </div>
                       </div>
 
