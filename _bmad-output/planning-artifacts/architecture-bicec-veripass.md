@@ -10,6 +10,9 @@
 
 ## Table des matières
 
+0. [Introduction](#0-introduction)
+0bis. [Guide de Lecture des Diagrammes](#0bis-guide-de-lecture-des-diagrammes)
+0ter. [Matrice de Fusion](#0ter-matrice-de-fusion)
 1. [Contexte & Contraintes](#1-contexte--contraintes)
 2. [Architecture Decisions Records (ADRs)](#2-architecture-decision-records-adrs)
 3. [Vue C4 — Architecture Système](#3-vue-c4--architecture-système)
@@ -24,6 +27,147 @@
 12. [Pipeline AI/ML](#12-pipeline-aiml)
 13. [Stratégie Analytics & Data Warehouse](#13-stratégie-analytics--data-warehouse)
 14. [Stratégie de Chiffrement (Phased)](#14-stratégie-de-chiffrement-phased)
+
+---
+
+## 0. Introduction
+
+### 0.1 Objectif du Document
+
+Ce document d'architecture technique définit l'implémentation complète du système **bicec-veripass**, une plateforme d'onboarding KYC digital souveraine pour la Banque Internationale du Cameroun pour l'Épargne et le Crédit (BICEC).
+
+**Public cible :**
+- Équipe de développement (implémentation)
+- Jury académique PFE Data/IA Engineering
+- Direction IT BICEC (validation technique)
+- Auditeurs COBAC (conformité réglementaire)
+
+
+### 0.2 Livrables Primaires (PFE)
+
+En tant que projet de fin d'études en Data/IA Engineering, les composants évalués prioritairement sont :
+
+1. **Funnel Analytics** : Observabilité drop-off par étape (§13.1-13.2)
+2. **OCR Observability** : Métriques confidence, correction rate, engine performance (§12.1)
+3. **Agent Load Balancing** : Algorithme Smooth WRR + Least Connections (§12.3)
+4. **AML Screening** : Fuzzy matching pg_trgm sur listes PEP/Sanctions (§12.5)
+5. **Data Warehouse** : Star schema OLAP avec refresh incrémental (§7.4)
+
+### 0.3 Conventions de Notation
+
+- **[ADR-XXX]** : Architecture Decision Record (décision justifiée)
+- **[FRXX]** : Functional Requirement (PRD)
+- **[NFRXX]** : Non-Functional Requirement (PRD)
+- **[GXX]** : Correction issue (architecture-patch-v3bis-final)
+- **[EXX]** : Erreur UX (Fonctionnalité_Interaction_Erreurs.csv)
+- **[BX]** : Scénario métier (UX Spec v2.1)
+
+
+---
+
+## 0bis. Guide de Lecture des Diagrammes
+
+### Comment lire un diagramme C4
+
+Le modèle C4 décrit un système à 4 niveaux de zoom croissants, comme une carte géographique :
+
+| Niveau                 | Analogie           | Ce qu'on voit                                                                         |
+| ---------------------- | ------------------ | ------------------------------------------------------------------------------------- |
+| **C4 L1 – Contexte**   | Vue satellite      | Le système entier + les acteurs humains + systèmes externes qui l'entourent           |
+| **C4 L2 – Conteneurs** | Vue du quartier    | Les grandes "boîtes" déployées (serveurs, apps, bases de données) et leurs connexions |
+| **C4 L3 – Composants** | Plan d'un bâtiment | À l'intérieur d'une boîte, les modules logiciels et leurs interactions internes       |
+| **C4 L4 – Code**       | Plan d'une pièce   | Classes, fonctions (non produit ici — niveau implémentation)                          |
+
+**Symboles utilisés :**
+- **Personne** (icône humain) = acteur externe (Marie, Jean…)
+- **Boîte pleine** = composant interne au système
+- **Boîte en pointillés** = système externe (Orange SMS, Axway…)
+- **Flèche →** = direction du flux de données ou appel
+- **Label sur flèche** = protocole ou rôle du lien (ex : `HTTPS/443`, `SQL/5432`)
+
+### Comment lire un diagramme de Séquence
+
+Se lit **de haut en bas**, comme une conversation dans le temps :
+
+```
+Acteur A          Acteur B          Système C
+   |                 |                  |
+   |----requête------>|                 |     ← A appelle B
+   |                 |----traitement--->|     ← B appelle C
+   |                 |<---réponse-------|     ← C répond à B
+   |<----résultat----|                  |     ← B répond à A
+```
+
+- Les **barres verticales** = lignes de vie des acteurs
+- Les **rectangles sur une ligne de vie** = période d'activité (traitement en cours)
+- `alt / else` = bloc conditionnel (si/sinon)
+- `Note over X` = commentaire sur un acteur
+- `loop` = répétition
+- Flèche **pleine** `—>` = appel synchrone (attend réponse)
+- Flèche **pointillée** `-->` = réponse ou appel asynchrone
+
+### Comment lire un State Machine (Diagramme d'états)
+
+- **`[*]`** = point de départ ou de fin
+- **Rectangle arrondi** = un état stable du système
+- **Flèche entre états** = transition (déclenchée par un événement)
+- **Label sur flèche** = condition ou action qui déclenche la transition
+- **`note`** = clarification sur un état
+
+### Comment lire un ERD (Entity-Relationship Diagram)
+
+Mermaid utilise la notation **Crow's Notation** pour représenter les cardinalités.
+
+| Notation     | Signification                                                          |
+| ------------ | ---------------------------------------------------------------------- |
+| `\|\|--o{`   | Un (obligatoire) → Zéro ou plusieurs (optionnel) = **1:N optionnel**   |
+| `\|\|--\|{`  | Un (obligatoire) → Un ou plusieurs (obligatoire) = **1:N obligatoire** |
+| `\|\|--\|\|` | Un (obligatoire) → Un (obligatoire) = **1:1 strict**                   |
+| `o\|--\|\|`  | Zéro ou un (optionnel) → Un (obligatoire) = **0,1:1**                  |
+| `o{--\|\|`   | Zéro ou plusieurs (optionnel) → Un (obligatoire) = **N:1 optionnel**   |
+| `}\|--\|{`   | Un ou plusieurs ↔ Un ou plusieurs = **N:M obligatoire**                |
+| `}o--o{`     | Zéro ou plusieurs ↔ Zéro ou plusieurs = **N:M optionnel**              |
+| `PK`         | Clé primaire — identifiant unique de la table                          |
+| `FK`         | Clé étrangère — référence vers une autre table                         |
+| `UK`         | Unique Key — valeur unique (mais pas la PK)                            |
+
+#### Mémo visuel des symboles côté entité
+
+| Symbole (côté) | Lecture           |
+| -------------- | ----------------- |
+| `\|`           | Exactement **1**  |
+| `o`            | **0** (optionnel) |
+| `{`            | **Plusieurs (N)** |
+| `o{`           | **0 ou N**        |
+| `\|{`          | **1 ou N**        |
+| `o\|`          | **0 ou 1**        |
+
+Exemple de lecture : `users ||--o{ kyc_sessions` = **un user peut avoir plusieurs sessions KYC** (mais une session appartient à un seul user).
+
+---
+
+## 0ter. Matrice de Fusion
+
+> Pour tout implémenteur ou relecteur : le document consolidé intègre dans cet ordre :
+> `v1.0 (base) → corrections-v2 → patch-v3 → patch-v3bis → patch-v3bis-final`
+
+| Section            | Document actif                      | Statut v1.0                       |
+| ------------------ | ----------------------------------- | --------------------------------- |
+| §1 Contexte        | v1.0                                | ✅ Conservé                        |
+| §2 ADRs            | v1.0 + compléments Y                | ✅ Enrichi                         |
+| §3 C4 L1           | v1.0                                | ✅ Conservé                        |
+| §3 C4 L2/L3        | corrections-v2 + v3bis §3bis        | ❌ v1 obsolète                     |
+| §4 Use Case        | corrections-v2 + Y                  | ❌ v1 obsolète                     |
+| §5 State Machine   | state-machine-kyc-v3-updated.md     | ❌ v1 + v2 obsolètes               |
+| §6 Séquences       | corrections-v2 + patch-v3 + Y       | ❌ v1 partiellement obsolète       |
+| §7 ERD/LDM         | patch-v3bis §7bis                   | ❌ v1 + v3 partiellement obsolètes |
+| §8 API Contract    | patch-v3 + v3bis §8bis              | ❌ v1 partiellement obsolète       |
+| §9 Docker Compose  | patch-v3                            | ❌ v1 partiellement obsolète       |
+| §10 RAM Budget     | patch-v3bis §10bis                  | ❌ v1 + v3 obsolètes               |
+| §11 Sécurité       | v1.0 + Y (matrice RBAC, audit DDL)  | ✅ Enrichi                         |
+| §12 Pipeline AI/ML | v1.0 + Y (flowcharts)               | ✅ Enrichi                         |
+| §13 Analytics      | v1.0 + Y (star schema, events, SQL) | ❌ §13.3 supprimé                  |
+| §14 Chiffrement    | v1.0 + patch-v3bis AR5              | ❌ Phase 1 corrigée                |
 
 ---
 
@@ -68,17 +212,17 @@ Le PRD initial indiquait Flutter comme stack mobile. Contraintes réelles : dév
 
 **Options évaluées :**
 
-| Critère                 | PWA React/TS              | Flutter                  |
-| ----------------------- | ------------------------- | ------------------------ |
-| Build iOS sans Mac      |  Safari 15+ / WebRTC     |  Requiert macOS         |
-| Test sur iPhone perso   |  URL localhost           |  AVD virtuel uniquement |
-| RAM Docker + dev        |  Pas d'AVD               |  AVD = +2-4GB RAM       |
-| Stack cohérente         |  Même TS que back-office |  Dart = 4ème langage    |
-| Tests E2E               |  Playwright natif        |  Adaptation nécessaire  |
-| Time-to-market          |  Hot reload immédiat     |  Lent sur Windows       |
-| Caméra (KYC)            |  `getUserMedia` + WebRTC |  Camera plugin Flutter  |
-| Crédibilité banque prod |  Perçue inférieure       |  App native préférée    |
-| Post-MVP BICEC          |  API contract inchangé   | N/A                      |
+| Critère                 | PWA React/TS            | Flutter                |
+| ----------------------- | ----------------------- | ---------------------- |
+| Build iOS sans Mac      | Safari 15+ / WebRTC     | Requiert macOS         |
+| Test sur iPhone perso   | URL localhost           | AVD virtuel uniquement |
+| RAM Docker + dev        | Pas d'AVD               | AVD = +2-4GB RAM       |
+| Stack cohérente         | Même TS que back-office | Dart = 4ème langage    |
+| Tests E2E               | Playwright natif        | Adaptation nécessaire  |
+| Time-to-market          | Hot reload immédiat     | Lent sur Windows       |
+| Caméra (KYC)            | `getUserMedia` + WebRTC | Camera plugin Flutter  |
+| Crédibilité banque prod | Perçue inférieure       | App native préférée    |
+| Post-MVP BICEC          | API contract inchangé   | N/A                    |
 
 **Décision :** **PWA React/TypeScript**
 
@@ -106,14 +250,14 @@ Choix entre Monolithe, Microservices, ou Serverless pour le backend FastAPI.
 
 **Options évaluées :**
 
-| Critère           | Monolithe Modulaire            | Microservices                | Serverless               |
-| ----------------- | ------------------------------ | ---------------------------- | ------------------------ |
-| Setup initial     |  Faible                       |  30% du temps en infra      |  Non applicable on-prem |
-| Debug             |  Un process, logs centralisés |  Distributed tracing requis | N/A                      |
-| Déploiement       |  Un docker-compose            |  Orchestrateur (K8s)        | N/A                      |
-| Tests             |  Integration simple           |  Inter-service complexe     | N/A                      |
-| RAM i3 (16GB)     |  Optimisé                     |  Overhead par service       | N/A                      |
-| Évolution Phase 2 |  Modules extractibles         |  Déjà prêt                  | N/A                      |
+| Critère           | Monolithe Modulaire          | Microservices              | Serverless             |
+| ----------------- | ---------------------------- | -------------------------- | ---------------------- |
+| Setup initial     | Faible                       | 30% du temps en infra      | Non applicable on-prem |
+| Debug             | Un process, logs centralisés | Distributed tracing requis | N/A                    |
+| Déploiement       | Un docker-compose            | Orchestrateur (K8s)        | N/A                    |
+| Tests             | Integration simple           | Inter-service complexe     | N/A                    |
+| RAM i3 (16GB)     | Optimisé                     | Overhead par service       | N/A                    |
+| Évolution Phase 2 | Modules extractibles         | Déjà prêt                  | N/A                    |
 
 **Décision :** **Monolithe Modulaire déployé en Docker multi-containers**
 
@@ -292,7 +436,7 @@ Pas d'Active Directory pour MVP. Email/Password hashé bcrypt/Argon2 dans Postgr
 
 - **Celery** : orchestrateur de tâches (GLM-OCR, envoi SMS/Email, batch Amplitude, cron PEP/Sanctions)
 - **Redis** : message broker Celery + sessions OTP (TTL) + anti-replay liveness
-- Workers dédiés par queue : `glm_ocr_jobs`, `notifications`, `amplitude_batch`, `sanctions_sync`
+- Workers dédiés par queue : `glm_ocr_jobs`, `notifications`, `provisioning_batch`, `sanctions_sync`
 
 ---
 
@@ -354,8 +498,9 @@ C4Container
         Container(storage, "Filesystem Volume", "Docker Volume</br>/data/documents", "Images CNI, selfies</br>Factures (10 ans COBAC)")
     }
 
-    System_Ext(orange, "Orange SMS API")
-    System_Ext(amplitude, "Sopra Amplitude")
+    System_Ext(orange, "Orange Cameroon SMS API")
+    System_Ext(axway, "Axway API Manager</br>(réseau BICEC intranet)</br>→ Sopra Amplitude Core Banking")
+    System_Ext(sanctions, "OpenSanctions / UN</br>EU FSF · OFAC</br>Sync hebdo batch")
 
     Rel(marie, nginx, "HTTPS", "443")
     Rel(agent, nginx, "HTTPS", "443")
@@ -368,7 +513,8 @@ C4Container
     Rel(celery, postgres, "SQL", "5432")
     Rel(celery, redis, "Queue/Broker", "6379")
     Rel(celery, orange, "SMS OTP", "HTTPS")
-    Rel(celery, amplitude, "Batch provision", "HTTPS")
+    Rel(celery, axway, "ISO 20022 provisioning", "REST/HTTPS")
+    Rel(celery, sanctions, "Sync listes PEP/Sanctions", "HTTPS Download")
 ```
 
 > **Note Redis :** L'API **pousse** les tâches dans Redis (PUSH/SET). Celery les **consomme** (POP). L'API lit aussi Redis directement pour vérifier les OTP et les tokens anti-replay liveness. Redis joue donc deux rôles distincts : **broker de messages** (pour Celery) et **cache sessions** (pour l'API).
@@ -1036,7 +1182,8 @@ erDiagram
     KYC_SESSION ||--o| CONSENT_RECORD : "finalise par"
     KYC_SESSION ||--o| DOSSIER_ASSIGNMENT : "assigné à"
     KYC_SESSION ||--o{ VALIDATION_DECISION : "reçoit"
-    KYC_SESSION ||--o{ AMPLITUDE_BATCH_ITEM : "provisionné dans"
+    KYC_SESSION ||--o{ PROVISIONING_BATCH_ITEM : "provisionné dans"
+    KYC_SESSION ||--o{ SUPPORT_THREAD : "associé à"
 
     DOCUMENT ||--|{ OCR_FIELD : "extrait en"
 
@@ -1044,9 +1191,10 @@ erDiagram
     AGENT ||--o{ VALIDATION_DECISION : "émet"
     AGENT }|--|| AGENCY : "appartient à"
 
-    AMPLITUDE_BATCH ||--|{ AMPLITUDE_BATCH_ITEM : "contient"
+    PROVISIONING_BATCH ||--|{ PROVISIONING_BATCH_ITEM : "contient"
 
     PEP_SANCTIONS ||--o{ AML_ALERT : "déclenche"
+    SUPPORT_THREAD ||--|{ SUPPORT_MESSAGE : "contient"
 
     AUDIT_LOG }|--|| USER : "tracé par"
 ```
@@ -1066,6 +1214,8 @@ erDiagram
         VARCHAR(255) pin_hash
         BOOLEAN biometric_opt_in
         VARCHAR(10) language
+        INT liveness_lockout_count_24h
+        TIMESTAMPTZ last_lockout_reset_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -1214,7 +1364,8 @@ erDiagram
         BOOLEAN cgu_accepted
         BOOLEAN privacy_accepted
         BOOLEAN data_processing_accepted
-        TEXT digital_signature_path
+        TEXT consent_method
+        JSONB consent_metadata
         TIMESTAMPTZ signed_at
         INET client_ip
     }
@@ -1230,7 +1381,7 @@ erDiagram
         INET request_ip
     }
 
-    amplitude_batches {
+    provisioning_batches {
         UUID id PK
         UUID created_by FK
         TIMESTAMPTZ created_at
@@ -1240,12 +1391,14 @@ erDiagram
         INT retry_count
     }
 
-    amplitude_batch_items {
+    provisioning_batch_items {
         UUID id PK
         UUID batch_id FK
         UUID session_id FK
         TEXT status
-        JSONB amplitude_response
+        TEXT axway_request_id
+        TEXT iso20022_message_ref
+        JSONB axway_response
         TIMESTAMPTZ processed_at
     }
 
@@ -1311,33 +1464,54 @@ erDiagram
     agents ||--o{ validation_decisions : "agent_id"
     agencies ||--o{ agents : "agency_id"
     agencies ||--o{ kyc_sessions : "agency_id"
-    amplitude_batches ||--|{ amplitude_batch_items : "batch_id"
+    provisioning_batches ||--|{ provisioning_batch_items : "batch_id"
     pep_sanctions ||--o{ aml_alerts : "pep_sanctions_id"
 ```
+
+> **Contraintes CHECK à ajouter en DDL :**
+> ```sql
+> -- Sur kyc_sessions
+> status CHECK IN ('DRAFT','PENDING_KYC','PENDING_INFO','COMPLIANCE_REVIEW',
+>                  'READY_FOR_OPS','PROVISIONING','OPS_ERROR','OPS_CORRECTION',
+>                  'VALIDATED_PENDING_AGENCY','ACTIVATED_LIMITED','ACTIVATED_PRE_FULL',
+>                  'ACTIVATED_FULL','EXPIRY_WARNING','PENDING_RESUBMIT',
+>                  'MONITORED','REJECTED','DISABLED','ABANDONED')
+> access_level CHECK IN ('RESTRICTED','LIMITED_ACCESS','PRE_FULL_ACCESS',
+>                         'FULL_ACCESS','BLOCKED','PENDING_ACTIVATION')
+> -- Sur agents (Jean,Thomas,Sylvie)
+> role CHECK IN ('AGENT','CONFORMITY','STAKEHOLDER')
+> ```
+> Trigger PostgreSQL validant les combinaisons `(status, access_level)` légales selon la matrice du §5.
 
 ![LDM](mermaid.ink/svg/pako:eNrVWW1v2zYQ_iuGhgArkHaJ0ySOv-XF3bI1bdG6xdB5IGiJltlSpEpSSdwk_31HSoolknKUpl8WFCisO5J3z72TN1EsEhKNo62tG8qpHg9uZpFekozMovFgFiVkgQumZ9E2_GB4JQo9nkWEfS2_WM5PWFI8Z0SZJbA8lzTDcnUqmJDlLr9M9l4NX52VayrylFzrJsvu8XDvcNJiOREyIbLFdHR4cDaspKGchGh3d3dbWzM-4_1VKgn_B62IPKM4lTib8QH8FYpIBdLZH-bv48fzswFNBu_-Wn_7dPz-9I_j978Od54N8qXgZPAxRN3ffzYgGaasm5xTjpZYLdfkk7dvX0-O3wzmVGRESxojkWtEub_BLpzOME8LnJI1dXp-MfkwPb54N_08iCXBmiQI6zC9yJMW_W5WHfN1FSNFlKKCPwiG_WZgQ0B45RJANh6vXNJ08vd0oDTWhXI-4jiGcxEjl4Q5JE4LpFd5Q9ezyen5xfHrQSz4giZwEEEqFpKglIk5bqw_fzMdMHpJuNlbAapfCYpFwbWPO_iUkFSv0ILh1CcnIkbkOqfSZWji2mBKCE6MBz7IyIWmC7rBWETFmG00JwAqN9KLeUb1Jo5YZDkjHodBn2GlATqSo3umJr6Tabm99RlEc8ehQNEiI1z386bK9YJeYyBre4H9vKCMoBzrpetkSzzcP3BizFJELBHhacs2f354--bEUiS-Ql-U4C6t4Wo5uDxYjCUeD851AV74rcDMeFIZx6oD8pK5jbjxV6uRot8Jmq80UQ6gRkZ7eD9Ea_yDkNp9EMeZCyqkXolj4w6XmBU9As-Pl2WRYQ4uIyWJWy5jD7j_7h5ghV5T5ytkEokvfst3a24vna1zqSQKKtWTvLDWfYFB6wzreOnqXnOsM06YjrmmSOVCLChPXSaLTwatBEOXUJKMIObEjQz1gWGAcilMbg0BZMHth0o4oa9rEhSltic9UA6tGjlW6gqqeChOpWCkHRmmcIAtrwhNl07QxAU4AfiJS6vdkSqEL0EE04e0V4KfA3ooEWB0CGynOjRxtJnQspvgDmIZU9K7idgAmSXFcEoHSZKUCt61TmRZwbt2hdwkNSgahshi0a-naKT4EjkwJU35k5P9vbNtDPrysEdXtIaulcc4ykA6otAbGbkSEtP-jdDjtbFFrTrDdX2CWyXIltlql7yjo4CdkmCIZwxhRuRPsEoOTYDCPDbwqKA-9qCOZi2YMoMNYVkEGMHSlgD_mC-FMk1TbA31Yy0wFATBLkOAtbR8CLNSflFIL0ODsUyaCLUsBWOBqvvPvwAfxYo0kDg7nk4GpldHYoHmVHptDrcQ2HbD2w3yvplvVK9QtyeVvd4KynoozoucGcihg16S-Otj3QlxcuW7VINOrilYlae-uUvPCSBpjVi0ncBue29d13t6eQB0N8rEGrQVUJueFDc14nFaIDPi5K1eqDF7XGIort0c4AMYVYXcNA0-Z5lPaEo1ZsgkR2x7Uac1bk4FfgK1eSZmtJlo1p2nznvPht6gvKkt8HrDhLj9QHMcMmMTUV7bjGHAyXId9nYYU92pRZJvBVEBPTEUDqoLEGJu_I70s3-dbzY4XDAldQ7EREohQ05fEhKiW9AZCCT0uqtmB9OlE6KAVT-9Kv5kU-g-POKX89FaCjBgboLs0Q1rOS2Xif_HbyisjAFoMzi1dalSyp3jFRM4CXoW2DTpiC8TRd3lB4dqdZFQjZhIm5qdnP_-YfL-HCpoqPZo09GGZrgyeYHm3kVLO19Woy8MgibHuN8haTvfyxhdYp6CfcpJ1G3qiVwImdlg6DDwPUfv7KOKPBemt1ga6J52nfDYmPSEqPyknxSlxOEwITwhbpBXolsK9Qdnrgl3hYXch-OlnfMDVyENankr8tP8tXVdeHv7_Lm48Qxl7l7XhphFYXOaxbc3PsBje4lcAWgWN29rqxNbUpgFVcjXZ7WY2wnkIe5WzTPMtpj9VpatqAME0GN97RVW3wfuNnBZ0XftTbPJ77_Ia-jaS03Dtklet0t6xMGBibH_6uCI9hioQqUwvH5txsqujds3-wCyvl2rl1Q3Kg9oWk-E4VWdGoaW2SuHWre0dYK9runi9aLGX-E1QhUK3RDW3UK9RXuWCjurO1XOomg7SiVNorGWBdmOMiIh3uBnZNNt6wlqDvPSLNouv_tPUA1-5xXKirf5Lcrh6XyQcvg2vErVnF1PU4YOyRX-AQQ55p-FyGoUpCjSZTReYKbgV_mCU71g3X-VtmqcmgYwGh-MDvfsLtH4JrqOxs-Hh0cv9od7e6Ph7mj_6OUeUFfm887wxcHh7uHuy9HL4Q78N7zbjr7bk3dfjA6PRvujg4P9vcPhzsFotB0RaFGEvCjfOu2T591_zYjNqQ)
 ---
 
 ### 7.3 Data Dictionary (Champs critiques)
 
-| Table           | Champ                     | Type         | Contrainte           | Description                | Exemple                                                                   |
-| --------------- | ------------------------- | ------------ | -------------------- | -------------------------- | ------------------------------------------------------------------------- |
-| `kyc_sessions`  | `status`                  | TEXT         | NOT NULL             | État machine KYC           | `PENDING_KYC`                                                             |
-| `kyc_sessions`  | `access_level`            | TEXT         | DEFAULT 'RESTRICTED' | Niveau accès compte        | `LIMITED_ACCESS`                                                          |
-| `kyc_sessions`  | `niu_type`                | TEXT         | NULL                 | Mode NIU                   | `DECLARATIVE`, `UPLOADED`, `MISSING`                                      |
-| `kyc_sessions`  | `confidence_score_global` | DECIMAL(5,4) | NULL                 | Score global dossier (0-1) | `0.8750`                                                                  |
-| `kyc_sessions`  | `liveness_strike_count`   | INT          | DEFAULT 0            | Nombre échecs liveness     | `2`                                                                       |
-| `documents`     | `doc_type`                | TEXT         | NOT NULL             | Type document              | `CNI_RECTO`, `CNI_VERSO`, `BILL_ENEO`, `SELFIE`, `NIU`                    |
-| `documents`     | `ocr_engine`              | TEXT         | NULL                 | Moteur OCR utilisé         | `PADDLE`, `GLM`, `PADDLE_THEN_GLM`                                        |
-| `documents`     | `capture_quality_metrics` | JSONB        | NULL                 | Métriques qualité capture  | `{"laplacian": 145, "luminance_std": 0.32}`                               |
-| `ocr_fields`    | `confidence_score`        | DECIMAL(5,4) | NOT NULL             | Confiance extraction       | `0.9200` ( ≥0.85)                                                        |
-| `agents`        | `role`                    | TEXT         | NOT NULL             | Rôle agent back-office     | `JEAN`, `THOMAS`, `SYLVIE`                                                |
-| `agents`        | `static_weight`           | INT          | DEFAULT 1            | Poids WRR statique         | `2` (agent senior)                                                        |
-| `aml_alerts`    | `alert_type`              | TEXT         | NOT NULL             | Type alerte                | `PEP`, `SANCTIONS_UN`, `SANCTIONS_EU`, `SANCTIONS_OFAC`                   |
-| `aml_alerts`    | `status`                  | TEXT         | DEFAULT 'OPEN'       | État alerte                | `OPEN`, `CLEARED`, `CONFIRMED`, `ESCALATED`                               |
-| `pep_sanctions` | `entity_type`             | TEXT         | NOT NULL             | Type entité                | `INDIVIDUAL`, `ENTITY`                                                    |
-| `audit_log`     | `action`                  | TEXT         | NOT NULL             | Type action                | `INSERT`, `UPDATE`, `DELETE`, `VIEW`, `OCR_CORRECTED`, `DOSSIER_APPROVED` |
-| `audit_log`     | `old_data`                | JSONB        | NULL                 | État avant modification    | `{"status": "PENDING_KYC"}`                                               |
+| Table                      | Champ                        | Type         | Contrainte           | Description                 | Exemple                                                                   |
+| -------------------------- | ---------------------------- | ------------ | -------------------- | --------------------------- | ------------------------------------------------------------------------- |
+| `kyc_sessions`             | `status`                     | TEXT         | NOT NULL             | État machine KYC            | `PENDING_KYC`                                                             |
+| `kyc_sessions`             | `access_level`               | TEXT         | DEFAULT 'RESTRICTED' | Niveau accès compte         | `LIMITED_ACCESS`                                                          |
+| `kyc_sessions`             | `niu_type`                   | TEXT         | NULL                 | Mode NIU                    | `DECLARATIVE`, `UPLOADED`, `MISSING`                                      |
+| `kyc_sessions`             | `confidence_score_global`    | DECIMAL(5,4) | NULL                 | Score global dossier (0-1)  | `0.8750`                                                                  |
+| `kyc_sessions`             | `liveness_strike_count`      | INT          | DEFAULT 0            | Nombre échecs liveness      | `2`                                                                       |
+| `consent_records`          | `consent_method`             | TEXT         | NOT NULL             | Modalité de consentement    | `CHECKBOX_DIGITAL`, `PAPER_SCAN`                                          |
+| `consent_records`          | `consent_metadata`           | JSONB        | NULL                 | Métadonnées consentement    | `{"user_agent": "...", "screen_resolution": "..."}`                       |
+| `users`                    | `liveness_lockout_count_24h` | INT          | DEFAULT 0            | Compteur lockouts 24h       | `2` (max 30 avant blocage)                                                |
+| `users`                    | `last_lockout_reset_at`      | TIMESTAMPTZ  | NULL                 | Dernier reset du compteur   | `2026-03-05T00:00:00Z`                                                    |
+| `provisioning_batch_items` | `axway_request_id`           | TEXT         | NULL                 | ID requête Axway            | `axw-req-abc123`                                                          |
+| `provisioning_batch_items` | `iso20022_message_ref`       | TEXT         | NULL                 | Référence message ISO 20022 | `acmt.009-20260305-001`                                                   |
+| `documents`                | `doc_type`                   | TEXT         | NOT NULL             | Type document               | `CNI_RECTO`, `CNI_VERSO`, `BILL_ENEO`, `SELFIE`, `NIU`                    |
+| `documents`                | `ocr_engine`                 | TEXT         | NULL                 | Moteur OCR utilisé          | `PADDLE`, `GLM`, `PADDLE_THEN_GLM`                                        |
+| `documents`                | `capture_quality_metrics`    | JSONB        | NULL                 | Métriques qualité capture   | `{"laplacian": 145, "luminance_std": 0.32}`                               |
+| `ocr_fields`               | `confidence_score`           | DECIMAL(5,4) | NOT NULL             | Confiance extraction        | `0.9200` ( ≥0.85)                                                         |
+| `agents`                   | `role`                       | TEXT         | NOT NULL             | Rôle agent back-office      | `JEAN`, `THOMAS`, `SYLVIE`                                                |
+| `agents`                   | `static_weight`              | INT          | DEFAULT 1            | Poids WRR statique          | `2` (agent senior)                                                        |
+| `aml_alerts`               | `alert_type`                 | TEXT         | NOT NULL             | Type alerte                 | `PEP`, `SANCTIONS_UN`, `SANCTIONS_EU`, `SANCTIONS_OFAC`                   |
+| `aml_alerts`               | `status`                     | TEXT         | DEFAULT 'OPEN'       | État alerte                 | `OPEN`, `CLEARED`, `CONFIRMED`, `ESCALATED`                               |
+| `pep_sanctions`            | `entity_type`                | TEXT         | NOT NULL             | Type entité                 | `INDIVIDUAL`, `ENTITY`                                                    |
+| `audit_log`                | `action`                     | TEXT         | NOT NULL             | Type action                 | `INSERT`, `UPDATE`, `DELETE`, `VIEW`, `OCR_CORRECTED`, `DOSSIER_APPROVED` |
+| `audit_log`                | `old_data`                   | JSONB        | NULL                 | État avant modification     | `{"status": "PENDING_KYC"}`                                               |
 
 ---
 
@@ -1449,85 +1623,123 @@ Notation Mermaid :
 
 ### 8.1 Auth
 
-| Méthode | Endpoint                 | Body                        | Réponse                      | Description                     |
-| ------- | ------------------------ | --------------------------- | ---------------------------- | ------------------------------- |
-| POST    | `/auth/otp/send`         | `{phone?, email?, channel}` | `{expires_in: 300}`          | Envoi OTP (SMS Orange ou Email) |
-| POST    | `/auth/otp/verify`       | `{phone?, email?, code}`    | `{access_token, session_id}` | Vérifie OTP, crée session JWT   |
-| POST    | `/auth/pin/setup`        | `{session_id, pin_hash}`    | `{success}`                  | Setup PIN 6 chiffres            |
-| POST    | `/auth/pin/verify`       | `{user_id, pin_hash}`       | `{access_token}`             | Login récurrent par PIN         |
-| POST    | `/auth/backoffice/login` | `{email, password}`         | `{access_token, role}`       | Login agents back-office        |
-| POST    | `/auth/refresh`          | `{}`                        | `{access_token}`             | Refresh JWT                     |
-| POST    | `/auth/logout`           | `{}`                        | `{success}`                  | Invalide token                  |
+| Méthode | Endpoint                        | Body                        | Réponse                      | Description                     | Rate Limit                                                 |
+| ------- | ------------------------------- | --------------------------- | ---------------------------- | ------------------------------- | ---------------------------------------------------------- |
+| POST    | `/api/v1/auth/otp/send`         | `{phone?, email?, channel}` | `{expires_in: 300}`          | Envoi OTP (SMS Orange ou Email) | **5/15min → 429** ; lock 30min après 5 échecs vérification |
+| POST    | `/api/v1/auth/otp/verify`       | `{phone?, email?, code}`    | `{access_token, session_id}` | Vérifie OTP, crée session JWT   | 5 tentatives max                                           |
+| POST    | `/api/v1/auth/pin/setup`        | `{session_id, pin_hash}`    | `{success}`                  | Setup PIN 6 chiffres            | —                                                          |
+| POST    | `/api/v1/auth/pin/verify`       | `{user_id, pin_hash}`       | `{access_token}`             | Login récurrent par PIN         | —                                                          |
+| POST    | `/api/v1/auth/backoffice/login` | `{email, password}`         | `{access_token, role}`       | Login agents back-office        | —                                                          |
+| POST    | `/api/v1/auth/refresh`          | `{}`                        | `{access_token}`             | Refresh JWT                     | —                                                          |
+| POST    | `/api/v1/auth/logout`           | `{}`                        | `{success}`                  | Invalide token                  | —                                                          |
 
 ### 8.2 KYC — Marie
 
-| Méthode | Endpoint             | Body                                                             | Réponse                                                | Description                        |
-| ------- | -------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- |
-| POST    | `/kyc/session/start` | `{user_id}`                                                      | `{session_id, status}`                                 | Crée session KYC                   |
-| GET     | `/kyc/session/{id}`  | —                                                                | `{session, last_step, status}`                         | Récupère état session (résumption) |
-| POST    | `/kyc/capture/cni`   | `{session_id, side, image_b64}`                                  | `{ocr_fields, confidence_map, doc_id}`                 | Upload + OCR CNI                   |
-| POST    | `/kyc/capture/bill`  | `{session_id, bill_type, image_b64}`                             | `{agency_name, date, address, doc_id}`                 | Upload + GLM-OCR facture           |
-| POST    | `/kyc/capture/niu`   | `{session_id, mode, value/image_b64}`                            | `{niu_status, access_impact}`                          | Upload ou déclaration NIU          |
-| POST    | `/kyc/liveness`      | `{session_id, landmarks_json}`                                   | `{liveness_pass, face_match_score, strikes_remaining}` | Check liveness + face match        |
-| POST    | `/kyc/ocr/confirm`   | `{session_id, doc_id, fields}`                                   | `{success}`                                            | Confirme/corrige extraction OCR    |
-| POST    | `/kyc/address`       | `{session_id, region, ville, commune, quartier, lieu_dit, gps?}` | `{success}`                                            | Sauvegarde adresse                 |
-| POST    | `/kyc/submit`        | `{session_id, consent_record}`                                   | `{message, estimated_delay}`                           | Soumission finale dossier          |
+| Méthode | Endpoint                    | Body                                                             | Réponse                                                | Description                                    |
+| ------- | --------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------- |
+| POST    | `/api/v1/kyc/session/start` | `{user_id}`                                                      | `{session_id, status}`                                 | Crée session KYC                               |
+| GET     | `/api/v1/kyc/session/{id}`  | —                                                                | `{session, last_step, status}`                         | Récupère état session (résumption)             |
+| POST    | `/api/v1/kyc/capture/cni`   | `{session_id, side, image_b64}`                                  | `{ocr_fields, confidence_map, doc_id}`                 | Upload + OCR CNI — **413 si payload >10MB**    |
+| POST    | `/api/v1/kyc/capture/bill`  | `{session_id, bill_type, image_b64}`                             | `{agency_name, date, address, doc_id}`                 | Upload + GLM-OCR facture                       |
+| POST    | `/api/v1/kyc/capture/niu`   | `{session_id, mode, value/image_b64}`                            | `{niu_status, access_impact}`                          | Upload ou déclaration NIU                      |
+| POST    | `/api/v1/kyc/liveness`      | `{session_id, landmarks_json}`                                   | `{liveness_pass, face_match_score, strikes_remaining}` | Check liveness + face match                    |
+| POST    | `/api/v1/kyc/ocr/confirm`   | `{session_id, doc_id, fields}`                                   | `{success}`                                            | Confirme/corrige extraction OCR                |
+| POST    | `/api/v1/kyc/address`       | `{session_id, region, ville, commune, quartier, lieu_dit, gps?}` | `{success}`                                            | Sauvegarde adresse                             |
+| POST    | `/api/v1/kyc/submit`        | `{session_id, consent_record}`                                   | `{message, estimated_delay}`                           | Soumission finale — **409 si status != DRAFT** |
 
 ### 8.3 Back-Office — Jean
 
-| Méthode | Endpoint                                 | Description                                          |
-| ------- | ---------------------------------------- | ---------------------------------------------------- |
-| GET     | `/backoffice/dossiers`                   | Queue dossiers (filtres: status, priority, agent_id) |
-| GET     | `/backoffice/dossiers/{id}`              | Détail complet + images signed URLs                  |
-| POST    | `/backoffice/dossiers/{id}/approve`      | Approuve dossier (Jean)                              |
-| POST    | `/backoffice/dossiers/{id}/reject`       | Rejette avec motif (Jean)                            |
-| POST    | `/backoffice/dossiers/{id}/request-info` | Demande doc supplémentaire → notification Marie      |
-| POST    | `/backoffice/dossiers/{id}/override-ocr` | Correction manuelle champ OCR + justification        |
+| Méthode | Endpoint                                        | Description                                             |
+| ------- | ----------------------------------------------- | ------------------------------------------------------- |
+| GET     | `/api/v1/backoffice/dossiers`                   | Queue dossiers (filtres: status, priority, agent_id)    |
+| GET     | `/api/v1/backoffice/dossiers/{id}`              | Détail complet + liens documents (JWT+RBAC)             |
+| GET     | `/api/v1/documents/{session_id}/{filename}`     | Récupère fichier image (JWT+RBAC, remplace signed URLs) |
+| POST    | `/api/v1/backoffice/dossiers/{id}/approve`      | Approuve dossier (Jean)                                 |
+| POST    | `/api/v1/backoffice/dossiers/{id}/reject`       | Rejette avec motif (Jean)                               |
+| POST    | `/api/v1/backoffice/dossiers/{id}/request-info` | Demande doc supplémentaire → notification Marie         |
+| POST    | `/api/v1/backoffice/dossiers/{id}/override-ocr` | Correction manuelle champ OCR + justification           |
 
 ### 8.4 AML — Thomas
 
-| Méthode | Endpoint                     | Description                                     |
-| ------- | ---------------------------- | ----------------------------------------------- |
-| GET     | `/aml/alerts`                | Liste alertes PEP/Sanctions actives             |
-| GET     | `/aml/alerts/{id}`           | Détail alerte (profil vs liste sanctions)       |
-| POST    | `/aml/alerts/{id}/clear`     | Efface faux positif + justification obligatoire |
-| POST    | `/aml/alerts/{id}/confirm`   | Confirme match → gel compte                     |
-| POST    | `/aml/alerts/{id}/escalate`  | Escalade pour revue supérieure                  |
-| GET     | `/aml/conflicts`             | File déduplication (doublons détectés)          |
-| POST    | `/aml/conflicts/{id}/merge`  | Fusionne profils (B1: même personne)            |
-| POST    | `/aml/conflicts/{id}/reject` | Flagge fraude (B2: noms différents)             |
+| Méthode | Endpoint                            | Description                                        |
+| ------- | ----------------------------------- | -------------------------------------------------- |
+| GET     | `/api/v1/aml/alerts`                | Liste alertes PEP/Sanctions actives                |
+| GET     | `/api/v1/aml/alerts/{id}`           | Détail alerte (profil vs liste sanctions)          |
+| POST    | `/api/v1/aml/alerts/{id}/clear`     | Efface faux positif + justification obligatoire    |
+| POST    | `/api/v1/aml/alerts/{id}/confirm`   | Confirme match → gel compte                        |
+| POST    | `/api/v1/aml/alerts/{id}/monitor`   | Marque PEP confirmé → MONITORED (actif, surveillé) |
+| POST    | `/api/v1/aml/alerts/{id}/escalate`  | Escalade pour revue supérieure                     |
+| GET     | `/api/v1/aml/conflicts`             | File déduplication (doublons détectés)             |
+| POST    | `/api/v1/aml/conflicts/{id}/merge`  | Fusionne profils (B1: même personne)               |
+| POST    | `/api/v1/aml/conflicts/{id}/reject` | Flagge fraude (B2: noms différents)                |
 
 ### 8.5 Admin — Thomas & Agencies
 
-| Méthode | Endpoint                  | Description               |
-| ------- | ------------------------- | ------------------------- |
-| GET     | `/admin/agencies`         | Liste agences             |
-| POST    | `/admin/agencies`         | Crée agence               |
-| PUT     | `/admin/agencies/{id}`    | Modifie agence            |
-| DELETE  | `/admin/agencies/{id}`    | Désactive agence          |
-| GET     | `/admin/batch`            | Statuts batches Amplitude |
-| POST    | `/admin/batch/create`     | Lance batch provisioning  |
-| POST    | `/admin/batch/{id}/retry` | Relance batch en erreur   |
+| Méthode | Endpoint                         | Description                       |
+| ------- | -------------------------------- | --------------------------------- |
+| GET     | `/api/v1/admin/agencies`         | Liste agences                     |
+| POST    | `/api/v1/admin/agencies`         | Crée agence                       |
+| PUT     | `/api/v1/admin/agencies/{id}`    | Modifie agence                    |
+| DELETE  | `/api/v1/admin/agencies/{id}`    | Désactive agence                  |
+| GET     | `/api/v1/admin/batch`            | Statuts batches provisioning      |
+| POST    | `/api/v1/admin/batch/create`     | Lance batch provisioning (Thomas) |
+| POST    | `/api/v1/admin/batch/{id}/retry` | Relance batch en erreur           |
 
 ### 8.6 Analytics — Sylvie
 
-| Méthode | Endpoint                           | Description                                              |
-| ------- | ---------------------------------- | -------------------------------------------------------- |
-| GET     | `/analytics/health`                | Santé système R/Y/G (queue, SLA, uptime, OCR accuracy)   |
-| GET     | `/analytics/funnel`                | Funnel drop-off par étape (paramètre: period)            |
-| GET     | `/analytics/sla`                   | Dashboard SLA agents (violations, moyennes)              |
-| GET     | `/analytics/agents`                | Charge agents (WRR current weights, active counts)       |
-| POST    | `/analytics/escalate/{dossier_id}` | Escalade Sylvie → flag HIGH_PRIORITY + notif Jean        |
-| POST    | `/analytics/redistribute`          | Redistribue dossiers par load balancing WRR              |
-| GET     | `/analytics/ocr-quality`           | Métriques OCR (confidence distribution, engine accuracy) |
-| POST    | `/audit/export/{session_id}`       | Export pack COBAC (PDF + JSON + images)                  |
+| Méthode | Endpoint                                  | Description                                              |
+| ------- | ----------------------------------------- | -------------------------------------------------------- |
+| GET     | `/api/v1/analytics/health`                | Santé système R/Y/G (queue, SLA, uptime, OCR accuracy)   |
+| GET     | `/api/v1/analytics/funnel`                | Funnel drop-off par étape (paramètre: period)            |
+| GET     | `/api/v1/analytics/sla`                   | Dashboard SLA agents (violations, moyennes)              |
+| GET     | `/api/v1/analytics/agents`                | Charge agents (WRR current weights, active counts)       |
+| POST    | `/api/v1/analytics/escalate/{dossier_id}` | Escalade Sylvie → flag HIGH_PRIORITY + notif Jean        |
+| POST    | `/api/v1/analytics/redistribute`          | Redistribue dossiers par load balancing WRR              |
+| GET     | `/api/v1/analytics/ocr-quality`           | Métriques OCR (confidence distribution, engine accuracy) |
+| POST    | `/api/v1/audit/export/{session_id}`       | Export pack COBAC (PDF + JSON + images)                  |
 
 ### 8.7 Notifications — Marie
 
-| Méthode | Endpoint                           | Description                                |
-| ------- | ---------------------------------- | ------------------------------------------ |
-| GET     | `/notifications?since={timestamp}` | Polling — retourne nouvelles notifications |
-| POST    | `/notifications/{id}/read`         | Marque notification lue                    |
+| Méthode | Endpoint                                  | Description                                                             |
+| ------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| GET     | `/api/v1/notifications?after_id={cursor}` | Polling cursor-based — retourne nouvelles notifications + `next_cursor` |
+| POST    | `/api/v1/notifications/{id}/read`         | Marque notification lue                                                 |
+
+### 8.8 Schéma d'erreur standard (toutes routes)
+
+```json
+{
+  "error": {
+    "code": "OTP_RATE_LIMIT_EXCEEDED",
+    "message": "Trop de tentatives. Réessayez dans 15 minutes.",
+    "retry_after_seconds": 900,
+    "request_id": "req_abc123"
+  }
+}
+```
+
+| Code HTTP | Code erreur métier          | Déclencheur                         |
+| --------- | --------------------------- | ----------------------------------- |
+| 400       | `VALIDATION_ERROR`          | Champ manquant ou format incorrect  |
+| 401       | `TOKEN_EXPIRED`             | JWT expiré                          |
+| 401       | `TOKEN_INVALID`             | JWT invalide ou falsifié            |
+| 403       | `RBAC_DENIED`               | Rôle insuffisant                    |
+| 409       | `SESSION_ALREADY_SUBMITTED` | Double-soumission `/kyc/submit`     |
+| 413       | `PAYLOAD_TOO_LARGE`         | Image >10MB                         |
+| 422       | `OCR_ALL_FIELDS_FAILED`     | Confidence = 0% sur tous les champs |
+| 429       | `OTP_RATE_LIMIT_EXCEEDED`   | >5 envois OTP/15min                 |
+| 429       | `LIVENESS_LOCKOUT`          | 3 strikes consécutifs               |
+| 500       | `INTERNAL_ERROR`            | Erreur serveur non anticipée        |
+| 503       | `OCR_SERVICE_UNAVAILABLE`   | PaddleOCR ou GLM-OCR indisponible   |
+
+### 8.9 Support Messagerie — Marie ↔ Jean
+
+| Méthode | Endpoint                                  | Description                                          |
+| ------- | ----------------------------------------- | ---------------------------------------------------- |
+| GET     | `/api/v1/support/threads?session_id={id}` | Liste threads support d'une session                  |
+| POST    | `/api/v1/support/threads`                 | Ouvre un nouveau thread                              |
+| GET     | `/api/v1/support/threads/{id}`            | Lit les messages d'un thread                         |
+| POST    | `/api/v1/support/messages`                | Envoie un message (texte + pièce jointe optionnelle) |
 
 ---
 
@@ -1609,6 +1821,7 @@ services:
       - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
       - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
       - OCR_CONFIDENCE_THRESHOLD=0.85
+      - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
     volumes:
       - documents_storage:/data/documents
     depends_on:
@@ -1617,7 +1830,11 @@ services:
     networks:
       - veripass-net
     restart: unless-stopped
-    mem_limit: 3g       # PaddleOCR (2GB) + FastAPI workers (512MB) + marge
+    mem_limit: 2.5g     # PaddleOCR lazy (2GB) + FastAPI workers (512MB)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      start_period: 60s
     # GLM-OCR via worker Celery séparé
 
   #  CELERY WORKERS 
@@ -1631,15 +1848,16 @@ services:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_PATH=/data/documents
+      - GLM_LAZY_LOAD=true      # GLM-OCR chargé à la 1ère tâche de la queue
     volumes:
       - documents_storage:/data/documents
     depends_on:
-      - redis
-      - postgres
+      api:
+        condition: service_healthy  # Ne démarre qu'après API prête
     networks:
       - veripass-net
     restart: unless-stopped
-    mem_limit: 4g       # GLM-OCR 0.9B quantifié: 2.5-3.5GB RAM
+    mem_limit: 3.5g     # GLM-OCR 0.9B quantifié: 2.5-3.5GB RAM lazy
     # Séquentiel obligatoire (concurrency=1)
 
   celery_notifications:
@@ -1647,7 +1865,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: vp_celery_notif
-    command: celery -A app.celery worker -Q notifications,amplitude_batch,sanctions_sync --concurrency=2 -n notif_worker@%h
+    command: celery -A app.celery worker -Q notifications,provisioning_batch,sanctions_sync --concurrency=2 -n notif_worker@%h
     environment:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
@@ -1710,20 +1928,17 @@ services:
 
 ## 10. Budget RAM & Profil Hardware
 
-### 10.1 Allocation RAM (WSL2 — 8GB cap)
+### 10.1 Budget RAM — Version honnête (WSL2 cap 8GB)
 
-| Service                       | RAM Allouée  | Notes                               |
-| ----------------------------- | ------------ | ----------------------------------- |
-| `nginx`                       | ~64MB        | Minimal                             |
-| `pwa` + `backoffice`          | ~256MB       | Static files                        |
-| `api` (FastAPI + PaddleOCR)   | 3GB (cap)    | PaddleOCR ONNX ~2GB, workers ~512MB |
-| `celery_ocr` (GLM-OCR)        | 4GB (cap)    | GLM-OCR 0.9B quantifié ~2.5-3.5GB   |
-| `celery_notifications`        | ~512MB       | Léger                               |
-| `celery_beat`                 | ~128MB       | Scheduler uniquement                |
-| `postgres`                    | ~512MB       |                                     |
-| `redis`                       | ~256MB       |                                     |
-| **TOTAL sans GLM actif**      | **~4.8GB**  |                                     |
-| **TOTAL GLM actif simultané** | **~8.8GB**  | Acceptable si séquentiel (GLM seul) |
+| Phase                                        | Mémoire    | Condition                                          |
+| -------------------------------------------- | ---------- | -------------------------------------------------- |
+| Démarrage à froid (aucune requête)           | ~2.2GB     | Nginx + PG + Redis + API (sans modèles en mémoire) |
+| API active, PaddleOCR chargé                 | ~3.7GB     | Après 1ère requête OCR                             |
+| Celery actif, GLM en attente                 | ~4.2GB     | Workers prêts, pas de tâche GLM                    |
+| **Peak : PaddleOCR en cours + GLM en cours** | **~7.2GB** | **⚠️ Séquentiel obligatoire (Redis lock)**          |
+| Peak absolu théorique (si lock échoue)       | ~9GB       | ❌ OOM — le Redis lock l'empêche                    |
+
+> Le Redis lock applicatif (§12 pipeline) est **la seule protection** contre l'OOM. Il doit être implémenté avant toute mise en production, même sur i3.
 
 **Règle critique : PaddleOCR et GLM-OCR ne s'exécutent JAMAIS simultanément.**
 - `api` traite PaddleOCR synchrone
@@ -1746,6 +1961,16 @@ services:
 
 ## 11. Sécurité Architecture
 
+> **Principe Directeur** : Défense en profondeur en **5 couches** conformément à la **Loi n°2024-017 relative à la cybercriminalité au Cameroun** et aux directives **COBAC** sur la protéction des données bancaires.
+>
+> | Couche | Mécanisme | Menace couverte |
+> |---|---|---|
+> | 1 — Transit | TLS 1.3 (Nginx) | Interception réseau |
+> | 2 — Périmètre | JWT Auth + RBAC + Rate Limit | Accès non autorisé |
+> | 3 — Application | Pydantic validation + param. queries | Injection, XSS |
+> | 4 — Stockage | SHA-256 document hashing + AES-256 (Phase 1+) | Corruption, vol |
+> | 5 — Audit | Append-only audit_log + trigger PostgreSQL | Effacement de traces |
+
 ### 11.1 Couches de Défense (Defense in Depth)
 
 ```
@@ -1756,26 +1981,26 @@ Nginx (Rate limiting, CSP headers, HTTPS forced)
 FastAPI (JWT auth, RBAC, parameterized queries, Pydantic validation)
     ↓ SQLAlchemy parameterized
 PostgreSQL (roles least-privilege, audit_log append-only)
-    ↓ Filesystem chiffré (Phase pré-pilote)
-Docker Volume (AES-256 LUKS — activé en Phase finale)
+    ↓ Filesystem chiffré (Phase 1+)
+Docker Volume (AES-256 LUKS + applicatif Python via Fernet)
 ```
 
 ### 11.2 Matrice RBAC
 
 | Permission               | Marie | Jean | Thomas | Sylvie |
 | ------------------------ | ----- | ---- | ------ | ------ |
-| Onboarding KYC           |   ✅   |  ❌   |   ❌    |   ❌    |
-| Voir ses notifications   |   ✅   |  ❌   |   ❌    |   ❌    |
-| Queue dossiers (agence)  |   ❌   |  ✅   |   ❌    |   ❌    |
-| Inspect + approve/reject |   ❌   |  ✅   |   ❌    |   ❌    |
-| Override OCR             |   ❌   |  ✅   |   ❌    |   ❌    |
-| AML screening            |   ❌   |  ❌   |   ✅    |   ❌    |
-| Agency CRUD              |   ❌   |  ❌   |   ✅    |   ❌    |
-| Batch Amplitude          |   ❌   |  ❌   |   ✅    |   ❌    |
-| Dashboard analytics      |   ❌   |  ❌   |   ❌    |   ✅    |
-| Escalade + redistribute  |   ❌   |  ❌   |   ❌    |   ✅    |
-| Export COBAC             |   ❌   |  ❌   |   ✅    |   ✅    |
-| Audit log (lecture)      |   ❌   |  ❌   |   ✅    |   ✅    |
+| Onboarding KYC           | ✅     | ❌    | ❌      | ❌      |
+| Voir ses notifications   | ✅     | ❌    | ❌      | ❌      |
+| Queue dossiers (agence)  | ❌     | ✅    | ❌      | ❌      |
+| Inspect + approve/reject | ❌     | ✅    | ❌      | ❌      |
+| Override OCR             | ❌     | ✅    | ❌      | ❌      |
+| AML screening            | ❌     | ❌    | ✅      | ❌      |
+| Agency CRUD              | ❌     | ❌    | ✅      | ❌      |
+| Batch Amplitude          | ❌     | ❌    | ✅      | ❌      |
+| Dashboard analytics      | ❌     | ❌    | ❌      | ✅      |
+| Escalade + redistribute  | ❌     | ❌    | ❌      | ✅      |
+| Export COBAC             | ❌     | ❌    | ✅      | ✅      |
+| Audit log (lecture)      | ❌     | ❌    | ✅      | ✅      |
 
 ### 11.3 Audit Log — Implémentation PostgreSQL
 
@@ -1857,6 +2082,8 @@ flowchart TD
     K --> L[Réponse API</br>Confidence badges ]
 ```
 
+> **Comportement partiel PaddleOCR→GLM (E04) :** Si PaddleOCR extrait certains champs avec confidence ≥ 85% mais pas tous, les champs échoués sont envoyés à GLM uniquement (pas l'image complète). Réponse: `engine: PADDLE_THEN_GLM`, `partial_glm: true`.
+
 ### 12.2 Pipeline Biométrique
 
 ```mermaid
@@ -1884,6 +2111,18 @@ flowchart TD
     K -->|Non: strike = 3| M[Status = LOCKED_LIVENESS</br>Purge Redis session</br>Message lockout FR]
 ```
 
+> **Validation serveur landmarks (E19) :** Les landmarks reçus du client sont vérifiés côté serveur pour détecter le spoofing : plage de valeurs (x,y,z ∈ [-1,1]), variance temporelle minimale (>0.02 std sur 5 frames), rejet si JSON format invalid. Pas de confiance aveugle aux données client.
+
+### 12.4 Table UX Erreurs (AR6 — 5 scénarios critiques)
+
+| Code | Erreur                                 | Message affiché Marie                                         | Action système                              |
+| ---- | -------------------------------------- | ------------------------------------------------------------- | ------------------------------------------- |
+| E01  | OCR confidence <40% tous champs        | « Photo floue ou mal cadrée. Recommencez. »                   | Suppression image, retry immédiat           |
+| E04  | OCR partial (certains champs <85%)     | « Quelques champs peu lisibles, on complète automatiquement » | Envoi silencieux queue GLM                  |
+| E13  | Liveness FAIL (strike 1-2)             | « Non validé. Recentrez votre visage (× restant) »            | Strike++ Redis, retry                       |
+| E14  | Liveness LOCKOUT (strike 3)            | « Limite atteinte pour aujourd'hui. Réessayez demain. »       | Status LOCKED_LIVENESS, lockout_count++     |
+| E19  | Landmarks invalides (spoofing detecté) | « Vérification impossible. Utilisez votre visage réel. »      | Rejet immmédiat, audit log SPOOFING_ATTEMPT |
+
 ### 12.3 Agent Load Balancing — Smooth Weighted Round Robin
 
 ```
@@ -1910,6 +2149,29 @@ Exemple (3 agents: Jean-A(w=2), Jean-B(w=1), Jean-C(w=1)):
   Tour 4: CW=[4,2,0] → Jean-A
   → Sur 4 tours: Jean-A=2, Jean-B=1, Jean-C=1  (ratio 2:1:1)
 ```
+
+### 12.5 AML — Algorithme pg_trgm (G40)
+
+```sql
+-- Accès index tri-gramme PostgreSQL pour fuzzy search PEP/Sanctions
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_pep_name_trgm ON pep_sanctions USING gin(full_name gin_trgm_ops);
+
+-- Requête de matching lors de la soumission dossier
+SELECT id, full_name, date_of_birth, source, similarity(full_name, :candidate_name) AS score
+FROM pep_sanctions
+WHERE full_name %% :candidate_name         -- Sélecteur tri-gramme rapide
+  AND similarity(full_name, :candidate_name) >= 0.65  -- Seuil alerte haute
+  AND is_active = true
+  AND last_synced_at >= NOW() - INTERVAL '8 days'     -- Périmé si >8 jours
+ORDER BY score DESC;
+
+-- Match potentiel (surveillance, pas alerte immédiate) : seuil 0.40-0.65
+-- Correspondance DOB tolérance ±2 ans (homonymie):
+--   ABS(EXTRACT(YEAR FROM date_of_birth) - :candidate_year) <= 2
+```
+
+> **Note staleness :** Si `last_synced_at < NOW() - INTERVAL '8 days'` sur toutes les lignes, Celery Beat ré-enclenche une synchro d'urgence et bloque les nouvelles soumissions avec un message d'alerte Sylvie.
 
 ---
 
@@ -1999,38 +2261,85 @@ WHERE action = 'LIVENESS_ATTEMPT'
 GROUP BY 1 ORDER BY 1 DESC;
 ```
 
-### 13.3 Amplitude Python SDK (Thomas — Batch)
+### 13.3 Provisioning Sopra Amplitude — Architecture Axway (Thomas)
 
-```python
-# Événements envoyés à Amplitude lors du provisioning
-from amplitude import Amplitude, BaseEvent
+> **❌ L'ancienne section référençant `amplitude.com` (SaaS analytics américain) est supprimée.** Elle référençait un produit sans lien avec notre architecture. Voir §8.5 et §10.x pour le flow ISO 20022 via Axway.
 
-client = Amplitude(api_key=settings.AMPLITUDE_API_KEY)
+**Ce que "Amplitude" signifie dans ce projet :** Sopra Banking Software — Amplitude Core Banking System de BICEC. L'accès se fait uniquement via le middleware **Axway API Manager v11.6 AIF** sur le réseau interne BICEC.
 
-events = [
-    BaseEvent("KYC_Started",      user_id=session.user_id),
-    BaseEvent("Document_Processed", user_id=session.user_id, 
-              event_properties={"doc_type": "CNI", "ocr_engine": "PADDLE", "confidence": 0.92}),
-    BaseEvent("Liveness_Validated", user_id=session.user_id,
-              event_properties={"face_match_score": 0.88, "liveness_score": 0.95}),
-    BaseEvent("Dossier_Approved",   user_id=session.user_id,
-              event_properties={"validation_duration_h": 1.2, "agent_id": jean.id}),
-]
-client.flush()
+**Format des messages — ISO 20022 (obligatoire depuis 2025, directive BEAC) :**
+
+| Action                      | Message ISO 20022                            |
+| --------------------------- | -------------------------------------------- |
+| Création compte             | `acmt.009` — AccountOpeningInstruction       |
+| Confirmation création       | `acmt.010` — AccountOpeningConfirmation      |
+| Mise à jour client existant | `acmt.003` — AccountModificationInstruction  |
+| Confirmation mise à jour    | `acmt.004` — AccountModificationConfirmation |
+
+**Flow Axway (séquence) :**
 ```
+Celery beat → provisioning_worker
+  → build acmt.009 XML payload
+  → POST Axway API Manager /v1/accounts
+     headers: Authorization: Bearer ${AXWAY_TOKEN}
+     body: acmt.009 ISO 20022 XML
+  → Axway valide, route vers Amplitude CBS
+  → Réponse acmt.010: account_number assigné
+  → UPDATE kyc_sessions SET status='ACTIVATED_LIMITED',
+      access_level='LIMITED_ACCESS',
+      axway_request_id=:req_id,
+      iso20022_message_ref=:ref
+  → Notification SMS Marie: « Compte créé !»
+```
+
+> **Note implémentation :** La documentation exacte des endpoints Axway disponibles dans l'environnement BICEC doit être demandée à l'équipe IT BICEC avant implémentation.
+
+### 13.4 Dashboard Sylvie — Périmètre complet
+
+Le Command Center de Sylvie couvre **4 zones (A–D)** :
+
+| Zone  | Titre                      | Contenu                                                                                     |
+| ----- | -------------------------- | ------------------------------------------------------------------------------------------- |
+| **A** | Vue temps réel (OLTP live) | File d'attente active, nombre PENDING_KYC, agents disponibles, alertes SLA                  |
+| **B** | Analytics DWH (OLAP)       | Funnel drop-off par étape, taux conversion semaine vs semaine, OCR accuracy distribution    |
+| **C** | Performance agents         | WRR current weights, active_dossier_count, SLA compliance par agent, temps moyen validation |
+| **D** | Actions Sylvie             | Bouton escalade (flag HIGH_PRIORITY), bouton redistribution WRR, export COBAC pack          |
+
+> **Différence OLTP vs OLAP :** Zone A lit `kyc_sessions` directement (OLTP, max freshness). Zones B-C lisent `fact_*` tables du DWH (OLAP, refresh toutes les heures via `pg_cron`). Zone D écrit vers OLTP.
 
 ---
 
 ## 14. Stratégie de Chiffrement (Phased)
 
-### Phase 1 — Dev/Debug (maintenant → mi-MVP)
+### 14.1 Phase 1 — Dev/Debug (maintenant → mi-MVP)
 -  Pas de chiffrement au repos sur les fichiers images (itération rapide, debug facile)
 -  **TLS 1.3** en transit (Nginx → clients) — **dès le départ**
 -  Passwords bcrypt/Argon2 — **dès le départ**
 -  SHA-256 intégrité documents — **dès le départ**
 -  JWT signé — **dès le départ**
 
-### Phase 2 — Pré-Pilote (mi-MVP → livraison)
+**Helper AES-256 Phase 1 (encrypt avant stockage documents sensibles) :**
+```python
+from cryptography.fernet import Fernet
+import os
+
+def encrypt_file(file_bytes: bytes, key: bytes) -> bytes:
+    """Chiffre un fichier avant stockage. key = FERNET_KEY env var."""
+    f = Fernet(key)
+    return f.encrypt(file_bytes)
+
+def decrypt_file(encrypted_bytes: bytes, key: bytes) -> bytes:
+    """Déchiffre un fichier à la lecture. key = FERNET_KEY env var."""
+    f = Fernet(key)
+    return f.decrypt(encrypted_bytes)
+
+# Usage dans FastAPI:
+# FERNET_KEY = os.environ["FERNET_KEY"].encode()  # 32-byte url-safe base64
+# stored = encrypt_file(image_bytes, FERNET_KEY)
+# Path(file_path).write_bytes(stored)
+```
+
+### 14.2 Phase 2 — Pré-Pilote (mi-MVP → livraison)
 -  Activation chiffrement volume Docker (LUKS ou chiffrement applicatif niveau Python avec Fernet/AES-256 sur les fichiers sensibles avant écriture)
 -  IndexedDB côté PWA : chiffrement applicatif JS (Web Crypto API) pour les images temporaires locales
 -  AES-256 sur biometric_results en base (champ BYTEA si embeddings stockés)
@@ -2053,5 +2362,164 @@ Chiffrer dès le départ sur filesystem Docker (LUKS) nécessite une configurati
 
 ---
 
-*Document généré le 2026-02-28 | Version 1.0 | bicec-veripass MVP Architecture*
-*Document ratifié le 2026-03- | Version 1.1 | bicec-veripass MVP Architecture*
+*Document généré le 2026-02-28 | Version 1.0 | bicec-veripass MVP Architecture*  
+*Document rattrapé le 2026-03-05 | Version 1.1 | bicec-veripass MVP Architecture — 39 corrections appliquées*
+
+---
+
+## 15. Compatibilité RHEL & Licences (G27)
+
+> **Compatibilité RHEL 8/9 :** Toutes les images Docker utilisées sont disponibles sur le régistre UBI Red Hat ou Docker Hub officiel. Aucune dépendance Alpine-only critique. En environnement RHEL, remplacer les images `*:alpine` par leurs équivalents UBI9 ou distroless.
+
+| Composant          | Image Docker                  | Licence            | Compatible RHEL |
+| ------------------ | ----------------------------- | ------------------ | --------------- |
+| Nginx              | `nginx:alpine` / `nginx:1.25` | BSD-2-Clause       | ✅               |
+| PostgreSQL 16      | `postgres:16-alpine`          | PostgreSQL License | ✅               |
+| Redis 7            | `redis:7-alpine`              | BSD-3-Clause       | ✅               |
+| FastAPI            | PyPI `fastapi`                | MIT                | ✅               |
+| PaddleOCR          | PyPI `paddleocr`              | Apache 2.0         | ✅               |
+| GLM-OCR 0.9B       | HuggingFace GGUF              | Apache 2.0         | ✅               |
+| DeepFace           | PyPI `deepface`               | MIT                | ✅               |
+| MediaPipe WASM     | npm `@mediapipe/tasks-vision` | Apache 2.0         | ✅               |
+| Celery             | PyPI `celery`                 | BSD-3-Clause       | ✅               |
+| React/Vite         | npm `react`, `vite`           | MIT                | ✅               |
+| Playwright (tests) | npm `playwright`              | Apache 2.0         | ✅               |
+
+---
+
+## 16. Isolation Schémas PostgreSQL (G28)
+
+```sql
+-- Création des 3 schémas séparés
+CREATE SCHEMA public;   -- OLTP principal (kyc_sessions, users, agents...)
+CREATE SCHEMA dwh;      -- Data Warehouse analytique (fact_*, dim_*)
+CREATE SCHEMA audit;    -- Audit logs append-only (audit_log)
+
+-- Permissions ségréguées
+GRANT USAGE ON SCHEMA public TO vp_user;
+GRANT USAGE ON SCHEMA dwh TO vp_analytics_user;    -- Sylvie lecture seule
+GRANT USAGE ON SCHEMA audit TO vp_audit_user;      -- Thomas + Sylvie lecture
+REVOKE ALL ON SCHEMA audit FROM vp_user;           -- Les workers ne peuvent pas lire audit
+
+-- Les tables audit_log résident dans le schéma audit:
+CREATE TABLE audit.audit_log ( ... );
+-- Les tables DWH résident dans dwh:
+CREATE TABLE dwh.fact_kyc_sessions ( ... );
+```
+
+---
+
+## 17. Automatisation Celery Beat & Redis Cache (G29)
+
+### Celery Beat Schedules
+
+```python
+# app/celery_config.py
+beat_schedule = {
+    # Sync PEP/Sanctions hebdomadaire (lundis 02h00)
+    'sync-sanctions-weekly': {
+        'task': 'app.tasks.sanctions.sync_pep_sanctions',
+        'schedule': crontab(hour=2, minute=0, day_of_week=1),
+    },
+    # Rotation partitions audit_log (1er du mois)
+    'create-audit-partition-monthly': {
+        'task': 'app.tasks.maintenance.create_audit_partition',
+        'schedule': crontab(hour=0, minute=0, day_of_month=1),
+    },
+    # Détection sessions ABANDONED (quotidien 03h00)
+    'detect-abandoned-sessions': {
+        'task': 'app.tasks.kyc.detect_abandoned_sessions',
+        'schedule': crontab(hour=3, minute=0),
+    },
+    # Backup DB quotidien
+    'backup-db-daily': {
+        'task': 'app.tasks.maintenance.backup_postgres',
+        'schedule': crontab(hour=1, minute=0),
+    },
+    # Vérification disk >85%
+    'check-disk-usage': {
+        'task': 'app.tasks.maintenance.check_disk',
+        'schedule': crontab(hour='*/6'),  # Toutes les 6h
+    },
+}
+```
+
+### Redis Cache Notifications
+
+```python
+# Cache Redis pour notifications non lues (TTL 24h)
+# Key pattern: notif:user:{user_id}:unread
+# Value: JSON list des ids non lus
+
+REDIS_NOTIF_CACHE_TTL = 86400  # 24h
+
+async def get_unread_notifications(user_id: str, after_id: str = None):
+    cache_key = f"notif:user:{user_id}:unread"
+    cached = await redis.get(cache_key)
+    if cached:
+        notifs = json.loads(cached)
+        if after_id:
+            notifs = [n for n in notifs if n['id'] > after_id]
+        return notifs
+    # Cache miss: lecture PG, mise en cache
+    notifs = await db.fetch_unread_notifications(user_id)
+    await redis.setex(cache_key, REDIS_NOTIF_CACHE_TTL, json.dumps(notifs))
+    return notifs
+```
+
+---
+
+## 📋 §15 — Checklist Réconciliation Prototype (G33)
+
+> Voir `docs/test_tmp_trash/onboarding-system-design-wireframe` comme **référence prototype**.
+
+| Élément prototype             | Statut                                   | Action requise                                   |
+| ----------------------------- | ---------------------------------------- | ------------------------------------------------ |
+| Flux onboarding (A01→E02)     | ✅ Aligné avec §6 séquences               | Aucune                                           |
+| Étapes Consentement/Signature | ✅ Décision ADR : checkbox écran Review   | Aucune                                           |
+| État RESTRICTED (accueil)     | ⚠️ Prototype montre « RESTRICTED_ACCESS » | Harmoniser en code : access_level = 'RESTRICTED' |
+| État ABANDONED                | ❌ Absent du prototype                    | Ajouter écran session expirée avec CTA reprise   |
+| Back-office queue Jean        | ✅ Aligné                                 | Aucune                                           |
+| Dashboard Sylvie zones A-D    | ⚠️ Zones C et D absentes du prototype     | Ajouter dans backoffice SPA (Phase 2)            |
+| Flow ISO 20022 Axway          | ❌ Non visible dans prototype             | À implémenter côté backend uniquement            |
+
+### G31 — Harmonisation RESTRICTED dans séquences
+
+> Dans SEQ-07 et SEQ-08, toute mention de `RESTRICTED_ACCESS` comme valeur de `status` est incorrecte. `RESTRICTED_ACCESS` est un label lisible (access_level), la valeur enum correcte est `RESTRICTED` ou `LIMITED_ACCESS`. Correction : chercher `RESTRICTED_ACCESS` dans les séquences et remplacer par `access_level: 'RESTRICTED'`.
+
+### G32 — État ABANDONED
+
+Transitions légales ajoutées à la state machine :
+- `DRAFT → ABANDONED` : session inactive >72h sans soumission (Celery Beat 03h00)
+- `PENDING_INFO → ABANDONED` : client ne répond pas dans les 15 jours
+
+Action Celery :
+```python
+async def detect_abandoned_sessions():
+    # Sessions DRAFT inactives depuis 72h
+    abandoned_draft = await db.query("""
+        UPDATE kyc_sessions SET status = 'ABANDONED'
+        WHERE status = 'DRAFT'
+          AND updated_at < NOW() - INTERVAL '72 hours'
+        RETURNING id, user_id
+    """)
+    for session in abandoned_draft:
+        await notify_user(session.user_id, 'SESSION_ABANDONED',
+            {'resume_link': f'/kyc/resume/{session.id}'})
+        await analytics.track('Session_Abandoned', session.id)
+```
+
+### G34 — Détection Dropout
+
+Colonne `dropout_step` déjà dans `fact_kyc_sessions`. Procédure :
+1. Celery Beat 03h00 : sélectionne sessions `ABANDONED` sans `dropout_step`
+2. Détermine dernière étape complétée via `last_step_completed` (OLTP)
+3. Remplit `fact_kyc_sessions.dropout_step` pour analyse funnel
+4. Alerte Sylvie si taux dropout étape >30% sur 7 jours
+
+### G35 — Voir §13.3 pour le flow Axway ISO 20022 complet
+
+---
+
+*Document généré le 2026-02-28 | Version 1.0 | bicec-veripass MVP Architecture*  
+*Document rattrapé le 2026-03-05 | Version 1.1 | bicec-veripass MVP Architecture — 39 corrections appliquées*
