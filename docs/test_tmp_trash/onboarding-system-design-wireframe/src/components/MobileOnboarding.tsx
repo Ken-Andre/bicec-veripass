@@ -10,6 +10,7 @@ import {
   ArrowRight, Loader2, Shield
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { useScenario } from '@/contexts/ScenarioContext';
 import { STEP_SEQUENCE, LANGUAGES, MOCK_OCR_FIELDS, REGIONS, REGION_NAMES, validateNIU, type QuartierEntry } from '@/data';
 import type { OCRField } from '@/types';
 
@@ -24,6 +25,7 @@ interface MobileOnboardingProps {
 }
 
 export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
+  const scenario = useScenario();
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const [showOfflineBanner, setShowOfflineBanner] = useState(false);
@@ -57,15 +59,19 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
   // Simuler hors ligne toggle
   useEffect(() => {
-    if (!isOnline) {
+    if (!isOnline || scenario.isOffline) {
       setShowOfflineBanner(true);
-      const t = setTimeout(() => {
-        setIsOnline(true);
-        setShowOfflineBanner(false);
-      }, 3000);
-      return () => clearTimeout(t);
+      if (!scenario.isOffline) {
+        const t = setTimeout(() => {
+          setIsOnline(true);
+          setShowOfflineBanner(false);
+        }, 3000);
+        return () => clearTimeout(t);
+      }
+    } else {
+      setShowOfflineBanner(false);
     }
-  }, [isOnline]);
+  }, [isOnline, scenario.isOffline]);
 
   const goNext = useCallback(() => {
     if (currentStepIdx < totalSteps - 1) {
@@ -168,7 +174,62 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
   };
 
   const renderPostSubmission = () => {
-    if (postState === 'pending') {
+    const effectiveState = scenario.kycState === 'PENDING_INFO' ? 'PENDING_INFO' :
+      scenario.kycState === 'REJECTED' ? 'REJECTED' :
+        scenario.accessLevel === 'FULL' ? 'full' :
+          scenario.accessLevel === 'LIMITED' ? 'limited' :
+            postState;
+
+    if (effectiveState === 'PENDING_INFO') {
+      return (
+        <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-6">
+          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
+            <AlertTriangle className="w-10 h-10 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Action requise</h2>
+            <p className="text-sm text-slate-500 mt-2">L'agent en charge a besoin d'un document supplémentaire pour valider votre dossier.</p>
+          </div>
+          <div className="w-full bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
+            <p className="text-sm font-semibold text-blue-900 mb-1">Motif de la demande :</p>
+            <p className="text-sm text-blue-800 italic">"Bonjour, la facture ENEO fournie est illisible ou tronquée. Merci de renvoyer une photo nette de l'intégralité du document."</p>
+          </div>
+          <div className="w-full pt-4">
+            <button className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all text-sm shadow-md">
+              <Upload className="w-4 h-4" /> Fournir le document manquant
+            </button>
+            <button className="w-full py-3 mt-2 text-slate-500 font-semibold rounded-xl text-sm hover:bg-slate-50">
+              Contacter le support
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (effectiveState === 'REJECTED') {
+      return (
+        <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-6">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center">
+            <Ban className="w-10 h-10 text-red-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Dossier Rejeté</h2>
+            <p className="text-sm text-slate-500 mt-2">Nous ne pouvons malheureusement pas donner suite à votre demande d'ouverture de compte.</p>
+          </div>
+          <div className="w-full bg-red-50 border border-red-200 rounded-xl p-4 text-left">
+            <p className="text-sm font-semibold text-red-900 mb-1">Motif :</p>
+            <p className="text-sm text-red-800">Non-conformité vis-à-vis des exigences réglementaires.</p>
+          </div>
+          <div className="w-full pt-4">
+            <button className="w-full py-3 bg-slate-900 text-white font-semibold rounded-xl text-sm shadow-md">
+              Retour à l'accueil
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (effectiveState === 'pending') {
       return (
         <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-6">
           <div className="relative">
@@ -227,7 +288,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
       );
     }
 
-    if (postState === 'limited') {
+    if (effectiveState === 'limited') {
       return (
         <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-6">
           <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center">
@@ -256,7 +317,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
       );
     }
 
-    if (postState === 'full') {
+    if (effectiveState === 'full') {
       return (
         <div className="flex flex-col h-full bg-slate-50">
           {/* Banking Header */}
@@ -746,7 +807,9 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
                 {/* Engine badge */}
                 <rect x="230" y="14" width="80" height="22" fill="#0f1f3d" rx="4" />
                 <text x="270" y="22" textAnchor="middle" fill="#E37B03" fontSize="5" fontWeight="bold" fontFamily="monospace">PaddleOCR v5</text>
-                <text x="270" y="30" textAnchor="middle" fill="#10b981" fontSize="4.5" fontFamily="monospace">✓ Confiance 93.6%</text>
+                <text x="270" y="30" textAnchor="middle" fill={scenario.ocrConfidenceLow ? "#ef4444" : "#10b981"} fontSize="4.5" fontFamily="monospace">
+                  {scenario.ocrConfidenceLow ? '⚠️ Confiance 43.2%' : '✓ Confiance 93.6%'}
+                </text>
               </svg>
               <div className="absolute top-2 right-2 flex items-center gap-1 bg-emerald-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
                 <Check className="w-2.5 h-2.5" /> OCR OK
@@ -755,43 +818,48 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
             {/* Fields */}
             <div className="space-y-2">
-              {ocrFields.map(f => (
-                <div key={f.key} className="bg-white rounded-xl border border-slate-200 p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-slate-500">{f.label}</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={cn('h-full rounded-full', f.confidence >= 90 ? 'bg-emerald-500' : f.confidence >= 70 ? 'bg-amber-500' : 'bg-red-500')}
-                          style={{ width: `${f.confidence}%` }} />
+              {ocrFields.map(f => {
+                const conf = scenario.ocrConfidenceLow ? Math.floor(f.confidence / 2.2) : f.confidence;
+                const isLow = conf < 85;
+                return (
+                  <div key={f.key} className={cn("bg-white rounded-xl border p-3 transition-colors", isLow && !f.edited ? "border-red-200 bg-red-50" : "border-slate-200")}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-slate-500">{f.label}</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={cn('h-full rounded-full', conf >= 90 ? 'bg-emerald-500' : conf >= 70 ? 'bg-amber-500' : 'bg-red-500')}
+                            style={{ width: `${conf}%` }} />
+                        </div>
+                        <span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded-full', confidenceColor(conf))}>
+                          {conf}%
+                        </span>
                       </div>
-                      <span className={cn('text-xs font-semibold px-1.5 py-0.5 rounded-full', confidenceColor(f.confidence))}>
-                        {f.confidence}%
-                      </span>
                     </div>
+                    {editingField === f.key ? (
+                      <div className="flex gap-2">
+                        <input type="text" defaultValue={f.value}
+                          onBlur={(e) => {
+                            setOcrFields(prev => prev.map(fld => fld.key === f.key ? { ...fld, value: e.target.value, edited: true } : fld));
+                            setEditingField(null);
+                          }}
+                          className="flex-1 px-2 py-1 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-200 outline-none"
+                          autoFocus />
+                        <button onClick={() => setEditingField(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className={cn('text-sm font-medium', f.edited ? 'text-orange-800' : 'text-slate-900')}>
+                          {f.value} {f.edited && <span className="text-xs text-orange-500">(corrigé)</span>}
+                        </span>
+                        <button onClick={() => setEditingField(f.key)} className="text-slate-400 hover:text-orange-600">
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    {isLow && !f.edited && <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Merci de vérifier cette valeur attentivement.</p>}
                   </div>
-                  {editingField === f.key ? (
-                    <div className="flex gap-2">
-                      <input type="text" defaultValue={f.value}
-                        onBlur={(e) => {
-                          setOcrFields(prev => prev.map(fld => fld.key === f.key ? { ...fld, value: e.target.value, edited: true } : fld));
-                          setEditingField(null);
-                        }}
-                        className="flex-1 px-2 py-1 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-200 outline-none"
-                        autoFocus />
-                      <button onClick={() => setEditingField(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <span className={cn('text-sm font-medium', f.edited ? 'text-orange-800' : 'text-slate-900')}>
-                        {f.value} {f.edited && <span className="text-xs text-orange-500">(corrigé)</span>}
-                      </span>
-                      <button onClick={() => setEditingField(f.key)} className="text-slate-400 hover:text-orange-600">
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         );
@@ -1455,16 +1523,48 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
             {showOfflineBanner && (
               <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
                 className="overflow-hidden z-10 relative">
-                <div className="bg-amber-500 text-white text-xs text-center py-1.5 flex items-center justify-center gap-1.5">
+                <div className="bg-slate-900 text-white text-xs text-center py-1.5 flex items-center justify-center gap-1.5 shadow-md border-b border-slate-800">
                   <WifiOff className="w-3.5 h-3.5" />
-                  Mode hors ligne — progression sauvegardée. Reconnexion...
+                  Pas de connexion Internet. Vos données sont sauvegardées.
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {postState ? (
-            // Post-submission views
+          {scenario.kycState === 'LOCKED_LIVENESS' ? (
+            <div className="flex flex-col items-center justify-center h-full px-6 text-center space-y-6 pt-12">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center border-4 border-red-50">
+                  <Lock className="w-10 h-10 text-red-600" />
+                </div>
+                <div className="absolute top-0 right-0 w-8 h-8 rounded-full bg-red-500 flex items-center justify-center border-2 border-white">
+                  <Ban className="w-4 h-4 text-white" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-slate-900">Compte verrouillé</h2>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  Suite à 3 échecs consécutifs lors de la détection de vivacité, votre démarche est temporairement bloquée par mesure de sécurité.
+                </p>
+              </div>
+              <div className="w-full bg-red-50 text-red-800 text-sm p-4 rounded-xl border border-red-100 shadow-sm flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="text-left font-medium">
+                  <p>Veuillez réessayer dans 60 secondes,</p>
+                  <p className="text-red-600 mt-1">ou rendez-vous en agence pour finaliser avec un conseiller.</p>
+                </div>
+              </div>
+              <div className="w-full pt-4 space-y-3">
+                <button className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors shadow-md">
+                  <MapPin className="w-4 h-4" /> Trouver une agence
+                </button>
+                <button className="w-full py-2.5 text-slate-500 font-bold rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+                  <RotateCcw className="w-4 h-4" /> Réessayer plus tard
+                </button>
+              </div>
+            </div>
+          ) : postState || scenario.kycState === 'PENDING_INFO' || scenario.kycState === 'REJECTED' || (scenario.accessLevel !== 'RESTRICTED' && scenario.kycState !== 'DRAFT') ? (
+            // Post-submission or forced views
             <div className="h-[calc(100%-2rem)] overflow-y-auto pb-8 pt-4">
               {renderPostSubmission()}
             </div>

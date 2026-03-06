@@ -57,6 +57,9 @@ export function BackOffice() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showImageZoom, setShowImageZoom] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<string>('thomas-dashboard');
+  const [showRequestInfoModal, setShowRequestInfoModal] = useState(false);
+  const [requestInfoReason, setRequestInfoReason] = useState('');
+  const [rejectionType, setRejectionType] = useState('fraude');
 
   // Set default view based on persona when logging in
   useEffect(() => {
@@ -876,9 +879,12 @@ export function BackOffice() {
                           </button>
                         )}
                         {batch.status === 'error' && (
-                          <button className="px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm">
-                            Retry
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded uppercase">OPS_ERROR</span>
+                            <button className="px-3 py-1.5 text-xs font-bold text-white bg-[#E37B03] hover:bg-orange-600 rounded-lg transition-colors shadow-sm flex items-center gap-1">
+                              <RefreshCw className="w-3 h-3" /> Retry Batch
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1277,13 +1283,10 @@ export function BackOffice() {
                     </div>
                     <div className="flex items-center gap-3">
                       <button className="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2">
-                        <XCircle className="w-4 h-4" /> Bloquer & Escalader Direction
+                        <XCircle className="w-4 h-4" /> Confirmer Fraude (Rejet Définitif)
                       </button>
-                      <button className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors">
-                        Faux Positif (Homonymie)
-                      </button>
-                      <button className="px-4 py-2 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors">
-                        Demander justificatifs
+                      <button className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-600" /> Faux Positif (Retour pending_kyc)
                       </button>
                     </div>
                   </div>
@@ -1307,8 +1310,8 @@ export function BackOffice() {
                   ].map((alert) => (
                     <div key={alert.id} className="flex items-center gap-6 px-6 py-4 hover:bg-slate-50 transition-colors">
                       <div className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-black ${alert.level === 'CRITIQUE' ? 'bg-red-100 text-red-700' :
-                          alert.level === 'URGENT' ? 'bg-orange-100 text-orange-700' :
-                            alert.level === 'MOYEN' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                        alert.level === 'URGENT' ? 'bg-orange-100 text-orange-700' :
+                          alert.level === 'MOYEN' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
                         }`}>{alert.level}</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-slate-900">{alert.name}</p>
@@ -1316,7 +1319,7 @@ export function BackOffice() {
                       </div>
                       <div className="text-center shrink-0 w-16">
                         <p className={`text-sm font-black ${parseFloat(alert.score) >= 90 ? 'text-red-600' :
-                            parseFloat(alert.score) >= 70 ? 'text-orange-600' : 'text-amber-600'
+                          parseFloat(alert.score) >= 70 ? 'text-orange-600' : 'text-amber-600'
                           }`}>{alert.score}</p>
                         <p className="text-[10px] text-slate-400">similarité</p>
                       </div>
@@ -1325,8 +1328,8 @@ export function BackOffice() {
                         <p className="text-[10px] text-slate-400">{alert.time}</p>
                       </div>
                       <div className="flex gap-2 shrink-0">
-                        <button className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">Bloquer</button>
-                        <button className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors">Classer</button>
+                        <button className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">Fraude (DISABLED)</button>
+                        <button className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors">Faux Positif (PENDING_KYC)</button>
                       </div>
                     </div>
                   ))}
@@ -1424,6 +1427,10 @@ export function BackOffice() {
                             className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 flex items-center gap-2 transition-colors">
                             <ThumbsUp className="w-4 h-4" /> Approuver
                           </button>
+                          <button onClick={() => setShowRequestInfoModal(true)}
+                            className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-sm">
+                            <MessageSquare className="w-4 h-4" /> Demander Infos
+                          </button>
                           <button onClick={() => setShowRejectModal(true)}
                             className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 flex items-center gap-2 transition-colors">
                             <ThumbsDown className="w-4 h-4" /> Rejeter
@@ -1456,11 +1463,12 @@ export function BackOffice() {
                       { id: 'identity' as const, label: 'Identity & OCR', icon: CreditCard },
                       { id: 'liveness' as const, label: 'Liveness', icon: Camera },
                       { id: 'address' as const, label: 'Address & Docs', icon: MapPin },
+                      { id: 'chat' as const, label: 'Messagerie (1)', icon: MessageSquare },
                       { id: 'summary' as const, label: 'Summary', icon: Shield },
                     ].map(tab => (
-                      <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                      <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
                         className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-semibold transition-all',
-                          activeTab === tab.id ? 'bg-white text-orange-850 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+                          activeTab === tab.id ? 'bg-white text-orange-800 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
                         <tab.icon className="w-3.5 h-3.5" /> {tab.label}
                       </button>
                     ))}
@@ -1716,6 +1724,68 @@ export function BackOffice() {
                       )}
                     </div>
                   )}
+
+                  {activeTab === 'chat' as any && (
+                    <div className="space-y-6">
+                      <div className="bg-white rounded-xl border border-slate-200 flex flex-col h-[500px]">
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-xl">
+                          <div>
+                            <h3 className="font-bold text-slate-900">Messagerie Dossier</h3>
+                            <p className="text-xs text-slate-500">Dialogue direct avec le client</p>
+                          </div>
+                          <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded">Actif</span>
+                        </div>
+
+                        <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                          <div className="flex justify-center">
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full">Hier</span>
+                          </div>
+
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                              <User className="w-4 h-4 text-slate-500" />
+                            </div>
+                            <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[80%]">
+                              <p className="text-sm text-slate-700">Bonjour, j'ai soumis mon dossier ce matin mais je n'ai pas de facture ENEO à mon nom.</p>
+                              <span className="text-[10px] text-slate-400 mt-1 block">14:22</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3 flex-row-reverse">
+                            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                              <span className="text-emerald-700 text-xs font-bold">JP</span>
+                            </div>
+                            <div className="bg-[#E37B03] rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[80%] text-white">
+                              <p className="text-sm">Bonjour. Dans ce cas, merci de fournir un certificat de domicile signé par le chef de quartier, ou une facture au nom de votre logeur avec une attestation d'hébergement.</p>
+                              <span className="text-[10px] text-orange-200 mt-1 block text-right">14:45</span>
+                            </div>
+                          </div>
+
+                          {selectedApp.status === 'limited' && (
+                            <div className="flex justify-center mt-6">
+                              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 max-w-sm text-center">
+                                <AlertTriangle className="w-5 h-5 text-amber-500 mx-auto mb-2" />
+                                <p className="text-xs text-amber-700 font-medium">Le client a été notifié de la demande d'information supplémentaire (Statut: PENDING_INFO).</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-4 border-t border-slate-100">
+                          <div className="flex gap-2">
+                            <button className="p-2 text-slate-400 hover:text-[#E37B03] hover:bg-orange-50 rounded-xl transition-colors">
+                              <FileText className="w-5 h-5" />
+                            </button>
+                            <input type="text" placeholder="Écrire un message au client..."
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#E37B03] focus:bg-white transition-all" />
+                            <button className="px-5 bg-[#E37B03] text-white font-bold rounded-xl shadow-md hover:bg-orange-600 transition-colors">
+                              Envoyer
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1745,28 +1815,90 @@ export function BackOffice() {
                   <ThumbsDown className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Reject Application</h3>
+                  <h3 className="font-bold text-slate-900">Rejet Définitif du Dossier</h3>
                   <p className="text-xs text-slate-500">{selectedApp.fullName} — {selectedApp.id}</p>
                 </div>
               </div>
+
               <div>
-                <label className="text-sm font-medium text-slate-700">Rejection Reason *</label>
+                <label className="text-sm font-medium text-slate-700">Motif du rejet (Documenté COBAC) *</label>
+                <select value={rejectionType} onChange={e => setRejectionType(e.target.value)}
+                  className="w-full mt-1.5 px-3 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none appearance-none bg-white">
+                  <option value="fraude">Suspicion de Fraude Documentaire</option>
+                  <option value="non_eligible">Personne Sanctionnée / Non Eligilbe AML</option>
+                  <option value="usurpation">Tentative d'Usurpation d'Identité (Spoofing)</option>
+                  <option value="mineur">Mineur (Non Eligile au parcours digital)</option>
+                  <option value="delai">Dépassement du délai de fourniture (30+ jours)</option>
+                  <option value="autre">Autre raison (préciser ci-dessous)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">Commentaire Additionnel *</label>
                 <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)}
-                  placeholder="Provide a clear reason for rejection..."
+                  placeholder="Justifiez précisément la raison de ce rejet définitif..."
                   className="w-full mt-1.5 px-3 py-2 border border-slate-300 rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none" />
               </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
-                <strong>Note:</strong> The customer will be notified of the rejection and can contact support or re-submit.
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex gap-3 text-xs text-red-800">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <p><strong>Attention (UC8c) :</strong> Cette action clôture définitivement le dossier (Statut: REJECTED). Le client recevra un SMS/Email de notification formelle. Cette action est irréversible et loggée.</p>
               </div>
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-2 justify-end mt-4">
                 <button onClick={() => { setShowRejectModal(false); setRejectReason(''); }}
                   className="px-4 py-2 border border-slate-300 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-50">
-                  Cancel
+                  Annuler
                 </button>
                 <button onClick={() => handleReject(selectedApp.id)} disabled={!rejectReason.trim()}
-                  className={cn('px-4 py-2 text-sm font-semibold rounded-xl flex items-center gap-2 transition-colors',
+                  className={cn('px-4 py-2 text-sm font-semibold rounded-xl flex items-center gap-2 transition-colors shadow-sm',
                     rejectReason.trim() ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed')}>
-                  <XCircle className="w-4 h-4" /> Confirm Rejection
+                  <XCircle className="w-4 h-4" /> Rejeter Définitivement
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Request Info Modal */}
+        {showRequestInfoModal && selectedApp && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">Demande de Compléments</h3>
+                  <p className="text-xs text-slate-500">{selectedApp.fullName} — {selectedApp.id}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700">Message au client *</label>
+                <textarea value={requestInfoReason} onChange={e => setRequestInfoReason(e.target.value)}
+                  placeholder="Décrivez précisément ce qui manque (ex: Facture ENEO illisible, merci de re-photographier)..."
+                  className="w-full mt-1.5 px-3 py-2 border border-slate-300 rounded-xl text-sm resize-none h-24 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 flex gap-3">
+                <AlertTriangle className="w-5 h-5 shrink-0 text-blue-500" />
+                <p><strong>UC8b :</strong> Le dossier passera en statut <code>PENDING_INFO</code>. Le client recevra une notification push l'invitant à ouvrir l'App pour fournir le bousin demandé dans l'onglet action.</p>
+              </div>
+
+              <div className="flex gap-2 justify-end mt-4">
+                <button onClick={() => { setShowRequestInfoModal(false); setRequestInfoReason(''); }}
+                  className="px-4 py-2 border border-slate-300 text-sm font-medium text-slate-600 rounded-xl hover:bg-slate-50">
+                  Annuler
+                </button>
+                <button onClick={() => {
+                  setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, status: 'limited' } : a));
+                  setSelectedApp(prev => prev ? { ...prev, status: 'limited' } : null);
+                  setShowRequestInfoModal(false);
+                  setRequestInfoReason('');
+                  setActiveTab('chat' as any);
+                }} disabled={!requestInfoReason.trim()}
+                  className={cn('px-4 py-2 text-sm font-semibold rounded-xl flex items-center gap-2 transition-colors shadow-sm',
+                    requestInfoReason.trim() ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed')}>
+                  <MessageSquare className="w-4 h-4" /> Envoyer la demande
                 </button>
               </div>
             </div>
