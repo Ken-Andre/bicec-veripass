@@ -27,6 +27,8 @@
 12. [Pipeline AI/ML](#12-pipeline-aiml)
 13. [Stratégie Analytics & Data Warehouse](#13-stratégie-analytics--data-warehouse)
 14. [Stratégie de Chiffrement (Phased)](#14-stratégie-de-chiffrement-phased)
+18. [Stratégie de Test](#18-stratégie-de-test)
+19. [FAQ Technique — Réponses Jury](#19-faq-technique--réponses-jury)
 
 ---
 
@@ -168,6 +170,8 @@ Exemple de lecture : `users ||--o{ kyc_sessions` = **un user peut avoir plusieur
 | §12 Pipeline AI/ML | v1.0 + Y (flowcharts)               | ✅ Enrichi                         |
 | §13 Analytics      | v1.0 + Y (star schema, events, SQL) | ❌ §13.3 supprimé                  |
 | §14 Chiffrement    | v1.0 + patch-v3bis AR5              | ❌ Phase 1 corrigée                |
+| §18 Test Strategy  | patch-v4                            | ➕ Nouveau                         |
+| §19 FAQ Technique  | patch-v4                            | ➕ Nouveau (réponses jury)         |
 
 ---
 
@@ -654,6 +658,15 @@ graph LR
 ## 5. State Machine KYC
 
 ![KYC / Onboarding State Diagram](https://mermaid.ink/svg/pako:eNqtWd1u2zgWfhWugGLjjZPYcZomxkwBx1YKt46dkd3MZOrCYGXaYStRHoryNA0C7NUAc7vYR9iLZq_3DfwmfZI9JCVZlGznZ9qLwYQiv3N4zsdzzpfcWG4wJlbdevYMhQIL0qJ4yrG_M98fMliT_8aUE1fQgKHByZCly-_-8R7t7LxELadxOkB1dIY5JcjlizuCQhKGcCCzmwWCIE6nVwIFE30m_Sb_xafxTEScoGa3XUYenRMGQGVjIx5zWCNl1G2_LSM3YCFhgvjwH2Pbt3_-G4kgEogw5AUu9vZmPJjKo3SSbiRsrBzL-KlvI-_V6TXf2K1Rp31hd-1-H25YQ4s794q4Yepaeiy_ORuYpkddNLQc4gY--OkSPrR-2PvAX265GODQLOLTxV0ZPInmBEdJ8FC7VdqILxOQojc8j3B5WTyVJobWyjud291Wu_tq9OaymWYsDCKfCOQRNA7AMHhXPOfY_YHTbg7AhUazqaPxDrvu4muI8GyGQupHnsBscacuNqeCU0aQD9xCGLgzX9y9X0uGAriRyJa0IX2kKirl2OsZicyEk88zL-AQA-_v0iOIROJF3dgnGSN9FQpsDBmVYedCkpbPqUtyfPMhGxBTFaloNgu42DW-NyI3kra44iBiFEgMaLubSJZNQzYt7e5pDyL7mmCGxsTHbExUPCmbBGgvJcg4cCOD8Mb5zXlWeHkgtHVWPShtcLDZOzvvtBvdpj1y7Iu2_TOgNjwVtcZZR2HiSAQ7EE4BtQJKQAaseLjo4uAq8HGIyGSCXX3nCY4-o1kQUiEf7D1gZ71ue9Bz7NYSCvI8odwnYOg8fm2BPxMpH5GPKRAr4nNCPW9xV7rXSKvdb5x0VtnQDnMcSboDNjcDkI-mYzdal6PTnjPqnfeTfANpuUyL8RBTCPOIip_Tu2j323Dx7qulRx5mcfw-YOFeoYY_86gAv7LuZE9KKIAc2Y7TcwDH5pxEHEEWrxj9LdJYGZQYY3lkvS-cCH59n91mz3Hs5gBWl8YnAfexZmoQyToPgfY8qjtKxoHM2fVeuAGHSkPQ9v3-NADroiHrUJKxxiu727yUZE8iYOZcdjtVSZAml1p8F16HYvEVqAfPnk7g6ekH2D_rgxeQ52wpXGtTtaD2WduouZopc0wFmmOPjuN62290-ypOapE8DPzcsUenbzude9EbF3bTQF9Tx9dZM8qlDoIKDKJsR5fqeXC9uAtzhXpoXQSCkziyiIQCzfjivwL9zdjmQH0lX3bmQRQu2x8Ujogb20I6ZbJBCgQpc6MZPFL4ca4t6IJtbSzZuWjJCJrR64MFrKYX7YMuOr-DxTD9UvtcUsvbugpp6kwow17WVi7tq5OlORVB08PASkhPDKySyInOFdp6Xa2V1mbMNJRru3ezxf9EiHpvykbPhAWzAV7ErS8sqxcG7IH_UyGFjKKTTu-nt4s_--aZE8xkNuqQ5Cak15Nt40ucDbjK5lSYd8hExTAxgOEPPJgETM2uEGIqJMmA1R-84LcISnSY7-TiCjmYegjmgRCd0HN8XUZNGE-avTIwx93Y0_PksH85bzuXo58bTlyP-klViJukJgiMLZTrwC678evq_l7_sl-tLAfAHFy2g4KDb08gkckLNqqOZiGY9DCFmUJ9dEmp0JtSkCKxjTExMzoYhIM6mDSwmHObDKyaJ1uxj0A8HIZx7fn2x7-AVSEMclqBwKQPIxgGymVCv-z-j2jTUEu-Lvu_bJsbklnEDKNwBizQ4Y0x9yAqEZCLJRbVVLH-Ua9FzbT9fJweds6MSK5OZa4MwwaMKzFJYFCC9JrOD2MNd0MZFXV0M7TEFbz2oSWf7pjAkOaJoVWGHzx8DS9OfyDeJ70IkpKLHutAjZJfBI9IOfmu0HzCp8QeT0koFybYC9UG99r1yAkn-BNl0z4UFUGm1xq73R3Yjmo19tC6vb199mzICsp1lWx9oGbVw6wLOiAcQXSIh37MpCEBepxM1LMCFFHZeuBxhhokV4xNIL1FTaNB4I2D3xk6rISyPbP4FYLiWwrtZPM2kvMnvH9XF5UIVM0uCOBPkJwRSB0mRvsHV-jbn_9BteWpLYhAKNWyXdkHCLvyvKQ_Lgvdk1Uu2orfmhvfQ3YHiI_-qMVvaT3-_Sr3oRK3mFlZWQhS68UUP1GkQWFUQhF6mizmulQ9WKRxOQzFVVsJgaQlLGVoaRV5suDLtA6oT2RW6zCCwLQlZ44JeoleoI8wHoXLfbLKNgmE9jptHup629qrlTw5KjBkddieIh2_l2r8foJxUjal4vdUiasl4mtbkjEhGicfiYhHhqTdLO7mMOIx8DBSUk0SJXYtPb58QV2V2Lgq6LQO2Tbyg1hfP1qoJoceJU3BZk6YosZ5O7W_SZkmZH7uUwYwIWahHDtm8jeAGZ07ZBmSHsfxeJRcfYJWBatFpfpXZepKPy4anXbroRoV3HonBZecmjxokanyysqu94mttdCmNo4HmZV6EQzmteiQ5ZppXnQ8wnSigtbZzivVgu2cjEpuvsKCaTg2mpd4kmxS4IGsK9raaCcJ4tr7FeSdeq2GuCuipp7fLz4ATnYqLT-gwfyAapWPGu-pUkNGIxYatYpuMSWzrhgaoBBdQ2cUdcWDoJbkzMuJfIIAWci_CGBJnTiS5thcTH9xcl51LtMBTnWlTifqtbpjTR43TPrr-fTgQwbZ7zl1n8aKN1tla8rp2KrrUV7O9z6WP1s3EmeNfNCfigpCr68SEfpLqiOY_oXRKjWRfHuopJD7b4fsFm4yw-zXIPCtujJpAQunV-nNotl4KTrSVS5_G8Wbcs626tVK5eBIwVj1G-szLNSe7x69ODw-qh4f1A5eVA7K1rVV36m-qO0e1qq1_eOjSqVyfHR0W7a-KMP7u8eVw-pB7eiwCp-OjgGNjKkI-Jn-q536493t_wGrD7bI)
+> **Règle Terminologique Normative (Patch V4) :**
+>
+> | Champ | Valeurs légales | Usage |
+> |---|---|---|
+> | `kyc_sessions.status` | `DRAFT` \| `PENDING_KYC` \| `PENDING_INFO` \| `COMPLIANCE_REVIEW` \| `READY_FOR_OPS` \| `PROVISIONING` \| `OPS_ERROR` \| `OPS_CORRECTION` \| `VALIDATED_PENDING_AGENCY` \| `ACTIVATED_LIMITED` \| `ACTIVATED_PRE_FULL` \| `ACTIVATED_FULL` \| `EXPIRY_WARNING` \| `PENDING_RESUBMIT` \| `MONITORED` \| `REJECTED` \| `DISABLED` \| `ABANDONED` | État du **workflow KYC** |
+> | `kyc_sessions.access_level` | `RESTRICTED` \| `PENDING_ACTIVATION` \| `LIMITED_ACCESS` \| `PRE_FULL_ACCESS` \| `FULL_ACCESS` \| `BLOCKED` | Niveau de **droits dans l'app Marie** |
+>
+> ⚠️ Le terme `RESTRICTED_ACCESS` n'existe **pas** comme valeur d'un champ. Tout résidu de ce terme dans le code ou les diagrammes est une erreur v1 à corriger.
+
 ```mermaid
 %%{init: {"theme": "default", "layout": "elk", "startOnLoad": true, "elk": {"mergeEdges": false, "cycleBreakingStrategy": "INTERACTIVE"}}}%%
 stateDiagram-v2
@@ -752,9 +765,16 @@ sequenceDiagram
 
     Marie->>PWA: Saisit code OTP
     PWA->>API: POST /auth/otp/verify {phone, code}
-    API->>Redis: Vérifie OTP (anti-replay)
-    API->>PG: Crée/récupère user + kyc_session (status=DRAFT)
-    API-->>PWA: 200 JWT token + session_id
+    API->>Redis: GET otp:{phone}
+    alt Code incorrect ou expiré
+        API-->>PWA: 401 OTP_EXPIRED / OTP_INVALID
+    else Code correct
+        API->>Redis: DEL otp:{phone}
+        Note over API,Redis: Anti-replay : code supprimé immédiatement après vérification
+        API->>Redis: DEL otp_verify_attempts:{phone}
+        API->>PG: Crée/récupère user + kyc_session (status=DRAFT)
+        API-->>PWA: 200 JWT token + session_id
+    end
 
     Note over Marie,PWA: Phase identité
 
@@ -1014,7 +1034,7 @@ sequenceDiagram
     participant PG as PostgreSQL
     actor Jean
 
-    Note over Marie,Jean: Marie est en RESTRICTED_ACCESS, dossier PENDING_INFO
+    Note over Marie,Jean: Marie est en access_level: RESTRICTED, statut dossier PENDING_INFO
 
     Marie->>PWA: Ouvre messagerie support
     PWA->>API: GET /support/threads?session_id={id}
@@ -1074,7 +1094,7 @@ sequenceDiagram
     API->>PG: SELECT user + kyc_session (access_level)
     API-->>PWA: {access_token, access_level: RESTRICTED/LIMITED/FULL}
 
-    alt access_level = RESTRICTED_ACCESS
+    alt access_level = RESTRICTED
         PWA->>PWA: Affiche dashboard VITRINE
         PWA->>PWA: Banner: "⏳ Dossier en cours de validation"
         PWA->>PWA: Fonctionnalités : read-only, plans, cartes verrouillées
@@ -1150,7 +1170,7 @@ sequenceDiagram
         API->>PG: UPDATE kyc_session (doc_expiry_flag=false, status=FULL_ACCESS)
         API->>PG: INSERT audit_log (action=DOC_REAPPROVED)
     else Délai dépassé
-        SYS->>PG: UPDATE user (access_level=RESTRICTED_ACCESS)
+        SYS->>PG: UPDATE kyc_session (access_level='RESTRICTED')
         SYS->>PG: INSERT notifications (user_id=marie, type=ACCOUNT_RESTRICTED)
         Note over SYS: Jean peut lever la restriction</br>après nouveau doc validé (J12)
     end
@@ -1365,6 +1385,8 @@ erDiagram
         BOOLEAN privacy_accepted
         BOOLEAN data_processing_accepted
         TEXT consent_method
+        VARCHAR cgu_version
+        VARCHAR privacy_version
         JSONB consent_metadata
         TIMESTAMPTZ signed_at
         INET client_ip
@@ -1488,30 +1510,32 @@ erDiagram
 
 ### 7.3 Data Dictionary (Champs critiques)
 
-| Table                      | Champ                        | Type         | Contrainte           | Description                 | Exemple                                                                   |
-| -------------------------- | ---------------------------- | ------------ | -------------------- | --------------------------- | ------------------------------------------------------------------------- |
-| `kyc_sessions`             | `status`                     | TEXT         | NOT NULL             | État machine KYC            | `PENDING_KYC`                                                             |
-| `kyc_sessions`             | `access_level`               | TEXT         | DEFAULT 'RESTRICTED' | Niveau accès compte         | `LIMITED_ACCESS`                                                          |
-| `kyc_sessions`             | `niu_type`                   | TEXT         | NULL                 | Mode NIU                    | `DECLARATIVE`, `UPLOADED`, `MISSING`                                      |
-| `kyc_sessions`             | `confidence_score_global`    | DECIMAL(5,4) | NULL                 | Score global dossier (0-1)  | `0.8750`                                                                  |
-| `kyc_sessions`             | `liveness_strike_count`      | INT          | DEFAULT 0            | Nombre échecs liveness      | `2`                                                                       |
-| `consent_records`          | `consent_method`             | TEXT         | NOT NULL             | Modalité de consentement    | `CHECKBOX_DIGITAL`, `PAPER_SCAN`                                          |
-| `consent_records`          | `consent_metadata`           | JSONB        | NULL                 | Métadonnées consentement    | `{"user_agent": "...", "screen_resolution": "..."}`                       |
-| `users`                    | `liveness_lockout_count_24h` | INT          | DEFAULT 0            | Compteur lockouts 24h       | `2` (max 30 avant blocage)                                                |
-| `users`                    | `last_lockout_reset_at`      | TIMESTAMPTZ  | NULL                 | Dernier reset du compteur   | `2026-03-05T00:00:00Z`                                                    |
-| `provisioning_batch_items` | `axway_request_id`           | TEXT         | NULL                 | ID requête Axway            | `axw-req-abc123`                                                          |
-| `provisioning_batch_items` | `iso20022_message_ref`       | TEXT         | NULL                 | Référence message ISO 20022 | `acmt.009-20260305-001`                                                   |
-| `documents`                | `doc_type`                   | TEXT         | NOT NULL             | Type document               | `CNI_RECTO`, `CNI_VERSO`, `BILL_ENEO`, `SELFIE`, `NIU`                    |
-| `documents`                | `ocr_engine`                 | TEXT         | NULL                 | Moteur OCR utilisé          | `PADDLE`, `GLM`, `PADDLE_THEN_GLM`                                        |
-| `documents`                | `capture_quality_metrics`    | JSONB        | NULL                 | Métriques qualité capture   | `{"laplacian": 145, "luminance_std": 0.32}`                               |
-| `ocr_fields`               | `confidence_score`           | DECIMAL(5,4) | NOT NULL             | Confiance extraction        | `0.9200` ( ≥0.85)                                                         |
-| `agents`                   | `role`                       | TEXT         | NOT NULL             | Rôle agent back-office      | `JEAN`, `THOMAS`, `SYLVIE`                                                |
-| `agents`                   | `static_weight`              | INT          | DEFAULT 1            | Poids WRR statique          | `2` (agent senior)                                                        |
-| `aml_alerts`               | `alert_type`                 | TEXT         | NOT NULL             | Type alerte                 | `PEP`, `SANCTIONS_UN`, `SANCTIONS_EU`, `SANCTIONS_OFAC`                   |
-| `aml_alerts`               | `status`                     | TEXT         | DEFAULT 'OPEN'       | État alerte                 | `OPEN`, `CLEARED`, `CONFIRMED`, `ESCALATED`                               |
-| `pep_sanctions`            | `entity_type`                | TEXT         | NOT NULL             | Type entité                 | `INDIVIDUAL`, `ENTITY`                                                    |
-| `audit_log`                | `action`                     | TEXT         | NOT NULL             | Type action                 | `INSERT`, `UPDATE`, `DELETE`, `VIEW`, `OCR_CORRECTED`, `DOSSIER_APPROVED` |
-| `audit_log`                | `old_data`                   | JSONB        | NULL                 | État avant modification     | `{"status": "PENDING_KYC"}`                                               |
+| Table                      | Champ                        | Type         | Contrainte           | Description                                     | Exemple                                                                   |
+| -------------------------- | ---------------------------- | ------------ | -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- |
+| `kyc_sessions`             | `status`                     | TEXT         | NOT NULL             | État machine KYC                                | `PENDING_KYC`                                                             |
+| `kyc_sessions`             | `access_level`               | TEXT         | DEFAULT 'RESTRICTED' | Niveau accès compte                             | `LIMITED_ACCESS`                                                          |
+| `kyc_sessions`             | `niu_type`                   | TEXT         | NULL                 | Mode NIU                                        | `DECLARATIVE`, `UPLOADED`, `MISSING`                                      |
+| `kyc_sessions`             | `confidence_score_global`    | DECIMAL(5,4) | NULL                 | Score global dossier (0-1)                      | `0.8750`                                                                  |
+| `kyc_sessions`             | `liveness_strike_count`      | INT          | DEFAULT 0            | Nombre échecs liveness                          | `2`                                                                       |
+| `consent_records`          | `consent_method`             | TEXT         | NOT NULL             | Modalité de consentement                        | `CHECKBOX_DIGITAL`, `PAPER_SCAN`                                          |
+| `consent_records`          | `cgu_version`                | VARCHAR      | DEFAULT '1.0.0'      | Version CGU lors du consentement (Loi 2024-017) | `"1.0.0"`, `"1.1.0"`                                                      |
+| `consent_records`          | `privacy_version`            | VARCHAR      | DEFAULT '1.0.0'      | Version politique vie privée                    | `"1.0.0"`                                                                 |
+| `consent_records`          | `consent_metadata`           | JSONB        | NULL                 | Métadonnées consentement                        | `{"user_agent": "...", "screen_resolution": "..."}`                       |
+| `users`                    | `liveness_lockout_count_24h` | INT          | DEFAULT 0            | Compteur lockouts 24h                           | `2` (max 30 avant blocage)                                                |
+| `users`                    | `last_lockout_reset_at`      | TIMESTAMPTZ  | NULL                 | Dernier reset du compteur                       | `2026-03-05T00:00:00Z`                                                    |
+| `provisioning_batch_items` | `axway_request_id`           | TEXT         | NULL                 | ID requête Axway                                | `axw-req-abc123`                                                          |
+| `provisioning_batch_items` | `iso20022_message_ref`       | TEXT         | NULL                 | Référence message ISO 20022                     | `acmt.009-20260305-001`                                                   |
+| `documents`                | `doc_type`                   | TEXT         | NOT NULL             | Type document                                   | `CNI_RECTO`, `CNI_VERSO`, `BILL_ENEO`, `SELFIE`, `NIU`                    |
+| `documents`                | `ocr_engine`                 | TEXT         | NULL                 | Moteur OCR utilisé                              | `PADDLE`, `GLM`, `PADDLE_THEN_GLM`                                        |
+| `documents`                | `capture_quality_metrics`    | JSONB        | NULL                 | Métriques qualité capture                       | `{"laplacian": 145, "luminance_std": 0.32}`                               |
+| `ocr_fields`               | `confidence_score`           | DECIMAL(5,4) | NOT NULL             | Confiance extraction                            | `0.9200` ( ≥0.85)                                                         |
+| `agents`                   | `role`                       | TEXT         | NOT NULL             | Rôle agent back-office                          | `JEAN`, `THOMAS`, `SYLVIE`                                                |
+| `agents`                   | `static_weight`              | INT          | DEFAULT 1            | Poids WRR statique                              | `2` (agent senior)                                                        |
+| `aml_alerts`               | `alert_type`                 | TEXT         | NOT NULL             | Type alerte                                     | `PEP`, `SANCTIONS_UN`, `SANCTIONS_EU`, `SANCTIONS_OFAC`                   |
+| `aml_alerts`               | `status`                     | TEXT         | DEFAULT 'OPEN'       | État alerte                                     | `OPEN`, `CLEARED`, `CONFIRMED`, `ESCALATED`                               |
+| `pep_sanctions`            | `entity_type`                | TEXT         | NOT NULL             | Type entité                                     | `INDIVIDUAL`, `ENTITY`                                                    |
+| `audit_log`                | `action`                     | TEXT         | NOT NULL             | Type action                                     | `INSERT`, `UPDATE`, `DELETE`, `VIEW`, `OCR_CORRECTED`, `DOSSIER_APPROVED` |
+| `audit_log`                | `old_data`                   | JSONB        | NULL                 | État avant modification                         | `{"status": "PENDING_KYC"}`                                               |
 
 ---
 
@@ -1646,6 +1670,28 @@ Notation Mermaid :
 | POST    | `/api/v1/kyc/ocr/confirm`   | `{session_id, doc_id, fields}`                                   | `{success}`                                            | Confirme/corrige extraction OCR                |
 | POST    | `/api/v1/kyc/address`       | `{session_id, region, ville, commune, quartier, lieu_dit, gps?}` | `{success}`                                            | Sauvegarde adresse                             |
 | POST    | `/api/v1/kyc/submit`        | `{session_id, consent_record}`                                   | `{message, estimated_delay}`                           | Soumission finale — **409 si status != DRAFT** |
+
+### 8.2bis — Tailles Payload & Compression Client
+
+> **Comportement côté PWA (service de capture) :** L'image capturée par `getUserMedia` est redimensionnée et compressée *avant* envoi pour garantir des temps de transfert acceptables sur réseau 3G/4G camerounais.
+
+```
+Image capturée par getUserMedia (résolution native mobile)
+    → Canvas resize : max 1920×1080 (conserve ratio)
+    → JPEG encode   : qualité 88%
+    → Taille estimée : 300KB – 800KB (CNI bien éclairée)
+    → Conversion base64 pour envoi API
+    → Taille payload : ~400KB – 1.1MB (×1.37 overhead base64)
+```
+
+| Endpoint                           | Taille nominale attendue | Limite serveur (filet sécurité) |
+| ---------------------------------- | ------------------------ | ------------------------------- |
+| `POST /kyc/capture/cni`            | ~400KB–1.1MB             | **10MB** (413)                  |
+| `POST /kyc/capture/bill`           | ~300KB–900KB             | **10MB** (413)                  |
+| `POST /kyc/liveness`               | ~15KB (landmarks JSON)   | **100KB** (413)                 |
+| `POST /support/messages` (avec PJ) | ~500KB–2MB               | **5MB** (413)                   |
+
+> Une image >10MB après compression cliente indique un bug côté client (format non comprimé). La limite serveur est un dernier rempart, pas une cible.
 
 ### 8.3 Back-Office — Jean
 
@@ -1926,6 +1972,41 @@ services:
 
 ---
 
+### 9.2 Monitoring Technique (Phase 2)
+
+> **MVP :** Logs JSON structurés (FastAPI + Nginx) consultables via `docker-compose logs -f`.
+
+**Phase 2 — Stack Prometheus + Grafana (on-premise, zéro cloud) — services commentés dans docker-compose.yml :**
+
+```yaml
+# Phase 2 - à activer dès que le pilote est stable
+
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   networks: [veripass-net]
+  #   mem_limit: 256m
+
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+  #   networks: [veripass-net]
+  #   mem_limit: 256m
+
+  # Exporters :
+  # - prometheus-fastapi-instrumentator  (métriques HTTP sur /metrics)
+  # - celery-prometheus-exporter         (queue depth, task duration, failures)
+  # - postgres_exporter
+  # - redis_exporter
+  # - nginx-prometheus-exporter
+```
+
+**Alertmanager (Phase 2) :** Alerte email si `CPU > 85%` ou `disk > 80%` ou `queue_depth > 10`.
+
+---
+
 ## 10. Budget RAM & Profil Hardware
 
 ### 10.1 Budget RAM — Version honnête (WSL2 cap 8GB)
@@ -2084,6 +2165,52 @@ flowchart TD
 
 > **Comportement partiel PaddleOCR→GLM (E04) :** Si PaddleOCR extrait certains champs avec confidence ≥ 85% mais pas tous, les champs échoués sont envoyés à GLM uniquement (pas l'image complète). Réponse: `engine: PADDLE_THEN_GLM`, `partial_glm: true`.
 
+**§12.1bis — Fusion résultats PaddleOCR + GLM (pseudocode) :**
+
+```python
+def merge_ocr_results(
+    paddle_fields: dict[str, OCRField],
+    glm_fields: dict[str, OCRField],
+    low_confidence_keys: list[str]
+) -> tuple[dict, str]:
+    """
+    Fusionne les résultats OCR :
+    - Champs Paddle confidence >= 0.85 : conservés intacts
+    - Champs dans low_confidence_keys : écrasés si GLM fait mieux
+    - Si GLM n'améliore pas, Paddle est conservé (même si < 0.85)
+    """
+    final = dict(paddle_fields)
+    glm_improved = []
+
+    for key in low_confidence_keys:
+        if key in glm_fields and glm_fields[key].confidence > paddle_fields[key].confidence:
+            final[key] = glm_fields[key]
+            glm_improved.append(key)
+
+    if not glm_improved:
+        engine = "PADDLE_GLM_NO_IMPROVEMENT"
+    elif len(glm_improved) == len(low_confidence_keys):
+        engine = "PADDLE_THEN_GLM_FULL"
+    else:
+        engine = "PADDLE_THEN_GLM_PARTIAL"
+
+    return final, engine
+```
+
+**Cas GLM échoue complètement (timeout 120s ou RuntimeError) :**
+
+```python
+try:
+    result = glm_model.extract(image, field_hints=low_confidence_keys)
+except (TimeoutError, RuntimeError) as e:
+    db.update_document(doc_id, ocr_engine="GLM_FAILED", status="PENDING_MANUAL")
+    db.insert_notification(
+        agent_id=jean_id, type="OCR_MANUAL_REQUIRED",
+        payload={"doc_id": doc_id, "reason": str(e)}
+    )
+    return  # Pas de retry auto GLM (RAM critique)
+```
+
 ### 12.2 Pipeline Biométrique
 
 ```mermaid
@@ -2111,7 +2238,9 @@ flowchart TD
     K -->|Non: strike = 3| M[Status = LOCKED_LIVENESS</br>Purge Redis session</br>Message lockout FR]
 ```
 
-> **Validation serveur landmarks (E19) :** Les landmarks reçus du client sont vérifiés côté serveur pour détecter le spoofing : plage de valeurs (x,y,z ∈ [-1,1]), variance temporelle minimale (>0.02 std sur 5 frames), rejet si JSON format invalid. Pas de confiance aveugle aux données client.
+> **Validation serveur landmarks (E19) :** Les landmarks reçus du client sont vérifiés côté serveur pour détecter le spoofing : plage de valeurs (x,y,z ∈ [-1,1]), variance temporelle minimale (>0.02 std sur 5 frames), rejet si JSON format invalid. Pas de confiance aveugle aux données client.
+
+> **Landmarks seuls — Confidentialité par design (RGPD + Loi 2024-017) :** La vidéo brute ne quitte **jamais** le device. MediaPipe WASM extrait 478 points 3D normalisés ç{x,y,z ∈ [0.0,1.0]} — environ 15–30KB pour 5 frames. Ces landmarks ne permettent pas de reconstruire le visage (minimisation des données biométriques). Conforme COBAC : les landmarks ne constituent pas des données biométriques « originales » au sens de la conservation 10 ans — seule la selfie photo statique est conservée.
 
 ### 12.4 Table UX Erreurs (AR6 — 5 scénarios critiques)
 
@@ -2148,6 +2277,26 @@ Exemple (3 agents: Jean-A(w=2), Jean-B(w=1), Jean-C(w=1)):
   Tour 3: CW=[2,1,3] → Jean-C
   Tour 4: CW=[4,2,0] → Jean-A
   → Sur 4 tours: Jean-A=2, Jean-B=1, Jean-C=1  (ratio 2:1:1)
+```
+
+**Réaffectation agent indisponible (limite MVP documentée) :**
+
+```
+Celery beat (toutes les 15min) :
+    SELECT dossier_assignments
+    WHERE is_current = true
+    AND agent.is_available = false
+    AND assigned_at < NOW() - INTERVAL '4 hours'
+    → Pour chaque dossier orphelin :
+        INSERT notification (sylvie, type=DOSSIER_ORPHAN)
+        WRR → sélectionne nouvel agent disponible
+        UPDATE dossier_assignments (agent_id = nouvel_agent, reassigned_at = NOW())
+        INSERT notification (nouvel_agent, type=DOSSIER_REASSIGNED, with_full_context=true)
+
+Si TOUS les agents sont indisponibles simultanément :
+    → Dossiers restent en queue sans réaffectation
+    → Sylvie reçoit alerte ALL_AGENTS_OFFLINE
+    → Sylvie peut relancer manuellement depuis son dashboard
 ```
 
 ### 12.5 AML — Algorithme pg_trgm (G40)
@@ -2522,4 +2671,143 @@ Colonne `dropout_step` déjà dans `fact_kyc_sessions`. Procédure :
 ---
 
 *Document généré le 2026-02-28 | Version 1.0 | bicec-veripass MVP Architecture*  
-*Document rattrapé le 2026-03-05 | Version 1.1 | bicec-veripass MVP Architecture — 39 corrections appliquées*
+*Document rattrapé le 2026-03-05 | Version 1.1 | bicec-veripass MVP Architecture — 39 corrections appliquées*  
+*Patch V4 intégré le 2026-03-05 | Version 1.2 | 9 corrections + 4 Q&A (revue jury)*
+
+---
+
+## 18. Stratégie de Test
+
+> **Pyramide de tests appliquée au MVP bicec-veripass :**
+
+```
+         /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\
+        /   E2E — Playwright   \   ← Peu nombreux, parcours critiques
+       /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\
+      /  Intégration — FastAPI  \  ← Contrats API + effets DB
+     /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\
+    /   Unitaires — Pytest/Vitest \  ← Nombreux, rapides, logique métier
+   /‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\
+```
+
+| Niveau                    | Outil                               | Ce qui est testé                                                                            | Priorité MVP |
+| ------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- | ------------ |
+| **Unitaires Backend**     | Pytest                              | State machine transitions, `merge_ocr_results`, WRR algorithm, AML fuzzy scoring, JWT utils | ★★★          |
+| **Unitaires Frontend**    | Vitest + React Testing Library      | Composants PWA, gestion états offline, formulaires OCR                                      | ★★           |
+| **Intégration API**       | FastAPI TestClient + pytest-asyncio | Chaque endpoint : body, codes erreur, DB side effects                                       | ★★★          |
+| **E2E Parcours nominaux** | Playwright                          | Onboarding Marie complet, validation Jean, login back-office                                | ★★★          |
+| **E2E Cas limites**       | Playwright                          | Liveness lockout, session resumption, OTP rate limit                                        | ★★           |
+| **Fixtures KYC**          | Pytest fixtures                     | Sessions dans chaque état pour tests répétables                                             | ★★★          |
+
+**Fixtures essentielles (`conftest.py`) :**
+
+```python
+@pytest.fixture
+def session_pending_kyc(db):
+    """Session soumise prête pour validation Jean"""
+    return create_test_session(
+        status="PENDING_KYC",
+        with_documents=True,
+        with_biometrics=True
+    )
+
+@pytest.fixture
+def session_activated_full(db):
+    """Session compte activé FULL_ACCESS"""
+    return create_test_session(
+        status="ACTIVATED_FULL",
+        access_level="FULL_ACCESS"
+    )
+
+@pytest.fixture
+def session_abandoned(db):
+    """Session abandonnée après 72h inactives"""
+    return create_test_session(
+        status="ABANDONED",
+        updated_at=datetime.now() - timedelta(hours=73)
+    )
+```
+
+---
+
+## 19. FAQ Technique — Réponses Jury
+
+### Q1 — Que se passe-t-il si GLM-OCR échoue complètement ?
+
+**Défini dans §12.1bis.** Résumé :
+- Timeout Celery configuré à **120s** sur le worker `celery_ocr`
+- Si `TimeoutError` ou `RuntimeError` : document marqué `ocr_engine = 'GLM_FAILED'`, `status = 'PENDING_MANUAL'`
+- Jean reçoit une notification avec badge rouge sur tous les champs concernés
+- Jean effectue la saisie manuelle depuis les images haute-résolution
+- Pas de retry automatique GLM (RAM critique) — Jean peut déclencher manuellement
+- L'événement est log dans `audit_log` + comptabilisé dans les métriques OCR (taux échec GLM)
+
+---
+
+### Q2 — Pourquoi envoyer uniquement les landmarks, pas la vidéo brute ?
+
+**Défini dans §12.2.** Résumé :
+
+```
+Flux vidéo getUserMedia (caméra)
+    → MediaPipe WASM (100% dans le navigateur, WASM sandbox)
+    → 478 points 3D normalisés extraits par frame (x, y, z ∈ [0.0, 1.0])
+    → Sélection de 5 frames espacées de 200ms
+    → landmarks_json = [{frame: 1, points: [...]}, ...] (~15–30KB total)
+    → Seul landmarks_json envoyé à l'API — jamais la vidéo
+```
+
+| Dimension               | Bénéfice                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **RGPD / Loi 2024-017** | Minimisation des données : les landmarks ne permettent pas de reconstruire le visage                                          |
+| **Performance**         | 15–30KB au lieu de plusieurs Mo de vidéo                                                                                      |
+| **COBAC**               | Les landmarks ne sont pas des données biométriques « originales » — conservation 10 ans ne s'applique qu'à la selfie statique |
+
+---
+
+### Q3 — Comment `SET LOCAL app.current_user` est-il positionné ?
+
+**Pattern exact — Middleware FastAPI (transaction scope) :**
+
+```python
+# app/core/middleware.py
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class AuditContextMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        user_id = getattr(request.state, "user_id", "anonymous")
+
+        async with db.begin():
+            # SET LOCAL : scopé à la transaction → thread-safe dans asyncpg pool
+            await db.execute(
+                "SELECT set_config('app.current_user', :uid, true)",
+                {"uid": str(user_id)}
+            )
+            # true = LOCAL (transaction scope), pas SESSION scope
+            response = await call_next(request)
+
+        return response
+```
+
+Le trigger PostgreSQL lit `current_setting('app.current_user', true)` — le `true` (missing_ok) évite une exception si la variable n'est pas positionnée (ex. migrations).
+
+---
+
+### Q4 — Comment la mémoire GLM est-elle libérée après chaque tâche ?
+
+**Mécanisme `--max-tasks-per-child=1` (docker-compose.yml) :**
+
+```yaml
+# docker-compose.yml — celery_ocr
+celery_ocr:
+  command: >
+    celery -A app.celery worker
+    -Q glm_ocr_jobs
+    --concurrency=1
+    --max-tasks-per-child=1
+    -n ocr_worker@%h
+```
+
+`--max-tasks-per-child=1` : après chaque tâche GLM, le process Python worker se termine proprement. Celery en fork automatiquement un nouveau. **La mémoire du modèle GLM (2.5–3.5GB) est libérée par l'OS après `exit()` du process enfant.**
+
+**Coût (acceptable) :** Rechargement du modèle = 5–15s de warm-up. Acceptable en back-office async (les factures ne sont pas traitées en temps réel pour Marie).
