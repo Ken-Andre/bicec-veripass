@@ -1235,6 +1235,106 @@ export function BackOffice() {
 
 
 
+          {/* Screening AML View — Thomas */}
+          {currentView === 'fraud' && (
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Screening AML / CFT</h2>
+                  <p className="text-slate-500 text-sm">Alertes de conformité — Correspondances PEP, Sanctions et comportement suspect</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="bg-red-100 text-red-700 font-bold px-3 py-1.5 rounded-xl text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" /> 7 alertes actives
+                  </span>
+                </div>
+              </div>
+
+              {/* Critical Alert — PEP Hit */}
+              <div className="bg-red-50 rounded-2xl border-2 border-red-200 p-6 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-xs font-bold bg-red-600 text-white px-2 py-0.5 rounded uppercase">CRITIQUE — PEP</span>
+                      <span className="text-xs font-mono text-slate-500">ALERT-2026-0041 · Il y a 12 min</span>
+                    </div>
+                    <h3 className="text-base font-bold text-red-900 mb-1">Correspondance liste sanctions ONU — Dossier VRF-2026-0008</h3>
+                    <p className="text-sm text-red-700 mb-4">Nom: <strong>Ndoumbe Théodore Michel</strong> — Score similarité: <strong className="text-red-900">94.7%</strong> avec liste OFAC/ONU. Occupation déclarée : Conseiller ministériel.</p>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      {[
+                        { label: 'Similarité Nom', value: '94.7%', color: 'red' },
+                        { label: 'Date Naissance', value: '07/12/1967 ✓', color: 'orange' },
+                        { label: 'Nationalité', value: 'CMR ✓', color: 'orange' },
+                      ].map(item => (
+                        <div key={item.label} className="bg-white rounded-xl p-3 text-center border border-red-100">
+                          <p className={`text-lg font-black ${item.color === 'red' ? 'text-red-600' : 'text-orange-600'}`}>{item.value}</p>
+                          <p className="text-xs text-slate-500 mt-1">{item.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button className="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-sm transition-colors flex items-center gap-2">
+                        <XCircle className="w-4 h-4" /> Bloquer & Escalader Direction
+                      </button>
+                      <button className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors">
+                        Faux Positif (Homonymie)
+                      </button>
+                      <button className="px-4 py-2 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors">
+                        Demander justificatifs
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* AML Queue Table */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-700">File d'attente AML — 7 alertes</h3>
+                  <button className="text-xs font-bold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50">
+                    Exporter Rapport COBAC
+                  </button>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {[
+                    { id: 'ALERT-2026-0041', name: 'Ndoumbe Théodore M.', type: 'PEP / Sanctions ONU', score: '94.7%', level: 'CRITIQUE', dossier: 'VRF-2026-0008', time: 'il y a 12 min' },
+                    { id: 'ALERT-2026-0040', name: 'Biyiha Jean-Claude R.', type: 'Transactions suspectes (>5M XAF)', score: '78.2%', level: 'URGENT', dossier: 'VRF-2026-0007', time: 'il y a 34 min' },
+                    { id: 'ALERT-2026-0039', name: 'Mbouda Clarisse A.', type: 'Tentatives multiples identité', score: '65.1%', level: 'MOYEN', dossier: 'VRF-2026-0005', time: 'il y a 1h' },
+                    { id: 'ALERT-2026-0038', name: 'Kamgang Aristide N.', type: 'Homonymie liste sanctions EU', score: '51.3%', level: 'FAIBLE', dossier: 'VRF-2026-0003', time: 'il y a 2h' },
+                  ].map((alert) => (
+                    <div key={alert.id} className="flex items-center gap-6 px-6 py-4 hover:bg-slate-50 transition-colors">
+                      <div className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-black ${alert.level === 'CRITIQUE' ? 'bg-red-100 text-red-700' :
+                          alert.level === 'URGENT' ? 'bg-orange-100 text-orange-700' :
+                            alert.level === 'MOYEN' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                        }`}>{alert.level}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-900">{alert.name}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{alert.type}</p>
+                      </div>
+                      <div className="text-center shrink-0 w-16">
+                        <p className={`text-sm font-black ${parseFloat(alert.score) >= 90 ? 'text-red-600' :
+                            parseFloat(alert.score) >= 70 ? 'text-orange-600' : 'text-amber-600'
+                          }`}>{alert.score}</p>
+                        <p className="text-[10px] text-slate-400">similarité</p>
+                      </div>
+                      <div className="shrink-0">
+                        <p className="text-xs font-mono text-blue-600">{alert.dossier}</p>
+                        <p className="text-[10px] text-slate-400">{alert.time}</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">Bloquer</button>
+                        <button className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors">Classer</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Application list View (Jean/Thomas) */}
           {currentView === 'applications' && (
             <>
