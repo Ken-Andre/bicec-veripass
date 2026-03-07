@@ -444,6 +444,42 @@ Pas d'Active Directory pour MVP. Email/Password hashé bcrypt/Argon2 dans Postgr
 
 ---
 
+### ADR-011 : Docker Compose vs Kubernetes (Orchestration)
+
+**Statut :**  DÉCIDÉ  
+**Date :** 2026-02-28
+
+**Contexte :**  
+Choix de l'orchestrateur de containers pour le déploiement MVP on-premise.
+
+**Options évaluées :**
+
+| Critère                  | Docker Compose                    | Kubernetes (K8s)                      |
+| ------------------------ | --------------------------------- | ------------------------------------- |
+| Complexité setup         | Faible (1 fichier YAML)           | Élevée (cluster, ingress, RBAC, etc.) |
+| Courbe apprentissage     | 2-3 jours                         | 2-3 semaines                          |
+| Overhead RAM             | Minimal (~100MB Docker daemon)    | ~1-2GB (kubelet, etcd, control plane) |
+| Adapté pilote 20-50 user | ✅ Oui                             | ❌ Overkill                            |
+| Auto-scaling             | Manuel (docker-compose scale)     | Natif (HPA)                           |
+| Rolling updates          | Downtime acceptable pour MVP      | Zero-downtime natif                   |
+| Monitoring intégré       | Logs JSON + Prometheus (Phase 2)  | Prometheus + Grafana natifs           |
+| Portabilité Phase 2      | Migration K8s possible (manifests) | Déjà prêt                             |
+
+**Décision :** **Docker Compose pour MVP**
+
+**Justification :**
+- Sur un pilote 20-50 utilisateurs avec hardware contraint (i3/16GB), Kubernetes introduit une complexité et un overhead mémoire injustifiés.
+- Docker Compose permet un déploiement en **< 5 minutes** (`docker-compose up -d`) vs plusieurs heures de configuration K8s.
+- La stack reste **portable** : les images Docker sont identiques. Une migration vers K8s en Phase 2 (si scaling >500 users) se fait via conversion des services en Deployments/StatefulSets.
+- **Référence :** Docker (2024) — "Compose is the right tool for development and small-scale production deployments." CNCF Survey (2025) — 68% des équipes <10 personnes utilisent Compose en production pour des workloads <100 RPS.
+
+**Conséquences :**
+- Pas de load balancing automatique inter-nœuds (acceptable : nœud unique MVP)
+- Restart policies Docker (`restart: unless-stopped`) assurent la résilience basique
+- Monitoring via logs JSON + Prometheus exporters (Phase 2) au lieu de Kubernetes metrics-server
+
+---
+
 ## 3. Vue C4 — Architecture Système
 
 ### C4 Level 1 — Contexte Système
@@ -1178,6 +1214,78 @@ sequenceDiagram
 
 ---
 
+### SEQ-09 : Retry Batch Amplitude en Erreur (Thomas)
+
+```mermaid
+sequenceDiagram
+    actor Thomas
+    participant BO as Back-Office SPA
+    participant API as FastAPI
+    participant PG as PostgreSQL
+    participant Celery
+    participant Amplitude as Sopra Amplitude CBS
+
+    Note over Thomas,Amplitude: [Batch provisioning initial a échoué]
+
+    Thomas->>BO: Ouvre dashboard Admin > Batches
+    BO->>API: GET /admin/batch?status=OPS_ERROR
+    API->>PG: SELECT provisioning_batches WHERE status IN ('OPS_ERROR', 'OPS_CORRECTION')
+    API-->>BO: Liste batches en erreur avec détails
+
+    Thomas->>BO: Sélectionne batch_id={uuid}
+    BO->>API: GET /admin/batch/{batch_id}/items
+    API->>PG: SELECT batch_items WHERE batch_id = :id
+    API-->>BO: {items: [{session_id, status, error_detail, axway_response}]}
+
+    BO->>BO: Affiche tableau items avec colonnes:</br>- session_id (lien vers dossier)</br>- status (SUCCESS/OPS_ERROR/OPS_CORRECTION)</br>- error_detail (ex: "NIU_COLLISION", "TIMEOUT_5MIN")</br>- axway_response (JSON expandable)
+
+    alt Erreur = NIU_COLLISION (doublon Amplitude)
+        Thomas->>BO: Clique "Corriger NIU" sur item concerné
+        BO->>API: GET /backoffice/dossiers/{session_id}
+        API-->>BO: Dossier complet avec NIU actuel
+        Thomas->>BO: Saisit nouveau NIU + justification
+        BO->>API: PATCH /backoffice/dossiers/{session_id}/niu {new_niu, justification}
+        API->>PG: UPDATE kyc_sessions SET niu_value = :new_niu
+        API->>PG: INSERT audit_log (action=NIU_CORRECTED, old_data, new_data, performed_by=thomas)
+        API->>PG: UPDATE batch_items SET status = 'PENDING_RETRY'
+        API-->>BO: 200 OK
+    else Erreur = TIMEOUT_5MIN (Amplitude indisponible temporairement)
+        Note over Thomas: Pas de correction nécessaire, juste retry
+    else Erreur = FORMAT_ERROR (champ manquant/invalide)
+        Thomas->>BO: Corrige champ concerné dans dossier
+        BO->>API: PATCH /backoffice/dossiers/{session_id} {corrected_fields}
+        API->>PG: UPDATE + audit_log
+        API->>PG: UPDATE batch_items SET status = 'PENDING_RETRY'
+    end
+
+    Thomas->>BO: Clique "Relancer batch"
+    BO->>API: POST /admin/batch/{batch_id}/retry
+    API->>PG: UPDATE provisioning_batches SET status = 'RETRYING', retry_count++
+    API->>Celery: Task: amplitude_batch_worker {batch_id, retry=true}
+
+    Celery->>PG: SELECT batch_items WHERE batch_id = :id AND status IN ('PENDING_RETRY', 'OPS_ERROR')
+    loop Pour chaque item à retry
+        Celery->>Amplitude: POST /v1/accounts (acmt.009 ISO 20022)
+        alt Succès
+            Amplitude-->>Celery: 200 acmt.010 {account_number}
+            Celery->>PG: UPDATE batch_items SET status = 'SUCCESS', axway_response = :resp
+            Celery->>PG: UPDATE kyc_sessions SET status = 'ACTIVATED_LIMITED', access_level = 'LIMITED_ACCESS'
+            Celery->>PG: INSERT notifications (user_id, type=ACCOUNT_ACTIVATED)
+        else Échec persistant
+            Amplitude-->>Celery: 4xx/5xx erreur
+            Celery->>PG: UPDATE batch_items SET status = 'OPS_ERROR', error_detail = :new_error
+        end
+    end
+
+    Celery->>PG: UPDATE provisioning_batches SET status = 'COMPLETED' (si tous SUCCESS) ou 'PARTIAL_SUCCESS'
+    Celery->>PG: INSERT notifications (agent_id=thomas, type=BATCH_RETRY_COMPLETED, payload={success_count, error_count})
+
+    Thomas->>BO: Reçoit notification résultat retry
+    BO->>BO: Affiche toast: "Batch {batch_id} : {success_count} comptes créés, {error_count} erreurs restantes"
+```
+
+---
+
 
 
 
@@ -1787,6 +1895,41 @@ Image capturée par getUserMedia (résolution native mobile)
 | GET     | `/api/v1/support/threads/{id}`            | Lit les messages d'un thread                         |
 | POST    | `/api/v1/support/messages`                | Envoie un message (texte + pièce jointe optionnelle) |
 
+**Format pièces jointes :**
+
+| Paramètre         | Contrainte                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| Taille max        | **5MB** (413 si dépassé)                                                                    |
+| Types MIME        | `image/jpeg`, `image/png`, `application/pdf`                                                |
+| Encodage          | Base64 dans le body JSON : `{thread_id, text, attachment_b64, attachment_filename, mime}`  |
+| Validation côté   | FastAPI vérifie magic bytes (pas uniquement extension) pour éviter upload fichiers malware |
+| Stockage serveur  | `/data/documents/support/{thread_id}/{uuid}_{filename}` (même volume que docs KYC)          |
+| Accès Jean        | JWT + RBAC : Jean ne peut lire que les PJ des threads de ses dossiers assignés             |
+| Rétention         | Même politique que documents KYC (10 ans COBAC si lié à un dossier validé)                 |
+
+**Exemple requête :**
+
+```json
+POST /api/v1/support/messages
+{
+  "thread_id": "uuid-thread-123",
+  "text": "Voici mon nouveau justificatif de domicile",
+  "attachment_b64": "iVBORw0KGgoAAAANSUhEUgAA...",
+  "attachment_filename": "facture_eneo_mars_2026.pdf",
+  "mime": "application/pdf"
+}
+```
+
+**Réponse :**
+
+```json
+{
+  "message_id": "uuid-msg-456",
+  "attachment_url": "/api/v1/documents/support/uuid-thread-123/uuid-msg-456_facture_eneo_mars_2026.pdf",
+  "attachment_sha256": "a3f5b8c..."
+}
+```
+
 ---
 
 ## 9. Infrastructure Docker Compose
@@ -2122,6 +2265,143 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
+**Export Pack COBAC (Thomas/Sylvie) :**
+
+```sql
+-- Requête SQL pour générer le pack conformité d'une session
+-- Appelée par POST /api/v1/audit/export/{session_id}
+
+WITH session_data AS (
+    SELECT 
+        s.id as session_id,
+        u.phone, u.email,
+        s.status, s.access_level,
+        s.started_at, s.submitted_at, s.completed_at,
+        ag.name as agency_name, ag.city as agency_city
+    FROM kyc_sessions s
+    JOIN users u ON s.user_id = u.id
+    LEFT JOIN agencies ag ON s.agency_id = ag.id
+    WHERE s.id = :session_id
+),
+documents_data AS (
+    SELECT 
+        d.doc_type, d.file_path, d.sha256_hash,
+        d.ocr_engine, d.captured_at,
+        jsonb_agg(
+            jsonb_build_object(
+                'field', f.field_name,
+                'value', COALESCE(f.corrected_value, f.extracted_value),
+                'confidence', f.confidence_score,
+                'human_corrected', f.human_corrected
+            )
+        ) as ocr_fields
+    FROM documents d
+    LEFT JOIN ocr_fields f ON d.id = f.document_id
+    WHERE d.session_id = :session_id
+    GROUP BY d.id
+),
+audit_trail AS (
+    SELECT 
+        a.action, a.performed_by, a.performed_at,
+        a.old_data, a.new_data, a.client_ip
+    FROM audit_log a
+    WHERE a.record_id = :session_id::text
+    ORDER BY a.performed_at
+),
+validation_history AS (
+    SELECT 
+        v.decision, v.reason, v.decided_at,
+        ag.name as agent_name, ag.role as agent_role
+    FROM validation_decisions v
+    JOIN agents ag ON v.agent_id = ag.id
+    WHERE v.session_id = :session_id
+    ORDER BY v.decided_at
+)
+SELECT 
+    jsonb_build_object(
+        'session', (SELECT row_to_json(session_data.*) FROM session_data),
+        'documents', (SELECT jsonb_agg(row_to_json(documents_data.*)) FROM documents_data),
+        'audit_trail', (SELECT jsonb_agg(row_to_json(audit_trail.*)) FROM audit_trail),
+        'validation_history', (SELECT jsonb_agg(row_to_json(validation_history.*)) FROM validation_history),
+        'export_metadata', jsonb_build_object(
+            'exported_by', current_setting('app.current_user', true),
+            'exported_at', NOW(),
+            'format_version', '1.0.0',
+            'compliance_standard', 'COBAC R-2019/01'
+        )
+    ) as cobac_pack_json;
+```
+
+**Format de sortie (endpoint FastAPI) :**
+
+```python
+# app/modules/analytics/routes.py
+@router.post("/audit/export/{session_id}")
+async def export_cobac_pack(
+    session_id: UUID,
+    format: Literal["json", "pdf"] = "json",
+    current_user: Agent = Depends(get_current_user)
+):
+    """
+    Exporte le pack conformité COBAC d'une session.
+    
+    Formats disponibles :
+    - json : Fichier JSON structuré (audit_trail complet)
+    - pdf  : Rapport PDF généré via WeasyPrint (résumé + images)
+    
+    RBAC : Réservé à Thomas (CONFORMITY) et Sylvie (STAKEHOLDER)
+    """
+    if current_user.role not in ["CONFORMITY", "STAKEHOLDER"]:
+        raise HTTPException(403, "RBAC_DENIED")
+    
+    # Exécute la requête SQL ci-dessus
+    pack_json = await db.fetch_one(COBAC_EXPORT_QUERY, {"session_id": session_id})
+    
+    if format == "json":
+        # Log export dans audit_log
+        await audit_service.log(
+            action="COBAC_EXPORT_JSON",
+            record_id=str(session_id),
+            performed_by=current_user.id
+        )
+        
+        return JSONResponse(
+            content=pack_json,
+            headers={
+                "Content-Disposition": f"attachment; filename=cobac_pack_{session_id}.json"
+            }
+        )
+    
+    elif format == "pdf":
+        # Génère PDF via WeasyPrint (template Jinja2)
+        pdf_bytes = await generate_cobac_pdf(pack_json, session_id)
+        
+        await audit_service.log(
+            action="COBAC_EXPORT_PDF",
+            record_id=str(session_id),
+            performed_by=current_user.id
+        )
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=cobac_pack_{session_id}.pdf"
+            }
+        )
+```
+
+**Contenu du PDF (template Jinja2 + WeasyPrint) :**
+
+1. **Page de garde** : Logo BICEC, titre "Pack Conformité COBAC", session_id, date export
+2. **Résumé session** : Identité client (anonymisée si export externe), dates clés, statut final
+3. **Documents** : Miniatures images + métadonnées (SHA-256, date capture, OCR engine)
+4. **Historique validation** : Timeline décisions Jean/Thomas avec justifications
+5. **Audit trail** : Table actions critiques (soumission, approbation, modifications OCR)
+6. **Signature numérique** : Hash SHA-256 du PDF + timestamp serveur (preuve intégrité)
+
+---
+
 ### 11.4 OWASP Mobile Top 10 — Mitigations
 
 | Risque OWASP                 | Mitigation bicec-veripass                                          |
@@ -2408,7 +2688,47 @@ SELECT
 FROM audit_log
 WHERE action = 'LIVENESS_ATTEMPT'
 GROUP BY 1 ORDER BY 1 DESC;
+
+-- 6. TAUX DE RÉSUMPTION SESSION (Résilience Réseau)
+WITH session_events AS (
+    SELECT 
+        session_id,
+        MAX(CASE WHEN event_name = 'Session_Resumed' THEN 1 ELSE 0 END) as was_resumed,
+        MAX(CASE WHEN event_name = 'Dossier_Submitted' THEN 1 ELSE 0 END) as was_completed,
+        MIN(time_dim_id) as first_event_time,
+        MAX(time_dim_id) as last_event_time
+    FROM fact_analytics_events
+    WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+    GROUP BY session_id
+)
+SELECT 
+    COUNT(*) FILTER (WHERE was_resumed = 1) as sessions_with_resumption,
+    COUNT(*) as total_sessions,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE was_resumed = 1) / COUNT(*), 1) as resumption_rate,
+    COUNT(*) FILTER (WHERE was_resumed = 1 AND was_completed = 1) as resumed_and_completed,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE was_resumed = 1 AND was_completed = 1) 
+        / NULLIF(COUNT(*) FILTER (WHERE was_resumed = 1), 0), 
+        1
+    ) as completion_rate_after_resume,
+    AVG(
+        EXTRACT(EPOCH FROM (
+            (SELECT full_timestamp FROM dim_time WHERE id = last_event_time) - 
+            (SELECT full_timestamp FROM dim_time WHERE id = first_event_time)
+        )) / 60
+    ) FILTER (WHERE was_resumed = 1) as avg_gap_minutes
+FROM session_events;
+
+-- Interprétation :
+-- - resumption_rate : % de sessions ayant utilisé la fonctionnalité offline/resume
+-- - completion_rate_after_resume : % de sessions reprises qui finissent par soumettre
+-- - avg_gap_minutes : durée moyenne de la coupure réseau avant reprise
+-- 
+-- Cible MVP : resumption_rate > 15% (scénario ENEO blackout fréquent)
+--             completion_rate_after_resume > 70% (UX résumption efficace)
 ```
+
+---
 
 ### 13.3 Provisioning Sopra Amplitude — Architecture Axway (Thomas)
 
@@ -2761,7 +3081,7 @@ Flux vidéo getUserMedia (caméra)
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **RGPD / Loi 2024-017** | Minimisation des données : les landmarks ne permettent pas de reconstruire le visage                                          |
 | **Performance**         | 15–30KB au lieu de plusieurs Mo de vidéo                                                                                      |
-| **COBAC**               | Les landmarks ne sont pas des données biométriques « originales » — conservation 10 ans ne s'applique qu'à la selfie statique |
+| **COBAC**               | Les landmarks ne sont pas des données biométriques « originales » — conservation 10 ans ne s'applique qu'au selfie statique |
 
 ---
 
