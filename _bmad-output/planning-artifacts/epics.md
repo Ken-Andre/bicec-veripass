@@ -723,7 +723,7 @@ So that I can take proactive action before SLA violations escalate.
 **When** the dashboard loads
 **Then** she sees status tiles for: Agent Queue SLA (% within 2h validation target), Liveness Failure Rate, Duplicate Alert Rate, Amplitude Batch Success Rate, System Health (FastAPI, DB, Redis)
 **And** each tile is colored GREEN (<threshold), YELLOW (approaching threshold), RED (threshold exceeded)
-**And** the dashboard refreshes every 30 seconds and responds to queries within <3 seconds even with 1,000+ dossiers
+**And** the dashboard refreshes every 30 seconds and responds to queries within < 3 seconds even with 1,000+ dossiers
 **And** Sylvie can escalate any flagged dossier with one click, triggering a priority re-assignment to Jean
 
 ---

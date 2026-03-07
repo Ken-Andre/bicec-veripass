@@ -136,6 +136,7 @@ stateDiagram-v2
 
 > C4 Mermaid ne supporte pas ELK actuellement — dagre avec directives de padding.
 
+### Version simplifie
 ```mermaid
 %%{init: {"theme": "base", "layout": "elk", "themeVariables": {"primaryColor": "#E3F2FD", "primaryTextColor": "#1A237E", "primaryBorderColor": "#1976D2", "lineColor": "#1976D2", "secondaryColor": "#FFF3E0", "tertiaryColor": "#F3E5F5"}, "flowchart": {"diagramPadding": 25, "nodeSpacing": 50, "rankSpacing": 65, "curve": "basis"}}}%%
 
@@ -173,6 +174,8 @@ graph LR
     SUPPORT --> AUDIT
     SUPPORT --> CORE
 ```
+
+### Version détaillé
 
 ---
 
