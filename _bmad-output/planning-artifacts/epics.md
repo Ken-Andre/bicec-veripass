@@ -17,6 +17,7 @@ The system is a sovereign digital KYC onboarding platform for BICEC (Cameroon), 
 - **Jean** — the KYC validation agent reviewing dossiers in the back-office
 - **Thomas** — the AML/Compliance supervisor
 - **Sylvie** — the operations manager overseeing the Command Center
+- **Admin IT** — the system administrator managing agent lifecycle, branch assignments, and system configuration
 
 **Stack:** PWA React/TypeScript + FastAPI (Python) + PostgreSQL + Redis + Celery + Docker Compose — 100% on-premise, open-source.
 
@@ -162,7 +163,7 @@ FR39-FR47: Epic 8 — Client Relationship & Banking Discovery frontend demos
 ## Epic List
 
 ### Epic 1: Foundation — Project Infrastructure & Authentication
-Enable the team to deploy the complete project skeleton and allow all users (Marie, Jean, Thomas, Sylvie) to securely authenticate.
+Enable the team to deploy the complete project skeleton and allow all users (Marie, Jean, Thomas, Sylvie, Admin IT) to securely authenticate.
 **FRs covered:** FR1, FR37
 **NFRs addressed:** NFR4, NFR7, NFR9, NFR10
 
@@ -200,6 +201,11 @@ Enable Sylvie to monitor operational health via a R/Y/G dashboard, analyze funne
 Enable Marie to explore BICEC's banking value proposition through plan personalization, use-case selection, and account management UI shells, with status-driven gating logic.
 **FRs covered:** FR39, FR40, FR41, FR42, FR43, FR44, FR45, FR46, FR47
 **NFRs addressed:** NFR3, NFR12
+
+### Epic 9: Admin IT — Agent Lifecycle & System Administration
+Enable Admin IT to manage the complete lifecycle of back-office agents (create, assign to branch, deactivate, reset passwords), manage agency configuration, and configure system parameters, so that Jean, Thomas, and Sylvie can be onboarded before any KYC processing begins.
+**FRs covered:** R45, R46 (Requirements 45 and 46)
+**NFRs addressed:** NFR4, NFR14
 
 ---
 
@@ -266,9 +272,9 @@ So that I can securely access the onboarding application without remembering a p
 
 ---
 
-### Story 1.4: Back-Office Authentication (Jean, Thomas, Sylvie)
+### Story 1.4: Back-Office Authentication (Jean, Thomas, Sylvie, Admin IT)
 
-As a **back-office agent (Jean / Thomas / Sylvie)**,
+As a **back-office user (Jean / Thomas / Sylvie / Admin IT)**,
 I want to log in with my Email and Password,
 So that I can securely access the back-office portal with my role-specific permissions.
 
@@ -276,7 +282,7 @@ So that I can securely access the back-office portal with my role-specific permi
 
 **Given** an agent navigates to the back-office login page
 **When** they enter a valid Email and Password
-**Then** they receive a JWT token and are redirected to their role-specific dashboard (Jean → Validation Desk, Thomas → AML/Compliance, Sylvie → Command Center)
+**Then** they receive a JWT token and are redirected to their role-specific dashboard (Jean → Validation Desk, Thomas → AML/Compliance, Sylvie → Command Center, Admin IT → `/admin`)
 
 **Given** an agent enters incorrect credentials 5 times
 **When** the 5th failed attempt is submitted
@@ -287,7 +293,8 @@ So that I can securely access the back-office portal with my role-specific permi
 **Then** the API returns 401 and the front-end redirects to the login page
 
 **And** passwords are hashed using bcrypt/Argon2 (never stored in plain text)
-**And** RBAC is enforced at API level — Jean cannot access Thomas's or Sylvie's endpoints
+**And** RBAC is enforced at API level — Jean cannot access Thomas's, Sylvie's, or Admin IT's endpoints
+**And** Admin IT cannot access Jean's validation, Thomas's AML, or Sylvie's metrics endpoints
 
 ---
 

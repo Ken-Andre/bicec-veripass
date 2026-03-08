@@ -41,6 +41,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 - **Marie (Customer)**: Completes the sub-20MB "low-data" journey with a >75% completion rate, supported by mandatory encrypted session persistence.
 - **Jean (KYC Agent)**: Validates dossiers in <5 minutes via a dedicated portal, achieving an 85% First-Time-Right (FTR) rate.
 - **Sylvie (Manager)**: Real-time visibility into operational health via a Red/Yellow/Green dashboard, maintaining a >90% Validation SLA (within 2h).
+- **Admin IT**: Manages agent lifecycle (creation, branch assignment, deactivation) and system configuration with zero downtime impact; bootstraps the system before any other back-office user can log in.
 
 ### 💼 Business Success
 - **CAC Transformation**: Realize a 3x reduction in Customer Acquisition Cost within 6 months of pilot launch.
@@ -57,7 +58,7 @@ By using a Mock-First integration strategy, the MVP proves the business value (3
 
 ### MVP - Minimum Viable Product
 - **Mobile Journey**: SMS/Email OTP, PIN Setup, Resilient AI Capture , Local Encryption, Offline Metadata Sync.
-- **Back-Office**: Jean's Validation Desk, Thomas's AML & Compliance Dashboard, Sylvie's Command Dashboard.
+- **Back-Office**: Jean's Validation Desk, Thomas's AML & Compliance Dashboard, Sylvie's Command Dashboard, Admin IT's System Administration Portal.
 - **Core API**: Sovereign Python/FastAPI services for OCR, Biometrics, and KYC State Management.
 
 ### Growth Features (Post-MVP)
@@ -208,11 +209,12 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 - Jean's side-by-side Validation Desk + Audit Log.
 - Thomas's AML/Compliance Dashboard & Conflict Resolver.
 - Sylvie's Dashboard (Red/Yellow/Green internal MVP metrics).
+- Admin IT's System Administration Portal (agent lifecycle, agency management, system config).
 
 **Must-Have Capabilities**:
 - **Resilient Mobile Capture**: Sequential upload, local encrypted cache.
 - **Sovereign AI Engine**: Hybrid OCR strategy (PaddleOCR for CNI structured extraction + GLM-OCR for semantic bill analysis) and DeepFace biometrics running locally on Docker.
-- **Human-in-the-Loop Portal**: RBAC for Jean, Thomas, and Sylvie.
+- **Human-in-the-Loop Portal**: RBAC for Jean, Thomas, Sylvie, and Admin IT.
 <!-- - **Mock Service Layer**: High-fidelity stubs for DGI and Sopra Amplitude. >Removed because no more mock for even the MVP, too much complexity.-->
 - **Universal 16GB Optimization**: WSL2 RAM capping and auto-pruning scripts.
 - **Client Relationship Frontend (Banking Demos - UI Only)**:
@@ -376,7 +378,7 @@ The goal is to prove that a sovereign AI stack can securely onboard 20-50 users 
 - **NFR3 (Mobile Footprint)**: Total app size must be **<40MB** (Target: <20MB for initial download) to respect Cameroonian data constraints. Cold start time must be **<4 seconds**.
 
 ### 🛡️ Security & Sovereignty
-- **NFR4 (Auth Simplicity)**: Back-office access (Jean/Thomas/Sylvie) uses standard **Email/Password** authentication managed in the local application database (No Active Directory for MVP). Passwords must be hashed using **bcrypt/Argon2**.
+- **NFR4 (Auth Simplicity)**: Back-office access (Jean/Thomas/Sylvie/Admin IT) uses standard **Email/Password** authentication managed in the local application database (No Active Directory for MVP). Passwords must be hashed using **bcrypt/Argon2**. The first Admin IT account is seeded via `scripts/seed_admin_it.sql` at deployment.
 - **NFR5 (Data at Rest)**: 100% of biometric templates and CNI images must be encrypted using **AES-256** inside the Docker volumes.
 - **NFR6 (Sovereignty Pillar)**: The system must operate with **no external service calls** for its core AI functions, ensuring 100% data sovereignty and regulatory compliance.
 - **NFR7 (Transport)**: All communication between the Flutter app and FastAPI must use **TLS 1.3**.

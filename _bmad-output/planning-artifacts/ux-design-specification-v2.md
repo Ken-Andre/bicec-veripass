@@ -30,6 +30,7 @@
 - **Jean (The Guardian)**: Internal validator needing "side-by-side" evidence to perform 3-minute sanity checks with total audit trails. He works usually in one of BICEC's agencies.
 - **Thomas (The AML/CFT Supervisor)**: National compliance officer reviewing PEP/Sanctions alerts, handling identity deduplication, managing agency CRUD, and monitoring automated Amplitude batch provisioning.
 - **Sylvie (The Commander)**: Manager needing R/Y/G operational health visibility and funnel analytics. This can be manager of an agency or the central BICEC direction stakeholders.
+- **Admin IT (The Systems Manager)**: Infrastructure and lifecycle administrator responsible for creating agent accounts, assigning agents to branches, and managing system configuration. The only persona able to log in before others are onboarded — bootstrapped via seed script at deployment. Future path: LDAP/AD BICEC integration.
 
 ### Key Design Challenges
 - **The Hardware Ceiling**: Maintaining >15 FPS camera guidance on legacy Android 8 (NFR2).

@@ -179,7 +179,7 @@ Exemple de lecture : `users ||--o{ kyc_sessions` = **un user peut avoir plusieur
 
 ### 1.1 Résumé du Projet
 
-**bicec-veripass** est une plateforme d'onboarding KYC digital souveraine pour BICEC (Cameroun), transformant un processus manuel de 14 jours en un parcours numérique de 15 minutes. Le système intègre de l'IA locale (OCR + biométrie), un back-office multi-rôles (Jean/Thomas/Sylvie), et une PWA mobile pour le client (Marie).
+**bicec-veripass** est une plateforme d'onboarding KYC digital souveraine pour BICEC (Cameroun), transformant un processus manuel de 14 jours en un parcours numérique de 15 minutes. Le système intègre de l'IA locale (OCR + biométrie), un back-office multi-rôles (Jean/Thomas/Sylvie/Admin IT), et une PWA mobile pour le client (Marie).
 
 C'est un **Projet de Fin d'Études** (PFE) en Data/IA Engineering, présenté à un jury. Les composants Data/BI (funnel analytics, OCR observability, agent load-balancing) sont les **livrables primaires** évalués.
 
@@ -278,6 +278,7 @@ app/
     auth/          # OTP, PIN, sessions
     kyc/           # Capture, OCR, biométrie, state machine
     backoffice/    # Jean, Thomas, Sylvie
+    admin/         # Admin IT (agent lifecycle, agencies, config)
     aml/           # Screening PEP/Sanctions, déduplication
     analytics/     # Funnel, SLA, events
     admin/         # Agences, agents
@@ -430,7 +431,7 @@ Retour réseau → App détecte → "Reprise à l'étape [X]..." (< 2s)
 
 **Statut :**  DÉCIDÉ
 
-Pas d'Active Directory pour MVP. Email/Password hashé bcrypt/Argon2 dans PostgreSQL local. RBAC strict par rôle (JEAN, THOMAS, SYLVIE). Sessions JWT avec expiry.
+Pas d'Active Directory pour MVP. Email/Password hashé bcrypt/Argon2 dans PostgreSQL local. RBAC strict par rôle (JEAN, THOMAS, SYLVIE, ADMIN_IT). Sessions JWT avec expiry. Premier compte ADMIN_IT bootstrappé via `scripts/seed_admin_it.sql`. Dette technique planifiée : intégration LDAP/AD BICEC en Phase 2.
 
 ---
 
@@ -518,14 +519,14 @@ C4Container
     title bicec-veripass — Conteneurs Docker
 
     Person(marie, "Marie", "PWA Browser")
-    Person(agent, "Jean/Thomas/Sylvie", "Desktop Chrome/Edge")
+    Person(agent, "Jean/Thomas/Sylvie/Admin IT", "Desktop Chrome/Edge")
 
     System_Boundary(veripass, "bicec-veripass (Docker Compose)") {
         Container(nginx, "Nginx", "Reverse Proxy", "TLS 1.3 termination</br>Routage vers containers</br>Rate limiting")
 
         Container(pwa, "PWA Marie", "React/TypeScript</br>Vite + Service Worker", "Onboarding KYC</br>MediaPipe WASM</br>IndexedDB offline")
 
-        Container(backoffice, "Back-Office SPA", "React/TypeScript</br>Vite", "Jean: Validation Desk</br>Thomas: AML/Compliance</br>Sylvie: Command Center")
+        Container(backoffice, "Back-Office SPA", "React/TypeScript</br>Vite", "Jean: Validation Desk</br>Thomas: AML/Compliance</br>Sylvie: Command Center</br>Admin IT: System Admin")
 
         Container(api, "FastAPI Backend", "Python 3.11</br>FastAPI + Celery", "Modules: auth, kyc,</br>backoffice, aml,</br>analytics, admin,</br>notifications")
 
@@ -1608,8 +1609,10 @@ erDiagram
 >                  'MONITORED','REJECTED','DISABLED','ABANDONED')
 > access_level CHECK IN ('RESTRICTED','LIMITED_ACCESS','PRE_FULL_ACCESS',
 >                         'FULL_ACCESS','BLOCKED','PENDING_ACTIVATION')
-> -- Sur agents (Jean,Thomas,Sylvie)
-> role CHECK IN ('AGENT','CONFORMITY','STAKEHOLDER')
+> -- Sur users (rôles back-office + client)
+> role CHECK IN ('CLIENT','JEAN','THOMAS','SYLVIE','ADMIN_IT')
+> -- Sur agents (Jean,Thomas,Sylvie uniquement — Admin IT n'a pas de ligne dans agents)
+> -- (la table agents ne contient pas Admin IT car Admin IT ne traite pas de dossiers KYC)
 > ```
 > Trigger PostgreSQL validant les combinaisons `(status, access_level)` légales selon la matrice du §5.
 
@@ -1634,10 +1637,12 @@ erDiagram
 | `provisioning_batch_items` | `axway_request_id`           | TEXT         | NULL                 | ID requête Axway                                | `axw-req-abc123`                                                          |
 | `provisioning_batch_items` | `iso20022_message_ref`       | TEXT         | NULL                 | Référence message ISO 20022                     | `acmt.009-20260305-001`                                                   |
 | `documents`                | `doc_type`                   | TEXT         | NOT NULL             | Type document                                   | `CNI_RECTO`, `CNI_VERSO`, `BILL_ENEO`, `SELFIE`, `NIU`                    |
+| `documents`                | `format_variant`             | TEXT         | NULL                 | Format physique CNI détecté (recto seulement)   | `CNI_ANCIEN_LANDSCAPE`, `CNI_NOUVEAU_PORTRAIT`, `PASSPORT`, `N/A`         |
 | `documents`                | `ocr_engine`                 | TEXT         | NULL                 | Moteur OCR utilisé                              | `PADDLE`, `GLM`, `PADDLE_THEN_GLM`                                        |
 | `documents`                | `capture_quality_metrics`    | JSONB        | NULL                 | Métriques qualité capture                       | `{"laplacian": 145, "luminance_std": 0.32}`                               |
 | `ocr_fields`               | `confidence_score`           | DECIMAL(5,4) | NOT NULL             | Confiance extraction                            | `0.9200` ( ≥0.85)                                                         |
-| `agents`                   | `role`                       | TEXT         | NOT NULL             | Rôle agent back-office                          | `JEAN`, `THOMAS`, `SYLVIE`                                                |
+| `users`                    | `role`                       | TEXT         | NOT NULL             | Rôle utilisateur (client + back-office)         | `CLIENT`, `JEAN`, `THOMAS`, `SYLVIE`, `ADMIN_IT`                          |
+| `agents`                   | `role`                       | TEXT         | NOT NULL             | Rôle agent back-office (sous-ensemble de users) | `JEAN`, `THOMAS`, `SYLVIE` (ADMIN_IT n'a pas de ligne dans agents)        |
 | `agents`                   | `static_weight`              | INT          | DEFAULT 1            | Poids WRR statique                              | `2` (agent senior)                                                        |
 | `aml_alerts`               | `alert_type`                 | TEXT         | NOT NULL             | Type alerte                                     | `PEP`, `SANCTIONS_UN`, `SANCTIONS_EU`, `SANCTIONS_OFAC`                   |
 | `aml_alerts`               | `status`                     | TEXT         | DEFAULT 'OPEN'       | État alerte                                     | `OPEN`, `CLEARED`, `CONFIRMED`, `ESCALATED`                               |
@@ -1827,17 +1832,34 @@ Image capturée par getUserMedia (résolution native mobile)
 | POST    | `/api/v1/aml/conflicts/{id}/merge`  | Fusionne profils (B1: même personne)               |
 | POST    | `/api/v1/aml/conflicts/{id}/reject` | Flagge fraude (B2: noms différents)                |
 
-### 8.5 Admin — Thomas & Agencies
+### 8.5 Admin — Thomas & Agencies (CONFORMITY)
 
 | Méthode | Endpoint                         | Description                       |
 | ------- | -------------------------------- | --------------------------------- |
-| GET     | `/api/v1/admin/agencies`         | Liste agences                     |
-| POST    | `/api/v1/admin/agencies`         | Crée agence                       |
-| PUT     | `/api/v1/admin/agencies/{id}`    | Modifie agence                    |
-| DELETE  | `/api/v1/admin/agencies/{id}`    | Désactive agence                  |
+| GET     | `/api/v1/admin/agencies`         | Liste agences (Thomas + Admin IT) |
+| POST    | `/api/v1/admin/agencies`         | Crée agence (Admin IT seulement)  |
+| PUT     | `/api/v1/admin/agencies/{id}`    | Modifie agence (Admin IT)         |
+| DELETE  | `/api/v1/admin/agencies/{id}`    | Désactive agence (Admin IT)       |
 | GET     | `/api/v1/admin/batch`            | Statuts batches provisioning      |
 | POST    | `/api/v1/admin/batch/create`     | Lance batch provisioning (Thomas) |
 | POST    | `/api/v1/admin/batch/{id}/retry` | Relance batch en erreur           |
+
+### 8.5b Admin IT — Gestion du lifecycle des agents (ADMIN_IT uniquement)
+
+> **Note :** Ces endpoints sont accessibles exclusivement au rôle `ADMIN_IT`. Ils permettent de gérer le cycle de vie des agents back-office (Jean, Thomas, Sylvie) et la configuration système. Le premier compte Admin IT est créé via `scripts/seed_admin_it.sql` au déploiement initial.
+
+| Méthode | Endpoint                                  | Body                                         | Réponse              | Description                                      |
+| ------- | ----------------------------------------- | -------------------------------------------- | -------------------- | ------------------------------------------------ |
+| GET     | `/api/v1/admin/agents`                    | —                                            | `[{agent}]`          | Liste tous les agents (nom, email, rôle, agence, statut) |
+| POST    | `/api/v1/admin/agents`                    | `{name, email, role, agency_id}`             | `{agent_id}`         | Crée un compte agent, génère mot de passe initial et l'envoie par email |
+| GET     | `/api/v1/admin/agents/{id}`               | —                                            | `{agent}`            | Détail d'un agent                                |
+| PUT     | `/api/v1/admin/agents/{id}`               | `{name?, email?, agency_id?, role?}`         | `{agent}`            | Modifie un compte agent                          |
+| POST    | `/api/v1/admin/agents/{id}/disable`       | —                                            | `{status}`           | Désactive le compte (JWT invalidé via Redis blacklist) |
+| POST    | `/api/v1/admin/agents/{id}/enable`        | —                                            | `{status}`           | Réactive un compte désactivé                     |
+| POST    | `/api/v1/admin/agents/{id}/reset-password`| —                                            | `{email_sent: true}` | Envoie un lien de réinitialisation (token TTL 24h) |
+| GET     | `/api/v1/admin/audit`                     | Query: `?actor_id=&event_type=&from=&to=`    | `[{log_entry}]`      | Consultation de l'audit log complet (lecture seule) |
+| GET     | `/api/v1/admin/config`                    | —                                            | `{config}`           | Lecture de la configuration système              |
+| PUT     | `/api/v1/admin/config`                    | `{ocr_confidence_threshold?, celery_timeout_s?, ...}` | `{config}` | Mise à jour des paramètres système               |
 
 ### 8.6 Analytics — Sylvie
 
@@ -2211,20 +2233,23 @@ Docker Volume (AES-256 LUKS + applicatif Python via Fernet)
 
 ### 11.2 Matrice RBAC
 
-| Permission               | Marie | Jean | Thomas | Sylvie |
-| ------------------------ | ----- | ---- | ------ | ------ |
-| Onboarding KYC           | ✅     | ❌    | ❌      | ❌      |
-| Voir ses notifications   | ✅     | ❌    | ❌      | ❌      |
-| Queue dossiers (agence)  | ❌     | ✅    | ❌      | ❌      |
-| Inspect + approve/reject | ❌     | ✅    | ❌      | ❌      |
-| Override OCR             | ❌     | ✅    | ❌      | ❌      |
-| AML screening            | ❌     | ❌    | ✅      | ❌      |
-| Agency CRUD              | ❌     | ❌    | ✅      | ❌      |
-| Batch Amplitude          | ❌     | ❌    | ✅      | ❌      |
-| Dashboard analytics      | ❌     | ❌    | ❌      | ✅      |
-| Escalade + redistribute  | ❌     | ❌    | ❌      | ✅      |
-| Export COBAC             | ❌     | ❌    | ✅      | ✅      |
-| Audit log (lecture)      | ❌     | ❌    | ✅      | ✅      |
+| Permission               | Marie | Jean | Thomas | Sylvie | Admin IT |
+| ------------------------ | ----- | ---- | ------ | ------ | -------- |
+| Onboarding KYC           | ✅     | ❌    | ❌      | ❌      | ❌        |
+| Voir ses notifications   | ✅     | ❌    | ❌      | ❌      | ❌        |
+| Queue dossiers (agence)  | ❌     | ✅    | ❌      | ❌      | ❌        |
+| Inspect + approve/reject | ❌     | ✅    | ❌      | ❌      | ❌        |
+| Override OCR             | ❌     | ✅    | ❌      | ❌      | ❌        |
+| AML screening            | ❌     | ❌    | ✅      | ❌      | ❌        |
+| Agency CRUD              | ❌     | ❌    | ✅ (lecture) | ❌  | ✅ (full) |
+| Batch Amplitude          | ❌     | ❌    | ✅      | ❌      | ❌        |
+| Dashboard analytics      | ❌     | ❌    | ❌      | ✅      | ❌        |
+| Escalade + redistribute  | ❌     | ❌    | ❌      | ✅      | ❌        |
+| Export COBAC             | ❌     | ❌    | ✅      | ✅      | ❌        |
+| Audit log (lecture)      | ❌     | ❌    | ✅      | ✅      | ✅        |
+| Gestion agents (CRUD)    | ❌     | ❌    | ❌      | ❌      | ✅        |
+| Reset mot de passe agent | ❌     | ❌    | ❌      | ❌      | ✅        |
+| Configuration système    | ❌     | ❌    | ❌      | ❌      | ✅        |
 
 ### 11.3 Audit Log — Implémentation PostgreSQL
 

@@ -13,6 +13,7 @@
 | **Jean** (Agent KYC) | Primaire | Validateur interne, back-office web — Validation Desk |
 | **Thomas** (Superviseur AML/CFT) | Primaire | Superviseur national conformité — AML, Déduplication, Administration |
 | **Sylvie** (Manager) | Primaire | Directrice d'agence/centrale — Command Center Dashboard |
+| **Admin IT** (Administrateur Système) | Primaire | Gestionnaire du lifecycle des agents back-office, configuration système et support technique |
 | **Système IA** (PaddleOCR / DeepFace) | Secondaire (Système) | Moteur souverain d'OCR et de biométrie |
 | **DGI Mock** | Secondaire (Externe) | Service simulé de validation fiscale (NIU) |
 | **Sopra Amplitude Mock** | Secondaire (Externe) | Service simulé de provisioning bancaire (IBU) |
@@ -276,7 +277,60 @@ graph LR
 
 ---
 
-## 6. Diagramme Récapitulatif — Vue Système Globale
+## 6. Diagramme — Back-Office Administration Système (Admin IT)
+
+```mermaid
+graph LR
+    %% ========== ACTEUR ==========
+    AdminIT((Admin IT<br/>Administrateur<br/>Système))
+
+    %% ========== CAS D'UTILISATION ==========
+    subgraph "⚙️ Back-Office — Administration Système"
+        UCAI1["Se connecter<br/>(Email / Mot de passe)"]
+        UCAI2["Consulter la liste<br/>des agents"]
+        UCAI3["Créer un compte agent<br/>(nom, email, rôle, agence)"]
+        UCAI4["Modifier un compte agent<br/>(agence, rôle)"]
+        UCAI5["Désactiver un compte agent<br/>(JWT invalidé)"]
+        UCAI6["Réinitialiser le<br/>mot de passe agent"]
+        UCAI7["Consulter l'audit log<br/>(lecture seule)"]
+        UCAI8["Gérer la configuration<br/>système (seuils, timeouts)"]
+    end
+
+    %% ========== SYSTÈMES ==========
+    Email((Service<br/>Email))
+
+    %% ========== RELATIONS ==========
+    AdminIT --> UCAI1
+    AdminIT --> UCAI2
+    AdminIT --> UCAI3
+    AdminIT --> UCAI4
+    AdminIT --> UCAI5
+    AdminIT --> UCAI6
+    AdminIT --> UCAI7
+    AdminIT --> UCAI8
+
+    UCAI3 -.->|<<include>>| Email
+    UCAI6 -.->|<<include>>| Email
+    UCAI4 -.->|<<extend>>| UCAI3
+    UCAI5 -.->|<<extend>>| UCAI4
+```
+
+### Détail des cas d'utilisation — Admin IT
+
+| ID | Cas d'utilisation | FR associés | Description |
+|:---|:---|:---|:---|
+| UCAI1 | Se connecter | NFR4, R45 | Email/Password, rôle ADMIN_IT — redirection vers `/admin` |
+| UCAI2 | Consulter la liste des agents | R45.1 | Vue de tous les comptes (nom, email, rôle, agence, statut) |
+| UCAI3 | Créer un compte agent | R45.2, R45.3 | Formulaire + mot de passe initial généré → envoi email |
+| UCAI4 | Modifier un compte agent | R45.4 | Changement d'agence, de rôle |
+| UCAI5 | Désactiver un compte | R45.5 | `users.status = DISABLED`, JWT blacklisté Redis |
+| UCAI6 | Réinitialiser le mot de passe | R45.6 | Token temporaire TTL 24h → lien email |
+| UCAI7 | Consulter l'audit log | R45.8 | Lecture seule — toutes actions tous agents |
+| UCAI8 | Configuration système | R45.10 | Seuils OCR, timeouts Celery, capacités files |
+
+---
+
+## 7. Diagramme Récapitulatif — Vue Système Globale
 
 ```mermaid
 graph TB
@@ -285,6 +339,7 @@ graph TB
     Jean((Jean<br/>Agent KYC))
     Thomas((Thomas<br/>Superviseur<br/>AML/CFT))
     Sylvie((Sylvie<br/>Manager))
+    AdminIT((Admin IT<br/>Administrateur<br/>Système))
 
     %% ========== SYSTÈMES ==========
     subgraph "📱 Mobile App (Flutter)"
@@ -297,6 +352,7 @@ graph TB
         BO1["Validation Desk<br/>(Jean — 11 UC)"]
         BO2["Supervision AML/CFT<br/>(Thomas — 10 UC)"]
         BO3["Command Center<br/>(Sylvie — 10 UC)"]
+        BO4["Administration Système<br/>(Admin IT — 8 UC)"]
     end
 
     subgraph "⚙️ API Backend (FastAPI)"
@@ -321,6 +377,7 @@ graph TB
     Jean --> BO1
     Thomas --> BO2
     Sylvie --> BO3
+    AdminIT --> BO4
 
     %% ========== RELATIONS SYSTÈMES INTERNES ==========
     M1 --> API1
@@ -354,5 +411,7 @@ graph TB
 | **Jean — OCR Review** | FR5, FR24, FR22-FR25 |
 | **Thomas — AML** | FR31, FR32, FR33 |
 | **Sylvie — Dashboard** | FR34, FR35, FR36, FR37, FR38 |
+| **Admin IT — Lifecycle agents** | R45 (Req 45) |
+| **Admin IT — CNI format & OCR** | R46 (Req 46) |
 | **Tous — Authentification** | FR1 (mobile), NFR4 (back-office) |
 | **Tous — Audit** | FR36, FR38 |

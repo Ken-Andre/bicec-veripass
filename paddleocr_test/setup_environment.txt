@@ -1,0 +1,16 @@
+# Script To prepare the environment if conda is in path
+# Run this in your Conda or Terminal
+
+# 1. Create env (as per your tutorial)
+# conda create -n paddleocr_env python=3.10 -y
+# conda activate paddleocr_env
+
+# 2. Install PaddlePaddle
+python -m pip install paddlepaddle==3.2.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+
+# 3. Install PaddleOCR and everything
+python -m pip install "paddleocr[all]"
+pip install opencv-python matplotlib Pillow numpy
+
+# 4. Check
+python -c "import paddle; print('Paddle version:', paddle.__version__)"

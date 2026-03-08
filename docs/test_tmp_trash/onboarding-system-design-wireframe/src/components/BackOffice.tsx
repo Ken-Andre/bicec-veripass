@@ -5,7 +5,7 @@ import {
   FileText, MapPin, Shield, ScanLine, ThumbsUp, ThumbsDown,
   MessageSquare, ZoomIn,
   BarChart3, Users, Settings, Bell, LogOut,
-  Check, X, Building2, LineChart, FileTerminal, ArrowRightLeft
+  Check, X, Building2, LineChart, FileTerminal, ArrowRightLeft, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { MOCK_APPLICATIONS } from '@/data';
@@ -39,6 +39,15 @@ const PERSONAS = {
     color: 'purple',
     description: 'Tableaux de bord stratégiques, KPIs et pilotage.',
     permissions: ['dashboard', 'analytics', 'audit', 'reports', 'settings']
+  },
+  admin_it: {
+    id: 'admin_it',
+    name: 'Admin IT',
+    role: 'Administrateur Système',
+    avatar: 'AI',
+    color: 'slate',
+    description: 'Gestion du lifecycle des agents (Jean, Thomas, Sylvie), configuration système, support technique.',
+    permissions: ['system-admin', 'agents-management', 'agencies-crud', 'config', 'audit-log', 'settings']
   }
 } as const;
 
