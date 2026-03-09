@@ -11,13 +11,13 @@
 **Milestone:** 1
 
 **Sous-tâches :**
-- [ ] Créer repo GitHub `bicec-veripass` (privé)
-- [ ] Initialiser structure : `backend/`, `frontend/`, `backoffice/`, `infra/`, `docs/`, `scripts/`, `data/`
-- [ ] Créer `.gitignore` adapté (Python, Node, Docker secrets)
-- [ ] Créer `README.md` avec architecture overview et instructions de démarrage
-- [ ] Configurer branch protection (`main` = production, `develop` = intégration, `feature/*` = dev)
-- [ ] Créer `.env.example` avec toutes les variables d'environnement nécessaires
-- [ ] Ajouter `CONTRIBUTING.md` avec conventions Conventional Commits
+- [x] Créer repo GitHub `bicec-veripass` (privé)
+- [x] Initialiser structure : `backend/`, `frontend/`, `backoffice/`, `infra/`, `docs/`, `scripts/`, `data/`
+- [x] Créer `.gitignore` adapté (Python, Node, Docker secrets)
+- [x] Créer `README.md` avec architecture overview et instructions de démarrage
+- [x] Configurer branch protection (`main` = production, `develop` = intégration, `feature/*` = dev)
+- [x] Créer `.env.example` avec toutes les variables d'environnement nécessaires
+- [x] Ajouter `CONTRIBUTING.md` avec conventions Conventional Commits
 
 **Critères de succès :** `git clone` + `cp .env.example .env` = point de départ clair pour n'importe quel dev.
 

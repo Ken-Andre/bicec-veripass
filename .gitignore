@@ -1,1 +1,88 @@
-*.idea
+# ========================
+# IDE & Éditeurs
+# ========================
+.idea/
+.vscode/
+*.iml
+*.suo
+*.user
+.cursor/
+.qwen/
+
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ========================
+# Node / Frontend
+# ========================
+node_modules/
+.next/
+out/
+.nuxt/
+.cache/
+*.tsbuildinfo
+
+# ========================
+# Docker & Infra
+# ========================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+
+# ========================
+# Données & Modèles AI
+# ========================
+data/documents/
+data/models/
+data/db/
+*.onnx
+*.pdparams
+*.pdopt
+*.pdmodel
+
+# ========================
+# Logs & Temporaires
+# ========================
+*.log
+logs/
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# ========================
+# Secrets
+# ========================
+secrets/
+*.secret
+credentials.json
+service-account*.json
+
+
+# ========================
+# Tests code
+# ========================
+paddleocr_test/*
