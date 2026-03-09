@@ -1,12 +1,16 @@
 from paddleocr import PaddleOCR
 import cv2
 import os
+import sys
+
+# Forcer l'encodage UTF-8 pour Windows
+sys.stdout.reconfigure(encoding='utf-8')
 
 # Initialisation avec le modèle PaddleOCR (français + anglais)
 ocr = PaddleOCR(
-    use_textline_orientation=True,   # détecte les textes inclinés (remplace use_angle_cls)
+    use_angle_cls=True,   # détecte les textes inclinés
     lang='fr',            # langue française
-    use_gpu=False,        # CPU mode
+    use_gpu=False         # CPU mode
 )
 
 def extract_text(image_path):

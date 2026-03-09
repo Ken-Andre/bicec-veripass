@@ -2,8 +2,12 @@ from paddleocr import PaddleOCR, draw_ocr
 from PIL import Image
 import matplotlib.pyplot as plt
 import os
+import sys
 
-ocr = PaddleOCR(use_textline_orientation=True, lang='fr', use_gpu=False)
+# Forcer l'encodage UTF-8 pour Windows
+sys.stdout.reconfigure(encoding='utf-8')
+
+ocr = PaddleOCR(use_angle_cls=True, lang='fr', use_gpu=False)
 
 image_dir = "./images"
 image_path = os.path.join(image_dir, "facture_1.jpg") # Exemple de défaut

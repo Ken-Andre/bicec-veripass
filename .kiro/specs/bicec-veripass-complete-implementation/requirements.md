@@ -75,7 +75,7 @@ The platform is built entirely with open-source technologies (React/TypeScript P
 9. THE System SHALL store the file path and SHA-256 hash in the documents table
 10. THE System SHALL require both CNI Recto AND CNI Verso before allowing progression to liveness capture
 11. WHEN Marie captures CNI Verso, THE System SHALL apply the same quality gates as CNI Recto
-12. THE System SHALL support Passport as an alternative to CNI for non-Cameroonian nationals
+
 
 ### Requirement 3: Liveness Verification with Strike Lockout
 
@@ -135,8 +135,8 @@ The platform is built entirely with open-source technologies (React/TypeScript P
 #### Acceptance Criteria
 
 1. WHEN Marie accesses the Address entry screen, THE PWA SHALL display a Ville dropdown
-2. WHEN Marie selects a Ville, THE System SHALL populate the Commune dropdown with communes for that Ville
-3. WHEN Marie selects a Commune, THE System SHALL populate the Quartier dropdown with quartiers for that Commune
+2. WHEN Marie selects a Ville, THE System SHALL populate the Quartier dropdown with quartiers for that Ville
+3. WHEN Marie selects a Quartier, THE System SHALL auto-populate the Commune field with the appropriate commune for that Quartier
 4. WHEN Marie selects a Quartier, THE System SHALL populate the Lieu-dit dropdown with lieu-dits for that Quartier
 5. THE System SHALL store the selected Ville, Commune, Quartier, and Lieu-dit in the Session address fields
 6. WHEN Marie taps "Utiliser ma position actuelle", THE PWA SHALL request Geolocation API permission
