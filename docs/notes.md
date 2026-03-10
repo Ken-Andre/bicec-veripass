@@ -346,3 +346,5 @@ Documenter les décisions d’implémentation au fur et à mesure, pour votre ra
 
 Et je ne suis donc pas sur que t'as tout pris
 ***
+https://chat.z.ai/space/e1a382y7tge0-ppt
+***
