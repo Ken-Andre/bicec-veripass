@@ -33,13 +33,11 @@ def preprocess_image(image_path):
     # 3. Denoising
     denoised = cv2.bilateralFilter(gray, 9, 75, 75)
     
-    # 4. Fine-tuned Adaptive Thresholding
+    # 4. Milder Adaptive Thresholding
     binary = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                   cv2.THRESH_BINARY, 15, 8)
+                                   cv2.THRESH_BINARY, 31, 10)
     
-    # 5. Morphological Opening (remove small noise)
-    kernel = np.ones((2,2), np.uint8)
-    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+    # Skip morphology (can erase thin letters)
     
     # Sauvegarde temporaire pour PaddleOCR
     temp_fd, temp_path = tempfile.mkstemp(suffix='.png')
@@ -65,6 +63,11 @@ def extract_cni_fields(image_path):
         
     result = ocr.ocr(processed_path, cls=True)
     
+    # Fallback si rien n'est détecté sur l'image traitée
+    if not result or not result[0] or len(result[0]) < 5:
+        print("  DEBUG: Fallback sur l'image originale...")
+        result = ocr.ocr(image_path, cls=True)
+
     # Nettoyage fichier temporaire
     if os.path.exists(processed_path):
         os.remove(processed_path)
