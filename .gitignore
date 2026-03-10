@@ -85,4 +85,4 @@ service-account*.json
 # ========================
 # Tests code
 # ========================
-paddleocr_test/*
+paddleocr_test/.venv_ocr/*

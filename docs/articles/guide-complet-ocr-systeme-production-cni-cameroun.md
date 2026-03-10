@@ -252,7 +252,7 @@ C'est l'approche la plus courante. Tu utilises PaddleOCR pour scanner toute la C
 
 Voici l'implémentation en Python :
 
-Python
+```Python
 from paddleocr import PaddleOCR
 import math
 
@@ -301,7 +301,7 @@ def extract_cni_fields(image_path):
                 parsed_data["nom"] = candidates[0]['text']
 
     return parsed_data
-
+```
 # Test d'exécution
 # donnees = extract_cni_fields("chemin/vers/cni.jpg")
 # print(donnees)
@@ -319,10 +319,10 @@ Micro-OCR : Tu envoies uniquement cette mini-image à PaddleOCR.
 Avantage ingénieur : C'est extrêmement rapide et ça élimine 90% du "bruit" (les textes de fond, les filigranes) avant même que le modèle IA ne commence à travailler.
 
 
+---
 
 
-
-Salut tout le monde ! 🚀 Si tu es un développeur junior, un stagiaire qui vient d'arriver sur le projet **bicec-veripass**, ou même un passionné qui regarde un tutoriel sur YouTube, accroche-toi. 
+Salut tout le monde ! Si tu es un développeur junior, un stagiaire qui vient d'arriver sur le projet **bicec-veripass**, ou même un passionné qui regarde un tutoriel sur YouTube, accroche-toi. 
 
 Aujourd'hui, on va construire **l'extracteur ultime pour les CNI camerounaises**. 
 

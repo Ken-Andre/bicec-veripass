@@ -33,9 +33,13 @@ def preprocess_image(image_path):
     # 3. Denoising
     denoised = cv2.bilateralFilter(gray, 9, 75, 75)
     
-    # 4. Adaptive Thresholding (pour les fonds complexes des CNI)
+    # 4. Fine-tuned Adaptive Thresholding
     binary = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                   cv2.THRESH_BINARY, 11, 2)
+                                   cv2.THRESH_BINARY, 15, 8)
+    
+    # 5. Morphological Opening (remove small noise)
+    kernel = np.ones((2,2), np.uint8)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
     
     # Sauvegarde temporaire pour PaddleOCR
     temp_fd, temp_path = tempfile.mkstemp(suffix='.png')
@@ -93,12 +97,25 @@ def extract_cni_fields(image_path):
                 d = f"{day}.{month}.{year}"
         all_dates.append(d)
     
-    # 2. Heuristique pour le NOM et PRENOM (souvent en MAJUSCULES après REPUBLIQUE)
-    # On cherche des blocs de texte en MAJUSCULES de plus de 3 lettres
-    caps_words = re.findall(r'\b[A-Z]{3,}\b', full_text)
-    # On filtre les mots clés administratifs
-    stop_words = {'REPUBLIQUE', 'REPUBLIC', 'CAMEROON', 'CAMEROUN', 'NATIONAL', 'IDENTITY', 'CARD', 'CARTE', 'NATIONALE', 'IDENTITE', 'SIGNATURE', 'SEXE', 'NAME', 'NOM'}
-    potential_names = [w for w in caps_words if w not in stop_words]
+    # 2. Heuristique pour le NOM et PRENOM
+    # Stop words plus exhaustifs
+    stop_words = {
+        'REPUBLIQUE', 'REPUBLIC', 'CAMEROON', 'CAMEROUN', 'NATIONAL', 'IDENTITY', 
+        'CARD', 'CARTE', 'NATIONALE', 'IDENTITE', 'SIGNATURE', 'SEXE', 'NAME', 'NOM',
+        'SURNAME', 'GIVEN', 'NAMES', 'PROFESSION', 'OCCUPATION', 'MENAGERE', 'TRAVAIL',
+        'INGENIEUR', 'REPUBLIQUEDU', 'REPUBLICOF', 'CARTENATIONALE', 'D\'IDENTITE',
+        'FEIIL/FATHER'
+    }
+    
+    # On cherche les mots en MAJUSCULES qui ne sont pas des stop words
+    caps_words = []
+    for line in lines:
+        words = re.findall(r'\b[A-Z]{3,}\b', line)
+        for w in words:
+            if w.upper() not in stop_words and len(w) > 2:
+                caps_words.append(w)
+    
+    potential_names = caps_words
 
     # 3. Identifiants (NIU, NIN, ID No)
     # Cherche soit 17 chiffres (NIN camerounais), soit 9 chiffres + 1 lettre
