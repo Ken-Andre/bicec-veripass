@@ -26,9 +26,10 @@
 11. [Sécurité Architecture](#11-sécurité-architecture)
 12. [Pipeline AI/ML](#12-pipeline-aiml)
 13. [Stratégie Analytics & Data Warehouse](#13-stratégie-analytics--data-warehouse)
+13bis. [Stratégie de Supervision (Prometheus)](#13bis-stratégie-de-supervision-prometheus)
 14. [Stratégie de Chiffrement (Phased)](#14-stratégie-de-chiffrement-phased)
-18. [Stratégie de Test](#18-stratégie-de-test)
-19. [FAQ Technique — Réponses Jury](#19-faq-technique--réponses-jury)
+15. [Stratégie de Test](#18-stratégie-de-test)
+16. [FAQ Technique — Réponses Jury](#19-faq-technique--réponses-jury)
 
 ---
 
@@ -169,6 +170,7 @@ Exemple de lecture : `users ||--o{ kyc_sessions` = **un user peut avoir plusieur
 | §11 Sécurité       | v1.0 + Y (matrice RBAC, audit DDL)  | ✅ Enrichi                         |
 | §12 Pipeline AI/ML | v1.0 + Y (flowcharts)               | ✅ Enrichi                         |
 | §13 Analytics      | v1.0 + Y (star schema, events, SQL) | ❌ §13.3 supprimé                  |
+| §13bis Monitoring  | v1.0 + ADR-012                      | ➕ Nouveau (Prometheus)            |
 | §14 Chiffrement    | v1.0 + patch-v3bis AR5              | ❌ Phase 1 corrigée                |
 | §18 Test Strategy  | patch-v4                            | ➕ Nouveau                         |
 | §19 FAQ Technique  | patch-v4                            | ➕ Nouveau (réponses jury)         |
@@ -455,15 +457,15 @@ Choix de l'orchestrateur de containers pour le déploiement MVP on-premise.
 
 **Options évaluées :**
 
-| Critère                  | Docker Compose                    | Kubernetes (K8s)                      |
-| ------------------------ | --------------------------------- | ------------------------------------- |
-| Complexité setup         | Faible (1 fichier YAML)           | Élevée (cluster, ingress, RBAC, etc.) |
-| Courbe apprentissage     | 2-3 jours                         | 2-3 semaines                          |
-| Overhead RAM             | Minimal (~100MB Docker daemon)    | ~1-2GB (kubelet, etcd, control plane) |
-| Adapté pilote 20-50 user | ✅ Oui                             | ❌ Overkill                            |
-| Auto-scaling             | Manuel (docker-compose scale)     | Natif (HPA)                           |
-| Rolling updates          | Downtime acceptable pour MVP      | Zero-downtime natif                   |
-| Monitoring intégré       | Logs JSON + Prometheus (Phase 2)  | Prometheus + Grafana natifs           |
+| Critère                  | Docker Compose                     | Kubernetes (K8s)                      |
+| ------------------------ | ---------------------------------- | ------------------------------------- |
+| Complexité setup         | Faible (1 fichier YAML)            | Élevée (cluster, ingress, RBAC, etc.) |
+| Courbe apprentissage     | 2-3 jours                          | 2-3 semaines                          |
+| Overhead RAM             | Minimal (~100MB Docker daemon)     | ~1-2GB (kubelet, etcd, control plane) |
+| Adapté pilote 20-50 user | ✅ Oui                              | ❌ Overkill                            |
+| Auto-scaling             | Manuel (docker-compose scale)      | Natif (HPA)                           |
+| Rolling updates          | Downtime acceptable pour MVP       | Zero-downtime natif                   |
+| Monitoring intégré       | Logs JSON + Prometheus (Phase 2)   | Prometheus + Grafana natifs           |
 | Portabilité Phase 2      | Migration K8s possible (manifests) | Déjà prêt                             |
 
 **Décision :** **Docker Compose pour MVP**
@@ -477,7 +479,42 @@ Choix de l'orchestrateur de containers pour le déploiement MVP on-premise.
 **Conséquences :**
 - Pas de load balancing automatique inter-nœuds (acceptable : nœud unique MVP)
 - Restart policies Docker (`restart: unless-stopped`) assurent la résilience basique
-- Monitoring via logs JSON + Prometheus exporters (Phase 2) au lieu de Kubernetes metrics-server
+- Monitoring via logs JSON + Prometheus exporters (Phase 2) au lieu de Kubernetes metrics-server.
+- **Récupération de données (Pull Model)** : Simplifie la configuration des cibles sans agents lourds sur chaque worker.
+
+---
+
+### ADR-012 : Stratégie de Supervision (Prometheus vs OpenNMS)
+
+**Statut :**  DÉCIDÉ  
+**Date :** 2026-03-12
+
+**Contexte :**  
+Une confusion initiale a eu lieu entre "OpenMS" (spectrométrie de masse) et **OpenNMS** (Open Network Management System). Il nous a été suggéré d'évaluer OpenNMS comme alternative à Prometheus pour la Phase 2.
+
+**Options évaluées :**
+
+| Critère            | Prometheus                                  | OpenNMS                                      |
+| :----------------- | :------------------------------------------ | :------------------------------------------- |
+| **Focus**          | Métriques applicatives & IA (Cloud-native). | Monitoring réseau (SNMP, couche 2/3).        |
+| **Modèle**         | Pull (Tirage) via HTTP.                     | Poll/Push (Traps SNMP, agents).              |
+| **Performance IA** | Idéal pour percentiles (P95/P99) d'OCR.     | Orienté statut ON/OFF et défauts réseau.     |
+| **Intégration**    | Native avec FastAPI, Docker et Grafana.     | Plus complexe pour l'IA (requiert wrappers). |
+
+**Décision :** **Prometheus** (Standard CNCF).
+
+**Justification :**
+- **Précision IA** : Prometheus permet de suivre l'évolution des performances des modèles (PaddleOCR vs GLM) via des séries temporelles, contrairement à OpenNMS qui est plus adapté à l'inventaire matériel.
+- **Duo Standard** : Le binôme Prometheus+Grafana est le standard industriel pour l'observabilité moderne.
+- **Légèreté** : Déploiement via une image Docker unique, cohérent avec les contraintes hardware (i3/16GB).
+- **Sources :** 
+    - *Prometheus.io* : "Why Prometheus?" — Comparaison des modèles Pull vs Push (2024).
+    - *CNCF* : Prometheus Graduated Project Status (Standard de l'observabilité).
+    - *OpenNMS.org* : "Network Monitoring vs Observability" — Clarification des cas d'usage infrastructure classique.
+
+**Conséquences :**
+- Utilisation de `prometheus-client` en Python pour exposer les métriques.
+- Configuration d'un container Prometheus unique en Phase 2.
 
 ---
 
@@ -1848,18 +1885,18 @@ Image capturée par getUserMedia (résolution native mobile)
 
 > **Note :** Ces endpoints sont accessibles exclusivement au rôle `ADMIN_IT`. Ils permettent de gérer le cycle de vie des agents back-office (Jean, Thomas, Sylvie) et la configuration système. Le premier compte Admin IT est créé via `scripts/seed_admin_it.sql` au déploiement initial.
 
-| Méthode | Endpoint                                  | Body                                         | Réponse              | Description                                      |
-| ------- | ----------------------------------------- | -------------------------------------------- | -------------------- | ------------------------------------------------ |
-| GET     | `/api/v1/admin/agents`                    | —                                            | `[{agent}]`          | Liste tous les agents (nom, email, rôle, agence, statut) |
-| POST    | `/api/v1/admin/agents`                    | `{name, email, role, agency_id}`             | `{agent_id}`         | Crée un compte agent, génère mot de passe initial et l'envoie par email |
-| GET     | `/api/v1/admin/agents/{id}`               | —                                            | `{agent}`            | Détail d'un agent                                |
-| PUT     | `/api/v1/admin/agents/{id}`               | `{name?, email?, agency_id?, role?}`         | `{agent}`            | Modifie un compte agent                          |
-| POST    | `/api/v1/admin/agents/{id}/disable`       | —                                            | `{status}`           | Désactive le compte (JWT invalidé via Redis blacklist) |
-| POST    | `/api/v1/admin/agents/{id}/enable`        | —                                            | `{status}`           | Réactive un compte désactivé                     |
-| POST    | `/api/v1/admin/agents/{id}/reset-password`| —                                            | `{email_sent: true}` | Envoie un lien de réinitialisation (token TTL 24h) |
-| GET     | `/api/v1/admin/audit`                     | Query: `?actor_id=&event_type=&from=&to=`    | `[{log_entry}]`      | Consultation de l'audit log complet (lecture seule) |
-| GET     | `/api/v1/admin/config`                    | —                                            | `{config}`           | Lecture de la configuration système              |
-| PUT     | `/api/v1/admin/config`                    | `{ocr_confidence_threshold?, celery_timeout_s?, ...}` | `{config}` | Mise à jour des paramètres système               |
+| Méthode | Endpoint                                   | Body                                                  | Réponse              | Description                                                             |
+| ------- | ------------------------------------------ | ----------------------------------------------------- | -------------------- | ----------------------------------------------------------------------- |
+| GET     | `/api/v1/admin/agents`                     | —                                                     | `[{agent}]`          | Liste tous les agents (nom, email, rôle, agence, statut)                |
+| POST    | `/api/v1/admin/agents`                     | `{name, email, role, agency_id}`                      | `{agent_id}`         | Crée un compte agent, génère mot de passe initial et l'envoie par email |
+| GET     | `/api/v1/admin/agents/{id}`                | —                                                     | `{agent}`            | Détail d'un agent                                                       |
+| PUT     | `/api/v1/admin/agents/{id}`                | `{name?, email?, agency_id?, role?}`                  | `{agent}`            | Modifie un compte agent                                                 |
+| POST    | `/api/v1/admin/agents/{id}/disable`        | —                                                     | `{status}`           | Désactive le compte (JWT invalidé via Redis blacklist)                  |
+| POST    | `/api/v1/admin/agents/{id}/enable`         | —                                                     | `{status}`           | Réactive un compte désactivé                                            |
+| POST    | `/api/v1/admin/agents/{id}/reset-password` | —                                                     | `{email_sent: true}` | Envoie un lien de réinitialisation (token TTL 24h)                      |
+| GET     | `/api/v1/admin/audit`                      | Query: `?actor_id=&event_type=&from=&to=`             | `[{log_entry}]`      | Consultation de l'audit log complet (lecture seule)                     |
+| GET     | `/api/v1/admin/config`                     | —                                                     | `{config}`           | Lecture de la configuration système                                     |
+| PUT     | `/api/v1/admin/config`                     | `{ocr_confidence_threshold?, celery_timeout_s?, ...}` | `{config}`           | Mise à jour des paramètres système                                      |
 
 ### 8.6 Analytics — Sylvie
 
@@ -1919,15 +1956,15 @@ Image capturée par getUserMedia (résolution native mobile)
 
 **Format pièces jointes :**
 
-| Paramètre         | Contrainte                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------- |
-| Taille max        | **5MB** (413 si dépassé)                                                                    |
-| Types MIME        | `image/jpeg`, `image/png`, `application/pdf`                                                |
-| Encodage          | Base64 dans le body JSON : `{thread_id, text, attachment_b64, attachment_filename, mime}`  |
-| Validation côté   | FastAPI vérifie magic bytes (pas uniquement extension) pour éviter upload fichiers malware |
-| Stockage serveur  | `/data/documents/support/{thread_id}/{uuid}_{filename}` (même volume que docs KYC)          |
-| Accès Jean        | JWT + RBAC : Jean ne peut lire que les PJ des threads de ses dossiers assignés             |
-| Rétention         | Même politique que documents KYC (10 ans COBAC si lié à un dossier validé)                 |
+| Paramètre        | Contrainte                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| Taille max       | **5MB** (413 si dépassé)                                                                   |
+| Types MIME       | `image/jpeg`, `image/png`, `application/pdf`                                               |
+| Encodage         | Base64 dans le body JSON : `{thread_id, text, attachment_b64, attachment_filename, mime}`  |
+| Validation côté  | FastAPI vérifie magic bytes (pas uniquement extension) pour éviter upload fichiers malware |
+| Stockage serveur | `/data/documents/support/{thread_id}/{uuid}_{filename}` (même volume que docs KYC)         |
+| Accès Jean       | JWT + RBAC : Jean ne peut lire que les PJ des threads de ses dossiers assignés             |
+| Rétention        | Même politique que documents KYC (10 ans COBAC si lié à un dossier validé)                 |
 
 **Exemple requête :**
 
@@ -2233,23 +2270,23 @@ Docker Volume (AES-256 LUKS + applicatif Python via Fernet)
 
 ### 11.2 Matrice RBAC
 
-| Permission               | Marie | Jean | Thomas | Sylvie | Admin IT |
-| ------------------------ | ----- | ---- | ------ | ------ | -------- |
-| Onboarding KYC           | ✅     | ❌    | ❌      | ❌      | ❌        |
-| Voir ses notifications   | ✅     | ❌    | ❌      | ❌      | ❌        |
-| Queue dossiers (agence)  | ❌     | ✅    | ❌      | ❌      | ❌        |
-| Inspect + approve/reject | ❌     | ✅    | ❌      | ❌      | ❌        |
-| Override OCR             | ❌     | ✅    | ❌      | ❌      | ❌        |
-| AML screening            | ❌     | ❌    | ✅      | ❌      | ❌        |
-| Agency CRUD              | ❌     | ❌    | ✅ (lecture) | ❌  | ✅ (full) |
-| Batch Amplitude          | ❌     | ❌    | ✅      | ❌      | ❌        |
-| Dashboard analytics      | ❌     | ❌    | ❌      | ✅      | ❌        |
-| Escalade + redistribute  | ❌     | ❌    | ❌      | ✅      | ❌        |
-| Export COBAC             | ❌     | ❌    | ✅      | ✅      | ❌        |
-| Audit log (lecture)      | ❌     | ❌    | ✅      | ✅      | ✅        |
-| Gestion agents (CRUD)    | ❌     | ❌    | ❌      | ❌      | ✅        |
-| Reset mot de passe agent | ❌     | ❌    | ❌      | ❌      | ✅        |
-| Configuration système    | ❌     | ❌    | ❌      | ❌      | ✅        |
+| Permission               | Marie | Jean | Thomas      | Sylvie | Admin IT |
+| ------------------------ | ----- | ---- | ----------- | ------ | -------- |
+| Onboarding KYC           | ✅     | ❌    | ❌           | ❌      | ❌        |
+| Voir ses notifications   | ✅     | ❌    | ❌           | ❌      | ❌        |
+| Queue dossiers (agence)  | ❌     | ✅    | ❌           | ❌      | ❌        |
+| Inspect + approve/reject | ❌     | ✅    | ❌           | ❌      | ❌        |
+| Override OCR             | ❌     | ✅    | ❌           | ❌      | ❌        |
+| AML screening            | ❌     | ❌    | ✅           | ❌      | ❌        |
+| Agency CRUD              | ❌     | ❌    | ✅ (lecture) | ❌      | ✅ (full) |
+| Batch Amplitude          | ❌     | ❌    | ✅           | ❌      | ❌        |
+| Dashboard analytics      | ❌     | ❌    | ❌           | ✅      | ❌        |
+| Escalade + redistribute  | ❌     | ❌    | ❌           | ✅      | ❌        |
+| Export COBAC             | ❌     | ❌    | ✅           | ✅      | ❌        |
+| Audit log (lecture)      | ❌     | ❌    | ✅           | ✅      | ✅        |
+| Gestion agents (CRUD)    | ❌     | ❌    | ❌           | ❌      | ✅        |
+| Reset mot de passe agent | ❌     | ❌    | ❌           | ❌      | ✅        |
+| Configuration système    | ❌     | ❌    | ❌           | ❌      | ✅        |
 
 ### 11.3 Audit Log — Implémentation PostgreSQL
 
@@ -2755,6 +2792,24 @@ FROM session_events;
 
 ---
 
+## 13bis. Stratégie de Supervision (Prometheus)
+
+### 13bis.1 Objectifs de Supervision Phase 2
+Le monitoring avec Prometheus ne se limite pas à la disponibilité des serveurs (UP/DOWN), mais se concentre sur la **santé fonctionnelle de l'IA** et le respect des **SLA métiers**.
+
+### 13bis.2 Métriques Exposées (Exemples)
+| Métrique                        | Type      | Description                                      |
+| :------------------------------ | :-------- | :----------------------------------------------- |
+| `kyc_ocr_duration_seconds`      | Histogram | Latence d'extraction par moteur (Paddle/GLM).    |
+| `kyc_ocr_confidence_score`      | Gauge     | Score de confiance moyen du dernier lot.         |
+| `kyc_liveness_strike_count`     | Counter   | Nombre total de rejets pour suspicion de fraude. |
+| `kyc_onboarding_duration_total` | Histogram | Temps total du tunnel (Objectif < 15 min).       |
+
+### 13bis.3 Architecture de Collecte
+Prometheus "scrappera" l'endpoint `/metrics` du backend FastAPI toutes les 15 secondes. En cas de dépassement de seuil (ex: P95 latence OCR > 5s), une alerte est levée dans Grafana pour **Sylvie**.
+
+---
+
 ### 13.3 Provisioning Sopra Amplitude — Architecture Axway (Thomas)
 
 > **❌ L'ancienne section référençant `amplitude.com` (SaaS analytics américain) est supprimée.** Elle référençait un produit sans lien avec notre architecture. Voir §8.5 et §10.x pour le flow ISO 20022 via Axway.
@@ -3102,10 +3157,10 @@ Flux vidéo getUserMedia (caméra)
     → Seul landmarks_json envoyé à l'API — jamais la vidéo
 ```
 
-| Dimension               | Bénéfice                                                                                                                      |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **RGPD / Loi 2024-017** | Minimisation des données : les landmarks ne permettent pas de reconstruire le visage                                          |
-| **Performance**         | 15–30KB au lieu de plusieurs Mo de vidéo                                                                                      |
+| Dimension               | Bénéfice                                                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **RGPD / Loi 2024-017** | Minimisation des données : les landmarks ne permettent pas de reconstruire le visage                                        |
+| **Performance**         | 15–30KB au lieu de plusieurs Mo de vidéo                                                                                    |
 | **COBAC**               | Les landmarks ne sont pas des données biométriques « originales » — conservation 10 ans ne s'applique qu'au selfie statique |
 
 ---
