@@ -1,0 +1,23 @@
+name: 'Feature request'
+description: Suggest an idea for this project
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Est-ce que votre demande de fonctionnalité est liée à un problème ?
+      description: Une description claire et concise de ce qu'est le problème.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Description de la solution souhaitée
+      description: Une description claire et concise de ce que vous voulez qu'il se passe.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte additionnel
+      description: Ajoutez tout autre contexte ou captures d'écran sur la demande de fonctionnalité ici.

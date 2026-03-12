@@ -1,0 +1,32 @@
+name: 'Bug report'
+description: Create a report to help us improve
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler un bug.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Description du bug
+      description: Une description claire et concise de ce qu'est le bug.
+      placeholder: Je m'attendais à... mais j'ai obtenu...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes pour reproduire
+      description: Comment reproduire le problème ?
+      placeholder: |
+        1. Allez sur '...'
+        2. Cliquez sur '....'
+        3. Voir l'erreur
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte additionnel
+      description: Ajoutez tout autre contexte sur le problème ici.

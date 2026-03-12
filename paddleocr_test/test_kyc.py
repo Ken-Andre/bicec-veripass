@@ -48,6 +48,12 @@ def align_card_image(image_path):
             screen_cnt = approx
             break
 
+    if screen_cnt is not None:
+        area = cv2.contourArea(screen_cnt)
+        img_area = img_resized.shape[0] * img_resized.shape[1]
+        if area < 0.1 * img_area:  # Ignore tiny contours (false positives)
+            screen_cnt = None
+
     if screen_cnt is None:
         print("  ⚠️ Bords parfaits introuvables. Fallback sur l'image brute.")
         # Ensure fallback image is also strictly normalized to 800px wide
@@ -102,7 +108,7 @@ def extract_mrz(blocks):
         if mrz_pattern.match(text) and '<' in text:
             mrz_lines.append(text)
             
-    if len(mrz_lines) >= 2: # Le standard TD1 exige 3 lignes, on accepte 2 pour la tolérance OCR minimale
+    if len(mrz_lines) == 3: # Le standard TD1 exige 3 lignes
         print("  🎯 MRZ Détectée !")
         return {
             "mrz_trouvee": True,
@@ -142,7 +148,7 @@ def extract_spatial_data(blocks):
             candidates = [
                 b for b in blocks 
                 if b['cy'] > block['cy'] + 5 
-                and abs(b['cx'] - block['cx']) < 250 
+                and abs(b['cx'] - block['cx']) < 150 
             ]
             
             if candidates:
@@ -160,7 +166,7 @@ def extract_spatial_data(blocks):
             candidates = [
                 b for b in blocks 
                 if b['cy'] > block['cy'] + 5 
-                and abs(b['cx'] - block['cx']) < 250 
+                and abs(b['cx'] - block['cx']) < 150 
             ]
             if candidates:
                 candidates.sort(key=lambda b: b['cy'] - block['cy'])
@@ -170,7 +176,18 @@ def extract_spatial_data(blocks):
                     "conf": meilleur_candidat['conf']
                 }
 
-    # === FALLBACK HEURISTIQUE ===
+    # === DETECTION RECTO / VERSO ===
+    is_verso = False
+    for b in blocks:
+        if any(kw in b['text'].upper() for kw in ['PERE', 'FATHER', 'MERE', 'MOTHER', 'AUTORITE', 'AUTHORITY', 'DELIVRANCE']):
+            is_verso = True
+            break
+            
+    if is_verso:
+        parsed_data["methode"] += " (VERSO DETEC. -> IGNORE HEURISTIQUE NOM)"
+        return parsed_data
+
+    # === FALLBACK HEURISTIQUE (UNIQUEMENT RECTO) ===
     # Si le nom ou prénom n'a pas été trouvé (parce que le mot 'NOM' était illisible),
     # on cherche de gros blocs en majuscules qui ne sont pas des stopwords.
     if parsed_data["nom"]["value"] is None or parsed_data["prenom"]["value"] is None:
@@ -181,7 +198,8 @@ def extract_spatial_data(blocks):
             'INGENIEUR', 'REPUBLIQUEDUCAMEROUN', 'REPUBLICOFCAMEROON', 'CARTENATIONALED\'IDENTITE',
             'PERE/FATHER', 'MERE/MOTHER', 'S.P/S.M', 'AUTORITE/AUTHORITY', 'DATEDE', 'DELIVRANCE',
             'POSTEDIDENTIFICATION', 'DATEOFISSUE', 'IDENTIFSCATIONPOSS', 'DATEDEXPIRATION/', 
-            'DENTIFLANTUNIQUE', 'DATEOEEXPIRY', 'UNIOUEIDENDFIE', 'DENTIFIANURIQUE', 'OHOUEIDENTIFIER'
+            'DENTIFLANTUNIQUE', 'DATEOEEXPIRY', 'UNIOUEIDENDFIE', 'DENTIFIANURIQUE', 'OHOUEIDENTIFIER',
+            'FENO', 'PRÉNOMS', 'PRENOMS', 'PRÉNOM', 'PRENOM'
         }
         
         caps_blocks = []
@@ -254,9 +272,16 @@ def process_cni(image_path):
     # Extraction géométrique
     spatial_data = extract_spatial_data(blocks)
     print(f"  [RESULTAT] Mode: {spatial_data['methode']}")
-    print(f"    - Nom   : {spatial_data['nom']['value']} (conf: {spatial_data['nom']['conf']:.2f})")
-    print(f"    - Prenom: {spatial_data['prenom']['value']} (conf: {spatial_data['prenom']['conf']:.2f})")
-    print(f"    - CNI # : {spatial_data['numero_cni']['value']} (conf: {spatial_data['numero_cni']['conf']:.2f})")
+    
+    def format_output(label, field_data):
+        val = field_data['value']
+        conf = field_data['conf']
+        status = "✅ OK" if conf >= 0.85 else "⚠️ LOW CONFIDENCE (Review needed)"
+        return f"    - {label.ljust(6)}: {str(val).ljust(20)} | Score: {conf:.2f} {status}"
+
+    print(format_output("Nom", spatial_data['nom']))
+    print(format_output("Prenom", spatial_data['prenom']))
+    print(format_output("CNI #", spatial_data['numero_cni']))
     return spatial_data
 
 if __name__ == "__main__":

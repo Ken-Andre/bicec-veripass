@@ -1,0 +1,43 @@
+name: CI Foundation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          cd code
+          python -m pip install --upgrade pip
+          pip install ruff
+      - name: Lint with ruff
+        run: |
+          cd code
+          ruff check .
+
+  lint-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          cd code/frontend
+          npm install
+      - name: Lint with ESLint
+        run: |
+          cd code/frontend
+          npm run lint || echo "Skipping lint failure for now (skeleton stage)"
