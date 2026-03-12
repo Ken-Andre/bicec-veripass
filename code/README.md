@@ -13,7 +13,7 @@
 ```
 bicec-veripass/
 ├── backend/          # FastAPI — API, OCR, biométrie, KYC state machine
-├── frontend/         # PWA React/TypeScript — parcours onboarding mobile (Marie)
+├── mobile/           # PWA React/TypeScript — parcours onboarding mobile (Marie)
 ├── backoffice/       # SPA React/TypeScript — Jean, Thomas, Sylvie, Admin IT
 ├── infra/            # Nginx, Docker Compose, TLS, scripts infra
 ├── scripts/          # Utilitaires : seed, migrations, benchmarks, pruning
@@ -93,10 +93,10 @@ alembic downgrade -1
 docker compose exec fastapi pytest --cov=app tests/
 
 # Frontend (vitest)
-cd frontend && npm run test
+cd mobile && npm run test
 
 # E2E (Playwright)
-cd frontend && npx playwright test
+cd mobile && npx playwright test
 ```
 
 ---
