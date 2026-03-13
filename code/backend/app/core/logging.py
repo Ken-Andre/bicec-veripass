@@ -1,10 +1,9 @@
 import logging
 import sys
-import json
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-from functools import lru_cache
+from logging.handlers import RotatingFileHandler
 
 from pythonjsonlogger import jsonlogger
 
@@ -30,8 +29,6 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         for key in sensitive_keys:
             if key in log_record:
                 log_record[key] = "***"
-
-from logging.handlers import RotatingFileHandler
 
 def setup_logging(log_to_file: bool = True, log_dir: str = "logs", log_level: str = "INFO"):
     """

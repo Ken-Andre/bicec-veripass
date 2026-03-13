@@ -4,7 +4,7 @@ declare module 'virtual:pwa-register' {
   export interface RegisterSWOptions {
     immediate?: boolean
     onRegistered?: (registration: ServiceWorkerRegistration | undefined) => void
-    onRegisterError?: (error: any) => void
+    onRegisterError?: (error: unknown) => void
     onInstalled?: () => void
     onUpdated?: () => void
     onNeedRefresh?: () => void

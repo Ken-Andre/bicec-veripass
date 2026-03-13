@@ -1,4 +1,4 @@
-from typing import List, Union, Optional
+from typing import List, Union
 from functools import lru_cache
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict

@@ -6,6 +6,7 @@ export interface User {
 export interface KycData {
   idDocumentFront?: File | Blob;
   idDocumentBack?: File | Blob;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mrzData?: any;
   faceVideoLength?: number;
   livenessScore?: number;
