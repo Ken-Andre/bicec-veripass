@@ -11,7 +11,7 @@ if (saved === 'dark') {
 }
 
 // Enregistrement SW via vite-plugin-pwa virtual module
-const updateSW = registerSW({
+registerSW({
   onRegistered(r) {
     console.log('Service Worker registered:', r);
   },
