@@ -1,8 +1,10 @@
 import logging
 import sys
 import json
+import os
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+from functools import lru_cache
 
 from pythonjsonlogger import jsonlogger
 
@@ -29,17 +31,15 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
             if key in log_record:
                 log_record[key] = "***"
 
-import os
 from logging.handlers import RotatingFileHandler
 
-def setup_logging():
+def setup_logging(log_to_file: bool = True, log_dir: str = "logs", log_level: str = "INFO"):
+    """
+    Setup logging with configurable file output.
+    Guards against filesystem permission errors.
+    """
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    
-    # Ensure logs directory exists
-    log_dir = "logs"
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
     
     correlation_filter = CorrelationFilter()
     logger.addFilter(correlation_filter)
@@ -49,27 +49,51 @@ def setup_logging():
         rename_fields={"name": "logger"}
     )
     
-    # Console Handler
+    # Console Handler (always enabled)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
-    
-    # File Handler (Rotation: 50MB, 5 backups)
-    file_handler = RotatingFileHandler(
-        os.path.join(log_dir, "app.log"),
-        maxBytes=50 * 1024 * 1024,
-        backupCount=5
-    )
-    file_handler.setFormatter(formatter)
     
     # Clear existing handlers
     if logger.hasHandlers():
         logger.handlers.clear()
         
     logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+    
+    # File Handler (optional, with error guard)
+    if log_to_file:
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            file_handler = RotatingFileHandler(
+                os.path.join(log_dir, "app.log"),
+                maxBytes=50 * 1024 * 1024,
+                backupCount=5
+            )
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+        except (OSError, PermissionError) as e:
+            # Log to console only if file handler fails
+            logger.warning(f"Could not create log file handler: {e}. Logging to console only.")
     
     extra = {"service": "bicec-veripass-api"}
     return logging.LoggerAdapter(logger, extra)
 
-# Initialize logger
-logger = setup_logging()
+# Lazy initialization - logger is created on first use
+_logger_instance: Optional[logging.LoggerAdapter] = None
+
+def get_logger() -> logging.LoggerAdapter:
+    """Get or create logger instance lazily."""
+    global _logger_instance
+    if _logger_instance is None:
+        log_to_file = os.environ.get("LOG_TO_FILE", "true").lower() == "true"
+        log_dir = os.environ.get("LOG_DIR", "logs")
+        log_level = os.environ.get("LOG_LEVEL", "INFO")
+        _logger_instance = setup_logging(log_to_file, log_dir, log_level)
+    return _logger_instance
+
+# Module-level logger property that initializes on first access
+class _LoggerProxy:
+    """Proxy that lazily initializes the logger on first attribute access."""
+    def __getattr__(self, name: str):
+        return getattr(get_logger(), name)
+
+logger = _LoggerProxy()
