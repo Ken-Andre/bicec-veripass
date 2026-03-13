@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
+import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import MainLayout from './components/layout/MainLayout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
@@ -8,21 +9,8 @@ import CompliancePage from './pages/compliance/CompliancePage'
 import AdminPage from './pages/admin/AdminPage'
 import AnalyticsPage from './pages/analytics/AnalyticsPage'
 import CommandCenterPage from './pages/command-center/CommandCenterPage'
+import UnauthorizedPage from './pages/UnauthorizedPage'
 import NotFoundPage from './pages/NotFoundPage'
-
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
-  const { user, isAuthenticated } = useAuth()
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />
-  }
-
-  return <>{children}</>
-}
 
 function App() {
   const { isAuthenticated } = useAuth()
@@ -87,6 +75,7 @@ function App() {
         />
       </Route>
 
+      <Route path="/unauthorized" element={<UnauthorizedPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
