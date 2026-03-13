@@ -1,0 +1,17 @@
+{
+    "name": "BICEC VeriPass",
+    "short_name": "VeriPass",
+    "description": "BICEC VeriPass — Ouverture de compte digitale",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#FBF8F3",
+    "theme_color": "#E37B03",
+    "icons": [
+        {
+            "src": "/favicon.ico",
+            "sizes": "64x64",
+            "type": "image/x-icon"
+        }
+    ]
+}

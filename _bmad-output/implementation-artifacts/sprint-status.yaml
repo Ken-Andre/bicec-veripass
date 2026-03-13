@@ -1,0 +1,178 @@
+# generated: 2026-03-12T17:44:00+01:00
+# project: bicec-veripass
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-12T17:44:00+01:00
+project: bicec-veripass
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: Foundation — Project Infrastructure & Authentication
+  epic-1: in-progress
+  
+  # Story 1.1: Docker Compose Infrastructure Setup
+  # Issue #9 - OPEN - M0 milestone - Story 1.1
+  1-1-docker-compose-infrastructure-setup: in-progress
+  
+  # Story 1.2: PostgreSQL Schema — Core Tables
+  # Issue #40 - CLOSED - M0 milestone - INFRA-01
+  1-2-postgresql-schema-core-tables: done
+  
+  # Story 1.3: Mobile OTP Authentication (Marie)
+  # Issue #41 - CLOSED - M0 milestone - INFRA-02
+  1-3-mobile-otp-authentication-marie: done
+  
+  # Story 1.4: Back-Office Authentication (Jean, Thomas, Sylvie, Admin IT)
+  # Related issues in M0 milestone
+  1-4-back-office-authentication: ready-for-dev
+  
+  epic-1-retrospective: optional
+  
+  # Epic 2: Marie's Resilient KYC Capture Journey
+  epic-2: backlog
+  
+  # Story 2.1: CNI Recto Capture with Client-Side Quality Gate
+  2-1-cni-recto-capture-quality-gate: backlog
+  
+  # Story 2.2: CNI Verso Capture
+  2-2-cni-verso-capture: backlog
+  
+  # Story 2.3: Liveness Selfie with 3-Strike Lockout
+  2-3-liveness-selfie-3-strike-lockout: backlog
+  
+  # Story 2.4: OCR Extraction Review Screen
+  2-4-ocr-extraction-review-screen: backlog
+  
+  # Story 2.5: Session Resumption After Network Loss
+  2-5-session-resumption-network-loss: backlog
+  
+  epic-2-retrospective: optional
+  
+  # Epic 3: Address, NIU, Utility Bill & Legal Consent
+  epic-3: backlog
+  
+  # Story 3.1: Address Entry with Progressive Cascade Dropdowns
+  3-1-address-entry-progressive-cascade: backlog
+  
+  # Story 3.2: Utility Bill Upload & GLM-OCR Extraction
+  3-2-utility-bill-upload-glm-ocr: backlog
+  
+  # Story 3.3: NIU Declaration or Upload
+  3-3-niu-declaration-upload: backlog
+  
+  # Story 3.4: Digital Consent & Dossier Submission
+  3-4-digital-consent-dossier-submission: backlog
+  
+  epic-3-retrospective: optional
+  
+  # Epic 4: Sovereign AI Engine — OCR, Biometrics & Dossier Scoring
+  epic-4: backlog
+  
+  # Story 4.1: PaddleOCR Primary CNI Extraction Service
+  4-1-paddleocr-primary-cni-extraction: backlog
+  
+  # Story 4.2: GLM-OCR Fallback & Bill Semantic Extraction
+  4-2-glm-ocr-fallback-bill-extraction: backlog
+  
+  # Story 4.3: Biometric Face Matching & Liveness Scoring
+  4-3-biometric-face-matching-liveness: backlog
+  
+  # Story 4.4: Global Dossier Confidence Score & Duplicate Detection
+  4-4-global-dossier-confidence-duplicate: backlog
+  
+  epic-4-retrospective: optional
+  
+  # Epic 5: Jean's KYC Validation Desk
+  epic-5: backlog
+  
+  # Story 5.1: Jean's Prioritized Dossier Queue
+  5-1-jeans-prioritized-dossier-queue: backlog
+  
+  # Story 5.2: Side-by-Side Evidence Inspector ("Zoom + Compare")
+  5-2-side-by-side-evidence-inspector: backlog
+  
+  # Story 5.3: Jean's Decision Actions (Approve / Reject / Request Info)
+  5-3-jeans-decision-actions: backlog
+  
+  epic-5-retrospective: optional
+  
+  # Epic 6: Thomas's AML/CFT Compliance & Administration
+  epic-6: backlog
+  
+  # Story 6.1: PEP/Sanctions List Seeding & Weekly Sync
+  6-1-pep-sanctions-list-seeding: backlog
+  
+  # Story 6.2: AML Alert Review & PEP Screening
+  6-2-aml-alert-review-pep-screening: backlog
+  
+  # Story 6.3: Identity Conflict Resolution (Conflict Resolver)
+  6-3-identity-conflict-resolution: backlog
+  
+  # Story 6.4: Agency Management & Amplitude Provisioning Monitor
+  6-4-agency-management-amplitude-provisioning: backlog
+  
+  epic-6-retrospective: optional
+  
+  # Epic 7: Sylvie's Command Center, Audit & Compliance Export
+  epic-7: backlog
+  
+  # Story 7.1: SLA & Operational Health Dashboard (R/Y/G)
+  7-1-sla-operational-health-dashboard: backlog
+  
+  # Story 7.2: Funnel Drop-Off Analytics
+  7-2-funnel-drop-off-analytics: backlog
+  
+  # Story 7.3: Immutable SHA-256 Audit Log Viewer
+  7-3-immutable-sha256-audit-log: backlog
+  
+  # Story 7.4: COBAC Compliance Pack Export
+  7-4-cobac-compliance-pack-export: backlog
+  
+  epic-7-retrospective: optional
+  
+  # Epic 8: Client Relationship & Banking Discovery (Frontend-Only)
+  epic-8: backlog
+  
+  # Story 8.1: Plan Personalization Screen (Standard / Premium / Ultra)
+  8-1-plan-personalization-screen: backlog
+  
+  # Story 8.2: Use-Case Personalization Selection
+  8-2-use-case-personalization-selection: backlog
+  
+  # Story 8.3: Account Management Dashboard & Status-Based Gating
+  8-3-account-management-dashboard-gating: backlog
+  
+  epic-8-retrospective: optional

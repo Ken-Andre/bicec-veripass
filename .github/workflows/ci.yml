@@ -17,15 +17,15 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: |
-          cd code
+          cd code/backend
           python -m pip install --upgrade pip
           pip install ruff
       - name: Lint with ruff
         run: |
-          cd code
-          ruff check .
+          cd code/backend
+          ruff check . --output-format=github
 
-  lint-frontend:
+  lint-mobile:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,9 +35,69 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: |
-          cd code/frontend
-          npm install
+          cd code/mobile
+          npm install --legacy-peer-deps
       - name: Lint with ESLint
         run: |
-          cd code/frontend
-          npm run lint || echo "Skipping lint failure for now (skeleton stage)"
+          cd code/mobile
+          npm run lint
+
+  test-backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: veripass_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: cd code/backend && uv sync
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/veripass_test
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: ${{ secrets.JWT_SECRET || github.run_id }}
+          ENVIRONMENT: testing
+        run: cd code/backend && uv run pytest -v
+
+  build-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          cd code/mobile
+          npm install --legacy-peer-deps
+      - name: Build
+        run: |
+          cd code/mobile
+          npm run build
