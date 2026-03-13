@@ -3,7 +3,7 @@ import { useAuth } from './contexts/AuthContext'
 import MainLayout from './components/layout/MainLayout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
-import ValidationDeskPage from './pages/validation/ValidationDeskPage'
+import ValidationDesk from './pages/validation/ValidationDesk'
 import CompliancePage from './pages/compliance/CompliancePage'
 import AdminPage from './pages/admin/AdminPage'
 import AnalyticsPage from './pages/analytics/AnalyticsPage'
@@ -45,7 +45,7 @@ function App() {
           path="validation"
           element={
             <ProtectedRoute allowedRoles={['JEAN']}>
-              <ValidationDeskPage />
+              <ValidationDesk />
             </ProtectedRoute>
           }
         />
