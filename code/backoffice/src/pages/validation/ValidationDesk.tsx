@@ -29,13 +29,13 @@ export default function ValidationDesk() {
       case 'PENDING': return <Badge variant="warning"><Clock className="mr-1 h-3 w-3" />En attente</Badge>
       case 'IN_REVIEW': return <Badge variant="default"><Eye className="mr-1 h-3 w-3" />En cours</Badge>
       case 'APPROVED': return <Badge variant="success"><CheckCircle className="mr-1 h-3 w-3" />Approuvé</Badge>
-      case 'REJECTED': return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" />Rejeté</Badge>
+      case 'REJECTED': return <Badge variant="danger"><XCircle className="mr-1 h-3 w-3" />Rejeté</Badge>
     }
   }
 
   const getPriorityBadge = (priority: Dossier['priority']) => {
     switch (priority) {
-      case 'HIGH': return <Badge variant="destructive">Haute</Badge>
+      case 'HIGH': return <Badge variant="danger">Haute</Badge>
       case 'MEDIUM': return <Badge variant="warning">Moyenne</Badge>
       case 'LOW': return <Badge variant="secondary">Basse</Badge>
     }

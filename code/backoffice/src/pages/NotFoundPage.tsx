@@ -21,11 +21,3 @@ export default function NotFoundPage() {
     </div>
   )
 }
-</content>
-<write_to_file>
-<path>code/backoffice/src/pages/Index.tsx</path>
-<content>import { Navigate } from 'react-router-dom'
-
-export default function Index() {
-  return <Navigate to="/" replace />
-}

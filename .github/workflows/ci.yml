@@ -81,7 +81,7 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/veripass_test
           REDIS_URL: redis://localhost:6379/0
-          JWT_SECRET: ${{ secrets.JWT_SECRET || github.run_id }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || format('test-secret-{0}', github.run_id) }}
           ENVIRONMENT: testing
         run: cd code/backend && uv run pytest -v
 

@@ -13,7 +13,7 @@ export default function ProfilePage() {
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'JEAN': return <Badge variant="default">Validation KYC</Badge>
-      case 'THOMAS': return <Badge variant="destructive">Conformité AML</Badge>
+      case 'THOMAS': return <Badge variant="danger">Conformité AML</Badge>
       case 'SYLVIE': return <Badge variant="success">Command Center</Badge>
       case 'ADMIN_IT': return <Badge variant="secondary">Administration</Badge>
       default: return <Badge>{role}</Badge>
@@ -69,7 +69,7 @@ export default function ProfilePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Agence</label>
-              <Input value={user.agency || 'Non assigné'} disabled />
+              <Input value={user.agencyId || 'Non assigné'} disabled />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">ID Utilisateur</label>

@@ -40,7 +40,7 @@ export default function CompliancePage() {
 
   const getStatusBadge = (status: AMLAlert['status']) => {
     switch (status) {
-      case 'OPEN': return <Badge variant="destructive">Ouverte</Badge>
+      case 'OPEN': return <Badge variant="danger">Ouverte</Badge>
       case 'CLEARED': return <Badge variant="success">Effacée</Badge>
       case 'CONFIRMED': return <Badge variant="warning">Confirmée</Badge>
     }
