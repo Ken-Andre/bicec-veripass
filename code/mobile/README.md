@@ -1,73 +1,55 @@
-# React + TypeScript + Vite
+# BICEC VeriPass — Mobile PWA
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Application KYC mobile pour l'onboarding digital des clients BICEC (Persona: Marie). 
+Plateforme souveraine basée sur une Progressive Web App React.
 
-Currently, two official plugins are available:
+## 🚀 Stack Technique
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Framework** : React 18 + TypeScript strict
+- **Build & Dev** : Vite + `vite-plugin-pwa` (Workbox GenerateSW)
+- **Styling** : Tailwind CSS + variantes Dark Mode (`.dark`)
+- **Routing** : `react-router-dom` v6
+- **Data Fetching** : `@tanstack/react-query`
+- **Utilitaires** : `clsx` + `tailwind-merge` + `lucide-react`
+- **Package Manager** : Bun
 
-## React Compiler
+## 🛠️ Lancement Local
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Installez les dépendances :
+   ```bash
+   bun install
+   ```
 
-## Expanding the ESLint configuration
+2. Lancez le serveur de développement :
+   ```bash
+   bun run dev
+   ```
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 📁 Structure des fichiers
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- `public/` : Assets statiques (manifest.json, icônes)
+- `src/components/` : Composants UI réutilisables (ScreenLayout, OfflineBanner)
+- `src/contexts/` : Providers React (AuthContext, KycContext)
+- `src/hooks/` : Hooks personnalisés (useTheme, useMobile)
+- `src/services/` : Couche d'accès API et mock data
+- `src/store/` : State management global (futur)
+- `src/types/` : Définitions TypeScript globales
+- `src/views/` : Pages et écrans organisés par domaine
+- `src/lib/` : Utilitaires (ex: `cn()` pour Tailwind)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🧪 Vérification PWA
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Pour vérifier le fonctionnement du Service Worker et du manifest :
+- Ouvrir Chrome DevTools > Application > Service Workers (Doit être actif)
+- Ouvrir Chrome DevTools > Application > Manifest (Doit afficher "biveripass")
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🚫 Hors-scope du ticket INFRA-03
+- Design final des composants (`shadcn/ui`)
+- Implémentation réelle de la capture d'images (Caméra/MediaPipe)
+- Appel effectif à l'API Backend
+- Configuration avancée InjectManifest (Offline-10)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 📌 Issues Dépendantes
+- **[AUTH-01]** Flux d'authentification OTP/PIN
+- **[CAPTURE-01]** Accès caméra MediaPipe WASM
+- **[OFFLINE-01]** App shell & Service Worker strategy avancée
