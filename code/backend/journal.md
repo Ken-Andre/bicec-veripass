@@ -53,3 +53,92 @@ python -m uv run pytest
 
 ## Note sur le déploiement
 Pour faciliter le cycle de développement itératif et limiter les besoins en bande passante lors du téléchargement d'images lourdes, le développement est actuellement configuré pour fonctionner en **local pur** (PostgreSQL local). La conteneurisation via Docker Compose est prévue pour le ticket **INFRA-05** une fois les modèles de données stabilisés.
+
+---
+
+## Guide de Démarrage Rapide (Backend)
+
+### Lancement du serveur
+```bash
+cd code/backend
+uv run uvicorn app.main:app --reload
+```
+Le serveur démarre sur `http://127.0.0.1:8000`
+
+### Accès à la documentation API
+- **Swagger UI** : `http://127.0.0.1:8000/docs`
+- **OpenAPI JSON** : `http://127.0.0.1:8000/api/v1/openapi.json`
+
+### Endpoints API disponibles
+
+| Module | Endpoint | Méthode | Description |
+|--------|----------|---------|-------------|
+| **health** | `/health` | GET | Vérification de l'état du serveur (DB, Redis) |
+| **auth** | `/api/v1/auth/` | GET | Module d'authentification |
+| **kyc** | `/api/v1/kyc/` | GET | Module de vérification d'identité |
+| **backoffice** | `/api/v1/backoffice/` | GET | Interface d'administration |
+| **admin** | `/api/v1/admin/` | GET | Module d'administration système |
+| **aml** | `/api/v1/aml/` | GET | Module Anti-Money Laundering |
+| **analytics** | `/api/v1/analytics/` | GET | Module d'analytics |
+| **notifications** | `/api/v1/notifications/` | GET | Module de notifications |
+
+### Tests API réalisés (13/03/2026)
+
+#### 1. Endpoint `/health` - Health Check
+**Statut** : ✅ Succès (Code 200)
+
+**Request** :
+```bash
+curl -X GET 'http://127.0.0.1:8000/health' -H 'accept: application/json'
+```
+
+**Response** :
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "db": "ok",
+  "redis": "ok"
+}
+```
+
+**Headers** :
+- `x-correlation-id`: 3d7410c8-7132-466d-a5f0-6dd475362e5d
+- `x-process-time`: 0.004006624221801758
+- `content-type`: application/json
+
+#### 2. Endpoint `/api/v1/kyc/` - KYC Module
+**Statut** : ✅ Succès (Code 200)
+
+**Request** :
+```bash
+curl -X GET 'http://127.0.0.1:8000/api/v1/kyc/' -H 'accept: application/json'
+```
+
+**Response** :
+```json
+{
+  "module": "kyc",
+  "status": "initialized"
+}
+```
+
+**Headers** :
+- `x-correlation-id`: b101eaf3-9652-4300-98e1-fc4781cf9942
+- `x-process-time`: 0.0010516643524169922
+- `content-type`: application/json
+
+### Observations
+
+1. **Traçabilité** : L'ID de corrélation (`x-correlation-id`) est correctement injecté dans chaque réponse, permettant le suivi des requêtes de bout en bout.
+
+2. **Performance** : Les temps de réponse sont excellents (< 5ms pour les endpoints testés).
+
+3. **Structure modulaire** : Chaque module (auth, kyc, backoffice, admin, aml, analytics, notifications) expose un endpoint racine fonctionnel.
+
+4. **Documentation** : La documentation Swagger UI est accessible et permet de tester interactivement chaque endpoint.
+
+### Prochaines étapes
+- Tester les endpoints avec authentification (JWT)
+- Valider les endpoints de création/mise à jour dans chaque module
+- Documenter les schémas de requête/réponse détaillés

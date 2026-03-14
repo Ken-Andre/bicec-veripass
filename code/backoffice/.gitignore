@@ -30,3 +30,6 @@ dev-dist/
 *.sw?
 .vscode/*
 !.vscode/extensions.json
+
+# Test coverage
+coverage/
