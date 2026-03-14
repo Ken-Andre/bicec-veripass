@@ -1,0 +1,184 @@
+# docker-compose.yml — bicec-veripass MVP
+# WSL2 RAM cap: 8GB via .wslconfig
+
+
+
+networks:
+  veripass-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  documents_storage:  # Images CNI, selfies, factures — 10 ans COBAC
+  nginx_certs:
+
+services:
+
+  #  REVERSE PROXY 
+  nginx:
+    build:
+      context: ./infra/nginx
+      dockerfile: Dockerfile
+    container_name: vp_nginx
+    ports:
+      - "443:8443"
+      - "80:8080"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      pwa:
+        condition: service_started
+      backoffice:
+        condition: service_started
+    networks:
+      - veripass-net
+    restart: unless-stopped
+
+  #  PWA MARIE (Mobile)
+  pwa:
+    build:
+      context: ./mobile
+      dockerfile: Dockerfile
+    container_name: vp_pwa
+    environment:
+      - VITE_API_URL=/api
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    # RAM: ~128MB (nginx serve static)
+    ports:
+      - "8081:8080" # Optional direct access for debug
+
+  #  BACK-OFFICE SPA 
+  backoffice:
+    build:
+      context: ./backoffice
+      dockerfile: Dockerfile
+    container_name: vp_backoffice
+    environment:
+      - VITE_API_URL=/api
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    # RAM: ~128MB
+    ports:
+      - "8082:8080" # Optional direct access for debug
+
+  #  FASTAPI BACKEND 
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_api
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD:-postgres}@postgres:5432/veripass
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_PATH=/data/documents
+      - JWT_SECRET=${JWT_SECRET:-dev_secret_key_change_me}
+      - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID:-id}
+      - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET:-secret}
+      - OCR_CONFIDENCE_THRESHOLD=0.85
+      - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
+    volumes:
+      - documents_storage:/data/documents
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 2.5g     # PaddleOCR lazy (2GB) + FastAPI workers (512MB)
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 30s
+      start_period: 60s
+    # GLM-OCR via worker Celery séparé
+
+  #  CELERY WORKERS 
+  celery_ocr:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_celery_ocr
+    command: celery -A app.celery worker -Q glm_ocr_jobs --concurrency=1 -n ocr_worker@%h
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD:-postgres}@postgres:5432/veripass
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_PATH=/data/documents
+      - GLM_LAZY_LOAD=true      # GLM-OCR chargé à la 1ère tâche de la queue
+    volumes:
+      - documents_storage:/data/documents
+    depends_on:
+      api:
+        condition: service_healthy  # Ne démarre qu'après API prête
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 3.5g     # GLM-OCR 0.9B quantifié: 2.5-3.5GB RAM lazy
+    # Séquentiel obligatoire (concurrency=1)
+
+  celery_notifications:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_celery_notif
+    command: celery -A app.celery worker -Q notifications,provisioning_batch,sanctions_sync --concurrency=2 -n notif_worker@%h
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD:-postgres}@postgres:5432/veripass
+      - REDIS_URL=redis://redis:6379/0
+      - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID:-id}
+      - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET:-secret}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 512m
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_celery_beat
+    command: celery -A app.celery beat --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 128m
+    # Crons: sync PEP/Sanctions (hebdo), backup DB (quotidien), prune disk (si >85%)
+
+  #  POSTGRESQL 
+  postgres:
+    image: postgres:17-bookworm
+    container_name: vp_postgres
+    environment:
+      - POSTGRES_DB=veripass
+      - POSTGRES_USER=vp_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 512m
+
+  #  REDIS 
+  redis:
+    image: redis:7-bookworm
+    container_name: vp_redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 256m
