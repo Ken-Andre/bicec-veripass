@@ -34,6 +34,12 @@ As a sovereign, mobile-first digital onboarding solution for Cameroon, it replac
 
 ---
 
+## Regulatory and Operational Context
+
+In recent years, the Cameroonian banking sector has been marked by several cases of embezzlement and internal control failures, widely reported by the media and supervisory authorities. These episodes have highlighted the vulnerability of manual processes, the weakness of certain validation procedures, and the lack of fine-grained traceability for sensitive operations. In this context, credit institutions are required to strengthen their compliance and anti-fraud mechanisms, particularly in the areas of KYC/KYB, authorization management, transaction supervision, and IT system auditability. The Bicec Veripass project is part of this dynamic by proposing an application infrastructure designed to improve the quality of controls, centralize evidence, and prevent operational risks, while complying with applicable regulatory constraints.
+
+---
+
 ## Core Vision
 
 ### Problem Statement
