@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json.schemastore.org/package.json",
   "name": "backoffice",
   "private": true,
   "version": "0.0.0",
