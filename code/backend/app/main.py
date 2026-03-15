@@ -32,7 +32,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    openapi_url="/api/openapi.json",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
     lifespan=lifespan
 )
 
@@ -72,7 +74,7 @@ async def add_correlation_id(request: Request, call_next):
 # Routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-@app.get("/health", tags=["health"])
+@app.get("/api/health", tags=["health"])
 async def health_check():
     db_status = await check_db_connection()
     # Redis check placeholder (to be implemented in AUTH-06+)

@@ -3,7 +3,7 @@ import sys
 
 try:
     conn = http.client.HTTPConnection("localhost", 8000)
-    conn.request("GET", "/health")
+    conn.request("GET", "/api/health")
     res = conn.getresponse()
     if res.status == 200:
         sys.exit(0)
