@@ -86,3 +86,4 @@ service-account*.json
 # Tests code
 # ========================
 paddleocr_test/.venv_ocr/*
+.codex_slides_rapport/*

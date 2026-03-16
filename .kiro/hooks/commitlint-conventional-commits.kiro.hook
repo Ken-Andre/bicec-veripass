@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Commitlint - Conventional Commits",
+  "description": "Validates the last commit message against Conventional Commits rules using commitlint",
+  "version": "1.0.0",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "node_modules/.bin/commitlint --from HEAD~1 --to HEAD --verbose"
+  }
+}
