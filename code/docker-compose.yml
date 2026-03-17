@@ -75,12 +75,12 @@ services:
       dockerfile: Dockerfile
     container_name: vp_api
     environment:
-      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD:-postgres}@postgres:5432/veripass
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_PATH=/data/documents
-      - JWT_SECRET=${JWT_SECRET:-dev_secret_key_change_me}
-      - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID:-id}
-      - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET:-secret}
+      - JWT_SECRET=${JWT_SECRET}
+      - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
+      - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
       - OCR_CONFIDENCE_THRESHOLD=0.85
       - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
     volumes:
@@ -106,7 +106,7 @@ services:
     container_name: vp_celery_ocr
     command: celery -A app.celery worker -Q glm_ocr_jobs --concurrency=1 -n ocr_worker@%h
     environment:
-      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD:-postgres}@postgres:5432/veripass
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_PATH=/data/documents
       - GLM_LAZY_LOAD=true      # GLM-OCR chargé à la 1ère tâche de la queue
@@ -128,10 +128,10 @@ services:
     container_name: vp_celery_notif
     command: celery -A app.celery worker -Q notifications,provisioning_batch,sanctions_sync --concurrency=2 -n notif_worker@%h
     environment:
-      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD:-postgres}@postgres:5432/veripass
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
-      - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID:-id}
-      - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET:-secret}
+      - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
+      - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
     depends_on:
       - redis
       - postgres
@@ -163,7 +163,7 @@ services:
     environment:
       - POSTGRES_DB=veripass
       - POSTGRES_USER=vp_user
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro

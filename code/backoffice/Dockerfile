@@ -20,7 +20,7 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine
 
 # Switch to root to install security updates
 USER root
-RUN apk update && apk upgrade --no-cache && apk del curl
+RUN apk update && apk upgrade --no-cache
 
 # Switch back to the unprivileged user
 USER 101

@@ -13,7 +13,7 @@ async def test_health_check(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_api_v1_docs(client: AsyncClient):
-    response = await client.get("/api/openapi.json")
+    response = await client.get("/api/v1/openapi.json")
     assert response.status_code == 200
     data = response.json()
     assert "info" in data
