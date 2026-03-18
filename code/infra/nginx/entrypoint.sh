@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 # Nginx entrypoint with automatic TLS certificate generation
 # Certs are stored in /etc/nginx/ssl (outside the read-only mount)
 

@@ -16,8 +16,7 @@ openssl req -x509 -nodes -days 365 \
   -newkey rsa:2048 \
   -keyout "$CERTS_DIR/nginx-selfsigned.key" \
   -out "$CERTS_DIR/nginx-selfsigned.crt" \
-  -subj "/C=CM/ST=Centre/L=Yaounde/O=BICEC/OU=VeriPass/CN=localhost" \
-  2>/dev/null
+  -subj "/C=CM/ST=Centre/L=Yaounde/O=BICEC/OU=VeriPass/CN=localhost" 
 
 echo "✅ Certificats générés dans $CERTS_DIR"
 echo "   - nginx-selfsigned.crt (certificat public)"

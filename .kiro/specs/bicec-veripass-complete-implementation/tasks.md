@@ -89,12 +89,12 @@ This document breaks down the implementation of BICEC VeriPass into actionable t
 **Description**: Create complete Docker Compose stack with all services (Nginx, FastAPI, PWA, Back-Office, PostgreSQL, Redis, Celery).
 
 **Subtasks**:
-- [ ] Write `docker-compose.yml` with 8 services: nginx, fastapi, pwa, backoffice, postgres, redis, celery-worker, celery-beat
+- [ ] Write and test `docker-compose.yml` with 8 services: nginx, fastapi, pwa, backoffice, postgres, redis, celery-worker, celery-beat
 - [-] Configure Nginx reverse proxy with TLS 1.3 (self-signed cert for dev)
 - [-] Create `Dockerfile` for FastAPI (python:3.11-slim, ONNX Runtime, PaddleOCR)
 - [-] Create `Dockerfile` for PWA (node:20-alpine, Vite build)
 - [-] Create `Dockerfile` for Back-Office (node:20-alpine, Vite build)
-- [ ] Configure Docker volumes: `/data/documents`, `/data/models`, `/data/db`
+- [x] Configure Docker volumes: `/data/documents`, `/data/models`, `/data/db`
 - [ ] Create `.wslconfig` template with `memory=8GB`, `processors=4`
 - [ ] Create `scripts/docker_prune.sh` (cleanup when disk >85%)
 - [ ] Add health checks: postgres `pg_isready`, redis `redis-cli ping`, fastapi `/health`
