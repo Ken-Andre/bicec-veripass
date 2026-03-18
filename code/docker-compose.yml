@@ -8,9 +8,10 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
+  documents_storage:  # /data/documents — Images CNI, selfies, factures — 10 ans COBAC
+  models_storage:     # /data/models   — PaddleOCR, GLM-OCR, MiniFASNet, FaceNet-512
+  db_storage:         # /data/db       — PostgreSQL data files
   redis_data:
-  documents_storage:  # Images CNI, selfies, factures — 10 ans COBAC
   nginx_certs:
 
 services:
@@ -78,6 +79,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_PATH=/data/documents
+      - MODELS_PATH=/data/models
       - JWT_SECRET=${JWT_SECRET}
       - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
       - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
@@ -85,6 +87,7 @@ services:
       - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
     volumes:
       - documents_storage:/data/documents
+      - models_storage:/data/models
     depends_on:
       - postgres
       - redis
@@ -109,9 +112,11 @@ services:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_PATH=/data/documents
+      - MODELS_PATH=/data/models
       - GLM_LAZY_LOAD=true      # GLM-OCR chargé à la 1ère tâche de la queue
     volumes:
       - documents_storage:/data/documents
+      - models_storage:/data/models
     depends_on:
       api:
         condition: service_healthy  # Ne démarre qu'après API prête
@@ -165,7 +170,7 @@ services:
       - POSTGRES_USER=vp_user
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db_storage:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - veripass-net
