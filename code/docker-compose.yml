@@ -1,5 +1,6 @@
 # docker-compose.yml — bicec-veripass MVP
 # WSL2 RAM cap: 8GB via .wslconfig
+# PORT CONFLICTS FIXED: PostgreSQL 15432, Redis 16379, API 8001
 
 
 
@@ -27,7 +28,7 @@ services:
       - "80:8080"
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/nginx/certs:/etc/ssl/certs:ro
+      - ./infra/nginx/certs:/etc/nginx/ssl
     depends_on:
       api:
         condition: service_healthy
@@ -89,15 +90,21 @@ services:
       - documents_storage:/data/documents
       - models_storage:/data/models
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - veripass-net
     restart: unless-stopped
     mem_limit: 2.5g     # PaddleOCR lazy (2GB) + FastAPI workers (512MB)
+    ports:
+      - "8001:8000"     # Debug direct access (sans nginx) - CHANGED from 8000 to avoid conflicts
     healthcheck:
       test: ["CMD", "python", "healthcheck.py"]
       interval: 30s
+      timeout: 10s
+      retries: 5
       start_period: 60s
     # GLM-OCR via worker Celery séparé
 
@@ -138,8 +145,10 @@ services:
       - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
       - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
     depends_on:
-      - redis
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - veripass-net
     restart: unless-stopped
@@ -154,7 +163,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - veripass-net
     restart: unless-stopped
@@ -172,10 +182,18 @@ services:
     volumes:
       - db_storage:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "15432:5432"    # Debug: accès direct depuis host (DBeaver, pgAdmin, Alembic) - CHANGED from 5432 to avoid conflicts
     networks:
       - veripass-net
     restart: unless-stopped
     mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vp_user -d veripass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   #  REDIS 
   redis:
@@ -184,7 +202,15 @@ services:
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    ports:
+      - "16379:6379"    # Debug: accès direct depuis host (redis-cli, RedisInsight) - CHANGED from 6379 to avoid conflicts
     networks:
       - veripass-net
     restart: unless-stopped
     mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

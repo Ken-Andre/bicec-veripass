@@ -213,9 +213,104 @@ Quand un domaine public sera configuré (ex: `veripass.bicec.cm`) :
 
 ---
 
+## ⚠️ Erreur 6 : Nginx ignore les certificats mkcert et génère des auto-signés — Connexion "Non sécurisée" + ServiceWorker KO (2026-03-19)
+
+> **Régression récurrente** — Ce problème est apparu plusieurs fois. À lire en priorité si le navigateur affiche "Erreur de confidentialité" ou si la PWA ne démarre pas.
+
+### Symptômes
+
+1. Navigateur : `NET::ERR_CERT_AUTHORITY_INVALID` sur `https://localhost`
+2. Console DevTools :
+   ```
+   An SSL certificate error occurred when fetching the script.
+   Service Worker registration failed: SecurityError: Failed to register a ServiceWorker
+   for scope ('https://localhost/mobile/') with script ('https://localhost/mobile/sw.js')
+   ```
+3. Certificat affiché dans le navigateur émis par `BICEC / VeriPass` (auto-signé OpenSSL) au lieu de `mkcert development CA`
+4. Les logs Docker montrent : `Generating self-signed certificates...` au lieu de `Certificates found`
+
+### Cause Racine
+
+L'architecture repose sur **trois points interdépendants** qui doivent tous être cohérents :
+
+| Fichier | Rôle | Valeur correcte |
+|---------|------|-----------------|
+| `docker-compose.yml` | Montage du dossier certs | `./infra/nginx/certs:/etc/nginx/ssl` **(sans `:ro`)** |
+| `nginx.conf` | Chemin des certs dans la config Nginx | `/etc/nginx/ssl/nginx-selfsigned.{crt,key}` |
+| `entrypoint.sh` | Variable `CERT_DIR` | `/etc/nginx/ssl` |
+
+Si le montage Docker pointe vers `/etc/ssl/certs` (chemin historique) **ou** si `:ro` est ajouté, l'entrypoint ne peut plus écrire dans le dossier monté, et soit plante (avec `set -e`), soit génère de nouveaux certificats auto-signés dans un dossier interne ignorant le volume.
+
+### Pourquoi le `chmod` échouait avec `:ro`
+
+Quand le volume est monté en lecture seule, le dossier `/etc/nginx/ssl` est verrouillé par le kernel Linux. Toute tentative de `chmod` ou `mkdir` sur ce chemin renvoie `chmod: changing permissions of '/etc/nginx/ssl': Read-only file system` — ce qui fait crasher l'entrypoint si `set -e` est actif.
+
+### Architecture Définitive (validée le 2026-03-19)
+
+```
+[Host Windows]                          [Container vp_nginx]
+code/infra/nginx/certs/         →  mount  →  /etc/nginx/ssl/          (rw)
+  nginx-selfsigned.crt (mkcert)              nginx-selfsigned.crt
+  nginx-selfsigned.key (mkcert)              nginx-selfsigned.key
+
+entrypoint.sh (root)
+  1. mkdir -p /etc/nginx/ssl
+  2. Si certs absents → openssl (fallback auto-signé)
+  3. Si certs présents → "using host mkcert certs"
+  4. chmod 644 .crt / chmod 600 .key
+  5. exec nginx -g 'daemon off;'   ← nginx master en root, workers droppent internement
+```
+
+**Pourquoi le master nginx tourne en root :** nginx lit la clé TLS privée au démarrage, ce qui nécessite root. Nginx gère lui-même le privilege drop de ses worker processes via sa configuration interne. C'est le pattern Docker standard (identique à l'image officielle `nginx`).
+
+### Vérifier que mkcert est utilisé (et non un auto-signé)
+
+```powershell
+# Depuis l'intérieur du container
+docker exec vp_nginx sh -c "echo '' | openssl s_client -connect localhost:8443 -servername localhost 2>/dev/null | openssl x509 -noout -issuer -dates"
+```
+
+✅ Réponse attendue :
+```
+issuer=O = mkcert development CA, ..., CN = Darkshadow (yoann...)
+notAfter=Jun 19 ... 2028 GMT
+```
+
+❌ Si la réponse mentionne `BICEC` ou `VeriPass` comme issuer → certificat auto-signé, mkcert non utilisé.
+
+### Workflow de récupération (si régression)
+
+```powershell
+# 1. Régénérer les certs mkcert sur l'hôte (depuis code/infra/nginx/)
+cd code/infra/nginx
+./setup-trusted-certs.ps1
+
+# 2. Vérifier que docker-compose.yml a le bon montage (sans :ro)
+#    volumes:
+#      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+#      - ./infra/nginx/certs:/etc/nginx/ssl          ← PAS :ro ici
+
+# 3. Rebuild + restart
+cd ../..
+docker-compose build --no-cache nginx
+docker-compose up -d --force-recreate nginx
+
+# 4. Vérifier les logs — doit afficher "Certificates found"
+docker logs vp_nginx
+```
+
+### Pièges à éviter
+
+- ❌ Ne pas ajouter `:ro` au montage des certs (le `chmod` de l'entrypoint plantera)
+- ❌ Ne pas changer `ssl_certificate` dans `nginx.conf` vers `/etc/ssl/certs/` — c'est un autre chemin que celui monté
+- ❌ Ne pas lancer `setup-trusted-certs.ps1` depuis le dossier `code/` — il doit être lancé depuis `code/infra/nginx/`
+- ❌ Ne pas utiliser `gosu`/`su-exec` pour dropper vers `nginx` dans l'entrypoint — nginx gère ça lui-même, et forcer le drop empêche la lecture des logs
+
+---
+
 ## Références
 - Issue #44 : Nginx Reverse Proxy & TLS 1.3
 - Issue #176 : Security Headers
 - ADR-015 : docs/adr/ADR-015-tls-security-headers.md
 - Architecture §11.1 : Defense in Depth
-- Architecture §14.1 : Phase 1 Chiffrement
+- Architecture §14.1 : Phase 1 Chiffrement

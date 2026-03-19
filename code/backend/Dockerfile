@@ -12,13 +12,16 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Copy dependency files
+# Copy dependency files only (for better layer caching)
 COPY pyproject.toml uv.lock ./
 
 # Install dependencies
 RUN uv sync --frozen --no-dev --no-install-project && \
     uv pip install --upgrade pip>=25.3 && \
-    find /app/.venv -name "wheel*" -exec rm -rf {} +
+    # Clean up pip cache to reduce layer size
+    find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /app/.venv -name "wheel*" -exec rm -rf {} + 2>/dev/null || true && \
+    find /app/.venv -name "*.pyc" -delete
 
 # Final stage
 FROM python:3.11-alpine
@@ -27,7 +30,9 @@ FROM python:3.11-alpine
 RUN apk add --no-cache \
     mesa-gl \
     glib \
-    libstdc++
+    libstdc++ && \
+    # Clean apk cache to reduce image size
+    rm -rf /var/cache/apk/*
 
 # Create a non-root user
 RUN addgroup -S vpgroup && adduser -S vpuser -G vpgroup
@@ -47,6 +52,10 @@ RUN mkdir -p /data/documents && chown -R vpuser:vpgroup /data/documents
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs').read()" || exit 1
 
 USER vpuser
 

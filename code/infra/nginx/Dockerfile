@@ -1,7 +1,8 @@
 FROM nginxinc/nginx-unprivileged:1.27-bookworm
 
-# Switch to root to copy files and set permissions
+# Switch to root to copy files, install tools, and set permissions
 USER root
+
 
 # Copy entrypoint script with proper permissions
 COPY entrypoint.sh /entrypoint.sh
@@ -10,11 +11,15 @@ RUN chmod +x /entrypoint.sh
 # Copy security headers config file
 COPY security_headers.conf /etc/nginx/security_headers.conf
 
-# Create SSL directory with proper permissions
-RUN mkdir -p /etc/nginx/ssl && chown nginx:nginx /etc/nginx/ssl
+# Pre-create SSL directory with proper permissions (fallback if no volume mount)
+RUN mkdir -p /etc/nginx/ssl && chmod 755 /etc/nginx/ssl
 
-# Switch back to nginx user
-USER nginx
+# Add health check for the reverse proxy
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Keep root so entrypoint can fix permissions on mounted volume
+USER root
 
 EXPOSE 8080 8443
 
