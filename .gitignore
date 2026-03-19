@@ -54,9 +54,12 @@ out/
 # ========================
 # Données & Modèles AI
 # ========================
-data/documents/
-data/models/
-data/db/
+data/documents/*
+data/models/*
+data/db/*
+!data/documents/.gitkeep
+!data/models/.gitkeep
+!data/db/.gitkeep
 *.onnx
 *.pdparams
 *.pdopt

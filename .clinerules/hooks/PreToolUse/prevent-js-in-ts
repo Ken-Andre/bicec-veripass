@@ -1,0 +1,17 @@
+#!/bin/bash
+# PreToolUse Hook: prevent-js-in-ts
+# Empêche la création de fichiers .js dans un projet TypeScript
+
+INPUT=$(cat)
+TOOL=$(echo "$INPUT" | jq -r '.preToolUse.tool // empty')
+FILE_PATH=$(echo "$INPUT" | jq -r '.preToolUse.parameters.path // empty')
+
+if [[ "$TOOL" == "write_to_file" ]] && [[ "$FILE_PATH" == *.js ]]; then
+    # Vérifier si c'est un projet TypeScript
+    if [[ -f "tsconfig.json" ]]; then
+        echo '{"cancel":true,"errorMessage":"Utilisez des fichiers .ts au lieu de .js dans ce projet TypeScript"}'
+        exit 0
+    fi
+fi
+
+echo '{"cancel":false}'

@@ -1,0 +1,41 @@
+# Build stage
+FROM oven/bun:1 AS builder
+
+WORKDIR /app
+
+# Copy package files first (better layer caching)
+COPY package.json bun.lock ./
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Copy application code
+COPY . .
+
+# Build the application
+RUN bun run build && \
+    # Clean up unnecessary files to reduce layer size
+    rm -rf node_modules .next .bun
+
+# Final stage
+FROM nginxinc/nginx-unprivileged:1.27-alpine
+
+# Switch to root to install security updates and clean
+USER root
+RUN apk update && apk upgrade --no-cache && \
+    # Clean apk cache to reduce final image size
+    rm -rf /var/cache/apk/*
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
+
+# Switch back to the unprivileged user
+USER 101
+
+# Copy build artifacts
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 8080
+
+CMD ["nginx", "-g", "daemon off;"]
