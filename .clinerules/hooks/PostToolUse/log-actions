@@ -1,0 +1,20 @@
+#!/bin/bash
+# PostToolUse Hook: log-actions
+# Log toutes les actions effectuées dans un fichier de journal
+
+INPUT=$(cat)
+TOOL=$(echo "$INPUT" | jq -r '.postToolUse.tool // empty')
+SUCCESS=$(echo "$INPUT" | jq -r '.postToolUse.success // empty')
+DURATION=$(echo "$INPUT" | jq -r '.postToolUse.durationMs // empty')
+TIMESTAMP=$(date -Iseconds)
+
+# Log dans un fichier
+LOG_FILE="$HOME/.cline-actions.log"
+echo "$TIMESTAMP | $TOOL | success=$SUCCESS | ${DURATION}ms" >> "$LOG_FILE"
+
+# Si l'action a échoué, notifier
+if [[ "$SUCCESS" == "false" ]]; then
+    echo "⚠️ Action $TOOL a échoué (voir $LOG_FILE pour détails)" >&2
+fi
+
+echo '{"cancel":false}'

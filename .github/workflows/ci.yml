@@ -83,6 +83,7 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           JWT_SECRET: ${{ secrets.JWT_SECRET || format('test-secret-{0}', github.run_id) }}
           ENVIRONMENT: testing
+          OTP_MODE: dev_local
         run: cd code/backend && uv run pytest -v
 
   build-mobile:
