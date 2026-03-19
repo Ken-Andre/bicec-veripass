@@ -45,6 +45,20 @@ class Settings(BaseSettings):
     ORANGE_BASE_URL: str = "https://api.orange.com"
     ORANGE_SENDER_NAME: str = "VeriPass"
     ORANGE_SENDER_PHONE: str = ""
+    
+    # OTP Configuration
+    # Modes: "orange" (real SMS), "dev_local" (console logs only)
+    OTP_MODE: str = "orange"
+    OTP_EXPIRY_MINUTES: int = 10
+
+    @field_validator("OTP_MODE", mode="after")
+    @classmethod
+    def validate_otp_mode(cls, v: str, info) -> str:
+        # Avoid circular import issues by accessing info.data
+        env = info.data.get("ENVIRONMENT", "development")
+        if env == "production" and v == "dev_local":
+            raise ValueError("OTP_MODE 'dev_local' is NOT allowed in production environment")
+        return v
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
