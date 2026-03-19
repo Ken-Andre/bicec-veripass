@@ -1,4 +1,78 @@
 {
   "mcpServers": {
+    "github.com/upstash/context7-mcp": {
+      "autoApprove": [
+        "resolve-library-id",
+        "query-docs"
+      ],
+      "timeout": 60,
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "github.com/modelcontextprotocol/servers/tree/main/src/filesystem": {
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Users\\yoann\\OneDrive\\Documents\\Cline\\MCP",
+        "C:\\Users\\yoann\\Documents\\School\\Xp-X5\\Stage\\bicec-veripass"
+      ]
+    },
+    "github.com/executeautomation/mcp-playwright": {
+      "autoApprove": [
+        "playwright_navigate"
+      ],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "playwright-mcp-server",
+      "args": []
+    },
+    "github.com/modelcontextprotocol/servers/tree/main/src/git": {
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "mcp_server_git",
+        "--repository",
+        "C:\\Users\\yoann\\Documents\\School\\Xp-X5\\Stage\\bicec-veripass"
+      ]
+    },
+    "github.com/github/github-mcp-server": {
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 60,
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "disabledTools": [
+        "get_teams",
+        "search_users",
+        "get_tag",
+        "get_release_by_tag",
+        "assign_copilot_to_issue"
+      ]
+    }
   }
 }
