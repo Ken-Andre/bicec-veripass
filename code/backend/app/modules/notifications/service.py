@@ -13,7 +13,7 @@ async def send_sms_notification(phone_number: str, message: str) -> Dict[str, An
     
     if settings.OTP_MODE == "dev_local":
         print("\n" + "="*50)
-        print(f"DEBUG SMS [dev_local mode]")
+        print("DEBUG SMS [dev_local mode]")
         print(f"TO:      {phone_number}")
         print(f"MESSAGE: {message}")
         print("="*50 + "\n")

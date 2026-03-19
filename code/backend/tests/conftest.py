@@ -4,12 +4,15 @@ from typing import AsyncGenerator
 
 import pytest
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
-# Override DATABASE_URL before any app import
+# Use DATABASE_URL from env (CI sets it), fallback to TEST_DATABASE_URL, then local default
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://vp_user:vp_password@localhost:5432/veripass_test"
+    os.getenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/veripass_test"
+    )
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
