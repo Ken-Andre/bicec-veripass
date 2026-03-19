@@ -10,10 +10,6 @@ from alembic import context
 # Import project settings and base metadata
 from app.core.config import settings
 from app.db.base import Base
-import sys
-print(f"DEBUG: sys.path = {sys.path}")
-import app.db.base
-print(f"DEBUG: app.db.base file = {app.db.base.__file__}")
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

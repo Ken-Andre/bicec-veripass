@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     # IA / OCR
     OCR_CONFIDENCE_THRESHOLD: float = 0.85
     PADDLE_LAZY_LOAD: bool = True
+    
+    # Orange SMS API
+    ORANGE_CLIENT_ID: str = ""
+    ORANGE_CLIENT_SECRET: str = ""
+    ORANGE_AUTH_HEADER_BASIC: str = ""
+    ORANGE_BASE_URL: str = "https://api.orange.com"
+    ORANGE_SENDER_NAME: str = "VeriPass"
+    ORANGE_SENDER_PHONE: str = ""
 
     model_config = SettingsConfigDict(
         case_sensitive=True,

@@ -45,8 +45,9 @@ COPY --from=builder /app/.venv /app/.venv
 # Copy application code and set ownership
 COPY --chown=vpuser:vpgroup . .
 
-# Ensure storage directory exists
-RUN mkdir -p /data/documents && chown -R vpuser:vpgroup /data/documents
+# Ensure storage directory exists and set entrypoint permissions
+RUN mkdir -p /data/documents && chown -R vpuser:vpgroup /data/documents && \
+    chmod +x /app/entrypoint.sh
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
@@ -54,11 +55,11 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Add health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs').read()" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health').read()" || exit 1
 
 USER vpuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+ENTRYPOINT ["/app/entrypoint.sh"]

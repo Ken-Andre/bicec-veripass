@@ -20,10 +20,10 @@ Understand the entire codebase before any work begins. Read project structure, a
 Implement features and fix bugs. Follow the codebase explorer brief for patterns and conventions. Write clean, maintainable code with error handling.
 
 ### 3. Test Agent
-Write and run tests WITHOUT committing. Follow testing conventions. Run tests using pytest (backend) or npm test (frontend). Report pass/fail status with details.
+Write and run tests WITHOUT committing. Follow testing conventions. Run tests using pytest (backend) or bun test (frontend). Report pass/fail status with details.
 
 ### 4. Research Agent
-Research solutions on the internet when needed. Use web search for documentation, Stack Overflow, GitHub issues. Only activate when explicitly asked.
+Research solutions on the internet when needed. Use web search for documentation, Stack Overflow, GitHub issues, and other online resources. Only activate when explicitly asked.
 
 ### 5. Regression Agent
 Track issues for regression testing. Document bugs, add to regression test suite, maintain known issues list.
