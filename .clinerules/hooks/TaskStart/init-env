@@ -1,0 +1,28 @@
+#!/bin/bash
+# TaskStart Hook: init-env
+# Initialise l'environnement au démarrage d'une nouvelle tâche
+
+echo "🎯 Initialisation de l'environnement BICEC VeriPass..."
+
+# Vérifier Docker
+if docker info &> /dev/null; then
+    echo "✅ Docker est en cours d'exécution" >&2
+else
+    echo "⚠️ Docker n'est pas en cours d'exécution" >&2
+fi
+
+# Vérifier si les services sont déjà lancés
+if docker compose ps 2>/dev/null | grep -q "running"; then
+    echo "✅ Services Docker déjà actifs" >&2
+else
+    echo "ℹ️ Services Docker non lancés (utilisez docker compose up -d)" >&2
+fi
+
+# Vérifier les variables d'environnement
+if [[ -f ".env" ]]; then
+    echo "✅ Fichier .env trouvé" >&2
+else
+    echo "⚠️ Fichier .env manquant (copiez .env.example)" >&2
+fi
+
+echo '{"cancel":false}'

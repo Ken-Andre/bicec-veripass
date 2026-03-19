@@ -1,0 +1,28 @@
+#!/bin/bash
+# PostToolUse Hook: run-tests
+# Lance automatiquement les tests après modification de code
+
+INPUT=$(cat)
+TOOL=$(echo "$INPUT" | jq -r '.postToolUse.tool // empty')
+SUCCESS=$(echo "$INPUT" | jq -r '.postToolUse.success // empty')
+FILE_PATH=$(echo "$INPUT" | jq -r '.postToolUse.parameters.path // empty')
+
+# Vérifier si un fichier de test ou de code a été modifié
+if [[ "$TOOL" == "write_to_file" ]] && [[ "$SUCCESS" == "true" ]]; then
+    # Si c'est un fichier Python de test ou de code
+    if [[ "$FILE_PATH" == *.py ]]; then
+        # Vérifier si c'est un fichier de test
+        if [[ "$FILE_PATH" == *test* ]]; then
+            echo "🧪 Exécution des tests Python..." >&2
+            cd "$(dirname "$FILE_PATH")" && python -m pytest -v --tb=short 2>&1 | head -50
+        fi
+    fi
+    
+    # Si c'est un fichier TypeScript/JavaScript
+    if [[ "$FILE_PATH" == *.ts || "$FILE_PATH" == *.tsx || "$FILE_PATH" == *.jsx ]]; then
+        echo "🧪 Exécution des tests JavaScript/TypeScript..." >&2
+        npm test -- --watchAll=false 2>&1 | head -50
+    fi
+fi
+
+echo '{"cancel":false}'

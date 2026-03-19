@@ -1,0 +1,1 @@
+When you are on terminal that seems to be a powershell or all except linux terminal dont use &&. Instead use ;

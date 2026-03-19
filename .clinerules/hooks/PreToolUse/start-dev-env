@@ -1,0 +1,20 @@
+#!/bin/bash
+# PreToolUse Hook: start-dev-env
+# Démarre l'environnement de dev avant les opérations
+
+INPUT=$(cat)
+TOOL=$(echo "$INPUT" | jq -r '.preToolUse.tool // empty')
+COMMAND=$(echo "$INPUT" | jq -r '.preToolUse.parameters.command // empty')
+
+# Vérifier si on lance un serveur de dev
+if [[ "$TOOL" == "execute_command" ]] && [[ "$COMMAND" == *"npm run dev"* || "$COMMAND" == *"docker compose up"* ]]; then
+    echo "🚀 Vérification de l'environnement de développement..." >&2
+    
+    # Vérifier Docker
+    if ! docker info &> /dev/null; then
+        echo '{"cancel":true,"errorMessage":"Docker n'\''est pas en cours d'\''exécution. Veuillez démarrer Docker avant de continuer."}'
+        exit 0
+    fi
+fi
+
+echo '{"cancel":false}'
