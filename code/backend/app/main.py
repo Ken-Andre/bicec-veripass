@@ -20,6 +20,7 @@ from app.core.rate_limit import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 from app.db.session import check_db_connection
+from app.core.redis import check_redis_connection
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -84,8 +85,7 @@ app.include_router(demo_router, prefix="/api/v1")
 @app.get("/api/health", tags=["health"])
 async def health_check():
     db_status = await check_db_connection()
-    # Redis check placeholder (to be implemented in AUTH-06+)
-    redis_status = True # Mock for now as requested for skeleton
+    redis_status = await check_redis_connection()
     
     status = "ok" if db_status and redis_status else "degraded"
     

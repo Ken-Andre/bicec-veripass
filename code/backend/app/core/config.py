@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_DEFAULT: str = "100/minute"
     RATE_LIMIT_AUTH: str = "10/minute"
     RATE_LIMIT_OTP: str = "3/minute"
+    RATE_LIMIT_ADMIN: str = "30/minute"
     
     # CORS - simplified validator
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]

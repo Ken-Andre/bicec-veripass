@@ -1,9 +1,10 @@
-"""Admin router — user management."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.db.base  # noqa — ensures all mappers are registered
+from app.core.rate_limit import limiter
+from app.core.config import settings
 from app.core.pagination import PageParams, PageResponse, paginate
 from app.db.session import get_db
 from app.modules.auth.models import User
@@ -18,7 +19,9 @@ async def get_root():
 
 
 @router.get("/users", response_model=PageResponse[UserSchema])
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_users(
+    request: Request,
     page: PageParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ):

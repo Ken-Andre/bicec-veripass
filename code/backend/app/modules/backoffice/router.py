@@ -1,9 +1,10 @@
-"""Backoffice router — dossier review queue and audit logs."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.db.base  # noqa — ensures all mappers (Agency, etc.) are registered
+from app.core.rate_limit import limiter
+from app.core.config import settings
 from app.core.pagination import PageParams, PageResponse, paginate
 from app.db.session import get_db
 from app.modules.kyc.models import KYCSession
@@ -19,7 +20,9 @@ async def get_root():
 
 
 @router.get("/queue", response_model=PageResponse[KYCQueueItemSchema])
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_queue(
+    request: Request,
     page: PageParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
@@ -36,7 +39,9 @@ async def list_queue(
 
 
 @router.get("/audit-logs", response_model=PageResponse[AuditLogSchema])
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_audit_logs(
+    request: Request,
     page: PageParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
