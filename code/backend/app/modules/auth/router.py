@@ -29,6 +29,8 @@ from app.modules.auth.schemas import (
     PinVerifyRequest,
     OtpSendRequest,
     OtpVerifyRequest,
+    EmailOtpSendRequest,
+    EmailOtpVerifyRequest,
 )
 
 router = APIRouter()
@@ -117,6 +119,73 @@ async def verify_otp_endpoint(
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
+
+# ============================================================
+# MOBILE EMAIL OTP ENDPOINTS (Story 1.3 — Marie)
+# ============================================================
+
+@router.post("/email/send", status_code=status.HTTP_200_OK)
+@limiter.limit(settings.RATE_LIMIT_OTP)
+async def send_email_otp(
+    request: Request, 
+    body: EmailOtpSendRequest, 
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send OTP via email for Dual Authentication."""
+    email = body.email
+
+    # Update user email
+    current_user.email = email
+    await db.commit()
+
+    # Generate and store OTP
+    otp = generate_otp()
+    stored = await store_otp(email, otp)
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate OTP",
+        )
+
+    from app.modules.auth.tasks import send_only_email_otp_task
+    send_only_email_otp_task.delay(email, otp)
+    
+    logger.info(f"Email OTP task queued for {email}")
+    
+    response = {"message": "Email OTP request received and is being processed"}
+    if settings.ENVIRONMENT != "production":
+        response["otp_debug"] = otp
+        
+    return response
+
+@router.post("/email/verify", status_code=status.HTTP_200_OK)
+@limiter.limit(settings.RATE_LIMIT_OTP)
+async def verify_email_otp(
+    request: Request, 
+    body: EmailOtpVerifyRequest, 
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Verify Email OTP."""
+    if not current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No email associated with this user",
+        )
+
+    # Verify OTP
+    is_valid = await verify_otp(current_user.email, body.otp)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired OTP",
+        )
+
+    # Delete OTP after successful verification
+    await delete_otp(current_user.email)
+
+    return {"message": "Email verified successfully"}
 
 # ============================================================
 # PIN ENDPOINTS (Story 1.3 — Marie returning user)

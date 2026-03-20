@@ -66,3 +66,13 @@ class OtpVerifyRequest(BaseModel):
     """OTP verification request."""
     phone: str = Field(..., pattern=r"^\+?[1-9]\d{6,14}$")
     otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d+$")
+
+
+class EmailOtpSendRequest(BaseModel):
+    """Email OTP send request."""
+    email: EmailStr
+
+
+class EmailOtpVerifyRequest(BaseModel):
+    """Email OTP verification request."""
+    otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d+$")
