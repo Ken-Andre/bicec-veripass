@@ -10,7 +10,10 @@ celery = Celery(
     "bicec_veripass",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.tasks.maintenance"] # We'll create this module next
+    include=[
+        "app.tasks.maintenance",  # Tâches de maintenance
+        "app.tasks_demo",  # Tâches de démonstration
+    ]
 )
 
 # Optional configuration

@@ -8,6 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 
 from app.api.v1.router import api_router
+from app.routers.demo import router as demo_router
 from app.core.config import settings
 from app.core.logging import logger
 from app.core.exceptions import (
@@ -73,6 +74,7 @@ async def add_correlation_id(request: Request, call_next):
 
 # Routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(demo_router, prefix="/api/v1")
 
 @app.get("/api/health", tags=["health"])
 async def health_check():

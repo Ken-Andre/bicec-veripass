@@ -12,6 +12,7 @@ dependencies = [
     "alembic>=1.13",
     "redis>=5.0",
     "celery[redis]>=5.3",
+    "flower>=2.0",
     "python-json-logger>=2.0",
     "python-multipart>=0.0.9",
     "httpx>=0.27",
