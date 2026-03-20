@@ -42,9 +42,9 @@ Redis ne contient **aucune donnée réglementaire** (audit_logs, KYC, PEP/Sancti
 
 | Pattern de clé | Type Redis | TTL par défaut | Rôle fonctionnel | Source of truth |
 |----------------|-----------|----------------|-----------------|-----------------|
-| `otp:{phone}` | String | **300 s** (5 min) | Hash bcrypt de l'OTP 6 chiffres envoyé à Marie. Supprimé immédiatement après vérification réussie (anti-replay). | — (éphémère) |
-| `otp_verify_attempts:{phone}` | String (counter INCR) | **300 s** | Compteur de tentatives de vérification OTP par numéro. Bloqué à 3 tentatives. Supprimé après succès. | — (éphémère) |
-| `ratelimit:otp:{ip}` | String (counter INCR) | **300 s** | Compteur envois OTP par IP. Max 3/5 min (ADMIN-01 + AUTH-03). | — (éphémère) |
+| `otp:{phone}` | String | **600 s** (10 min) | Hash bcrypt de l'OTP 6 chiffres envoyé à Marie. Supprimé immédiatement après vérification réussie (anti-replay). | — (éphémère) |
+| `otp_verify_attempts:{phone}` | String (counter INCR) | **600 s** | Compteur de tentatives de vérification OTP par numéro. Bloqué à 3 tentatives. Supprimé après succès. | — (éphémère) |
+| `ratelimit:otp:{ip}` | String (counter INCR) | **600 s** | Compteur envois OTP par IP. Max 3/10 min (ADMIN-01 + AUTH-03). | — (éphémère) |
 | `ratelimit:auth:{ip}` | String (counter INCR) | **60 s** | Compteur requêtes auth endpoints par IP. Max 10/min (ADR-015, Nginx + applicatif). | — (éphémère) |
 | `ratelimit:global:{ip}` | String (counter INCR) | **60 s** | Compteur requêtes API générales par IP. Max 100/min. | — (éphémère) |
 | `refresh:{user_id}:{jti}` | String (valeur vide) | **604 800 s** (7 jours) | Présence = refresh token valide. Supprimé à `POST /auth/logout` ou révocation AML. Permet invalidation ciblée sans blacklist globale. | — (éphémère) |
@@ -88,10 +88,10 @@ Les constantes TTL ne sont pas encore définies. À ajouter dans `Settings` :
 
 ```python
 # Redis TTL (secondes)
-REDIS_OTP_TTL: int = 300           # 5 min — AUTH-03
-REDIS_OTP_ATTEMPTS_TTL: int = 300  # 5 min — AUTH-03
+REDIS_OTP_TTL: int = 600           # 10 min — AUTH-03
+REDIS_OTP_ATTEMPTS_TTL: int = 600  # 10 min — AUTH-03
 REDIS_REFRESH_TOKEN_TTL: int = 604800  # 7 jours — AUTH-02
-REDIS_RATELIMIT_OTP_TTL: int = 300     # 5 min — ADMIN-01
+REDIS_RATELIMIT_OTP_TTL: int = 600     # 10 min — ADMIN-01
 REDIS_RATELIMIT_AUTH_TTL: int = 60     # 1 min — ADMIN-01
 REDIS_RATELIMIT_GLOBAL_TTL: int = 60   # 1 min — ADMIN-01
 REDIS_LOCK_OCR_TTL: int = 120          # sécurité — ADR-003
@@ -100,7 +100,7 @@ REDIS_LOCK_AGENT_TTL: int = 30         # sécurité — §12.3
 REDIS_ANALYTICS_CACHE_TTL: int = 60    # ANALYTICS-12
 ```
 
-> Note : `OTP_EXPIRY_MINUTES = 10` dans `config.py` actuel est incohérent avec le backlog AUTH-03 (TTL 5 min / 300s). À aligner sur 5 min.
+> Note : `OTP_EXPIRY_MINUTES = 10` dans `config.py` actuel est cohérent avec ce TTL de 10 min.
 
 #### 4.2 `core/redis.py` — Helpers namespaces
 
@@ -166,7 +166,7 @@ Vérifier que l'implémentation future respecte :
 
 | Priorité | Fichier | Action |
 |----------|---------|--------|
-| 🔴 Critique | `core/config.py` | Ajouter les 10 constantes `REDIS_*_TTL` ; corriger `OTP_EXPIRY_MINUTES` de 10 à 5 |
+| 🔴 Critique | `core/config.py` | Ajouter les 10 constantes `REDIS_*_TTL` (`OTP_EXPIRY_MINUTES = 10` est déjà correct) |
 | 🔴 Critique | `core/security.py` | Persister `refresh:{user_id}:{jti}` dans Redis à la création du refresh token (AUTH-02) |
 | 🟠 Haute | `core/redis.py` | Ajouter les helpers de construction de clés (section 4.2) |
 | 🟠 Haute | `modules/auth/` | Implémenter OTP store avec `SET ... EX` + pipeline DEL anti-replay (AUTH-03) |
