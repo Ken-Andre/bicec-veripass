@@ -16,6 +16,9 @@ from app.core.exceptions import (
     validation_exception_handler,
     general_exception_handler
 )
+from app.core.rate_limit import limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 from app.db.session import check_db_connection
 
 @asynccontextmanager
@@ -38,8 +41,10 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc",
     lifespan=lifespan
 )
+app.state.limiter = limiter
 
 # Exception Handlers
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
