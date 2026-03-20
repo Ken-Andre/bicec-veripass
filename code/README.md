@@ -33,7 +33,14 @@ bicec-veripass/
 
 ### Prérequis
 - Docker Desktop (WSL2 backend) · RAM ≥ 16 GB
-- `.wslconfig` configuré (voir `infra/.wslconfig.template`)
+- `.wslconfig` configuré (IMPORTANT pour éviter OOM en Sprint 2+) :
+  1. Copier `infra/.wslconfig.template` → `C:\Users\<USERNAME>\.wslconfig`
+  2. Éditer le fichier et remplacer `<USERNAME>` par votre nom d'utilisateur Windows
+  3. Ajuster `processors` selon votre CPU (2-6 cores)
+  4. Redémarrer WSL : `wsl --shutdown` puis relancer Docker Desktop
+  5. Vérifier : `wsl --list --verbose` (État = Running)
+  
+  📖 Guide complet : `docs/setup-wsl2-windows.md`
 
 ### Lancement
 

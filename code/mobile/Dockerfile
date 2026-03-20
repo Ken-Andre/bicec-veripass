@@ -26,9 +26,10 @@ RUN apk update && apk upgrade --no-cache && \
     # Clean apk cache to reduce final image size
     rm -rf /var/cache/apk/*
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
+# Add health check — wget BusyBox (Alpine) ne supporte pas --spider
+# Utiliser 127.0.0.1 au lieu de localhost (résolution DNS Alpine)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
 
 # Switch back to the unprivileged user
 USER 101

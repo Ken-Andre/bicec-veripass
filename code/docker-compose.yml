@@ -42,7 +42,8 @@ services:
       - veripass-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1"]
+      # curl disponible dans nginx:bookworm — vérifie le redirect HTTP→HTTPS (301)
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -w '%{http_code}' http://localhost:8080/ | grep -qE '^(200|301|302)$' || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -66,9 +67,10 @@ services:
     restart: unless-stopped
     # RAM: ~128MB (nginx serve static)
     ports:
-      - "8081:8080" # Optional direct access for debug
+      - "3000:8080" # Optional direct access for debug
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1"]
+      # wget BusyBox (Alpine) ne supporte pas --spider — utiliser 127.0.0.1 (localhost DNS fail)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -92,9 +94,10 @@ services:
     restart: unless-stopped
     # RAM: ~128MB
     ports:
-      - "8082:8080" # Optional direct access for debug
+      - "3001:8080" # Optional direct access for debug
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1"]
+      # wget BusyBox (Alpine) ne supporte pas --spider — utiliser 127.0.0.1 (localhost DNS fail)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -119,6 +122,16 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
       - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
+      - OTP_MODE=${OTP_MODE:-dev_local}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - OTP_FALLBACK_EMAIL=${OTP_FALLBACK_EMAIL:-true}
+      - SMTP_HOST=${SMTP_HOST:-localhost}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_TLS=${SMTP_TLS:-false}
+      - SMTP_SSL=${SMTP_SSL:-false}
+      - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
       - OCR_CONFIDENCE_THRESHOLD=0.85
       - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
     volumes:
@@ -198,6 +211,16 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
       - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
+      - OTP_MODE=${OTP_MODE:-dev_local}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - OTP_FALLBACK_EMAIL=${OTP_FALLBACK_EMAIL:-true}
+      - SMTP_HOST=${SMTP_HOST:-localhost}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_TLS=${SMTP_TLS:-false}
+      - SMTP_SSL=${SMTP_SSL:-false}
+      - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
       - SKIP_MIGRATIONS=1
     depends_on:
       postgres:
@@ -238,7 +261,8 @@ services:
     restart: unless-stopped
     mem_limit: 128m
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -u $$CELERY_BROKER_URL ping | grep -q PONG || exit 1"]
+      # redis-cli absent dans l'image Python — utiliser Python + redis pour pinger le broker
+      test: ["CMD-SHELL", "/app/.venv/bin/python3 -c \"import redis; r=redis.from_url('redis://redis:6379/0'); r.ping()\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -265,7 +289,9 @@ services:
     restart: unless-stopped
     mem_limit: 256m
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:5555/ || exit 1"]
+      # wget BusyBox ne supporte pas --user/--password et flower retourne 401 sans auth
+      # nc vérifie juste que le port TCP est ouvert (flower tourne)
+      test: ["CMD-SHELL", "nc -z localhost 5555 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

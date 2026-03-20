@@ -1,0 +1,37 @@
+[wsl2]
+# ============================================================================
+# BICEC VeriPass — WSL2 Configuration Template
+# ============================================================================
+# 
+# INSTALLATION:
+# 1. Copier ce fichier vers: C:\Users\<USERNAME>\.wslconfig
+# 2. Remplacer <USERNAME> par votre nom d'utilisateur Windows
+# 3. Redémarrer WSL: wsl --shutdown
+# 4. Relancer Docker Desktop
+# 5. Vérifier: wsl --list --verbose (État = Running)
+#
+# ============================================================================
+
+# RAM Limit — 8GB pour Docker, 8GB restants pour Windows/IDE
+# Critique pour éviter OOM quand les modèles IA sont chargés (Sprint 2+)
+memory=8GB
+
+# CPU Cores (ajuster selon votre machine)
+# Recommandé: 4 cores pour i5/i7, 2 cores pour i3
+processors=4
+
+# Swap — 2GB buffer pour pics temporaires
+# Permet de gérer les pics de RAM sans crash
+swap=2GB
+swapFile=C:\\Users\\<USERNAME>\\AppData\\Local\\Temp\\wsl-swap.vhdx
+
+# Performance optimizations
+pageReporting=false
+localhostForwarding=true
+
+# ============================================================================
+# NOTES:
+# - Sans cette config, Docker Desktop peut utiliser jusqu'à 12-14 GB
+# - Avec modèles IA (Sprint 2+): ~8.5 GB nécessaires
+# - Budget RAM détaillé dans docs/analysis-issue-9-ports-wsl2.md
+# ============================================================================

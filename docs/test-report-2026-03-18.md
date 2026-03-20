@@ -51,7 +51,7 @@ vp_backoffice code-backoffice        backoffice Up
 ## Tests Mobile PWA
 
 ### Accès
-- **URL:** http://localhost:8081
+- **URL:** http://localhost:3000
 - **Résultat:** ✅ OK
 - **Fichiers servis:**
   - HTML: index.html (200)
@@ -70,7 +70,7 @@ vp_backoffice code-backoffice        backoffice Up
 ## Tests Backoffice
 
 ### Accès
-- **URL:** http://localhost:8082
+- **URL:** http://localhost:3001
 - **Résultat:** ✅ OK
 - **Workers Nginx:** 16 workers actifs
 

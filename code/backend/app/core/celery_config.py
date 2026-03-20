@@ -13,6 +13,7 @@ celery = Celery(
     include=[
         "app.tasks.maintenance",  # Tâches de maintenance
         "app.tasks_demo",  # Tâches de démonstration
+        "app.modules.auth.tasks", # Tâches d'authentification (OTP SMS/Email)
     ]
 )
 

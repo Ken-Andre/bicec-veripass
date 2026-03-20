@@ -53,10 +53,21 @@ class Settings(BaseSettings):
     ORANGE_SENDER_NAME: str = "VeriPass"
     ORANGE_SENDER_PHONE: str = ""
     
+    # Email Configuration
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 1025
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = False
+    SMTP_SSL: bool = False
+    SMTP_FROM: str = "noreply@bicec-veripass.cm"
+    
     # OTP Configuration
-    # Modes: "orange" (real SMS), "dev_local" (console logs only)
+    # Modes: "orange" (SMS), "email" (direct Email if preferred), "dev_local" (logs only)
     OTP_MODE: str = "orange"
+    OTP_FALLBACK_EMAIL: bool = True  # If SMS fails, try Email if user has an email recorded
     OTP_EXPIRY_MINUTES: int = 10
+
 
     @field_validator("OTP_MODE", mode="after")
     @classmethod
