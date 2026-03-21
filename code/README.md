@@ -76,6 +76,26 @@ docker compose exec fastapi python scripts/seed_dev.py
 Copier `.env.example` → `.env` et remplir toutes les valeurs.
 **Ne jamais committer `.env`** (voir `.gitignore`).
 
+### Chiffrement du .env (optionnel)
+
+Le projet supporte le chiffrement local du fichier `.env` avec `senv`.
+
+**Fichiers :**
+- `.env` — reste local (ignoré par Git)
+- `.env.enc` — version chiffrée à committer
+- `.env.pass` — clé de chiffrement (jamais committée)
+
+**Commandes :**
+```bash
+# Chiffrer .env -> .env.enc
+./scripts/encrypt-env.sh
+
+# Déchiffrer .env.enc -> .env
+./scripts/decrypt-env.sh
+```
+
+Un hook pre-commit chiffre automatiquement `.env` vers `.env.enc` avant chaque commit.
+
 ---
 
 ## Migrations
