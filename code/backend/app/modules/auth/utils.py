@@ -47,6 +47,9 @@ async def verify_otp(identifier: str, otp_to_verify: str) -> bool:
 
         if stored_hash is None:
             return False
+        # Redis returns bytes — decode to str for bcrypt
+        if isinstance(stored_hash, bytes):
+            stored_hash = stored_hash.decode("utf-8")
         return verify_password(otp_to_verify, stored_hash)
     except Exception as e:
         logger.error(f"Failed to verify OTP for {identifier}: {e}")
