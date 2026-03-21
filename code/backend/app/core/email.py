@@ -41,15 +41,22 @@ class EmailClient:
         message["To"] = to_email
         message["Subject"] = subject
 
+        if self.use_ssl and self.use_tls:
+            raise ValueError(
+                "use_tls (STARTTLS) and use_ssl (implicit TLS) are mutually exclusive. "
+                "Set only one of SMTP_TLS or SMTP_SSL."
+            )
+
         try:
             await aiosmtplib.send(
                 message,
                 hostname=self.host,
                 port=self.port,
-                username=self.user,
-                password=self.password,
-                use_tls=self.use_ssl,
-                start_tls=self.use_tls,
+                username=self.user or None,
+                password=self.password or None,
+                use_tls=self.use_ssl,      # SMTP_SSL  → implicit TLS (port 465)
+                start_tls=self.use_tls,    # SMTP_TLS  → STARTTLS upgrade (port 587)
+                timeout=10,
             )
             logger.info(f"Email sent to {to_email}")
             return True

@@ -125,7 +125,7 @@ services:
       - OTP_MODE=${OTP_MODE:-dev_local}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - OTP_FALLBACK_EMAIL=${OTP_FALLBACK_EMAIL:-true}
-      - SMTP_HOST=${SMTP_HOST:-localhost}
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
       - SMTP_PORT=${SMTP_PORT:-1025}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
@@ -214,7 +214,7 @@ services:
       - OTP_MODE=${OTP_MODE:-dev_local}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - OTP_FALLBACK_EMAIL=${OTP_FALLBACK_EMAIL:-true}
-      - SMTP_HOST=${SMTP_HOST:-localhost}
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
       - SMTP_PORT=${SMTP_PORT:-1025}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
@@ -350,6 +350,28 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # MAILPIT (Local SMTP for Dev)
+  mailpit:
+    image: axllent/mailpit
+    container_name: vp_mailpit
+    ports:
+      - "8025:8025"   # Web UI
+      - "1025:1025"   # SMTP port
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8025/api/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     logging:
       driver: json-file
       options:

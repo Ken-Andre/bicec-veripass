@@ -31,13 +31,6 @@ class Settings(BaseSettings):
     # CORS - simplified validator
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
-        if isinstance(v, str):
-            return [i.strip() for i in v.split(",") if i.strip()]
-        return v
-
     # Storage
     STORAGE_PATH: str = "./data/storage"
     
@@ -66,8 +59,20 @@ class Settings(BaseSettings):
     # Modes: "orange" (SMS), "email" (direct Email if preferred), "dev_local" (logs only)
     OTP_MODE: str = "orange"
     OTP_FALLBACK_EMAIL: bool = True  # If SMS fails, try Email if user has an email recorded
-    OTP_EXPIRY_MINUTES: int = 10
+    OTP_FALLBACK_EMAIL_ADDRESS: str = ""  # Fallback email for dev/staging when user has no email
+    OTP_EXPIRY_MINUTES: int = 5      # Aligned with ADR-016 (5 min)
 
+    # Redis TTL (secondes) — Required by ADR-016
+    REDIS_OTP_TTL: int = 300           # 5 min — AUTH-03
+    REDIS_OTP_ATTEMPTS_TTL: int = 300  # 5 min — AUTH-03
+    REDIS_REFRESH_TOKEN_TTL: int = 604800  # 7 jours — AUTH-02
+    REDIS_RATELIMIT_OTP_TTL: int = 300     # 5 min — ADMIN-01
+    REDIS_RATELIMIT_AUTH_TTL: int = 60     # 1 min — ADMIN-01
+    REDIS_RATELIMIT_GLOBAL_TTL: int = 60   # 1 min — ADMIN-01
+    REDIS_LOCK_OCR_TTL: int = 120          # sécurité — ADR-003
+    REDIS_LOCK_GLM_TTL: int = 300          # sécurité — ADR-003
+    REDIS_LOCK_AGENT_TTL: int = 30         # sécurité — §12.3
+    REDIS_ANALYTICS_CACHE_TTL: int = 60    # ANALYTICS-12
 
     @field_validator("OTP_MODE", mode="after")
     @classmethod
@@ -76,6 +81,28 @@ class Settings(BaseSettings):
         env = info.data.get("ENVIRONMENT", "development")
         if env == "production" and v == "dev_local":
             raise ValueError("OTP_MODE 'dev_local' is NOT allowed in production environment")
+        return v
+
+    @field_validator("JWT_SECRET", mode="after")
+    @classmethod
+    def validate_jwt_secret(cls, v: str, info) -> str:
+        env = info.data.get("ENVIRONMENT", "development")
+        if env == "production" and v == "dev-secret-change-in-production":
+            raise ValueError("JWT_SECRET MUST be changed in production")
+        if env == "production" and len(v) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters in production")
+        return v
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v) -> list:
+        import os
+        if isinstance(v, str):
+            origins = [i.strip() for i in v.split(",") if i.strip()]
+            env = os.getenv("ENVIRONMENT", "development")
+            if env == "production" and "*" in origins:
+                raise ValueError("CORS wildcards not allowed in production")
+            return origins
         return v
 
     model_config = SettingsConfigDict(

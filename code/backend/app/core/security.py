@@ -1,7 +1,32 @@
-"""Security utilities: JWT encoding/decoding, password hashing, and RBAC."""
+"""Security utilities: JWT encoding/decoding, password hashing, and RBAC.
+
+JWT Claim Validation Rules
+--------------------------
+Access token claims:
+  - sub  (str, required): opaque user/agent UUID — never expose raw DB id in responses
+  - exp  (int, required): expiry timestamp (UTC)
+  - type (str, required): must be "access"
+  - role (str, required for mobile/agent): user role string
+  - user_type (str, required): "mobile" | "agent"
+  - sid  (str, optional): HMAC-derived ephemeral session handle — NOT the raw KYCSession DB id
+
+Refresh token claims:
+  - sub  (str, required): same opaque UUID as access token
+  - exp  (int, required): expiry timestamp (UTC, 7-day window)
+  - type (str, required): must be "refresh"
+  - jti  (str, required): random UUID for per-token revocation tracking
+
+Validation rules enforced at decode time:
+  - Algorithm: HS256 only (no "none", no RS256 fallback)
+  - type claim checked before trusting any other claim
+  - sub must resolve to an existing DB row
+  - sid is verified via HMAC before any DB lookup
+"""
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any, BinaryIO
 import hashlib
+import hmac
+import uuid as _uuid
 from jose import JWTError, jwt
 import bcrypt
 from fastapi import Depends, HTTPException, status
@@ -36,18 +61,29 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-def calculate_sha256(data: bytes) -> str:
-    """Calculate SHA-256 hash of given bytes for document integrity."""
-    return hashlib.sha256(data).hexdigest()
+def make_session_handle(db_session_id: str) -> str:
+    """
+    Derive an ephemeral session handle from a KYCSession DB id using HMAC-SHA256.
+
+    The raw DB UUID is never exposed to clients. Instead, callers receive this
+    opaque handle. The backend can re-derive it at any time to verify a handle
+    without storing a mapping table.
+
+    Usage:
+        handle = make_session_handle(str(kyc_session.id))
+        # store handle in token / response; never store raw id client-side
+    """
+    return hmac.new(
+        settings.JWT_SECRET.encode(),
+        db_session_id.encode(),
+        hashlib.sha256,
+    ).hexdigest()
 
 
-def calculate_stream_sha256(stream: BinaryIO) -> str:
-    """Calculate SHA-256 hash of a binary stream (chunked for memory efficiency)."""
-    sha256_hash = hashlib.sha256()
-    # We read in 4KB chunks to keep memory usage low regardless of file size
-    for byte_block in iter(lambda: stream.read(4096), b""):
-        sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
+def verify_session_handle(handle: str, db_session_id: str) -> bool:
+    """Constant-time verification of a session handle against a DB id."""
+    expected = make_session_handle(db_session_id)
+    return hmac.compare_digest(expected, handle)
 
 
 def create_access_token(
@@ -55,26 +91,45 @@ def create_access_token(
     expires_delta: Optional[timedelta] = None,
     additional_claims: Optional[dict[str, Any]] = None,
 ) -> str:
-    """Create a JWT access token."""
+    """
+    Create a JWT access token.
+
+    Allowed additional_claims keys: role, user_type, sid.
+    - sid must be a pre-computed HMAC handle (use make_session_handle), NOT a raw DB id.
+    - Any other keys are silently dropped to keep the token minimal.
+    """
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
-    
-    to_encode = {"exp": expire, "sub": str(subject), "type": "access"}
+
+    to_encode: dict[str, Any] = {"exp": expire, "sub": str(subject), "type": "access"}
+
+    # Allowlist: only include claims that are explicitly needed
+    _allowed = {"role", "user_type", "sid"}
     if additional_claims:
-        to_encode.update(additional_claims)
-    
+        to_encode.update({k: v for k, v in additional_claims.items() if k in _allowed})
+
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm="HS256")
     return encoded_jwt
 
 
 def create_refresh_token(subject: str) -> str:
-    """Create a JWT refresh token with longer expiry."""
+    """
+    Create a JWT refresh token with longer expiry.
+
+    Includes a jti (JWT ID) for per-token revocation tracking.
+    Claims: sub, exp, type, jti — nothing else.
+    """
     expire = datetime.now(timezone.utc) + timedelta(days=7)
-    to_encode = {"exp": expire, "sub": str(subject), "type": "refresh"}
+    to_encode = {
+        "exp": expire,
+        "sub": str(subject),
+        "type": "refresh",
+        "jti": str(_uuid.uuid4()),  # unique token id — store in a revocation list to invalidate
+    }
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm="HS256")
     return encoded_jwt
 
@@ -87,6 +142,42 @@ def decode_token(token: str) -> Optional[dict[str, Any]]:
     except JWTError as e:
         logger.warning(f"JWT decode error: {e}")
         return None
+
+
+async def is_token_revoked(jti: str, db: AsyncSession) -> bool:
+    """Check if a refresh token jti is in the revocation list."""
+    from app.modules.auth.models import TokenRevocation
+    import uuid as _uuid_mod
+    try:
+        jti_uuid = _uuid_mod.UUID(jti)
+    except ValueError:
+        return True  # malformed jti — treat as revoked
+    result = await db.execute(
+        select(TokenRevocation).where(TokenRevocation.jti == jti_uuid)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def revoke_token(jti: str, expires_at, db: AsyncSession) -> None:
+    """Add a refresh token jti to the revocation list."""
+    from app.modules.auth.models import TokenRevocation
+    from datetime import datetime
+    import uuid as _uuid_mod
+    revocation = TokenRevocation(jti=_uuid_mod.UUID(jti), expires_at=expires_at)
+    db.add(revocation)
+    await db.commit()
+
+
+async def decode_refresh_token(token: str, db: AsyncSession) -> Optional[dict[str, Any]]:
+    """Decode a refresh token and verify it hasn't been revoked."""
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "refresh":
+        return None
+    jti = payload.get("jti")
+    if not jti or await is_token_revoked(jti, db):
+        logger.warning(f"Refresh token revoked or missing jti: {jti}")
+        return None
+    return payload
 
 
 async def get_current_user(
