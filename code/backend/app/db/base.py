@@ -1,7 +1,7 @@
 # Import all models here for Alembic to detect them
 # This file is what Alembic env.py should target for target_metadata
 from app.db.base_class import Base  # noqa
-from app.modules.auth.models import User, Agent, OTPSession  # noqa
+from app.modules.auth.models import User, Agent, OTPSession, TokenRevocation  # noqa
 from app.modules.kyc.models import (  # noqa
     KYCSession, Document, OCRField, BiometricResult, 
     ValidationDecision, DossierAssignment, AMLAlert, 

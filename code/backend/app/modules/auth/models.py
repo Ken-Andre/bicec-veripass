@@ -1,11 +1,18 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, Text
-# from sqlalchemy import Enum
+from enum import Enum as PyEnum
+from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, Text, Enum
 from sqlalchemy.dialects.postgresql import UUID, INET
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
+
+
+class AgentRole(str, PyEnum):
+    JEAN = "JEAN"          # KYC Validator
+    THOMAS = "THOMAS"      # AML Supervisor
+    SYLVIE = "SYLVIE"      # Operations Director
+    ADMIN_IT = "ADMIN_IT"
 
 class User(Base):
     __tablename__ = "users"
@@ -36,8 +43,7 @@ class Agent(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(Text, nullable=False)
-    role = Column(String(20), nullable=False) # JEAN, THOMAS, SYLVIE
-    
+    role = Column(Enum(AgentRole, name="agent_role"), nullable=False)  # JEAN, THOMAS, SYLVIE, ADMIN_IT
     static_weight = Column(Integer, default=1)
     current_weight = Column(Integer, default=1)
     is_available = Column(Boolean, default=True)
@@ -56,10 +62,22 @@ class OTPSession(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     phone = Column(String(20), nullable=True)
     email = Column(String(255), nullable=True)
+    # code_hash stores bcrypt hash of the OTP; hash_algo records the algorithm for auditability
     code_hash = Column(Text, nullable=False)
+    hash_algo = Column(String(20), nullable=False, default="bcrypt")
     expires_at = Column(DateTime(timezone=True), nullable=False)
     attempts = Column(Integer, default=0)
     is_used = Column(Boolean, default=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
     request_ip = Column(INET, nullable=True)
     
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class TokenRevocation(Base):
+    """Revocation list for refresh tokens (jti-based). Enables immediate invalidation."""
+    __tablename__ = "token_revocations"
+
+    jti = Column(UUID(as_uuid=True), primary_key=True)
+    revoked_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    expires_at = Column(DateTime(timezone=True), nullable=False)
