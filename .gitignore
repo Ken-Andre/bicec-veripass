@@ -47,6 +47,7 @@ out/
 .env.local
 .env.*.local
 .env.pass
+new.env
 *.pem
 *.key
 *.crt
