@@ -70,6 +70,21 @@ class TestSecurityUtilities:
         result = decode_token(tampered)
         assert result is None
 
+    def test_make_and_verify_session_handle(self):
+        """Tester la création et la vérification constante du session_handle HMAC."""
+        from app.core.security import make_session_handle, verify_session_handle
+        db_id = "123e4567-e89b-12d3-a456-426614174000"
+        handle = make_session_handle(db_id)
+        
+        # Le handle ne doit pas être le db_id brut
+        assert handle != db_id
+        # La vérification du bon handle doit réussir
+        assert verify_session_handle(handle, db_id) is True
+        # La vérification d'un mauvais handle doit échouer
+        assert verify_session_handle("bad-handle", db_id) is False
+        # La vérification contre un autre DB ID doit échouer
+        assert verify_session_handle(handle, "999e4567-e89b-12d3-a456-426614174999") is False
+
 
 # ============================================================
 # TESTS API ENDPOINTS (sans DB — mocks)
