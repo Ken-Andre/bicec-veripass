@@ -12,13 +12,24 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    decode_refresh_token,
+    revoke_token,
     get_current_user,
     get_current_agent,
+    make_session_handle,
 )
 from app.core.logging import logger
 from app.db.session import get_db
-from app.modules.auth.models import User, Agent
-from app.modules.auth.utils import generate_otp, store_otp, verify_otp, delete_otp
+from app.modules.auth.models import User, Agent, OTPSession
+from app.modules.kyc.models import KYCSession
+from app.modules.auth.utils import (
+    generate_otp,
+    store_otp,
+    verify_otp,
+    delete_otp,
+    mark_otp_session_used,
+    increment_otp_attempts,
+)
 from app.modules.auth.schemas import (
     TokenResponse,
     RefreshTokenRequest,
@@ -34,6 +45,16 @@ from app.modules.auth.schemas import (
 )
 
 router = APIRouter()
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@router.get("/health")
+async def health_check():
+    """Auth module health check for readiness probes."""
+    return {"status": "healthy", "module": "auth"}
+
 
 # ============================================================
 # MOBILE OTP ENDPOINTS (Story 1.3 — Marie)
@@ -64,11 +85,25 @@ async def send_otp(request: Request, body: OtpSendRequest, db: AsyncSession = De
             detail="Failed to generate OTP",
         )
 
+    # Record in Postgres (Audit) — code_hash uses bcrypt (salt embedded), hash_algo for auditability
+    from datetime import datetime, timedelta, timezone
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+    otp_session = OTPSession(
+        phone=phone,
+        email=user.email,
+        code_hash=hash_password(otp),
+        hash_algo="bcrypt",
+        expires_at=expires_at,
+        request_ip=request.client.host if request.client else None
+    )
+    db.add(otp_session)
+    await db.commit()
+
     # Trigger background task for robust sending (SMS + Fallback Email)
     from app.modules.auth.tasks import send_otp_task
     send_otp_task.delay(phone, otp, user.email)
     
-    logger.info(f"OTP task queued for {phone}")
+    logger.info(f"OTP task queued and session audited for {phone}")
     
     # Return response (including OTP in dev/test for convenience)
     response = {"message": "OTP request received and is being processed"}
@@ -86,16 +121,34 @@ async def verify_otp_endpoint(
     """Verify OTP and issue JWT tokens for mobile user."""
     phone = body.phone
 
-    # Verify OTP
+    # M1: server-side expiry check against DB audit record (defence if Redis TTL drifts)
+    from datetime import datetime, timezone
+    result_otp = await db.execute(
+        select(OTPSession)
+        .where(OTPSession.phone == phone, OTPSession.is_used == False)  # noqa: E712
+        .order_by(OTPSession.created_at.desc())
+        .limit(1)
+    )
+    otp_session_record = result_otp.scalar_one_or_none()
+    if otp_session_record and otp_session_record.expires_at < datetime.now(timezone.utc):
+        await increment_otp_attempts(db, phone, is_phone=True)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="OTP has expired",
+        )
+
+    # Verify OTP against bcrypt hash in Redis
     is_valid = await verify_otp(phone, body.otp)
     if not is_valid:
+        await increment_otp_attempts(db, phone, is_phone=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired OTP",
         )
 
-    # Delete OTP after successful verification
+    # Delete from Redis and mark DB audit record as used
     await delete_otp(phone)
+    await mark_otp_session_used(db, phone, is_phone=True)
 
     # Get or create user
     result = await db.execute(select(User).where(User.phone == phone))
@@ -106,10 +159,30 @@ async def verify_otp_endpoint(
         await db.commit()
         await db.refresh(user)
 
+    # Manage KYCSession for State Resume
+    result = await db.execute(
+        select(KYCSession).where(
+            KYCSession.user_id == user.id,
+            KYCSession.status.in_(["DRAFT", "PENDING_INFO"])
+        )
+    )
+    kyc_session = result.scalar_one_or_none()
+    
+    if not kyc_session:
+        kyc_session = KYCSession(user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED")
+        db.add(kyc_session)
+    else:
+        if not kyc_session.last_step_completed:
+            kyc_session.last_step_completed = "PHONE_VERIFIED"
+
+    await db.commit()
+    await db.refresh(kyc_session)
+    session_handle = make_session_handle(str(kyc_session.id))
+
     # Create tokens
     access_token = create_access_token(
         subject=str(user.id),
-        additional_claims={"role": user.role, "user_type": "mobile"},
+        additional_claims={"role": user.role, "user_type": "mobile", "sid": session_handle},
     )
     refresh_token = create_refresh_token(subject=str(user.id))
 
@@ -117,6 +190,7 @@ async def verify_otp_endpoint(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        session_handle=session_handle
     )
 
 
@@ -148,10 +222,24 @@ async def send_email_otp(
             detail="Failed to generate OTP",
         )
 
+    # Record in Postgres (Audit) — code_hash uses bcrypt (salt embedded), hash_algo for auditability
+    from datetime import datetime, timedelta, timezone
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+    otp_session = OTPSession(
+        phone=current_user.phone,
+        email=email,
+        code_hash=hash_password(otp),
+        hash_algo="bcrypt",
+        expires_at=expires_at,
+        request_ip=request.client.host if request.client else None
+    )
+    db.add(otp_session)
+    await db.commit()
+
     from app.modules.auth.tasks import send_only_email_otp_task
     send_only_email_otp_task.delay(email, otp)
     
-    logger.info(f"Email OTP task queued for {email}")
+    logger.info(f"Email OTP task queued and session audited for {email}")
     
     response = {"message": "Email OTP request received and is being processed"}
     if settings.ENVIRONMENT != "production":
@@ -174,16 +262,47 @@ async def verify_email_otp(
             detail="No email associated with this user",
         )
 
+    # M1: server-side expiry check
+    from datetime import datetime, timezone
+    result_otp = await db.execute(
+        select(OTPSession)
+        .where(OTPSession.email == current_user.email, OTPSession.is_used == False)  # noqa: E712
+        .order_by(OTPSession.created_at.desc())
+        .limit(1)
+    )
+    otp_session_record = result_otp.scalar_one_or_none()
+    if otp_session_record and otp_session_record.expires_at < datetime.now(timezone.utc):
+        await increment_otp_attempts(db, current_user.email, is_phone=False)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="OTP has expired",
+        )
+
     # Verify OTP
     is_valid = await verify_otp(current_user.email, body.otp)
     if not is_valid:
+        await increment_otp_attempts(db, current_user.email, is_phone=False)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired OTP",
         )
 
-    # Delete OTP after successful verification
+    # Delete from Redis and mark DB audit record as used
     await delete_otp(current_user.email)
+    await mark_otp_session_used(db, current_user.email, is_phone=False)
+
+    # Update KYCSession State
+    result = await db.execute(
+        select(KYCSession).where(
+            KYCSession.user_id == current_user.id,
+            KYCSession.status.in_(["DRAFT", "PENDING_INFO"])
+        )
+    )
+    kyc_session = result.scalar_one_or_none()
+    if kyc_session:
+        if kyc_session.last_step_completed == "PHONE_VERIFIED":
+            kyc_session.last_step_completed = "EMAIL_VERIFIED"
+            await db.commit()
 
     return {"message": "Email verified successfully"}
 
@@ -201,6 +320,19 @@ async def setup_pin(
 ):
     """Setup PIN for returning mobile user."""
     current_user.pin_hash = hash_password(body.pin)
+    
+    # Update KYCSession State
+    result = await db.execute(
+        select(KYCSession).where(
+            KYCSession.user_id == current_user.id,
+            KYCSession.status.in_(["DRAFT", "PENDING_INFO"])
+        )
+    )
+    kyc_session = result.scalar_one_or_none()
+    if kyc_session:
+        if kyc_session.last_step_completed in ["PHONE_VERIFIED", "EMAIL_VERIFIED"]:
+            kyc_session.last_step_completed = "PIN_SETUP"
+
     await db.commit()
     logger.info(f"PIN setup for user {current_user.id}")
     return {"message": "PIN setup successful"}
@@ -227,10 +359,20 @@ async def verify_pin(
             detail="Invalid credentials",
         )
 
+    # Manage KYCSession for State Resume
+    kyc_result = await db.execute(
+        select(KYCSession).where(
+            KYCSession.user_id == user.id,
+            KYCSession.status.in_(["DRAFT", "PENDING_INFO"])
+        )
+    )
+    kyc_session = kyc_result.scalar_one_or_none()
+    session_handle = make_session_handle(str(kyc_session.id)) if kyc_session else None
+
     # Create tokens
     access_token = create_access_token(
         subject=str(user.id),
-        additional_claims={"role": user.role, "user_type": "mobile"},
+        additional_claims={"role": user.role, "user_type": "mobile", "sid": session_handle},
     )
     refresh_token = create_refresh_token(subject=str(user.id))
 
@@ -238,6 +380,7 @@ async def verify_pin(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        session_handle=session_handle
     )
 
 
@@ -282,23 +425,35 @@ async def agent_login(
 
 @router.post("/refresh", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_AUTH)
-async def refresh_token(request: Request, body: RefreshTokenRequest):
-    """Refresh JWT access token using a valid refresh token."""
-    payload = decode_token(body.refresh_token)
-    if not payload or payload.get("type") != "refresh":
+async def refresh_token(request: Request, body: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+    """Refresh JWT access token using a valid refresh token. Old token is revoked on use."""
+    payload = await decode_refresh_token(body.refresh_token, db)
+    if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
+            detail="Invalid or revoked refresh token",
         )
 
     subject = payload.get("sub")
-    if not subject:
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+    if not subject or not jti:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
         )
 
-    # Create new tokens (rotation)
+    # Revoke the consumed refresh token (rotation — one-time use)
+    from datetime import datetime, timezone
+    expires_at = datetime.fromtimestamp(exp, tz=timezone.utc) if exp else datetime.now(timezone.utc)
+    await revoke_token(jti, expires_at, db)
+
+    logger.info(
+        f"Token refresh: subject={subject}, ip={request.client.host if request.client else 'unknown'}, "
+        f"user_agent={request.headers.get('user-agent', 'unknown')}"
+    )
+
+    # Issue new tokens
     access_token = create_access_token(subject=subject)
     new_refresh_token = create_refresh_token(subject=subject)
 

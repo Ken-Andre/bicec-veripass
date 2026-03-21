@@ -1,36 +1,70 @@
 """Auth module Pydantic schemas."""
-from typing import Optional
-from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, Annotated
+from pydantic import BaseModel, Field, EmailStr, StringConstraints
 
+
+# Reusable types for security enforcement
+ConstrainedPhone = Annotated[
+    str, 
+    StringConstraints(
+        strip_whitespace=True, 
+        pattern=r"^\+?[1-9]\d{6,14}$", 
+        max_length=20
+    )
+]
+ConstrainedPin = Annotated[
+    str, 
+    StringConstraints(
+        strip_whitespace=True, 
+        pattern=r"^\d{6}$", 
+        min_length=6, 
+        max_length=6
+    )
+]
+ConstrainedOtp = Annotated[
+    str, 
+    StringConstraints(
+        strip_whitespace=True, 
+        pattern=r"^\d{6}$", 
+        min_length=6, 
+        max_length=6
+    )
+]
 
 class TokenResponse(BaseModel):
-    """JWT token response."""
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    expires_in: int
+    """JWT token response.
+
+    session_handle is an HMAC-SHA256 digest of the internal KYCSession DB id,
+    keyed with JWT_SECRET. It is ephemeral and opaque — clients must treat it
+    as an opaque string and never attempt to reverse it to a DB id.
+    """
+    access_token: str = Field(..., max_length=1024)
+    refresh_token: str = Field(..., max_length=1024)
+    token_type: str = Field("bearer", max_length=20)
+    expires_in: int = Field(..., gt=0)
+    session_handle: Optional[str] = Field(None, max_length=64)
 
 
 class RefreshTokenRequest(BaseModel):
     """Refresh token request."""
-    refresh_token: str
+    refresh_token: str = Field(..., max_length=1024)
 
 
 class AgentLoginRequest(BaseModel):
     """Agent login request (back-office)."""
     email: EmailStr
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=8, max_length=128)
 
 
 class UserResponse(BaseModel):
     """User response schema."""
     model_config = {"from_attributes": True}
     
-    id: str
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    role: str
-    language: str
+    id: str = Field(..., max_length=64)
+    phone: Optional[str] = Field(None, max_length=20)
+    email: Optional[str] = Field(None, max_length=128)
+    role: str = Field(..., max_length=20)
+    language: str = Field(..., max_length=10)
     biometric_opt_in: bool
 
 
@@ -38,34 +72,34 @@ class AgentResponse(BaseModel):
     """Agent response schema."""
     model_config = {"from_attributes": True}
     
-    id: str
-    name: str
-    email: str
-    role: str
+    id: str = Field(..., max_length=64)
+    name: str = Field(..., max_length=100)
+    email: str = Field(..., max_length=128)
+    role: str = Field(..., max_length=20)
     is_available: bool
-    active_dossier_count: int
+    active_dossier_count: int = Field(..., ge=0)
 
 
 class PinSetupRequest(BaseModel):
     """PIN setup request."""
-    pin: str = Field(..., min_length=4, max_length=6, pattern=r"^\d+$")
+    pin: ConstrainedPin
 
 
 class PinVerifyRequest(BaseModel):
     """PIN verification request."""
-    phone: str = Field(..., pattern=r"^\+?[1-9]\d{6,14}$")
-    pin: str = Field(..., min_length=4, max_length=6, pattern=r"^\d+$")
+    phone: ConstrainedPhone
+    pin: ConstrainedPin
 
 
 class OtpSendRequest(BaseModel):
     """OTP send request."""
-    phone: str = Field(..., pattern=r"^\+?[1-9]\d{6,14}$", description="E.164 format phone number")
+    phone: ConstrainedPhone
 
 
 class OtpVerifyRequest(BaseModel):
     """OTP verification request."""
-    phone: str = Field(..., pattern=r"^\+?[1-9]\d{6,14}$")
-    otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d+$")
+    phone: ConstrainedPhone
+    otp: ConstrainedOtp
 
 
 class EmailOtpSendRequest(BaseModel):
@@ -75,4 +109,4 @@ class EmailOtpSendRequest(BaseModel):
 
 class EmailOtpVerifyRequest(BaseModel):
     """Email OTP verification request."""
-    otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d+$")
+    otp: ConstrainedOtp
