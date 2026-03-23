@@ -2,6 +2,7 @@
 API de démonstration Celery pour VeriPass
 Endpoints pour tester les différents workers
 """
+import random
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
@@ -195,22 +196,15 @@ async def trigger_cleanup_otps():
 
 @router.post("/workflow/complete-kyc", response_model=TaskResponse)
 async def trigger_complete_kyc(
-    user_id: str = "USER_001",
+    user_id: str = "DEMO_USER_001",
     phone: str = "+237670123456",
-    email: str = "marie@example.cm"
+    email: str = "client.demo@gmail.com"
 ):
     """
     🚀 Déclenche un workflow KYC complet (OCR → Liveness → Notification)
     
-    - **Orchestration**: Chaîne de tâches entre plusieurs queues
-    - **Durée totale**: ~15-20 secondes
-    - **Use case**: Processus KYC end-to-end
-    
-    **Étapes**:
-    1. Extraction OCR CNI (glm_ocr_jobs)
-    2. Vérification liveness (glm_ocr_jobs)
-    3. Décision approve/reject
-    4. Notification email (notifications)
+    - **Note**: Le système de démo va maintenant générer des données CNI aléatoires (Nom, Prénom, Date)
+      pour simuler différents profils d'utilisateurs camerounais.
     """
     task = demo_complete_kyc_workflow.apply_async(
         args=[user_id, phone, email],
@@ -222,8 +216,37 @@ async def trigger_complete_kyc(
         task_name="demo.workflow.complete_kyc",
         queue="notifications",
         status="pending",
-        message=f"Workflow KYC complet démarré pour {user_id}. Durée estimée: 20s"
+        message=f"Workflow KYC complet démarré pour {user_id}. Les données seront diversifiées."
     )
+
+
+@router.post("/populate/bulk-kyc", response_model=list[TaskResponse])
+async def populate_bulk_kyc(count: int = 5):
+    """
+    🌪️ Stress Test & Audit : Génère N workflows KYC complets en parallèle
+    
+    Permet de vérifier la montée en charge des workers OCR et Notifications.
+    Les sorties seront diversifiées (différents noms, numéros CNI et résultats).
+    """
+    tasks = []
+    for i in range(count):
+        user_id = f"BULK_TEST_{random.randint(1000, 9999)}"
+        email = f"test_audit_{i}@bicec-veripass.cm"
+        phone = f"+2376{random.randint(70, 99)}{random.randint(100000, 999999)}"
+        
+        task = demo_complete_kyc_workflow.apply_async(
+            args=[user_id, phone, email],
+            queue="notifications"
+        )
+        tasks.append(TaskResponse(
+            task_id=task.id,
+            task_name="demo.workflow.complete_kyc",
+            queue="notifications",
+            status="pending",
+            message=f"Tâche de stress-test #{i+1} lancée. User: {user_id}"
+        ))
+    
+    return tasks
 
 
 # ============================================================================

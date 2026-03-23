@@ -76,25 +76,39 @@ docker compose exec fastapi python scripts/seed_dev.py
 Copier `.env.example` → `.env` et remplir toutes les valeurs.
 **Ne jamais committer `.env`** (voir `.gitignore`).
 
-### Chiffrement du .env (optionnel)
+### Chiffrement des .env
 
-Le projet supporte le chiffrement local du fichier `.env` avec `senv`.
+Le projet chiffre tous les fichiers `.env` avec [senv](https://github.com/DannyBen/senv) pour pouvoir versionner les secrets de façon sécurisée.
 
-**Fichiers :**
-- `.env` — reste local (ignoré par Git)
-- `.env.enc` — version chiffrée à committer
-- `.env.pass` — clé de chiffrement (jamais committée)
+**Fichiers et leur statut Git :**
 
-**Commandes :**
+| Fichier | Git | Description |
+|---------|-----|-------------|
+| `.env` | ignoré | Secrets en clair — reste local |
+| `.env.enc` | versionné | Version chiffrée — safe à committer |
+| `.env.pass` | ignoré | Clé de chiffrement — jamais committée |
+| `new.env` | ignoré | Sortie du déchiffrement — renommer en `.env` |
+
+**Usage quotidien :**
 ```bash
-# Chiffrer .env -> .env.enc
-./scripts/encrypt-env.sh
+# Chiffrer tous les .env du repo -> .env.enc
+bash code/scripts/encrypt-all-envs.sh
 
-# Déchiffrer .env.enc -> .env
-./scripts/decrypt-env.sh
+# Déchiffrer tous les .env.enc -> new.env (sans écraser les .env existants)
+bash code/scripts/decrypt-all-envs.sh
 ```
 
-Un hook pre-commit chiffre automatiquement `.env` vers `.env.enc` avant chaque commit.
+Les hooks Kiro automatisent le chiffrement : dès qu'un `.env` est sauvegardé, `encrypt-all-envs.sh` se déclenche. Le hook de déchiffrement est manuel (panneau "Agent Hooks" dans Kiro).
+
+**Note sur l'avertissement "salt stored with encrypted data" :**
+
+Certains scanners de sécurité signalent que `senv` embarque le salt/IV dans le fichier `.env.enc`. C'est un comportement **normal et intentionnel** pour les formats chiffrés (AES) — le salt n'est pas secret, il garantit simplement l'unicité de chaque chiffrement. Ce n'est pas la clé de chiffrement.
+
+La sécurité repose sur la séparation :
+- `.env.enc` (salt + données chiffrées) → dans Git, lisible par tous les collaborateurs
+- `.env.pass` (clé réelle) → hors Git, partagée hors-bande (ex: gestionnaire de mots de passe d'équipe)
+
+Pour la **production**, remplacer `.env.pass` par une variable d'environnement `DOTENV_PASS` injectée via GitHub Actions Secrets, AWS Secrets Manager ou HashiCorp Vault.
 
 ---
 

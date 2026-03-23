@@ -1,28 +1,42 @@
-"""012_aml
+"""017_drop_orphan_sanctions_entries
 
-Revision ID: 012_aml
-Revises: 011_address_niu
-Create Date: 2026-03-21 08:40:00.000000
+Revision ID: 017_drop_orphan_sanctions
+Revises: 016_drop_orphan_consents
+Create Date: 2026-03-21 14:30:00.000000
+
+Changes:
+- Drops the orphan `sanctions_entries` table created in migration 012_aml.
+  No SQLAlchemy model was ever created for it.
+- Drops the dangling FK column `aml_alerts.sanctions_entry_id` added in 012_aml.
+
+The canonical AML/sanctions model is `PEPSanctions` (table `pep_sanctions`, initial schema)
+linked to `AMLAlert` via `aml_alerts.pep_sanctions_id`. That relationship is intact and unchanged.
 """
-
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-
-# revision identifiers, used by Alembic.
-revision: str = "012_aml"
-down_revision: Union[str, Sequence[str], None] = "011_address_niu"
+revision: str = "017_drop_orphan_sanctions"
+down_revision: Union[str, Sequence[str], None] = "016_drop_orphan_consents"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Must be first in this migration per issue requirements.
-    op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+    # Drop dangling FK column on aml_alerts first (references sanctions_entries)
+    op.drop_index("ix_aml_alerts_sanctions_entry_id", table_name="aml_alerts")
+    op.drop_constraint("fk_aml_alerts_sanctions_entry_id", "aml_alerts", type_="foreignkey")
+    op.drop_column("aml_alerts", "sanctions_entry_id")
 
+    # Drop orphan table and its trigram index
+    op.execute("DROP INDEX IF EXISTS ix_sanctions_entries_full_name_trgm")
+    op.drop_table("sanctions_entries")
+
+
+def downgrade() -> None:
+    # Recreate sanctions_entries as it was in 012_aml
     op.create_table(
         "sanctions_entries",
         sa.Column("id", sa.UUID(), nullable=False),
@@ -40,14 +54,10 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         sa.PrimaryKeyConstraint("id"),
     )
-
-    # GIN trigram index on sanctions_entries.full_name
     op.execute(
         "CREATE INDEX ix_sanctions_entries_full_name_trgm "
         "ON sanctions_entries USING gin (full_name gin_trgm_ops)"
     )
-
-    # Keep existing aml_alerts table but wire it to sanctions_entries for AML matching lifecycle.
     op.add_column("aml_alerts", sa.Column("sanctions_entry_id", sa.UUID(), nullable=True))
     op.create_foreign_key(
         "fk_aml_alerts_sanctions_entry_id",
@@ -57,10 +67,3 @@ def upgrade() -> None:
         ["id"],
     )
     op.create_index("ix_aml_alerts_sanctions_entry_id", "aml_alerts", ["sanctions_entry_id"], unique=False)
-
-
-def downgrade() -> None:
-    # sanctions_entries and aml_alerts.sanctions_entry_id are cleaned up by
-    # migration 017_drop_orphan_sanctions (which runs after this).
-    # Downgrading past 017 will recreate them there; no action needed here.
-    pass

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.db.base  # noqa — ensures all mappers (Agency, etc.) are registered
@@ -34,6 +35,9 @@ async def list_queue(
         select(KYCSession)
         .where(KYCSession.status.in_(["PENDING", "SUBMITTED", "DRAFT"]))
         .order_by(KYCSession.priority_flag.desc(), KYCSession.submitted_at.asc())
+        # Eager-load `user` to avoid N+1 if schema exposes user fields.
+        # Add further selectinload() calls here when new relations are needed.
+        .options(selectinload(KYCSession.user))
     )
     return await paginate(db, query, page, KYCQueueItemSchema)
 

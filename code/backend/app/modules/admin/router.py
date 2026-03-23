@@ -6,6 +6,7 @@ import app.db.base  # noqa — ensures all mappers are registered
 from app.core.rate_limit import limiter
 from app.core.config import settings
 from app.core.pagination import PageParams, PageResponse, paginate
+from app.core.security import require_role
 from app.db.session import get_db
 from app.modules.auth.models import User
 from app.modules.admin.schemas import UserSchema
@@ -22,6 +23,7 @@ async def get_root():
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_users(
     request: Request,
+    current_user: User = Depends(require_role("admin", "supervisor")),
     page: PageParams = Depends(),
     db: AsyncSession = Depends(get_db),
 ):

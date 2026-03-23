@@ -68,7 +68,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("consents")
+    # Note: `consents` table is dropped by migration 016_drop_orphan_consents (which runs after this).
+    # Downgrading past 016 will recreate it there; no action needed here.
     op.drop_index("uq_kyc_sessions_user_niu_not_null", table_name="kyc_sessions")
     op.drop_index("ix_kyc_sessions_niu_number", table_name="kyc_sessions")
 

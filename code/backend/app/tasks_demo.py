@@ -34,22 +34,27 @@ def demo_extract_cni(document_id: str, simulate_failure: bool = False):
         print(f"❌ [OCR] Échec extraction CNI #{document_id}")
         raise Exception("OCR confidence trop faible (< 85%)")
     
-    # Résultat simulé
+    # Listes pour génération aléatoire réaliste (Cameroun)
+    noms = ["NGONO", "BEKONO", "MBARGA", "EYENGA", "EKOTTO", "ETOUNDI", "TCHATCHOUANG", "KAMGA", "FOTSO", "TALLA"]
+    prenoms = ["Marie", "Jean", "Paul", "Alice", "Chantal", "Alain", "Dieudonné", "Symphorien", "Colette", "Blandine"]
+    lieux = ["Yaoundé", "Douala", "Garoua", "Maroua", "Bafoussam", "Bamenda", "Bertoua", "Ebolowa"]
+    
+    # Résultat simulé avec diversité
     result = {
         "document_id": document_id,
         "extracted_data": {
-            "nom": "NGONO",
-            "prenom": "Marie",
-            "date_naissance": "1995-03-15",
-            "numero_cni": "CM-YAO-2024-123456",
-            "lieu_naissance": "Yaoundé",
+            "nom": random.choice(noms),
+            "prenom": random.choice(prenoms),
+            "date_naissance": f"{random.randint(1970, 2005)}-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}",
+            "numero_cni": f"CM-{random.randint(100, 999)}-{random.randint(2000, 2024)}-{random.randint(100000, 999999)}",
+            "lieu_naissance": random.choice(lieux),
         },
         "confidence": random.randint(87, 98),
         "processing_time_seconds": 10,
         "timestamp": datetime.utcnow().isoformat(),
     }
     
-    print(f"✅ [OCR] Extraction réussie CNI #{document_id} - Confiance: {result['confidence']}%")
+    print(f"✅ [OCR] Extraction réussie CNI #{document_id} - {result['extracted_data']['nom']} {result['extracted_data']['prenom']}")
     return result
 
 
@@ -117,9 +122,13 @@ def demo_send_kyc_result(email: str, status: str):
     emoji = "✅" if status == "approved" else "❌"
     print(f"{emoji} [EMAIL] Résultat '{status}' envoyé à {email}")
     
+    # Simuler le déclenchement réel via aiosmtplib vers Mailpit si nécessaire
+    # (Ici on reste sur du log pour la démo worker, mais le workflow réel utilise le core/email.py)
+    
     return {
         "email": email,
         "status": status,
+        "subject": f"Votre vérification BICEC VeriPass - {'Approuvée' if status == 'approved' else 'Action Requise'}",
         "sent_at": datetime.utcnow().isoformat(),
     }
 
