@@ -26,11 +26,17 @@ RUN uv sync --frozen --no-dev --no-install-project && \
 # Final stage
 FROM python:3.11-alpine
 
-# Install runtime dependencies for OCR (Alpine equivalents)
+# Install runtime dependencies:
+# - OCR: mesa-gl, glib, libstdc++
+# - PostgreSQL client tools: postgresql-client (pg_dump, pg_restore, psql)
+# - Docker CLI: docker-cli (for disk prune task)
 RUN apk add --no-cache \
     mesa-gl \
     glib \
-    libstdc++ && \
+    libstdc++ \
+    postgresql-client \
+    docker-cli \
+    gnupg && \
     # Clean apk cache to reduce image size
     rm -rf /var/cache/apk/*
 
@@ -46,7 +52,8 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --chown=vpuser:vpgroup . .
 
 # Ensure storage directory exists and set entrypoint permissions
-RUN mkdir -p /data/documents && chown -R vpuser:vpgroup /data/documents && \
+RUN mkdir -p /data/documents /backups/db && \
+    chown -R vpuser:vpgroup /data/documents /backups/db && \
     chmod +x /app/entrypoint.sh
 
 # Set environment variables

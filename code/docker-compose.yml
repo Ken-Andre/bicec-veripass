@@ -12,6 +12,7 @@ volumes:
   documents_storage:  # /data/documents — Images CNI, selfies, factures — 10 ans COBAC
   models_storage:     # /data/models   — PaddleOCR, GLM-OCR, MiniFASNet, FaceNet-512
   db_storage:         # /data/db       — PostgreSQL data files
+  db_backups:         # /backups/db    — PostgreSQL backups (non-pruned par docker prune)
   redis_data:
   nginx_certs:
 
@@ -205,7 +206,7 @@ services:
       dockerfile: Dockerfile
     container_name: vp_celery_notif
     entrypoint: []
-    command: ["/app/.venv/bin/celery", "-A", "app.celery", "worker", "-Q", "notifications,provisioning_batch,sanctions_sync", "--concurrency=2", "-n", "notif_worker@%h", "--loglevel=info"]
+    command: ["/app/.venv/bin/celery", "-A", "app.celery", "worker", "-Q", "celery,notifications,provisioning_batch,sanctions_sync", "--concurrency=2", "-n", "notif_worker@%h", "--loglevel=info"]
     environment:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
@@ -251,10 +252,19 @@ services:
     entrypoint: []
     command: ["/app/.venv/bin/celery", "-A", "app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
+      - DB_PASSWORD=${DB_PASSWORD}
+      - BACKUP_RETENTION_DAYS=7
       - SKIP_MIGRATIONS=1
+    volumes:
+      - db_backups:/backups/db
+      - /var/run/docker.sock:/var/run/docker.sock:rw  # Docker socket with write access for prune task
+    user: root  # Required to access docker.sock (usually root:docker or root:root)
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks:
       - veripass-net
@@ -312,6 +322,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - db_storage:/var/lib/postgresql/data
+      - db_backups:/backups/db
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "15432:5432"    # Debug: accès direct depuis host (DBeaver, pgAdmin, Alembic) - CHANGED from 5432 to avoid conflicts
