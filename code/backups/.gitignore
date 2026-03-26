@@ -1,0 +1,4 @@
+# Ignore actual backup files, keep directory structure
+*.dump
+*.sql
+*.gz

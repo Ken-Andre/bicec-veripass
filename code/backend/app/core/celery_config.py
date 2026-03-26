@@ -35,7 +35,21 @@ celery.conf.beat_schedule = {
         "task": "app.tasks.maintenance.check_disk_usage",
         "schedule": crontab(hour=3, minute=0),
     },
+    # Backup PostgreSQL every day at 01:00 AM
+    "backup-db-daily": {
+        "task": "app.tasks.maintenance.backup_postgres",
+        "schedule": crontab(hour=1, minute=0),
+    },
+    # Weekly encrypted backup of KYC images (Sunday at 02:00 AM)
+    "backup-images-weekly": {
+        "task": "app.tasks.maintenance.backup_kyc_images",
+        "schedule": crontab(hour=2, minute=0, day_of_week="sun"),
+    },
+    # Daily check for missed backups (03:30 AM)
+    "check-backup-catchup-daily": {
+        "task": "app.tasks.maintenance.check_and_catchup_backup",
+        "schedule": crontab(hour=3, minute=30),
+    },
     # Other tasks from architecture (placeholders)
     # "sync-sanctions-weekly": { ... }
-    # "backup-db-daily": { ... }
 }
