@@ -91,3 +91,4 @@ service-account*.json
 # Tests code
 # ========================
 paddleocr_test/.venv_ocr/*
+docs/issue-183-implementation-report.md

@@ -17,7 +17,7 @@
 | 178 | ADMIN-05 | Production docker-compose.yml | [ ] | [ ] | #9 |
 | 46 | INFRA-07 | Local Daily Prune Script | [ ] | [ ] | #178 |
 | 180 | ADMIN-07 | S3 Bucket config backups images | [ ] | [ ] | #178, #46 |
-| 183 | ADMIN-10 | PostgreSQL Replication/Backups auto | [ ] | [ ] | #178, #180 |
+| 183 | ADMIN-10 | PostgreSQL Replication/Backups auto | [x] | [ ] | #178, #180 |
 
 **Flux logique :** #9 → #178 → #46 → #180 → #183
 
@@ -31,7 +31,7 @@
 | 48 | AUTH-02 | PIN Setup & Secure Storage | [x] | [x] | #50 |
 | 51 | AUTH-05 | Users & Roles tables | [x] | [x] | #50 |
 | 52 | AUTH-06 | Mobile OTP Capture Screen | [-] | [ ] | #50 |
-| 54 | AUTH-08 | Redis TTL for OTP storage | [ ] | [ ] | #50 |
+| 54 | AUTH-08 | Redis TTL for OTP storage | [x] Q-dev | [x] Q-dev | #50 |
 | 53 | AUTH-07 | Back-Office Login Dashboard | [ ] | [ ] | #50, #51 |
 
 **Flux logique :** #50 → #48/#51 → #52 → #54 → #53
@@ -46,4 +46,4 @@
 
 ---
 
-*Dernière mise à jour : 2026-03-21*
+*Dernière mise à jour : 2026-03-26*
