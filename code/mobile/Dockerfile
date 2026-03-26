@@ -36,6 +36,8 @@ USER 101
 
 # Copy build artifacts
 COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy Nginx config for SPA routing
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 

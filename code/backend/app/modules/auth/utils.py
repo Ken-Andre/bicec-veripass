@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.core.redis import get_redis
+from app.core.redis import get_redis, otp_key
 from app.core.config import settings
 from app.core.logging import logger
 
@@ -24,7 +24,7 @@ async def store_otp(identifier: str, otp: str, expire_minutes: int = settings.OT
     try:
         from app.core.security import hash_password
         redis = await get_redis()
-        key = f"otp:{identifier}"
+        key = otp_key(identifier)
         otp_hash = hash_password(otp)
         await redis.setex(key, expire_minutes * 60, otp_hash)
         return True
@@ -42,7 +42,7 @@ async def verify_otp(identifier: str, otp_to_verify: str) -> bool:
     try:
         from app.core.security import verify_password
         redis = await get_redis()
-        key = f"otp:{identifier}"
+        key = otp_key(identifier)
         stored_hash = await redis.get(key)
 
         if stored_hash is None:
@@ -60,7 +60,7 @@ async def delete_otp(identifier: str) -> None:
     """Delete OTP from Redis after successful verification."""
     try:
         redis = await get_redis()
-        await redis.delete(f"otp:{identifier}")
+        await redis.delete(otp_key(identifier))
     except Exception as e:
         logger.error(f"Failed to delete OTP for {identifier}: {e}")
 
