@@ -14,7 +14,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
+
     const success = await login(email, password)
     if (success) {
       navigate('/')
@@ -34,14 +34,14 @@ export default function LoginPage() {
             Back Office - Connexion
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="rounded-md bg-red-50 p-4">
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
-          
+
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -64,7 +64,7 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Mot de passe
@@ -108,7 +108,7 @@ export default function LoginPage() {
               {isLoading ? 'Connexion...' : 'Se connecter'}
             </button>
           </div>
-          
+
           {import.meta.env.DEV && (
             <div className="mt-4 text-center text-xs text-gray-500">
               <p>Comptes de démonstration :</p>
@@ -116,17 +116,6 @@ export default function LoginPage() {
               <p>jean@bicec.cm / thomas@bicec.cm / sylvie@bicec.cm / admin@bicec.cm</p>
             </div>
           )}
-
-          <div className="mt-8 pt-6 border-t border-gray-100 flex justify-center opacity-20 hover:opacity-100 transition-opacity">
-            <button
-               type="button"
-               id="sentry-test-btn"
-               onClick={() => { throw new Error("Verification Sentry - Backoffice") }}
-               className="text-[10px] text-gray-400 uppercase tracking-widest font-bold"
-            >
-              Test Sentry Integration
-            </button>
-          </div>
         </form>
       </div>
     </div>
