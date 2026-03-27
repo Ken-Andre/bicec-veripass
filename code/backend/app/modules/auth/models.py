@@ -9,9 +9,40 @@ from app.db.base_class import Base
 
 
 class AgentRole(str, PyEnum):
-    JEAN = "JEAN"          # KYC Validator
-    THOMAS = "THOMAS"      # AML Supervisor
-    SYLVIE = "SYLVIE"      # Operations Director
+    """
+    Rôles fonctionnels des agents back-office.
+
+    IMPORTANT — Terminologie :
+    Ces valeurs (JEAN, THOMAS, SYLVIE, ADMIN_IT) sont des IDENTIFIANTS DE RÔLE
+    fonctionnel, pas des noms de personnes. Ils correspondent aux personas UX
+    définis dans l'architecture (§ADR-009, §7.3) :
+
+        JEAN      → Rôle : Agent KYC Validateur
+                    Persona demo : "Jean Dupont" (jean@bicec.cm)
+                    Responsabilité : validation dossiers, queue, approve/reject
+
+        THOMAS    → Rôle : Superviseur AML/CFT & Admin Agences
+                    Persona demo : "Thomas Martin" (thomas@bicec.cm)
+                    Responsabilité : screening PEP/Sanctions, batch Amplitude
+
+        SYLVIE    → Rôle : Directrice Opérations / Command Center
+                    Persona demo : "Sylvie Bernard" (sylvie@bicec.cm)
+                    Responsabilité : dashboard SLA, funnel analytics, escalades
+
+        ADMIN_IT  → Rôle : Administrateur Système
+                    Persona demo : "Admin IT" (admin@bicec.cm)
+                    Responsabilité : gestion agents, agences, config système
+                    NOTE : ADMIN_IT n'a PAS de ligne dans la table `agents`
+                           (il ne traite pas de dossiers KYC)
+
+    En production, un vrai agent nommé "Kouam Bertrand" avec le rôle JEAN
+    aura role=JEAN dans la DB — son prénom n'est pas "Jean".
+    Les comptes demo (jean@bicec.cm etc.) sont des fixtures de développement
+    créées par seed_data.py, pas des comptes de production.
+    """
+    JEAN = "JEAN"
+    THOMAS = "THOMAS"
+    SYLVIE = "SYLVIE"
     ADMIN_IT = "ADMIN_IT"
 
 class User(Base):

@@ -1,4 +1,16 @@
-"""Redis async client and utilities — KISS Foundation."""
+﻿"""Redis async client and utilities  KISS Foundation.
+
+Security threat model (ADR-016):
+- Redis is bound to the private Docker network (veripass-net) only.
+  It is NOT exposed to the public internet.
+- Redis AUTH password is required in production (set REDIS_URL with credentials).
+- All data in transit between containers uses the Docker bridge network.
+  For production deployments outside Docker, enable Redis TLS (rediss://).
+- Key names use human-readable prefixes (otp:, refresh:, lock:) which is
+  acceptable because Redis is only reachable from within the private network.
+  If Redis were ever exposed, identifiers should be HMAC-hashed before use as keys.
+- decode_responses=True is set globally so all get() calls return str, never bytes.
+"""
 from typing import Optional
 
 import redis.asyncio as redis
@@ -6,61 +18,36 @@ import redis.asyncio as redis
 from app.core.config import settings
 from app.core.logging import logger
 
-# Global singleton client
-# Initialisation is lazy or via lifespan
+# Global singleton client  lazy-initialised on first request
 redis_client = None
 
 
 # ============================================================
-# REDIS KEY HELPERS — ADR-016 Namespaces
-# ============================================================
-# Centralized key construction to avoid typos and ensure
-# consistent namespace usage across the codebase.
+# REDIS KEY HELPERS  ADR-016 Namespaces
 # ============================================================
 
 def otp_key(identifier: str) -> str:
-    """
-    Redis key for OTP storage.
-    Pattern: otp:{identifier} (phone or email)
-    TTL: REDIS_OTP_TTL (300s / 5 min)
-    """
+    """otp:{identifier}  TTL: REDIS_OTP_TTL"""
     return f"otp:{identifier}"
 
 
 def otp_attempts_key(identifier: str) -> str:
-    """
-    Redis key for OTP verification attempts counter.
-    Pattern: otp_verify_attempts:{identifier}
-    TTL: REDIS_OTP_ATTEMPTS_TTL (300s / 5 min)
-    """
+    """otp_verify_attempts:{identifier}  TTL: REDIS_OTP_ATTEMPTS_TTL"""
     return f"otp_verify_attempts:{identifier}"
 
 
 def refresh_key(user_id: str, jti: str) -> str:
-    """
-    Redis key for refresh token tracking.
-    Pattern: refresh:{user_id}:{jti}
-    TTL: REDIS_REFRESH_TOKEN_TTL (604800s / 7 days)
-    """
+    """refresh:{user_id}:{jti}  TTL: REDIS_REFRESH_TOKEN_TTL"""
     return f"refresh:{user_id}:{jti}"
 
 
 def ratelimit_key(scope: str, identifier: str) -> str:
-    """
-    Redis key for rate limiting counters.
-    Pattern: ratelimit:{scope}:{identifier}
-    Scopes: 'otp', 'auth', 'global'
-    TTL: Varies by scope (see REDIS_RATELIMIT_*_TTL constants)
-    """
+    """ratelimit:{scope}:{identifier}  scopes: otp, auth, global"""
     return f"ratelimit:{scope}:{identifier}"
 
 
 def lock_key(resource: str, resource_id: Optional[str] = None) -> str:
-    """
-    Redis key for distributed locks.
-    Pattern: lock:{resource}:{resource_id}
-    TTL: Varies by resource (see REDIS_LOCK_*_TTL constants)
-    """
+    """lock:{resource}[:{resource_id}]  distributed lock"""
     base = f"lock:{resource}"
     if resource_id:
         return f"{base}:{resource_id}"
@@ -68,16 +55,15 @@ def lock_key(resource: str, resource_id: Optional[str] = None) -> str:
 
 
 def analytics_key(report: str) -> str:
-    """
-    Redis key for analytics dashboard cache.
-    Pattern: analytics:{report}
-    TTL: REDIS_ANALYTICS_CACHE_TTL (60s)
-    """
+    """analytics:{report}  TTL: REDIS_ANALYTICS_CACHE_TTL"""
     return f"analytics:{report}"
 
 
 async def get_redis():
-    """Returns the global redis client, initialising if needed."""
+    """
+    Returns the global Redis client, initialising if needed.
+    decode_responses=True ensures all values are returned as str (never bytes).
+    """
     global redis_client
     if redis_client is None:
         try:
@@ -85,9 +71,8 @@ async def get_redis():
                 settings.REDIS_URL,
                 decode_responses=True,
                 socket_timeout=5,
-                retry_on_timeout=True
+                retry_on_timeout=True,
             )
-            # Basic ping test
             await redis_client.ping()
         except Exception as e:
             logger.error(f"Failed to connect to Redis at {settings.REDIS_URL}: {e}")

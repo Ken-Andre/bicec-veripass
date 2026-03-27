@@ -66,6 +66,7 @@ class UserResponse(BaseModel):
     role: str = Field(..., max_length=20)
     language: str = Field(..., max_length=10)
     biometric_opt_in: bool
+    has_pin: bool
 
 
 class AgentResponse(BaseModel):

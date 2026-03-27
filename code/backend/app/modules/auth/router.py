@@ -25,10 +25,14 @@ from app.modules.kyc.models import KYCSession
 from app.modules.auth.utils import (
     generate_otp,
     store_otp,
-    verify_otp,
+    verify_otp_atomic,
     delete_otp,
     mark_otp_session_used,
     increment_otp_attempts,
+    increment_redis_otp_attempts,
+    reset_otp_attempts,
+    get_otp_attempts,
+    OTP_MAX_ATTEMPTS,
 )
 from app.modules.auth.schemas import (
     TokenResponse,
@@ -85,6 +89,9 @@ async def send_otp(request: Request, body: OtpSendRequest, db: AsyncSession = De
             detail="Failed to generate OTP",
         )
 
+    # Reset attempt counter — new OTP means fresh start
+    await reset_otp_attempts(phone)
+
     # Record in Postgres (Audit) — code_hash uses bcrypt (salt embedded), hash_algo for auditability
     from datetime import datetime, timedelta, timezone
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
@@ -121,6 +128,14 @@ async def verify_otp_endpoint(
     """Verify OTP and issue JWT tokens for mobile user."""
     phone = body.phone
 
+    # Anti-replay: check attempt counter before doing anything
+    attempts = await get_otp_attempts(phone)
+    if attempts >= OTP_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed attempts. Please request a new OTP.",
+        )
+
     # M1: server-side expiry check against DB audit record (defence if Redis TTL drifts)
     from datetime import datetime, timezone
     result_otp = await db.execute(
@@ -131,23 +146,26 @@ async def verify_otp_endpoint(
     )
     otp_session_record = result_otp.scalar_one_or_none()
     if otp_session_record and otp_session_record.expires_at < datetime.now(timezone.utc):
+        await increment_redis_otp_attempts(phone)
         await increment_otp_attempts(db, phone, is_phone=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="OTP has expired",
         )
 
-    # Verify OTP against bcrypt hash in Redis
-    is_valid = await verify_otp(phone, body.otp)
+    # Atomic verify + delete (anti-replay: OTP consumed inside distributed lock)
+    is_valid = await verify_otp_atomic(phone, body.otp)
     if not is_valid:
+        count = await increment_redis_otp_attempts(phone)
         await increment_otp_attempts(db, phone, is_phone=True)
+        remaining = max(0, OTP_MAX_ATTEMPTS - count)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired OTP",
+            detail=f"Invalid or expired OTP. {remaining} attempt(s) remaining.",
         )
 
-    # Delete from Redis and mark DB audit record as used
-    await delete_otp(phone)
+    # Success — clear attempt counter and mark DB audit record as used
+    await reset_otp_attempts(phone)
     await mark_otp_session_used(db, phone, is_phone=True)
 
     # Get or create user
@@ -222,6 +240,9 @@ async def send_email_otp(
             detail="Failed to generate OTP",
         )
 
+    # Reset attempt counter — new OTP means fresh start
+    await reset_otp_attempts(email)
+
     # Record in Postgres (Audit) — code_hash uses bcrypt (salt embedded), hash_algo for auditability
     from datetime import datetime, timedelta, timezone
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
@@ -262,34 +283,47 @@ async def verify_email_otp(
             detail="No email associated with this user",
         )
 
+    email = current_user.email
+
+    # Anti-replay: check attempt counter
+    attempts = await get_otp_attempts(email)
+    if attempts >= OTP_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed attempts. Please request a new OTP.",
+        )
+
     # M1: server-side expiry check
     from datetime import datetime, timezone
     result_otp = await db.execute(
         select(OTPSession)
-        .where(OTPSession.email == current_user.email, OTPSession.is_used == False)  # noqa: E712
+        .where(OTPSession.email == email, OTPSession.is_used == False)  # noqa: E712
         .order_by(OTPSession.created_at.desc())
         .limit(1)
     )
     otp_session_record = result_otp.scalar_one_or_none()
     if otp_session_record and otp_session_record.expires_at < datetime.now(timezone.utc):
-        await increment_otp_attempts(db, current_user.email, is_phone=False)
+        await increment_redis_otp_attempts(email)
+        await increment_otp_attempts(db, email, is_phone=False)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="OTP has expired",
         )
 
-    # Verify OTP
-    is_valid = await verify_otp(current_user.email, body.otp)
+    # Atomic verify + delete (anti-replay)
+    is_valid = await verify_otp_atomic(email, body.otp)
     if not is_valid:
-        await increment_otp_attempts(db, current_user.email, is_phone=False)
+        count = await increment_redis_otp_attempts(email)
+        await increment_otp_attempts(db, email, is_phone=False)
+        remaining = max(0, OTP_MAX_ATTEMPTS - count)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired OTP",
+            detail=f"Invalid or expired OTP. {remaining} attempt(s) remaining.",
         )
 
-    # Delete from Redis and mark DB audit record as used
-    await delete_otp(current_user.email)
-    await mark_otp_session_used(db, current_user.email, is_phone=False)
+    # Success — clear attempt counter and mark DB audit record as used
+    await reset_otp_attempts(email)
+    await mark_otp_session_used(db, email, is_phone=False)
 
     # Update KYCSession State
     result = await db.execute(
@@ -479,6 +513,7 @@ async def get_me(request: Request, current_user: User = Depends(get_current_user
         role=current_user.role,
         language=current_user.language,
         biometric_opt_in=current_user.biometric_opt_in,
+        has_pin=bool(current_user.pin_hash),
     )
 
 
