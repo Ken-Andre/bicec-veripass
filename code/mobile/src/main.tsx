@@ -12,6 +12,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     integrations: [Sentry.browserTracingIntegration()],
     tracesSampleRate: 0.1, // Don't overdo it in dev
     environment: import.meta.env.MODE,
+    release: `veripass-mobile@${import.meta.env.VITE_APP_VERSION || '0.1.0'}`,
   });
 }
 

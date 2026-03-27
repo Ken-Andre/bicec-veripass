@@ -62,6 +62,7 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_SENTRY_DSN=${VITE_SENTRY_DSN_MOBILE}
+        - VITE_APP_VERSION=${APP_VERSION}
     container_name: vp_pwa
     environment:
       - VITE_API_URL=/api
@@ -91,6 +92,7 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_SENTRY_DSN=${VITE_SENTRY_DSN_BACKOFFICE}
+        - VITE_APP_VERSION=${APP_VERSION}
     container_name: vp_backoffice
     environment:
       - VITE_API_URL=/api

@@ -12,9 +12,11 @@ RUN bun install --frozen-lockfile
 # Copy application code
 COPY . .
 
-# Pass Sentry DSN as build-time argument for Vite injection
+# Pass Sentry DSN and Version as build-time arguments for Vite injection
 ARG VITE_SENTRY_DSN
+ARG VITE_APP_VERSION
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+ENV VITE_APP_VERSION=$VITE_APP_VERSION
 
 # Build the application
 RUN bun run build && \

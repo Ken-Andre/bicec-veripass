@@ -19,6 +19,7 @@ if settings.SENTRY_DSN:
         send_default_pii=True,
         traces_sample_rate=0.1,
         environment=settings.ENVIRONMENT,
+        release=f"{settings.PROJECT_NAME}@{settings.PROJECT_VERSION}",
     )
 from app.core.logging import logger
 from app.core.exceptions import (

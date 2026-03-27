@@ -13,6 +13,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     integrations: [Sentry.browserTracingIntegration()],
     tracesSampleRate: 0.1,
     environment: import.meta.env.MODE,
+    release: `veripass-backoffice@${import.meta.env.VITE_APP_VERSION || '0.1.0'}`,
   });
 }
 

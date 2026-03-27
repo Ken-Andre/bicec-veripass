@@ -1,10 +1,11 @@
-from typing import List, Union
+﻿from typing import List, Union
 from functools import lru_cache
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "BICEC VeriPass"
+    PROJECT_VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
     
     # Database - with defaults for dev/test
@@ -20,6 +21,10 @@ class Settings(BaseSettings):
     # Application
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
+    SEED_DATA: bool = False  # Force seed even outside development
+
+    # Sentry
+    SENTRY_DSN: str = ""
     
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = True
@@ -33,6 +38,15 @@ class Settings(BaseSettings):
 
     # Storage
     STORAGE_PATH: str = "./data/storage"
+
+    # Backup
+    # ENABLE_BACKUPS: set to True only when backup infrastructure is configured.
+    # Prevents accidental task execution in dev/CI without a backup target.
+    ENABLE_BACKUPS: bool = False
+    BACKUP_RETENTION_DAYS: int = 7
+    # BACKUP_ENCRYPTION_KEY: dedicated AES-256 passphrase for GPG-encrypted image archives.
+    # MUST be distinct from JWT_SECRET. Set via secrets manager in production.
+    BACKUP_ENCRYPTION_KEY: str = ""
     
     # IA / OCR
     OCR_CONFIDENCE_THRESHOLD: float = 0.85
@@ -60,24 +74,23 @@ class Settings(BaseSettings):
     OTP_MODE: str = "orange"
     OTP_FALLBACK_EMAIL: bool = True  # If SMS fails, try Email if user has an email recorded
     OTP_FALLBACK_EMAIL_ADDRESS: str = ""  # Fallback email for dev/staging when user has no email
-    OTP_EXPIRY_MINUTES: int = 5      # Aligned with ADR-016 (5 min)
+    OTP_EXPIRY_MINUTES: int = 10     # Aligned with ADR-016 (10 min)
 
-    # Redis TTL (secondes) — Required by ADR-016
-    REDIS_OTP_TTL: int = 300           # 5 min — AUTH-03
-    REDIS_OTP_ATTEMPTS_TTL: int = 300  # 5 min — AUTH-03
-    REDIS_REFRESH_TOKEN_TTL: int = 604800  # 7 jours — AUTH-02
-    REDIS_RATELIMIT_OTP_TTL: int = 300     # 5 min — ADMIN-01
-    REDIS_RATELIMIT_AUTH_TTL: int = 60     # 1 min — ADMIN-01
-    REDIS_RATELIMIT_GLOBAL_TTL: int = 60   # 1 min — ADMIN-01
-    REDIS_LOCK_OCR_TTL: int = 120          # sécurité — ADR-003
-    REDIS_LOCK_GLM_TTL: int = 300          # sécurité — ADR-003
-    REDIS_LOCK_AGENT_TTL: int = 30         # sécurité — §12.3
+    # Redis TTL (secondes)  Required by ADR-016
+    REDIS_OTP_TTL: int = 600           # 10 min  AUTH-03
+    REDIS_OTP_ATTEMPTS_TTL: int = 600  # 10 min  AUTH-03
+    REDIS_REFRESH_TOKEN_TTL: int = 604800  # 7 jours  AUTH-02
+    REDIS_RATELIMIT_OTP_TTL: int = 600     # 10 min  ADMIN-01
+    REDIS_RATELIMIT_AUTH_TTL: int = 60     # 1 min  ADMIN-01
+    REDIS_RATELIMIT_GLOBAL_TTL: int = 60   # 1 min  ADMIN-01
+    REDIS_LOCK_OCR_TTL: int = 120          # sécurité  ADR-003
+    REDIS_LOCK_GLM_TTL: int = 300          # sécurité  ADR-003
+    REDIS_LOCK_AGENT_TTL: int = 30         # sécurité  12.3
     REDIS_ANALYTICS_CACHE_TTL: int = 60    # ANALYTICS-12
 
     @field_validator("OTP_MODE", mode="after")
     @classmethod
     def validate_otp_mode(cls, v: str, info) -> str:
-        # Avoid circular import issues by accessing info.data
         env = info.data.get("ENVIRONMENT", "development")
         if env == "production" and v == "dev_local":
             raise ValueError("OTP_MODE 'dev_local' is NOT allowed in production environment")
@@ -91,6 +104,15 @@ class Settings(BaseSettings):
             raise ValueError("JWT_SECRET MUST be changed in production")
         if env == "production" and len(v) < 32:
             raise ValueError("JWT_SECRET must be at least 32 characters in production")
+        return v
+
+    @field_validator("BACKUP_ENCRYPTION_KEY", mode="after")
+    @classmethod
+    def validate_backup_key(cls, v: str, info) -> str:
+        env = info.data.get("ENVIRONMENT", "development")
+        enable = info.data.get("ENABLE_BACKUPS", False)
+        if env == "production" and enable and not v:
+            raise ValueError("BACKUP_ENCRYPTION_KEY must be set when ENABLE_BACKUPS=true in production")
         return v
 
     @field_validator("CORS_ORIGINS", mode="before")
