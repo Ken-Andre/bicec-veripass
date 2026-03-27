@@ -2,6 +2,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -10,6 +11,17 @@ from fastapi.exceptions import RequestValidationError
 from app.api.v1.router import api_router
 from app.routers.demo import router as demo_router
 from app.core.config import settings
+
+# Sentry Init
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        send_default_pii=True,
+        traces_sample_rate=1.0,  # Set to 1.0 for verification
+        environment=settings.ENVIRONMENT,
+    )
+    # Verification message
+    sentry_sdk.capture_message("Sentry Backend initialized: VeriPass API 0.1.0")
 from app.core.logging import logger
 from app.core.exceptions import (
     http_exception_handler,
@@ -19,7 +31,7 @@ from app.core.exceptions import (
 from app.core.rate_limit import limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
-from app.db.session import check_db_connection
+from app.db.session import check_db_connection, AsyncSessionLocal
 from app.core.redis import check_redis_connection
 
 @asynccontextmanager
@@ -30,7 +42,16 @@ async def lifespan(app: FastAPI):
     db_ok = await check_db_connection()
     if not db_ok:
         logger.error("Failed to connect to Database on startup.")
-    
+
+    # Seed development data if enabled
+    if settings.ENVIRONMENT == "development" or getattr(settings, "SEED_DATA", False):
+        try:
+            from app.db.seed_data import seed_development_data
+            async with AsyncSessionLocal() as db:
+                await seed_development_data(db)
+        except Exception as e:
+            logger.warning(f"Seed data failed (non-fatal): {e}")
+
     yield
     # Shutdown
     logger.info("Shutting down BICEC VeriPass API...")
@@ -95,3 +116,8 @@ async def health_check():
         "db": "ok" if db_status else "error",
         "redis": "ok" if redis_status else "error"
     }
+
+@app.get("/api/sentry-debug", tags=["sentry"])
+async def trigger_error():
+    """Sentry test endpoint — intentionally raises ZeroDivisionError."""
+    division_by_zero = 1 / 0

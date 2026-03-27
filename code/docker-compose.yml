@@ -60,6 +60,8 @@ services:
     build:
       context: ./mobile
       dockerfile: Dockerfile
+      args:
+        - VITE_SENTRY_DSN=${VITE_SENTRY_DSN_MOBILE}
     container_name: vp_pwa
     environment:
       - VITE_API_URL=/api
@@ -87,6 +89,8 @@ services:
     build:
       context: ./backoffice
       dockerfile: Dockerfile
+      args:
+        - VITE_SENTRY_DSN=${VITE_SENTRY_DSN_BACKOFFICE}
     container_name: vp_backoffice
     environment:
       - VITE_API_URL=/api
@@ -135,6 +139,7 @@ services:
       - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
       - OCR_CONFIDENCE_THRESHOLD=0.85
       - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
+      - SENTRY_DSN=${SENTRY_DSN_BACKEND}
     volumes:
       - documents_storage:/data/documents
       - models_storage:/data/models
@@ -177,6 +182,7 @@ services:
       - MODELS_PATH=/data/models
       - GLM_LAZY_LOAD=true      # GLM-OCR chargé à la 1ère tâche de la queue
       - SKIP_MIGRATIONS=1
+      - SENTRY_DSN=${SENTRY_DSN_BACKEND}
     volumes:
       - documents_storage:/data/documents
       - models_storage:/data/models
@@ -223,6 +229,7 @@ services:
       - SMTP_SSL=${SMTP_SSL:-false}
       - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
       - SKIP_MIGRATIONS=1
+      - SENTRY_DSN=${SENTRY_DSN_BACKEND}
     depends_on:
       postgres:
         condition: service_healthy
@@ -257,6 +264,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - BACKUP_RETENTION_DAYS=7
       - SKIP_MIGRATIONS=1
+      - SENTRY_DSN=${SENTRY_DSN_BACKEND}
     volumes:
       - db_backups:/backups/db
       - /var/run/docker.sock:/var/run/docker.sock:rw  # Docker socket with write access for prune task

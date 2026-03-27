@@ -116,6 +116,17 @@ export default function LoginPage() {
               <p>jean@bicec.cm / thomas@bicec.cm / sylvie@bicec.cm / admin@bicec.cm</p>
             </div>
           )}
+
+          <div className="mt-8 pt-6 border-t border-gray-100 flex justify-center opacity-20 hover:opacity-100 transition-opacity">
+            <button
+               type="button"
+               id="sentry-test-btn"
+               onClick={() => { throw new Error("Verification Sentry - Backoffice") }}
+               className="text-[10px] text-gray-400 uppercase tracking-widest font-bold"
+            >
+              Test Sentry Integration
+            </button>
+          </div>
         </form>
       </div>
     </div>
