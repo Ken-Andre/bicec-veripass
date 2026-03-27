@@ -10,12 +10,9 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     integrations: [Sentry.browserTracingIntegration()],
-    tracesSampleRate: 1.0, // Set to 100% temporarily for verification
+    tracesSampleRate: 0.1, // Don't overdo it in dev
     environment: import.meta.env.MODE,
   });
-  
-  // Verification message to wake up Sentry
-  Sentry.captureMessage("Sentry Mobile initialized: VeriPass Mobile 0.1.0");
 }
 
 // Dark mode init AVANT le render

@@ -62,17 +62,6 @@ const PhoneEntryScreen = () => {
         >
           {loading ? 'Envoi...' : 'Continuer'}
         </button>
-
-        <div className="mt-8 flex justify-center opacity-20 hover:opacity-100 transition-opacity">
-          <button
-             type="button"
-             id="sentry-test-btn"
-             onClick={() => { throw new Error("Verification Sentry - Mobile") }}
-             className="text-[10px] text-gray-400 uppercase tracking-widest font-bold"
-          >
-            Test Sentry Integration
-          </button>
-        </div>
       </div>
     </ScreenLayout>
   );

@@ -11,12 +11,9 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     integrations: [Sentry.browserTracingIntegration()],
-    tracesSampleRate: 1.0, // Set to 100% temporarily for verification
+    tracesSampleRate: 0.1,
     environment: import.meta.env.MODE,
   });
-  
-  // Verification message to wake up Sentry
-  Sentry.captureMessage("Sentry Backoffice initialized: VeriPass Backoffice 0.1.0");
 }
 
 createRoot(document.getElementById('root')!).render(

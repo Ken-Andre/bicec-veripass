@@ -17,11 +17,9 @@ if settings.SENTRY_DSN:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         send_default_pii=True,
-        traces_sample_rate=1.0,  # Set to 1.0 for verification
+        traces_sample_rate=0.1,
         environment=settings.ENVIRONMENT,
     )
-    # Verification message
-    sentry_sdk.capture_message("Sentry Backend initialized: VeriPass API 0.1.0")
 from app.core.logging import logger
 from app.core.exceptions import (
     http_exception_handler,
