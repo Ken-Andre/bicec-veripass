@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 
 interface User {
   id: string
@@ -17,81 +17,109 @@ interface AuthState {
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<boolean>
   logout: () => void
+  getAuthHeader: () => Record<string, string>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const MOCK_USERS: Record<string, User & { password: string }> = {
-  'jean@bicec.cm': {
-    id: '1',
-    email: 'jean@bicec.cm',
-    name: 'Jean Dupont',
-    role: 'JEAN',
-    agencyId: 'agency-1',
-    password: 'password123',
-  },
-  'thomas@bicec.cm': {
-    id: '2',
-    email: 'thomas@bicec.cm',
-    name: 'Thomas Martin',
-    role: 'THOMAS',
-    agencyId: 'agency-1',
-    password: 'password123',
-  },
-  'sylvie@bicec.cm': {
-    id: '3',
-    email: 'sylvie@bicec.cm',
-    name: 'Sylvie Bernard',
-    role: 'SYLVIE',
-    agencyId: 'agency-1',
-    password: 'password123',
-  },
-  'admin@bicec.cm': {
-    id: '4',
-    email: 'admin@bicec.cm',
-    name: 'Admin IT',
-    role: 'ADMIN_IT',
-    password: 'password123',
-  },
-}
+const API_BASE = '/api/v1'
+const TOKEN_KEY = 'veripass_access_token'
+const REFRESH_KEY = 'veripass_refresh_token'
+const USER_KEY = 'veripass_user'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: false,
+  const [state, setState] = useState<AuthState>(() => {
+    try {
+      const stored = localStorage.getItem(USER_KEY)
+      const token = localStorage.getItem(TOKEN_KEY)
+      if (stored && token) {
+        return { user: JSON.parse(stored), isAuthenticated: true, isLoading: false }
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return { user: null, isAuthenticated: false, isLoading: false }
   })
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setState(prev => ({ ...prev, isLoading: true }))
-    
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    const userWithPassword = MOCK_USERS[email.toLowerCase()]
-    if (userWithPassword && userWithPassword.password === password) {
-      const { password: _, ...user } = userWithPassword
-      setState({
-        user,
-        isAuthenticated: true,
-        isLoading: false,
+    try {
+      const res = await fetch(`${API_BASE}/auth/agent/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       })
+
+      if (!res.ok) {
+        setState(prev => ({ ...prev, isLoading: false }))
+        return false
+      }
+
+      const data = await res.json()
+      const { access_token, refresh_token } = data
+
+      // Decode role from JWT payload (base64)
+      const payload = JSON.parse(atob(access_token.split('.')[1]))
+      const role = payload.role as User['role']
+
+      // Fetch agent profile
+      const meRes = await fetch(`${API_BASE}/auth/agent/me`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      })
+      const agentData = meRes.ok ? await meRes.json() : null
+
+      const user: User = {
+        id: agentData?.id ?? payload.sub,
+        email,
+        name: agentData?.name ?? email,
+        role,
+        agencyId: agentData?.agency_id,
+      }
+
+      localStorage.setItem(TOKEN_KEY, access_token)
+      localStorage.setItem(REFRESH_KEY, refresh_token)
+      localStorage.setItem(USER_KEY, JSON.stringify(user))
+
+      setState({ user, isAuthenticated: true, isLoading: false })
       return true
+    } catch {
+      setState(prev => ({ ...prev, isLoading: false }))
+      return false
     }
-    
-    setState(prev => ({ ...prev, isLoading: false }))
-    return false
   }, [])
 
   const logout = useCallback(() => {
-    setState({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-    })
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(REFRESH_KEY)
+    localStorage.removeItem(USER_KEY)
+    setState({ user: null, isAuthenticated: false, isLoading: false })
   }, [])
 
+  const getAuthHeader = useCallback((): Record<string, string> => {
+    const token = localStorage.getItem(TOKEN_KEY)
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }, [])
+
+  // Intercept 401s globally — redirect to login
+  useEffect(() => {
+    const originalFetch = window.fetch
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args)
+      if (response.status === 401) {
+        const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url
+        // Only redirect if it's an API call (not the login endpoint itself)
+        if (url.includes(API_BASE) && !url.includes('/auth/agent/login')) {
+          logout()
+          window.location.href = '/login'
+        }
+      }
+      return response
+    }
+    return () => { window.fetch = originalFetch }
+  }, [logout])
+
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
+    <AuthContext.Provider value={{ ...state, login, logout, getAuthHeader }}>
       {children}
     </AuthContext.Provider>
   )

@@ -494,6 +494,7 @@ This document breaks down the implementation of BICEC VeriPass into actionable t
 
 ---
 
+
 ## Sprint 2: PWA Foundation & Session Management (Weeks 3-4)
 
 **Goal**: Build PWA shell with offline support, session management, and camera access
