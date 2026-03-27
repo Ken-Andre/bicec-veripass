@@ -39,6 +39,30 @@
 
 ---
 
+## 🔴 M1 - Security (Rate Limiting)
+
+| # | Issue | Description | LOCAL | CLOUD | Dépendances |
+|---|-------|-------------|-------|-------|-------------|
+| 174 | ADMIN-01 | Security — Rate Limiting Middleware global | [-] | [ ] | #50 |
+
+**Flux logique :** #50 → #174
+
+---
+
+## 🟡 M2 - Document Capture & OCR (Deadline: 3 avril)
+
+| # | Issue | Description | LOCAL | CLOUD | Dépendances |
+|---|-------|-------------|-------|-------|-------------|
+| 308 | CAPTURE-04 | Docker Filesystem Volume for doc storage | [x] | [ ] | #9 |
+| 310 | CAPTURE-06 | MediaPipe WASM Client-Side Quality Gate | [-] | [ ] | #308 |
+| 311 | CAPTURE-08 | SHA-256 Integrity Hash Calculation | [x] | [ ] | #308 |
+| 312 | OCR-03 | Celery Worker for OCR Async Jobs | [-] | [ ] | #308 |
+| 314 | OCR-07 | UI Field Override Logic & Human Tagging | [-] | [ ] | #312 |
+
+**Flux logique :** #308 → #310/#311/#312 → #314
+
+---
+
 ## 📝 Notes
 
 - **LOCAL** = Travail en cours sur la machine (commit local, branche en cours)

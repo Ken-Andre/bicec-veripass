@@ -37,7 +37,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
 
     # Storage
-    STORAGE_PATH: str = "./data/storage"
+    STORAGE_PATH: str = "/data/documents"  # Docker volume mount in production
+    STORAGE_PATH_DEV: str = "./data/documents"  # Local development fallback
+    
+    # Allowed file types and max size
+    ALLOWED_DOCUMENT_TYPES: List[str] = ["image/jpeg", "image/png", "image/jpg", "application/pdf"]
+    MAX_DOCUMENT_SIZE_MB: int = 10  # 10MB max per document
 
     # Backup
     # ENABLE_BACKUPS: set to True only when backup infrastructure is configured.
