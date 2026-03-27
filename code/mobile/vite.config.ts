@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: './',
+  base: '/mobile/',
   plugins: [
     react(),
     VitePWA({
@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'BICEC VeriPass',
         short_name: 'VeriPass',
         description: 'BICEC VeriPass — Ouverture de compte digitale',
-        start_url: './',
+        start_url: '/mobile/',
         display: 'standalone',
         orientation: 'portrait',
         background_color: '#FBF8F3',

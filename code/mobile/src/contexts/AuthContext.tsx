@@ -1,48 +1,92 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+
+interface User {
+  id: string;
+  phone?: string;
+  email?: string;
+  role: string;
+  has_pin: boolean;
+}
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  userId: string | null;
-  login: () => void;
+  user: User | null;
+  phone: string | null;
+  loading: boolean;
+  login: (token: string, user: User) => void;
   logout: () => void;
+  setPhone: (phone: string) => void;
+  setPinSetupCompleted: () => void;
   resetAccount: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// TODO AUTH-01 : implémenter OTP + PIN + Passkeys WebAuthn
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = () => {
+  useEffect(() => {
+    const token = localStorage.getItem('vp_token');
+    const savedUser = localStorage.getItem('vp_user');
+    if (token && savedUser) {
+      setIsAuthenticated(true);
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
+  }, []);
+
+  const login = (token: string, userData: User) => {
+    localStorage.setItem('vp_token', token);
+    localStorage.setItem('vp_user', JSON.stringify(userData));
     setIsAuthenticated(true);
-    setUserId('dummy-user');
+    setUser(userData);
   };
 
   const logout = () => {
-    // efface tokens, conserve vp_user_id (reconnexion PIN)
+    localStorage.removeItem('vp_token');
+    // On garde vp_user pour savoir si on affiche le PIN Login ou l'OTP
     setIsAuthenticated(false);
+  };
+
+  const setPinSetupCompleted = () => {
+    if (user) {
+      const updatedUser = { ...user, has_pin: true };
+      localStorage.setItem('vp_user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    }
   };
 
   const resetAccount = () => {
-    // efface tout (tokens + userId + passkey)
+    localStorage.removeItem('vp_token');
+    localStorage.removeItem('vp_user');
     setIsAuthenticated(false);
-    setUserId(null);
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, userId, login, logout, resetAccount }}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated, 
+      user, 
+      phone,
+      loading, 
+      login, 
+      logout, 
+      setPhone,
+      setPinSetupCompleted, 
+      resetAccount 
+    }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}

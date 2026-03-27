@@ -1,9 +1,38 @@
-import { ScreenLayout } from '../components/ScreenLayout';
 import { ShieldCheck, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { ScreenLayout } from '../components/ScreenLayout';
 
 export function HomePage() {
   const navigate = useNavigate();
+  const { isAuthenticated, user, loading } = useAuth();
+  
+  useEffect(() => {
+    if (!loading) {
+      if (!isAuthenticated) {
+        // Not authenticated, check for returning user
+        const savedUser = localStorage.getItem('vp_user');
+        if (savedUser) {
+          navigate('/auth/pin-login');
+        } else {
+          // If the current path is already /auth/phone, don't redirect to avoid loops
+          // But HomePage is only at /, so it's fine.
+          navigate('/auth/phone');
+        }
+      } else if (user && !user.has_pin) {
+        navigate('/auth/pin-setup');
+      }
+    }
+  }, [loading, isAuthenticated, user, navigate]);
+
+  if (loading) {
+    return (
+      <ScreenLayout className="justify-center items-center">
+        <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </ScreenLayout>
+    );
+  }
 
   return (
     <ScreenLayout className="justify-center p-6 text-center">
@@ -24,7 +53,7 @@ export function HomePage() {
         {/* CTA */}
         <div className="w-full pt-8 pb-4">
           <button 
-            onClick={() => navigate('/')} 
+            onClick={() => navigate('/auth/phone')} 
             className="w-full bg-primary text-primary-foreground font-semibold h-14 rounded-xl shadow-lg flex items-center justify-center space-x-2 active:scale-[0.98] transition-all"
           >
             <span>Commencer</span>
