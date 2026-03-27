@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Best Practices Reminder",
+  "description": "Rappelle les conventions du projet (rôles vs personas, uv run, structure tests) avant toute écriture de fichier Python backend",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": [
+      "write"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Avant d'écrire ce fichier, vérifie les points suivants issus des steering files du projet :\n1. RÔLES vs PERSONAS : JEAN/THOMAS/SYLVIE/ADMIN_IT sont des rôles fonctionnels, pas des prénoms. Ne pas supposer que role=JEAN implique que l'agent s'appelle \"Jean\". Voir .kiro/steering/roles-vs-personas.md.\n2. COMMANDES : Toujours utiliser `uv run` pour Python/pytest, jamais `pip install` ou `python` direct. CWD = code/backend.\n3. TESTS : Tests unitaires dans tests/unit/ (pas de DB). Tests d'intégration dans tests/ racine (PostgreSQL requis).\n4. SEED DATA : Les comptes jean@bicec.cm etc. n'existent qu'en ENVIRONMENT=development ou SEED_DATA=true.\nSi le fichier respecte ces conventions, procède normalement."
+  }
+}
