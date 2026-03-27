@@ -27,14 +27,15 @@
 
 | # | Issue | Description | LOCAL | CLOUD | Dépendances |
 |---|-------|-------------|-------|-------|-------------|
+| 49 | AUTH-03 | Back-Office RBAC Logic & JWT | [x] | [ ] | #50, #51 |
 | 50 | AUTH-04 | Auth Router & Token Management | [x] | [x] | Aucune |
 | 48 | AUTH-02 | PIN Setup & Secure Storage | [x] | [x] | #50 |
 | 51 | AUTH-05 | Users & Roles tables | [x] | [x] | #50 |
 | 52 | AUTH-06 | Mobile OTP Capture Screen | [-] | [ ] | #50 |
 | 54 | AUTH-08 | Redis TTL for OTP storage | [x] Q-dev | [x] Q-dev | #50 |
-| 53 | AUTH-07 | Back-Office Login Dashboard | [ ] | [ ] | #50, #51 |
+| 53 | AUTH-07 | Back-Office Login Dashboard | [-] | [ ] | #50, #51, #49 |
 
-**Flux logique :** #50 → #48/#51 → #52 → #54 → #53
+**Flux logique :** #50 → #48/#51 → #49 → #52 → #54 → #53
 
 ---
 
