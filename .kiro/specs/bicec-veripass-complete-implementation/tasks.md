@@ -14,17 +14,17 @@ This document breaks down the implementation of BICEC VeriPass into actionable t
 
 ### Epic Summary
 
-| Epic | Sprints | Issues | Focus Area |
-|------|---------|--------|------------|
-| Epic 1: Foundation & Infrastructure | 1-2 | 25 | Docker, DB, Auth, CI/CD |
-| Epic 2: Capture Journey | 3-5 | 32 | PWA, Camera, OCR, Liveness |
-| Epic 3: Address, NIU, Consent | 6-7 | 18 | Forms, GPS, Utility Bills |
-| Epic 4: AI Engine Integration | 8-9 | 24 | PaddleOCR, GLM-OCR, Biometrics |
-| Epic 5: Jean's Validation Desk | 10-11 | 22 | Back-Office, Queue, Inspector |
-| Epic 6: Thomas's AML/CFT | 12 | 15 | Sanctions, PEP, Conflicts |
-| Epic 7: Sylvie's Command Center | 13 | 12 | Analytics, Dashboards, SLA |
-| Epic 8: Banking Discovery | 14 | 6 | Plans, Use-Cases, Feature Gates |
-| Epic 9: Admin IT — Agent Lifecycle & System Admin | 14-15 | 10 | Agent CRUD, Agency CRUD, Config, Seed |
+| Epic                                              | Sprints | Issues | Focus Area                            |
+| ------------------------------------------------- | ------- | ------ | ------------------------------------- |
+| Epic 1: Foundation & Infrastructure               | 1-2     | 25     | Docker, DB, Auth, CI/CD               |
+| Epic 2: Capture Journey                           | 3-5     | 32     | PWA, Camera, OCR, Liveness            |
+| Epic 3: Address, NIU, Consent                     | 6-7     | 18     | Forms, GPS, Utility Bills             |
+| Epic 4: AI Engine Integration                     | 8-9     | 24     | PaddleOCR, GLM-OCR, Biometrics        |
+| Epic 5: Jean's Validation Desk                    | 10-11   | 22     | Back-Office, Queue, Inspector         |
+| Epic 6: Thomas's AML/CFT                          | 12      | 15     | Sanctions, PEP, Conflicts             |
+| Epic 7: Sylvie's Command Center                   | 13      | 12     | Analytics, Dashboards, SLA            |
+| Epic 8: Banking Discovery                         | 14      | 6      | Plans, Use-Cases, Feature Gates       |
+| Epic 9: Admin IT — Agent Lifecycle & System Admin | 14-15   | 10     | Agent CRUD, Agency CRUD, Config, Seed |
 
 ### Task Status Legend
 
@@ -368,7 +368,7 @@ This document breaks down the implementation of BICEC VeriPass into actionable t
 **Description**: Implement OTP-based authentication for client users (Marie) with SMS delivery and PIN setup.
 
 **Subtasks**:
-- [ ] Backend `POST /auth/otp/send`: validate phone format (+237XXXXXXXXX), generate 6-digit OTP, store in Redis `otp:{phone}` TTL=5min (bcrypt hash), call SMS provider
+- [ ] Backend `POST /auth/otp/send`: validate phone format (+237XXXXXXXXX), generate 6-digit OTP, store in Redis `otp:{phone}` TTL=10min (bcrypt hash), call SMS provider
 - [ ] Backend `POST /auth/otp/verify`: compare hash, create `users` record if new, create `kyc_session` status=DRAFT, return JWT
 - [ ] Implement rate limiting: 3 attempts max per 5 minutes per IP + per phone (Redis counter)
 - [ ] Implement anti-replay: delete OTP from Redis immediately after successful use
@@ -976,13 +976,13 @@ This document breaks down the implementation of BICEC VeriPass into actionable t
 
 ### High-Risk Items
 
-| Risk | Impact | Mitigation | Owner |
-|------|--------|------------|-------|
-| GLM-OCR ONNX compatibility issues | 2 days lost | Validate in Sprint 0, fallback to PaddleOCR only | AI Engineer |
-| Orange SMS API unavailable | Blocks OTP flow | SMTP fallback implemented in Sprint 0 | Backend Dev |
-| i3 node insufficient for 5 concurrent sessions | Performance degradation | Benchmark in Sprint 0, optimize in Sprint 9 | DevOps |
-| CNI dataset insufficient for OCR training | Low accuracy | Synthetic generation + BICEC samples in Sprint 0 | AI Engineer |
-| Amplitude API integration delays | Blocks provisioning | Mock responses for testing, parallel track | Integration Lead |
+| Risk                                           | Impact                  | Mitigation                                       | Owner            |
+| ---------------------------------------------- | ----------------------- | ------------------------------------------------ | ---------------- |
+| GLM-OCR ONNX compatibility issues              | 2 days lost             | Validate in Sprint 0, fallback to PaddleOCR only | AI Engineer      |
+| Orange SMS API unavailable                     | Blocks OTP flow         | SMTP fallback implemented in Sprint 0            | Backend Dev      |
+| i3 node insufficient for 5 concurrent sessions | Performance degradation | Benchmark in Sprint 0, optimize in Sprint 9      | DevOps           |
+| CNI dataset insufficient for OCR training      | Low accuracy            | Synthetic generation + BICEC samples in Sprint 0 | AI Engineer      |
+| Amplitude API integration delays               | Blocks provisioning     | Mock responses for testing, parallel track       | Integration Lead |
 
 ### Technical Debt
 
