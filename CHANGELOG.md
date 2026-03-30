@@ -4,7 +4,12 @@
 
 ### Weekly recap (2026-03-23 to 2026-03-29)
 
-- No new commits or merged PRs recorded after 2026-03-22; this section will expand once changes land.
+- Hardened authentication with a new JWT service, updated auth router/utils, seed data, and refreshed login/navigation screens.
+- Strengthened backups and ops: new backup configuration, maintenance gating with audit logging, and tighter OTP/Redis TTL/versioning defaults.
+- Expanded observability by integrating Sentry across backend, backoffice, and mobile (with env templates) and removing test-only UI hooks.
+- Secured KYC document handling via SHA-256–verified storage service.
+- Added backend tests covering auth schemas, health endpoints, and OTP scenarios.
+- PR references: none recorded in commit history for this period.
 
 ### Weekly recap (2026-03-16 to 2026-03-22)
 
