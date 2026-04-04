@@ -14,6 +14,8 @@ celery = Celery(
         "app.tasks.maintenance",  # Tâches de maintenance
         "app.tasks_demo",  # Tâches de démonstration
         "app.modules.auth.tasks", # Tâches d'authentification (OTP SMS/Email)
+        "app.tasks.sanctions",    # Sync PEP/Sanctions listes (AML)
+        "app.tasks.kyc",          # Sessions abandonnées, doublons
     ]
 )
 
@@ -51,5 +53,19 @@ celery.conf.beat_schedule = {
         "schedule": crontab(hour=3, minute=30),
     },
     # Other tasks from architecture (placeholders)
-    # "sync-sanctions-weekly": { ... }
+    # Sync listes PEP/Sanctions hebdomadaire (lundi 02h00) — §13.3, AR7
+    "sync-sanctions-weekly": {
+        "task": "app.tasks.sanctions.sync_pep_sanctions",
+        "schedule": crontab(hour=2, minute=0, day_of_week=1),
+    },
+    # Détection sessions ABANDONED (quotidien 03h00) — §5, G32
+    "detect-abandoned-sessions": {
+        "task": "app.tasks.kyc.detect_abandoned_sessions",
+        "schedule": crontab(hour=3, minute=0),
+    },
+    # Vérification staleness sanctions (quotidien 04h00)
+    "check-sanctions-staleness": {
+        "task": "app.tasks.sanctions.check_staleness",  # TODO: créer
+        "schedule": crontab(hour=4, minute=0),
+    },
 }

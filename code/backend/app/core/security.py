@@ -22,6 +22,7 @@ Validation rules enforced at decode time:
   - sub must resolve to an existing DB row
   - sid is verified via HMAC before any DB lookup
 """
+
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any, BinaryIO
 import hashlib
@@ -37,6 +38,8 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.logging import logger
 from app.db.session import get_db
+from app.modules.auth.models import User, Agent, AgentRole
+from app.db.session import get_db
 from app.modules.auth.models import User, Agent
 
 # JWT Bearer security scheme
@@ -46,15 +49,15 @@ security = HTTPBearer(auto_error=False)
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
     salt = bcrypt.gensalt()
-    pwd_bytes = password.encode('utf-8')
+    pwd_bytes = password.encode("utf-8")
     hashed_password = bcrypt.hashpw(pwd_bytes, salt)
-    return hashed_password.decode('utf-8')
+    return hashed_password.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
-    plain_password_bytes = plain_password.encode('utf-8')
-    hashed_password_bytes = hashed_password.encode('utf-8')
+    plain_password_bytes = plain_password.encode("utf-8")
+    hashed_password_bytes = hashed_password.encode("utf-8")
     try:
         return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
     except ValueError:
@@ -128,7 +131,9 @@ def create_refresh_token(subject: str) -> str:
         "exp": expire,
         "sub": str(subject),
         "type": "refresh",
-        "jti": str(_uuid.uuid4()),  # unique token id — store in a revocation list to invalidate
+        "jti": str(
+            _uuid.uuid4()
+        ),  # unique token id — store in a revocation list to invalidate
     }
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm="HS256")
     return encoded_jwt
@@ -148,6 +153,7 @@ async def is_token_revoked(jti: str, db: AsyncSession) -> bool:
     """Check if a refresh token jti is in the revocation list."""
     from app.modules.auth.models import TokenRevocation
     import uuid as _uuid_mod
+
     try:
         jti_uuid = _uuid_mod.UUID(jti)
     except ValueError:
@@ -163,12 +169,15 @@ async def revoke_token(jti: str, expires_at, db: AsyncSession) -> None:
     from app.modules.auth.models import TokenRevocation
     from datetime import datetime
     import uuid as _uuid_mod
+
     revocation = TokenRevocation(jti=_uuid_mod.UUID(jti), expires_at=expires_at)
     db.add(revocation)
     await db.commit()
 
 
-async def decode_refresh_token(token: str, db: AsyncSession) -> Optional[dict[str, Any]]:
+async def decode_refresh_token(
+    token: str, db: AsyncSession
+) -> Optional[dict[str, Any]]:
     """Decode a refresh token and verify it hasn't been revoked."""
     payload = decode_token(token)
     if not payload or payload.get("type") != "refresh":
@@ -191,7 +200,7 @@ async def get_current_user(
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     payload = decode_token(credentials.credentials)
     if not payload:
         raise HTTPException(
@@ -199,29 +208,29 @@ async def get_current_user(
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if payload.get("type") != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type",
         )
-    
+
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
         )
-    
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
-    
+
     return user
 
 
@@ -236,7 +245,7 @@ async def get_current_agent(
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     payload = decode_token(credentials.credentials)
     if not payload:
         raise HTTPException(
@@ -244,34 +253,35 @@ async def get_current_agent(
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if payload.get("type") != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type",
         )
-    
+
     agent_id = payload.get("sub")
     if not agent_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
         )
-    
+
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
-    
+
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Agent not found",
         )
-    
+
     return agent
 
 
 def require_role(*allowed_roles: str):
-    """Dependency factory to require specific roles."""
+    """Dependency factory to require specific roles (for mobile users)."""
+
     async def role_checker(
         current_user: User = Depends(get_current_user),
     ) -> User:
@@ -281,4 +291,21 @@ def require_role(*allowed_roles: str):
                 detail=f"Role '{current_user.role}' not authorized. Required: {allowed_roles}",
             )
         return current_user
+
+    return role_checker
+
+
+def require_agent_role(*allowed_roles: AgentRole):
+    """Dependency factory to require specific agent roles (for back-office)."""
+
+    async def role_checker(
+        current_agent: Agent = Depends(get_current_agent),
+    ) -> Agent:
+        if current_agent.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{current_agent.role.value}' not authorized. Required: {[r.value for r in allowed_roles]}",
+            )
+        return current_agent
+
     return role_checker

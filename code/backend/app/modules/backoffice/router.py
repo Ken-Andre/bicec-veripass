@@ -7,7 +7,7 @@ import app.db.base  # noqa — ensures all mappers (Agency, etc.) are registered
 from app.core.rate_limit import limiter
 from app.core.config import settings
 from app.core.pagination import PageParams, PageResponse, paginate
-from app.core.security import get_current_agent, require_role
+from app.core.security import get_current_agent, require_agent_role
 from app.db.session import get_db
 from app.modules.auth.models import AgentRole
 from app.modules.kyc.models import KYCSession
@@ -25,7 +25,13 @@ async def get_root():
 @router.get(
     "/queue",
     response_model=PageResponse[KYCQueueItemSchema],
-    dependencies=[Depends(require_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT))],
+    dependencies=[
+        Depends(
+            require_agent_role(
+                AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT
+            )
+        )
+    ],
 )
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_queue(
@@ -36,7 +42,7 @@ async def list_queue(
     """
     Paginated KYC session queue — sessions in PENDING or SUBMITTED status,
     most recent first, priority sessions first.
-    
+
     Access: JEAN, THOMAS, SYLVIE, ADMIN_IT
     """
     query = (
@@ -53,7 +59,11 @@ async def list_queue(
 @router.get(
     "/audit-logs",
     response_model=PageResponse[AuditLogSchema],
-    dependencies=[Depends(require_role(AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT))],
+    dependencies=[
+        Depends(
+            require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT)
+        )
+    ],
 )
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_audit_logs(
@@ -62,7 +72,7 @@ async def list_audit_logs(
     db: AsyncSession = Depends(get_db),
 ):
     """Paginated audit log — most recent first.
-    
+
     Access: THOMAS, SYLVIE, ADMIN_IT
     """
     query = select(AuditLog).order_by(AuditLog.performed_at.desc())

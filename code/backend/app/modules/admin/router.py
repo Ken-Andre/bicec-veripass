@@ -6,7 +6,7 @@ import app.db.base  # noqa — ensures all mappers are registered
 from app.core.rate_limit import limiter
 from app.core.config import settings
 from app.core.pagination import PageParams, PageResponse, paginate
-from app.core.security import get_current_agent, require_role
+from app.core.security import get_current_agent, require_agent_role
 from app.db.session import get_db
 from app.modules.auth.models import AgentRole, User
 from app.modules.admin.schemas import UserSchema
@@ -15,14 +15,14 @@ router = APIRouter()
 
 
 @router.get("/")
-async def get_root():
+async def get_root(_agent=Depends(require_agent_role(AgentRole.ADMIN_IT))):
     return {"module": "admin", "status": "initialized"}
 
 
 @router.get(
     "/users",
     response_model=PageResponse[UserSchema],
-    dependencies=[Depends(require_role(AgentRole.ADMIN_IT))],
+    dependencies=[Depends(require_agent_role(AgentRole.ADMIN_IT))],
 )
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_users(
@@ -32,7 +32,7 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
 ):
     """Paginated user list — most recently created first.
-    
+
     Access: ADMIN_IT only
     """
     query = select(User).order_by(User.created_at.desc())

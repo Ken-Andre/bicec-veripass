@@ -1,8 +1,10 @@
 """Auth router: OTP, PIN, Agent login, Token refresh."""
+
 from datetime import timedelta
+from typing import Optional
 from fastapi import APIRouter, Request, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
@@ -21,7 +23,7 @@ from app.core.security import (
 from app.core.logging import logger
 from app.db.session import get_db
 from app.modules.auth.models import User, Agent, OTPSession
-from app.modules.kyc.models import KYCSession
+from app.modules.kyc.models import KYCSession, ConsentRecord, Notification
 from app.modules.auth.utils import (
     generate_otp,
     store_otp,
@@ -46,6 +48,7 @@ from app.modules.auth.schemas import (
     OtpVerifyRequest,
     EmailOtpSendRequest,
     EmailOtpVerifyRequest,
+    UserExistsCheckResponse,
 )
 
 router = APIRouter()
@@ -53,6 +56,7 @@ router = APIRouter()
 # ============================================================
 # HEALTH CHECK
 # ============================================================
+
 
 @router.get("/health")
 async def health_check():
@@ -64,25 +68,63 @@ async def health_check():
 # MOBILE OTP ENDPOINTS (Story 1.3 — Marie)
 # ============================================================
 
+
 @router.post("/otp/send", status_code=status.HTTP_200_OK)
 @limiter.limit(settings.RATE_LIMIT_OTP)
-async def send_otp(request: Request, body: OtpSendRequest, db: AsyncSession = Depends(get_db)):
-    """Send OTP via SMS or email for mobile authentication."""
-    phone = body.phone
+async def send_otp(
+    request: Request, body: OtpSendRequest, db: AsyncSession = Depends(get_db)
+):
+    """Send OTP via SMS or email for mobile authentication.
 
-    # Check if user exists or create one
-    result = await db.execute(select(User).where(User.phone == phone))
-    user = result.scalar_one_or_none()
-    if not user:
-        user = User(phone=phone, role="CLIENT")
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-        logger.info(f"New user created: {phone}")
+    If body.phone is provided: send OTP to phone.
+    If body.email is provided: send OTP to email.
+    mode='login': user MUST exist, no user creation.
+    mode='signup': user must NOT exist, creates new user.
+    """
+    mode = body.mode or "signup"
+    phone = body.phone
+    email = body.email
+
+    user: User | None = None
+
+    if phone:
+        result = await db.execute(select(User).where(User.phone == phone))
+        user = result.scalar_one_or_none()
+        if not user and mode == "login":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Numéro non reconnu. Créez d'abord un compte.",
+            )
+        if not user:
+            user = User(phone=phone, role="CLIENT")
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            logger.info(f"New user created: {phone}")
+        identifier = phone
+    elif email:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        if not user and mode == "login":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Email non reconnu. Créez d'abord un compte.",
+            )
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email OTP is only for login, not signup.",
+            )
+        identifier = email
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either phone or email must be provided.",
+        )
 
     # Generate and store OTP
     otp = generate_otp()
-    stored = await store_otp(phone, otp)
+    stored = await store_otp(identifier, otp)
     if not stored:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -90,33 +132,37 @@ async def send_otp(request: Request, body: OtpSendRequest, db: AsyncSession = De
         )
 
     # Reset attempt counter — new OTP means fresh start
-    await reset_otp_attempts(phone)
+    await reset_otp_attempts(identifier)
 
-    # Record in Postgres (Audit) — code_hash uses bcrypt (salt embedded), hash_algo for auditability
+    # Record in Postgres (Audit)
     from datetime import datetime, timedelta, timezone
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.OTP_EXPIRY_MINUTES
+    )
     otp_session = OTPSession(
-        phone=phone,
-        email=user.email,
+        phone=phone or user.phone,
+        email=email or user.email,
         code_hash=hash_password(otp),
         hash_algo="bcrypt",
         expires_at=expires_at,
-        request_ip=request.client.host if request.client else None
+        request_ip=request.client.host if request.client else None,
     )
     db.add(otp_session)
     await db.commit()
 
     # Trigger background task for robust sending (SMS + Fallback Email)
     from app.modules.auth.tasks import send_otp_task
-    send_otp_task.delay(phone, otp, user.email)
-    
-    logger.info(f"OTP task queued and session audited for {phone}")
-    
+
+    send_otp_task.delay(identifier, otp, user.email)
+
+    logger.info(f"OTP task queued and session audited for {identifier}")
+
     # Return response (including OTP in dev/test for convenience)
     response = {"message": "OTP request received and is being processed"}
     if settings.ENVIRONMENT != "production":
         response["otp_debug"] = otp
-        
+
     return response
 
 
@@ -126,10 +172,17 @@ async def verify_otp_endpoint(
     request: Request, body: OtpVerifyRequest, db: AsyncSession = Depends(get_db)
 ):
     """Verify OTP and issue JWT tokens for mobile user."""
-    phone = body.phone
+    identifier = body.phone or body.email
+    is_phone = bool(body.phone)
+
+    if not identifier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone or email is required",
+        )
 
     # Anti-replay: check attempt counter before doing anything
-    attempts = await get_otp_attempts(phone)
+    attempts = await get_otp_attempts(identifier)
     if attempts >= OTP_MAX_ATTEMPTS:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -138,26 +191,37 @@ async def verify_otp_endpoint(
 
     # M1: server-side expiry check against DB audit record (defence if Redis TTL drifts)
     from datetime import datetime, timezone
-    result_otp = await db.execute(
-        select(OTPSession)
-        .where(OTPSession.phone == phone, OTPSession.is_used == False)  # noqa: E712
-        .order_by(OTPSession.created_at.desc())
-        .limit(1)
-    )
+
+    if is_phone:
+        result_otp = await db.execute(
+            select(OTPSession)
+            .where(OTPSession.phone == identifier, OTPSession.is_used == False)  # noqa: E712
+            .order_by(OTPSession.created_at.desc())
+            .limit(1)
+        )
+    else:
+        result_otp = await db.execute(
+            select(OTPSession)
+            .where(OTPSession.email == identifier, OTPSession.is_used == False)  # noqa: E712
+            .order_by(OTPSession.created_at.desc())
+            .limit(1)
+        )
     otp_session_record = result_otp.scalar_one_or_none()
-    if otp_session_record and otp_session_record.expires_at < datetime.now(timezone.utc):
-        await increment_redis_otp_attempts(phone)
-        await increment_otp_attempts(db, phone, is_phone=True)
+    if otp_session_record and otp_session_record.expires_at < datetime.now(
+        timezone.utc
+    ):
+        await increment_redis_otp_attempts(identifier)
+        await increment_otp_attempts(db, identifier, is_phone=is_phone)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="OTP has expired",
         )
 
     # Atomic verify + delete (anti-replay: OTP consumed inside distributed lock)
-    is_valid = await verify_otp_atomic(phone, body.otp)
+    is_valid = await verify_otp_atomic(identifier, body.otp)
     if not is_valid:
-        count = await increment_redis_otp_attempts(phone)
-        await increment_otp_attempts(db, phone, is_phone=True)
+        count = await increment_redis_otp_attempts(identifier)
+        await increment_otp_attempts(db, identifier, is_phone=is_phone)
         remaining = max(0, OTP_MAX_ATTEMPTS - count)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -165,14 +229,17 @@ async def verify_otp_endpoint(
         )
 
     # Success — clear attempt counter and mark DB audit record as used
-    await reset_otp_attempts(phone)
-    await mark_otp_session_used(db, phone, is_phone=True)
+    await reset_otp_attempts(identifier)
+    await mark_otp_session_used(db, identifier, is_phone=is_phone)
 
     # Get or create user
-    result = await db.execute(select(User).where(User.phone == phone))
+    if is_phone:
+        result = await db.execute(select(User).where(User.phone == identifier))
+    else:
+        result = await db.execute(select(User).where(User.email == identifier))
     user = result.scalar_one_or_none()
     if not user:
-        user = User(phone=phone, role="CLIENT")
+        user = User(phone=identifier, role="CLIENT")
         db.add(user)
         await db.commit()
         await db.refresh(user)
@@ -181,13 +248,15 @@ async def verify_otp_endpoint(
     result = await db.execute(
         select(KYCSession).where(
             KYCSession.user_id == user.id,
-            KYCSession.status.in_(["DRAFT", "PENDING_INFO"])
+            KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
         )
     )
     kyc_session = result.scalar_one_or_none()
-    
+
     if not kyc_session:
-        kyc_session = KYCSession(user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED")
+        kyc_session = KYCSession(
+            user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
+        )
         db.add(kyc_session)
     else:
         if not kyc_session.last_step_completed:
@@ -200,7 +269,11 @@ async def verify_otp_endpoint(
     # Create tokens
     access_token = create_access_token(
         subject=str(user.id),
-        additional_claims={"role": user.role, "user_type": "mobile", "sid": session_handle},
+        additional_claims={
+            "role": user.role,
+            "user_type": "mobile",
+            "sid": session_handle,
+        },
     )
     refresh_token = create_refresh_token(subject=str(user.id))
 
@@ -208,7 +281,7 @@ async def verify_otp_endpoint(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        session_handle=session_handle
+        session_handle=session_handle,
     )
 
 
@@ -216,20 +289,40 @@ async def verify_otp_endpoint(
 # MOBILE EMAIL OTP ENDPOINTS (Story 1.3 — Marie)
 # ============================================================
 
+
 @router.post("/email/send", status_code=status.HTTP_200_OK)
 @limiter.limit(settings.RATE_LIMIT_OTP)
 async def send_email_otp(
-    request: Request, 
-    body: EmailOtpSendRequest, 
+    request: Request,
+    body: EmailOtpSendRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Send OTP via email for Dual Authentication."""
+    from sqlalchemy.exc import IntegrityError
+
     email = body.email
 
-    # Update user email
-    current_user.email = email
-    await db.commit()
+    try:
+        # Check if email is already used by another user
+        existing_user = await db.execute(
+            select(User).where(User.email == email, User.id != current_user.id)
+        )
+        if existing_user.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is already in use by another account.",
+            )
+
+        # Update user email
+        current_user.email = email
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already in use by another account.",
+        )
 
     # Generate and store OTP
     otp = generate_otp()
@@ -245,36 +338,41 @@ async def send_email_otp(
 
     # Record in Postgres (Audit) — code_hash uses bcrypt (salt embedded), hash_algo for auditability
     from datetime import datetime, timedelta, timezone
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.OTP_EXPIRY_MINUTES
+    )
     otp_session = OTPSession(
         phone=current_user.phone,
         email=email,
         code_hash=hash_password(otp),
         hash_algo="bcrypt",
         expires_at=expires_at,
-        request_ip=request.client.host if request.client else None
+        request_ip=request.client.host if request.client else None,
     )
     db.add(otp_session)
     await db.commit()
 
     from app.modules.auth.tasks import send_only_email_otp_task
+
     send_only_email_otp_task.delay(email, otp)
-    
+
     logger.info(f"Email OTP task queued and session audited for {email}")
-    
+
     response = {"message": "Email OTP request received and is being processed"}
     if settings.ENVIRONMENT != "production":
         response["otp_debug"] = otp
-        
+
     return response
+
 
 @router.post("/email/verify", status_code=status.HTTP_200_OK)
 @limiter.limit(settings.RATE_LIMIT_OTP)
 async def verify_email_otp(
-    request: Request, 
-    body: EmailOtpVerifyRequest, 
+    request: Request,
+    body: EmailOtpVerifyRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Verify Email OTP."""
     if not current_user.email:
@@ -295,6 +393,7 @@ async def verify_email_otp(
 
     # M1: server-side expiry check
     from datetime import datetime, timezone
+
     result_otp = await db.execute(
         select(OTPSession)
         .where(OTPSession.email == email, OTPSession.is_used == False)  # noqa: E712
@@ -302,7 +401,9 @@ async def verify_email_otp(
         .limit(1)
     )
     otp_session_record = result_otp.scalar_one_or_none()
-    if otp_session_record and otp_session_record.expires_at < datetime.now(timezone.utc):
+    if otp_session_record and otp_session_record.expires_at < datetime.now(
+        timezone.utc
+    ):
         await increment_redis_otp_attempts(email)
         await increment_otp_attempts(db, email, is_phone=False)
         raise HTTPException(
@@ -329,7 +430,7 @@ async def verify_email_otp(
     result = await db.execute(
         select(KYCSession).where(
             KYCSession.user_id == current_user.id,
-            KYCSession.status.in_(["DRAFT", "PENDING_INFO"])
+            KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
         )
     )
     kyc_session = result.scalar_one_or_none()
@@ -340,9 +441,11 @@ async def verify_email_otp(
 
     return {"message": "Email verified successfully"}
 
+
 # ============================================================
 # PIN ENDPOINTS (Story 1.3 — Marie returning user)
 # ============================================================
+
 
 @router.post("/pin/setup", status_code=status.HTTP_200_OK)
 @limiter.limit(settings.RATE_LIMIT_AUTH)
@@ -354,12 +457,12 @@ async def setup_pin(
 ):
     """Setup PIN for returning mobile user."""
     current_user.pin_hash = hash_password(body.pin)
-    
+
     # Update KYCSession State
     result = await db.execute(
         select(KYCSession).where(
             KYCSession.user_id == current_user.id,
-            KYCSession.status.in_(["DRAFT", "PENDING_INFO"])
+            KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
         )
     )
     kyc_session = result.scalar_one_or_none()
@@ -397,7 +500,7 @@ async def verify_pin(
     kyc_result = await db.execute(
         select(KYCSession).where(
             KYCSession.user_id == user.id,
-            KYCSession.status.in_(["DRAFT", "PENDING_INFO"])
+            KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
         )
     )
     kyc_session = kyc_result.scalar_one_or_none()
@@ -406,7 +509,11 @@ async def verify_pin(
     # Create tokens
     access_token = create_access_token(
         subject=str(user.id),
-        additional_claims={"role": user.role, "user_type": "mobile", "sid": session_handle},
+        additional_claims={
+            "role": user.role,
+            "user_type": "mobile",
+            "sid": session_handle,
+        },
     )
     refresh_token = create_refresh_token(subject=str(user.id))
 
@@ -414,13 +521,14 @@ async def verify_pin(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        session_handle=session_handle
+        session_handle=session_handle,
     )
 
 
 # ============================================================
 # AGENT LOGIN ENDPOINT (Story 1.4 — Jean, Thomas, Sylvie)
 # ============================================================
+
 
 @router.post("/agent/login", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_AUTH)
@@ -457,9 +565,12 @@ async def agent_login(
 # TOKEN REFRESH ENDPOINT
 # ============================================================
 
+
 @router.post("/refresh", response_model=TokenResponse)
 @limiter.limit(settings.RATE_LIMIT_AUTH)
-async def refresh_token(request: Request, body: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+async def refresh_token(
+    request: Request, body: RefreshTokenRequest, db: AsyncSession = Depends(get_db)
+):
     """Refresh JWT access token using a valid refresh token. Old token is revoked on use."""
     payload = await decode_refresh_token(body.refresh_token, db)
     if not payload:
@@ -479,7 +590,12 @@ async def refresh_token(request: Request, body: RefreshTokenRequest, db: AsyncSe
 
     # Revoke the consumed refresh token (rotation — one-time use)
     from datetime import datetime, timezone
-    expires_at = datetime.fromtimestamp(exp, tz=timezone.utc) if exp else datetime.now(timezone.utc)
+
+    expires_at = (
+        datetime.fromtimestamp(exp, tz=timezone.utc)
+        if exp
+        else datetime.now(timezone.utc)
+    )
     await revoke_token(jti, expires_at, db)
 
     logger.info(
@@ -501,6 +617,36 @@ async def refresh_token(request: Request, body: RefreshTokenRequest, db: AsyncSe
 # ============================================================
 # CURRENT USER/AGENT ENDPOINTS
 # ============================================================
+
+
+@router.get("/user/exists", response_model=UserExistsCheckResponse)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def check_user_exists(
+    request: Request,
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Check if a user exists by phone or email."""
+    user: User | None = None
+
+    if phone:
+        result = await db.execute(select(User).where(User.phone == phone))
+        user = result.scalar_one_or_none()
+    elif email:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+    if not user:
+        return UserExistsCheckResponse(exists=False, has_pin=False, has_email=False)
+
+    return UserExistsCheckResponse(
+        exists=True,
+        has_pin=bool(user.pin_hash),
+        has_email=bool(user.email),
+        phone=user.phone,
+    )
+
 
 @router.get("/me", response_model=UserResponse)
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
@@ -531,3 +677,30 @@ async def get_agent_me(
         is_available=current_agent.is_available,
         active_dossier_count=current_agent.active_dossier_count,
     )
+
+
+# ============================================================
+# DELETE ACCOUNT ENDPOINT
+# ============================================================
+
+
+@router.delete("/account")
+async def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete user account and all associated data."""
+    await db.execute(
+        delete(ConsentRecord).where(
+            ConsentRecord.session_id.in_(
+                select(KYCSession.id).where(KYCSession.user_id == current_user.id)
+            )
+        )
+    )
+    await db.execute(delete(KYCSession).where(KYCSession.user_id == current_user.id))
+    await db.execute(
+        delete(Notification).where(Notification.user_id == current_user.id)
+    )
+    await db.delete(current_user)
+    await db.commit()
+    return {"message": "Account deleted successfully"}

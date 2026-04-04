@@ -1,4 +1,4 @@
-﻿"""OTP generation and Redis-backed storage with TTL."""
+"""OTP generation and Redis-backed storage with TTL."""
 import secrets
 from datetime import datetime, timezone
 from typing import Optional

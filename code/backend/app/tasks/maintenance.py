@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import os
 import subprocess
 from datetime import datetime, timezone

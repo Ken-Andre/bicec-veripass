@@ -1,4 +1,4 @@
-﻿"""Redis async client and utilities  KISS Foundation.
+"""Redis async client and utilities  KISS Foundation.
 
 Security threat model (ADR-016):
 - Redis is bound to the private Docker network (veripass-net) only.
