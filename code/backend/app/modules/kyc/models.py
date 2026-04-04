@@ -39,7 +39,7 @@ class KYCSession(Base):
     agency = relationship("Agency", back_populates="kyc_sessions")
     documents = relationship("Document", back_populates="kyc_session", cascade="all, delete-orphan")
     biometric_results = relationship("BiometricResult", back_populates="kyc_session", cascade="all, delete-orphan", uselist=False)
-    aml_alerts = relationship("AMLAlert", back_populates="kyc_session", cascade="all, delete-orphan")
+    aml_alerts = relationship("AmlAlert", back_populates="kyc_session", cascade="all, delete-orphan")
     duplicate_checks = relationship("DuplicateCheck", foreign_keys="[DuplicateCheck.session_id_new]", back_populates="session_new", cascade="all, delete-orphan")
     consent_record = relationship("ConsentRecord", back_populates="kyc_session", cascade="all, delete-orphan", uselist=False)
     assignments = relationship("DossierAssignment", back_populates="kyc_session", cascade="all, delete-orphan")
@@ -137,7 +137,14 @@ class DossierAssignment(Base):
     kyc_session = relationship("KYCSession", back_populates="assignments")
     agent = relationship("Agent", back_populates="assignments")
 
-class AMLAlert(Base):
+from enum import Enum
+class AmlAlertStatus(str, Enum):
+    PENDING = "PENDING"
+    CLEARED = "CLEARED"
+    CONFIRMED = "CONFIRMED"
+    ESCALATED = "ESCALATED"
+
+class AmlAlert(Base):
     __tablename__ = "aml_alerts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -173,7 +180,7 @@ class PEPSanctions(Base):
     last_synced_at = Column(DATE, default=lambda: datetime.now(timezone.utc).date())
 
     # Relationships
-    alerts = relationship("AMLAlert", back_populates="pep_sanctions")
+    alerts = relationship("AmlAlert", back_populates="pep_sanctions")
 
 class DuplicateCheck(Base):
     __tablename__ = "duplicate_checks"
