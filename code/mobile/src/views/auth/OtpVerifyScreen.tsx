@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
+import { MessageSquareCheck } from 'lucide-react';
 
 const OtpVerifyScreen = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { phone, login } = useAuth();
+  const mode = location.state?.mode || 'signup';
+  const identifier = location.state?.identifier || phone;
   const [code, setCode] = useState<string[]>(Array(6).fill(''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,13 +25,15 @@ const OtpVerifyScreen = () => {
     }
   }, [resendTimer]);
 
+  const isEmail = identifier?.includes('@');
+
   useEffect(() => {
-    if (!phone) {
-        navigate('/auth/phone');
-        return;
+    if (!identifier) {
+      navigate('/auth/phone');
+      return;
     }
     inputRefs.current[0]?.focus();
-  }, [phone, navigate]);
+  }, [identifier, navigate]);
 
   const handleChange = (index: number, value: string) => {
     if (!/^\d?$/.test(value)) return;
@@ -49,43 +55,38 @@ const OtpVerifyScreen = () => {
     const newCode = [...code];
     paste.split('').forEach((c, i) => { newCode[i] = c; });
     setCode(newCode);
-    inputRefs.current[Math.min(paste.length, 5)]?.focus();
+
+    const lastFilledIndex = Math.min(paste.length - 1, 5) + (paste.length < 6 ? 1 : 0);
+    inputRefs.current[Math.min(lastFilledIndex, 5)]?.focus();
   };
 
   const fullCode = code.join('');
   const isComplete = fullCode.length === 6;
 
   const handleVerify = async () => {
-    if (!isComplete || !phone) return;
+    if (!isComplete || !identifier) return;
     setLoading(true);
     setError('');
     try {
-      const res: any = await apiClient.post('/auth/otp/verify', { 
-        phone: phone, 
-        otp: fullCode 
-      });
-      
-      // We got the token, now get user data
+      const payload = isEmail ? { email: identifier, otp: fullCode } : { phone: identifier, otp: fullCode };
+      const res: any = await apiClient.post('/auth/otp/verify', payload);
+
       const token = res.access_token;
-      // Temporarily store token in apiClient for the next request
-      // (AuthContext will do it properly in login)
-      
       const userRes: any = await apiClient.get('/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       (login as any)(token, userRes);
-      
-      // After phone OTP verification, proceed to email entry for dual auth
-      if (!userRes.email) {
-        navigate('/auth/email');
-      } else if (!userRes.has_pin) {
-        navigate('/auth/pin-setup');
+
+      // Login flow: after phone OTP verify, go directly to PIN login
+      if (mode === 'login') {
+        navigate('/auth/pin-login', { replace: true });
       } else {
-        navigate('/');
+        // Signup flow: go to email entry
+        navigate('/auth/email', { state: { mode } });
       }
     } catch (err: any) {
-      setError('Code invalide ou expiré');
+      setError(err.response?.data?.detail || 'Code invalide ou expiré');
       setCode(Array(6).fill(''));
       inputRefs.current[0]?.focus();
     } finally {
@@ -94,25 +95,31 @@ const OtpVerifyScreen = () => {
   };
 
   const handleResend = async () => {
-    if (resendTimer > 0 || !phone) return;
+    if (resendTimer > 0 || !identifier) return;
     setResendTimer(60);
     try {
-        await apiClient.post('/auth/otp/send', { phone });
+      const payload = isEmail ? { email: identifier } : { phone: identifier };
+      await apiClient.post('/auth/otp/send', payload);
     } catch (err) {
-        console.error("Resend error", err);
+      console.error("Resend error", err);
     }
   };
 
   return (
-    <ScreenLayout showBack>
-      <div className="flex-1 flex flex-col justify-between p-6 pt-12">
-        <div className="space-y-4">
-          <h1 className="text-2xl font-bold text-foreground">Vérification</h1>
-          <p className="text-muted-foreground text-sm">
-            Saisissez le code envoyé au <span className="font-semibold text-foreground">{phone}</span>
-          </p>
+    <ScreenLayout showBack title="Sécurité">
+      <div className="flex-1 flex flex-col pt-4">
+        <div className="space-y-8 flex-1">
+          <div className="space-y-3">
+            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
+              <MessageSquareCheck className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-primary">Vérification</h2>
+            <p className="text-slate-500 text-lg leading-relaxed">
+              Nous avons envoyé un code à 6 chiffres sur le <span className="font-bold text-slate-800">{identifier}</span>
+            </p>
+          </div>
 
-          <div className="flex justify-center gap-3 pt-8" onPaste={handlePaste}>
+          <div className="flex justify-between gap-2 py-8" onPaste={handlePaste}>
             {code.map((digit, i) => (
               <input
                 key={i}
@@ -124,34 +131,44 @@ const OtpVerifyScreen = () => {
                 onChange={(e) => handleChange(i, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 className={cn(
-                  'h-14 w-12 rounded-xl border-2 bg-card text-center text-xl font-bold transition-all outline-none',
-                  digit ? 'border-primary' : 'border-border',
-                  'focus:border-primary focus:ring-2 focus:ring-primary/20',
+                  'h-16 w-full max-w-[50px] rounded-2xl border-2 text-center text-2xl font-bold transition-all outline-none',
+                  digit ? 'border-primary bg-white shadow-sm' : 'border-slate-100 bg-slate-50',
+                  'focus:border-primary focus:ring-4 focus:ring-primary/10 focus:bg-white',
                 )}
               />
             ))}
           </div>
 
-          {error && <p className="text-destructive text-sm text-center mt-4 font-medium">{error}</p>}
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl animate-shake">
+              <p className="text-red-600 text-sm font-semibold text-center">{error}</p>
+            </div>
+          )}
 
-          <div className="pt-6 text-center">
-              <button
-                onClick={handleResend}
-                disabled={resendTimer > 0}
-                className="text-sm font-medium text-primary disabled:text-muted-foreground transition-colors"
-              >
-                {resendTimer > 0 ? `Renvoyer le code (${resendTimer}s)` : "Renvoyer le code"}
-              </button>
+          <div className="text-center pt-2">
+            <button
+              onClick={handleResend}
+              disabled={resendTimer > 0}
+              className="text-sm font-bold text-primary active:opacity-70 disabled:text-slate-400 transition-colors uppercase tracking-widest"
+            >
+              {resendTimer > 0 ? `Renvoyer (${resendTimer}s)` : "Renvoyer le code"}
+            </button>
           </div>
         </div>
 
-        <button
-          onClick={handleVerify}
-          disabled={!isComplete || loading}
-          className="w-full bg-primary text-primary-foreground font-semibold h-14 rounded-2xl shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 mb-4"
-        >
-          {loading ? 'Vérification...' : 'Confirmer'}
-        </button>
+        <div className="pt-8 pb-4">
+          <button
+            onClick={handleVerify}
+            disabled={!isComplete || loading}
+            className="bicec-button w-full h-16 text-lg"
+          >
+            {loading ? (
+              <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              'Valider le compte'
+            )}
+          </button>
+        </div>
       </div>
     </ScreenLayout>
   );

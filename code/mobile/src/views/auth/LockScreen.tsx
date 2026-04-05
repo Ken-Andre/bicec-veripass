@@ -4,11 +4,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
-import { Fingerprint, Delete, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Delete, Lock } from 'lucide-react';
 
-const PinLoginScreen = () => {
+const LockScreen = () => {
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const { user, unlock } = useAuth();
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -36,20 +36,16 @@ const PinLoginScreen = () => {
 
     setLoading(true);
     try {
-      const res: any = await apiClient.post('/auth/pin/verify', {
+      await apiClient.post('/auth/pin/verify', {
         phone: user.phone,
         pin: code
       });
 
-      login(res.access_token, {
-        id: user.id,
-        phone: user.phone,
-        email: user.email || '',
-        role: user.role,
-        has_pin: true
-      });
-
-      navigate('/dashboard');
+      unlock();
+      const lastRoute = sessionStorage.getItem('vp_last_route') || '/dashboard';
+      // Strip any /mobile prefix to avoid double-basename issue
+      const cleanRoute = lastRoute.replace(/^\/mobile/, '') || '/dashboard';
+      navigate(cleanRoute, { replace: true });
     } catch (err) {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
@@ -60,7 +56,10 @@ const PinLoginScreen = () => {
       }, 500);
 
       if (newAttempts >= MAX_ATTEMPTS) {
-        setError('Compte bloqué. Utilisez l\'OTP pour vous reconnecter.');
+        setError('Compte bloqué. Reconnexion complète requise.');
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 2000);
       } else {
         setError(`PIN incorrect (${MAX_ATTEMPTS - newAttempts} restants)`);
       }
@@ -69,22 +68,18 @@ const PinLoginScreen = () => {
     }
   };
 
-  const handleForgotPin = () => {
-    navigate('/auth/forgot-pin');
-  };
-
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
   return (
     <ScreenLayout className="bg-slate-50">
       <div className="flex-1 flex flex-col items-center pt-8">
         <div className="text-center w-full px-6">
-          <div className="h-20 w-20 rounded-3xl bg-primary shadow-lg shadow-primary/20 flex items-center justify-center mx-auto mb-8">
-            <ShieldCheck className="w-10 h-10 text-white" />
+          <div className="h-20 w-20 rounded-3xl bg-primary-bicec-red shadow-lg shadow-primary-bicec-red/20 flex items-center justify-center mx-auto mb-8">
+            <Lock className="w-10 h-10 text-white" />
           </div>
 
-          <h1 className="text-3xl font-black text-primary tracking-tight">Bon retour</h1>
-          <p className="text-slate-500 text-lg mt-2 mb-10">Saisissez votre code secret</p>
+          <h1 className="text-3xl font-black text-primary-bicec-blue tracking-tight">Session verrouillée</h1>
+          <p className="text-slate-500 text-lg mt-2 mb-10">Saisissez votre code pour reprendre</p>
 
           {/* PIN Dots Indicators */}
           <div className={cn(
@@ -95,7 +90,7 @@ const PinLoginScreen = () => {
               <div key={i} className={cn(
                 'h-5 w-5 rounded-full border-2 transition-all duration-300 shadow-sm',
                 i < pin.length
-                  ? 'bg-primary border-primary scale-125 shadow-primary/20'
+                  ? 'bg-primary-bicec-blue border-primary-bicec-blue scale-125 shadow-primary-bicec-blue/20'
                   : 'bg-white border-slate-200',
                 error && i < pin.length && 'bg-red-500 border-red-500',
               )} />
@@ -127,8 +122,8 @@ const PinLoginScreen = () => {
                   'h-20 w-20 mx-auto flex items-center justify-center rounded-full text-3xl font-bold transition-all border shadow-sm',
                   d === '' && 'invisible pointer-events-none',
                   d === 'del'
-                    ? 'border-transparent text-slate-400 active:text-primary active:scale-90'
-                    : 'bg-white border-slate-100 text-slate-800 active:scale-90 active:bg-slate-50 active:shadow-inner active:border-primary/30',
+                    ? 'border-transparent text-slate-400 active:text-primary-bicec-blue active:scale-90'
+                    : 'bg-white border-slate-100 text-slate-800 active:scale-90 active:bg-slate-50 active:shadow-inner active:border-primary-bicec-blue/30',
                   (attempts >= MAX_ATTEMPTS || loading) && 'opacity-30',
                 )}
               >
@@ -139,16 +134,10 @@ const PinLoginScreen = () => {
 
           <div className="flex flex-col gap-4 mt-10">
             <button
-              onClick={handleForgotPin}
-              className="flex items-center justify-center gap-2 w-full py-2 text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-primary transition-colors"
+              onClick={() => navigate('/auth/forgot-pin')}
+              className="text-sm font-bold text-primary active:opacity-70 transition-colors uppercase tracking-widest text-center py-2"
             >
-              <HelpCircle className="w-4 h-4" />
-              PIN Oublié ?
-            </button>
-
-            <button className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-400 text-sm font-bold opacity-50 cursor-not-allowed">
-              <Fingerprint className="h-6 w-6" />
-              Biométrie indisponible
+              PIN oublié ?
             </button>
           </div>
         </div>
@@ -157,4 +146,4 @@ const PinLoginScreen = () => {
   );
 };
 
-export default PinLoginScreen;
+export default LockScreen;

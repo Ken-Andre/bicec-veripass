@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
-import { ChevronLeft } from 'lucide-react';
+import { Delete, Lock } from 'lucide-react';
 
 const PinSetupScreen = () => {
   const navigate = useNavigate();
@@ -43,8 +43,7 @@ const PinSetupScreen = () => {
     try {
       await apiClient.post('/auth/pin/setup', { pin });
       setPinSetupCompleted();
-      // On redirige vers la liveness ou le dashboard selon l'état
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError('Erreur lors de la configuration du PIN');
       console.error(err);
@@ -53,75 +52,94 @@ const PinSetupScreen = () => {
     }
   };
 
+  // Auto-submit when 6 digits are entered for better UX
+  useEffect(() => {
+    if (currentPin.length === 6) {
+      const timer = setTimeout(() => {
+        if (step === 'confirm') handleSubmit();
+        else setStep('confirm');
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [currentPin.length, step]);
+
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
   return (
-    <ScreenLayout>
-      <div className="flex-1 flex flex-col p-6">
-        <header className="flex items-center mb-8">
-          <button 
-            onClick={() => step === 'confirm' ? setStep('create') : navigate(-1)}
-            className="p-2 -ml-2 hover:bg-muted rounded-full"
+    <ScreenLayout
+      showBack
+      title="Sécurité PIN"
+      className="bg-slate-50"
+    >
+      <div className="flex-1 flex flex-col pt-2 items-center">
+        <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6">
+          <Lock className="w-8 h-8 text-primary" />
+        </div>
+
+        <h2 className="text-3xl font-extrabold tracking-tight text-primary text-center">
+          {step === 'create' ? 'Définir un PIN' : 'Confirmer'}
+        </h2>
+        <p className="text-slate-500 text-lg text-center mt-3 mb-10 px-4 max-w-[280px]">
+          {step === 'create'
+            ? 'Choisissez 6 chiffres pour protéger votre application.'
+            : 'Veuillez ressaisir votre code pour confirmer.'}
+        </p>
+
+        {/* PIN Indicators */}
+        <div className="flex justify-center gap-5 mb-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className={cn(
+              'h-5 w-5 rounded-full border-2 transition-all duration-300 shadow-sm',
+              i < currentPin.length
+                ? 'bg-primary border-primary scale-125 shadow-primary/20'
+                : 'bg-white border-slate-200',
+            )} />
+          ))}
+        </div>
+
+        {error && (
+          <div className="mb-6 p-3 bg-red-50 border border-red-100 rounded-xl animate-shake">
+            <p className="text-red-600 text-xs font-bold text-center">{error}</p>
+          </div>
+        )}
+
+        {/* Pad Numérique Tactile */}
+        <div className="w-full max-w-xs mt-auto pb-10">
+          <div className="grid grid-cols-3 gap-y-6 gap-x-8">
+            {digits.map((d, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => {
+                  if (d === 'del') handleDelete();
+                  else if (d) handleDigit(d);
+                }}
+                className={cn(
+                  'h-20 w-20 mx-auto flex items-center justify-center rounded-full text-3xl font-bold transition-all border shadow-sm',
+                  d === '' && 'invisible pointer-events-none',
+                  d === 'del'
+                    ? 'border-transparent text-slate-400 active:text-primary active:scale-90'
+                    : 'bg-white border-slate-100 text-slate-800 hover:border-primary/30 active:scale-90 active:bg-slate-50 active:shadow-inner',
+                )}
+              >
+                {d === 'del' ? <Delete className="w-8 h-8" /> : d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="w-full pt-4 pb-8">
+          <button
+            onClick={handleSubmit}
+            disabled={currentPin.length !== 6 || loading}
+            className="bicec-button w-full h-16 text-lg"
           >
-            <ChevronLeft className="w-6 h-6" />
+            {loading ? (
+              <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              step === 'confirm' ? 'Enregistrer le PIN' : 'Continuer'
+            )}
           </button>
-          <h1 className="text-xl font-bold ml-2">
-            {step === 'create' ? 'Créez votre code PIN' : 'Confirmez votre code PIN'}
-          </h1>
-        </header>
-
-        <div className="flex-1 flex flex-col items-center justify-between">
-          <div className="text-center w-full">
-            <p className="text-muted-foreground text-sm mb-8">
-              {step === 'create' 
-                ? 'Choisissez un code à 6 chiffres pour sécuriser vos prochaines connexions.'
-                : 'Veuillez saisir à nouveau votre code pour confirmer.'}
-            </p>
-
-            <div className="flex justify-center gap-4 mb-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className={cn(
-                  'h-4 w-4 rounded-full border-2 transition-all',
-                  i < currentPin.length 
-                    ? 'bg-primary border-primary scale-110' 
-                    : 'bg-transparent border-muted-foreground/30',
-                )} />
-              ))}
-            </div>
-            {error && <p className="text-destructive text-sm mt-4 font-medium">{error}</p>}
-          </div>
-
-          <div className="w-full max-w-xs mx-auto pb-8">
-            <div className="grid grid-cols-3 gap-y-4 gap-x-8 mb-10">
-              {digits.map((d, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => {
-                    if (d === 'del') handleDelete();
-                    else if (d) handleDigit(d);
-                  }}
-                  className={cn(
-                    'h-16 w-16 mx-auto flex items-center justify-center rounded-full text-2xl font-semibold transition-all',
-                    d === '' && 'invisible pointer-events-none',
-                    d === 'del' 
-                      ? 'text-muted-foreground hover:text-foreground' 
-                      : 'hover:bg-primary/10 active:bg-primary/20 bg-muted/30',
-                  )}
-                >
-                  {d === 'del' ? '⌫' : d}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={handleSubmit}
-              disabled={currentPin.length !== 6 || loading}
-              className="w-full h-14 rounded-2xl text-base font-bold bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg active:scale-[0.98]"
-            >
-              {loading ? 'Traitement...' : step === 'create' ? 'Continuer' : 'Confirmer'}
-            </button>
-          </div>
         </div>
       </div>
     </ScreenLayout>
