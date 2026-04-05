@@ -26,11 +26,10 @@ RUN bun run build && \
 # Final stage
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 
-# Switch to root to install security updates and clean
+# Switch to root
 USER root
-RUN apk update && apk upgrade --no-cache && \
-    # Clean apk cache to reduce final image size
-    rm -rf /var/cache/apk/*
+# Skip apk update/upgrade to avoid network issues in CI - base image already has updates
+RUN rm -rf /var/cache/apk/*
 
 # Add health check — wget BusyBox (Alpine) ne supporte pas --spider
 # Utiliser 127.0.0.1 au lieu de localhost (résolution DNS Alpine)
