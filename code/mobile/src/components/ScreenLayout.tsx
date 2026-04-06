@@ -1,42 +1,60 @@
-import type { ReactNode } from 'react';
-import { OfflineBanner } from './OfflineBanner';
-import { cn } from '../lib/utils';
-import { useTheme } from '../hooks/use-theme';
-import { ChevronLeft } from 'lucide-react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 interface ScreenLayoutProps {
-  children: ReactNode;
-  className?: string;
-  showBack?: boolean;
+  children: React.ReactNode;
   title?: string;
+  showBack?: boolean;
+  onBack?: () => void;
+  showNav?: boolean;
+  center?: boolean;
+  className?: string;
 }
 
-export function ScreenLayout({ children, className, showBack, title }: ScreenLayoutProps) {
-  useTheme();
+export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
+  children,
+  title,
+  showBack = false,
+  onBack,
+  showNav = false,
+  center = false,
+  className,
+}) => {
   const navigate = useNavigate();
-  
+
   return (
-    <div className={cn("min-h-[100dvh] flex flex-col bg-background text-foreground transition-colors", className)}>
-      <OfflineBanner />
-      <main className="flex-1 flex flex-col w-full max-w-md mx-auto relative">
-        {(showBack || title) && (
-          <header className="flex items-center px-6 py-4 pt-safe-top">
+    <div className={cn('min-h-screen bg-background flex flex-col', className)}>
+      {(title || showBack) && (
+        <header className="sticky top-0 z-30 glass-strong safe-top">
+          <div className="flex items-center gap-3 h-16 px-4">
             {showBack && (
-              <button 
-                onClick={() => navigate(-1)}
-                className="p-2 -ml-2 rounded-full hover:bg-muted transition-colors mr-2"
+              <button
+                onClick={onBack ?? (() => navigate(-1))}
+                className="p-2 -ml-2 rounded-full hover:bg-muted active:bg-slate-200 transition-colors"
+                aria-label="Retour"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ArrowLeft className="w-6 h-6 text-foreground" />
               </button>
             )}
-            {title && <h1 className="text-xl font-bold tracking-tight">{title}</h1>}
-          </header>
+            {title && (
+              <h1 className="text-xl font-bold tracking-tight truncate flex-1">{title}</h1>
+            )}
+          </div>
+        </header>
+      )}
+      <main
+        className={cn(
+          'flex-1 flex flex-col px-6 py-8 safe-bottom',
+          center && 'items-center justify-center text-center',
+          showNav && 'pb-24'
         )}
-        <div className={cn("flex-1 flex flex-col", !showBack && !title && "pt-safe-top")}>
+      >
+        <div className={cn('w-full max-w-md mx-auto flex flex-col flex-1', center && 'justify-center items-center')}>
           {children}
         </div>
       </main>
     </div>
   );
-}
+};

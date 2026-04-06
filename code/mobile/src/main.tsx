@@ -23,7 +23,9 @@ if (saved === 'dark') {
 }
 
 // Enregistrement SW via vite-plugin-pwa virtual module
+// autoUpdate: true → skipWaiting + reload automatically when new SW is available
 registerSW({
+  immediate: true,
   onRegistered(r) {
     console.log('Service Worker registered:', r);
   },
@@ -34,7 +36,8 @@ registerSW({
     console.log('App is ready for offline use.');
   },
   onUpdated() {
-    console.log('New content available, please refresh.');
+    console.log('New content available, reloading...');
+    window.location.reload();
   },
 });
 
