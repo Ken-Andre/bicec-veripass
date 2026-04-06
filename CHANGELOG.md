@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Weekly recap (2026-03-30 to 2026-04-05)
+
+- Completed the full mobile authentication journey: email/SMS sign-in, OTP verification, PIN setup and login, biometric login (passkeys[not tested yet]), forgot PIN recovery, and auto-lock after inactivity to prevent unauthorized access.
+- Draft the complete mobile identity verification (KYC) flow from start to finish: consent, CNI document capture, face liveness check (fraud prevention), address entry, NIU validation, and final review — backed by a rebuilt KYC backend API.
+- Added an AML/CFT (anti-money laundering) system: alert management, NIU conflict detection, automated PEP/sanctions list sync, and a compliance dashboard for the backoffice.
+- Added a new audit module that tracks every action in the system for COBAC regulatory compliance, with a system logs page for administrators.
+- Added analytics pages to the backoffice: KYC funnel conversion tracking and OCR quality monitoring.
+- Added multiple new backoffice pages: validation queue, evidence viewer, compliance dashboard, agency management, and AML alert details.
+- Added reusable shared components (confidence bars, image viewer with zoom, address comparison tool) to speed up document review by operators.
+- Added automated background jobs (Celery) for compliance tasks: abandoned KYC detection, sanctions freshness checks, and weekly PEP list sync.
+- Added comprehensive backend test suites and Docker/Infrastructure improvements.
+- Added design assets for authentication and onboarding screens.
+
 ### Weekly recap (2026-03-23 to 2026-03-29)
 
 - Hardened authentication with a new JWT service, updated auth router/utils, seed data, and refreshed login/navigation screens.
