@@ -14,6 +14,7 @@ from sqlalchemy import (
 # from sqlalchemy import Table
 from sqlalchemy.dialects.postgresql import UUID, INET, JSONB, ARRAY, DATE
 from sqlalchemy.orm import relationship
+from enum import Enum
 
 from app.db.base_class import Base
 
@@ -205,9 +206,6 @@ class DossierAssignment(Base):
     # Relationships
     kyc_session = relationship("KYCSession", back_populates="assignments")
     agent = relationship("Agent", back_populates="assignments")
-
-
-from enum import Enum
 
 
 class AmlAlertStatus(str, Enum):

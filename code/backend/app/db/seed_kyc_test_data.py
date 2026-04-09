@@ -42,7 +42,7 @@ async def seed():
 
         jean = next((a for a in agents if a.role == "JEAN"), None)
         thomas = next((a for a in agents if a.role == "THOMAS"), None)
-        sylvie = next((a for a in agents if a.role == "SYLVIE"), None)
+        next((a for a in agents if a.role == "SYLVIE"), None)
 
         if not jean:
             print("[seed-kyc] ⚠ Aucun agent JEAN trouvé.")

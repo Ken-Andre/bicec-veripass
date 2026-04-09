@@ -46,7 +46,7 @@ class TestDocumentStorage:
     def test_init_creates_base_directory(self, tmp_path):
         """Le storage doit créer le dossier de base s'il n'existe pas."""
         new_path = tmp_path / "new_storage"
-        storage = DocumentStorage(storage_path=str(new_path))
+        DocumentStorage(storage_path=str(new_path))
         assert new_path.exists()
         assert new_path.is_dir()
 

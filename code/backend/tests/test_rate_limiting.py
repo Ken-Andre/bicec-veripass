@@ -148,7 +148,7 @@ class TestAuthRateLimiting:
     @pytest.mark.asyncio
     async def test_auth_endpoint_429_includes_retry_after(self, client: AsyncClient):
         """Vérifie que la réponse 429 inclut le header Retry-After sur auth."""
-        with patch("app.modules.auth.router.select") as mock_select:
+        with patch("app.modules.auth.router.select"):
             mock_result = MagicMock()
             mock_result.scalar_one_or_none.return_value = None
 

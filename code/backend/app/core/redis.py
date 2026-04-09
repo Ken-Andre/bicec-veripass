@@ -13,6 +13,7 @@ Security threat model (ADR-016):
 """
 
 from typing import Optional
+from urllib.parse import urlparse
 
 import redis.asyncio as redis
 
@@ -59,9 +60,6 @@ def lock_key(resource: str, resource_id: Optional[str] = None) -> str:
 def analytics_key(report: str) -> str:
     """analytics:{report}  TTL: REDIS_ANALYTICS_CACHE_TTL"""
     return f"analytics:{report}"
-
-
-from urllib.parse import urlparse
 
 
 async def get_redis():

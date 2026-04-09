@@ -143,8 +143,7 @@ async def _cleanup_expired_otp_sessions_flow():
 
     async with async_session_maker() as db:
         query = delete(OTPSession).where(
-            (OTPSession.expires_at < datetime.now(timezone.utc))
-            | (OTPSession.is_used == True)
+            (OTPSession.expires_at < datetime.now(timezone.utc)) | (OTPSession.is_used)
         )
         result = await db.execute(query)
         await db.commit()

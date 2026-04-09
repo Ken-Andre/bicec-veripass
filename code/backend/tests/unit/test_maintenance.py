@@ -156,9 +156,7 @@ class TestBackupPostgresTask:
 
         with (
             patch("app.tasks.maintenance._run_pg_dump") as mock_dump,
-            patch(
-                "app.tasks.maintenance._rotate_backups", return_value=0
-            ) as mock_rotate,
+            patch("app.tasks.maintenance._rotate_backups", return_value=0),
             patch("app.tasks.maintenance.Path") as mock_path_cls,
         ):
             # Setup Path mock
@@ -177,7 +175,7 @@ class TestBackupPostgresTask:
                 side_effect=Exception("should not retry"),
             ):
                 # Patch Path to use tmp_path for backup dir
-                with patch("app.tasks.maintenance.Path", wraps=Path) as real_path:
+                with patch("app.tasks.maintenance.Path", wraps=Path):
                     with patch.dict(os.environ, {"DB_NAME": "veripass"}):
                         # Direct test of logic via mocking _run_pg_dump
                         mock_dump.return_value = True

@@ -33,7 +33,7 @@ async def seed_kyc_sessions(db: AsyncSession):
     marie = result.scalar_one_or_none()
 
     result = await db.execute(select(User).where(User.phone == "+237699999999"))
-    returning_user = result.scalar_one_or_none()
+    result.scalar_one_or_none()
 
     if not marie:
         print("⚠ Test user Marie not found. Run seed_test_users.py first.")
