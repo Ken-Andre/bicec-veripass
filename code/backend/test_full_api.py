@@ -1,4 +1,4 @@
-import httpx, json
+import httpx
 
 BASE = "http://localhost:8000/api/v1"
 

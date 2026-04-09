@@ -1,6 +1,7 @@
-﻿"""
+"""
 Unit tests for auth Pydantic schemas — no DB or network required.
 """
+
 import pytest
 from pydantic import ValidationError
 

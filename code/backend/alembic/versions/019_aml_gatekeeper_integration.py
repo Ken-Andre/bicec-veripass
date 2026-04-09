@@ -34,7 +34,9 @@ def upgrade() -> None:
         sa.Column("resolved_by", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("resolved_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("justification", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+        sa.Column(
+            "created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")
+        ),
         sa.ForeignKeyConstraint(["session_id_new"], ["kyc_sessions.id"]),
         sa.ForeignKeyConstraint(["session_id_existing"], ["kyc_sessions.id"]),
         sa.ForeignKeyConstraint(["resolved_by"], ["agents.id"]),
@@ -45,7 +47,12 @@ def upgrade() -> None:
     op.create_table(
         "batch_jobs",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("job_type", sa.Text(), nullable=False, server_default="AMPLITUDE_PROVISIONING"),
+        sa.Column(
+            "job_type",
+            sa.Text(),
+            nullable=False,
+            server_default="AMPLITUDE_PROVISIONING",
+        ),
         sa.Column("status", sa.Text(), nullable=False, server_default="PENDING"),
         sa.Column("total_items", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("processed_items", sa.Integer(), nullable=False, server_default="0"),
@@ -53,15 +60,26 @@ def upgrade() -> None:
         sa.Column("started_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("completed_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("created_by", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+        sa.Column(
+            "created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")
+        ),
         sa.ForeignKeyConstraint(["created_by"], ["agents.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
 
     # Enrichir agencies (ajout région/commune/quartier si absents)
-    op.add_column("agencies", sa.Column("region", sa.Text(), nullable=True, server_default=sa.text("NULL")))
-    op.add_column("agencies", sa.Column("commune", sa.Text(), nullable=True, server_default=sa.text("NULL")))
-    op.add_column("agencies", sa.Column("quartier", sa.Text(), nullable=True, server_default=sa.text("NULL")))
+    op.add_column(
+        "agencies",
+        sa.Column("region", sa.Text(), nullable=True, server_default=sa.text("NULL")),
+    )
+    op.add_column(
+        "agencies",
+        sa.Column("commune", sa.Text(), nullable=True, server_default=sa.text("NULL")),
+    )
+    op.add_column(
+        "agencies",
+        sa.Column("quartier", sa.Text(), nullable=True, server_default=sa.text("NULL")),
+    )
 
 
 def downgrade() -> None:

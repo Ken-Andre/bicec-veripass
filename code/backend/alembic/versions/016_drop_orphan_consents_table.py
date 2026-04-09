@@ -9,6 +9,7 @@ Changes:
   The canonical consent model is `ConsentRecord` mapped to `consent_records` (initial schema).
   The `consents` table had no SQLAlchemy model and was never used by the application.
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -32,10 +33,30 @@ def downgrade() -> None:
         "consents",
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("session_id", sa.UUID(), nullable=False),
-        sa.Column("cgu_accepted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("privacy_accepted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("data_processing_accepted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("consent_method", sa.String(length=50), nullable=False, server_default=sa.text("'CHECKBOX_DIGITAL'")),
+        sa.Column(
+            "cgu_accepted",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+        sa.Column(
+            "privacy_accepted",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+        sa.Column(
+            "data_processing_accepted",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+        sa.Column(
+            "consent_method",
+            sa.String(length=50),
+            nullable=False,
+            server_default=sa.text("'CHECKBOX_DIGITAL'"),
+        ),
         sa.Column("consent_version", sa.String(length=20), nullable=True),
         sa.Column("signed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("client_ip", postgresql.INET(), nullable=True),

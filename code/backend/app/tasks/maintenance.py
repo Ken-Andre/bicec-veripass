@@ -25,7 +25,9 @@ def _run_pg_dump(backup_path: str) -> bool:
 
     if db_url:
         try:
-            url = db_url.replace("postgresql+asyncpg://", "").replace("postgresql://", "")
+            url = db_url.replace("postgresql+asyncpg://", "").replace(
+                "postgresql://", ""
+            )
             userinfo, hostinfo = url.split("@", 1)
             db_user, db_password = userinfo.split(":", 1)
             host_port, db_name = hostinfo.split("/", 1)
@@ -96,9 +98,16 @@ def backup_postgres(self):
 
         deleted = _rotate_backups(backup_dir, retention_days)
         remaining = len(list(Path(backup_dir).glob("*.dump")))
-        logger.info(f"Rotation: {deleted} deleted, {remaining} retained (max {retention_days}d)")
+        logger.info(
+            f"Rotation: {deleted} deleted, {remaining} retained (max {retention_days}d)"
+        )
 
-        return {"status": "ok", "file": backup_file, "size_mb": round(size_mb, 2), "retained": remaining}
+        return {
+            "status": "ok",
+            "file": backup_file,
+            "size_mb": round(size_mb, 2),
+            "retained": remaining,
+        }
 
     except Exception as e:
         logger.exception(f"DB Backup failed: {e}")
@@ -112,7 +121,9 @@ def check_disk_usage():
     Runs at 03:00 UTC via Celery Beat.
     """
     try:
-        result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True, timeout=10)
+        result = subprocess.run(
+            ["df", "-h", "/"], capture_output=True, text=True, timeout=10
+        )
 
         if result.returncode != 0:
             logger.error(f"df command failed: {result.stderr}")
@@ -138,10 +149,14 @@ def check_disk_usage():
         logger.info(f"Disk usage: {usage_pct}%")
 
         if usage_pct > 85:
-            logger.warning(f"Disk usage {usage_pct}% exceeds threshold (85%), triggering prune...")
+            logger.warning(
+                f"Disk usage {usage_pct}% exceeds threshold (85%), triggering prune..."
+            )
             prune_result = subprocess.run(
                 ["docker", "system", "prune", "-af", "--volumes"],
-                capture_output=True, text=True, timeout=300,
+                capture_output=True,
+                text=True,
+                timeout=300,
             )
             if prune_result.returncode != 0:
                 logger.error(f"Docker prune failed: {prune_result.stderr}")
@@ -196,7 +211,9 @@ async def _log_backup_result(backup_info: dict) -> None:
         await session.commit()
 
 
-@celery_app.task(name="app.tasks.maintenance.backup_kyc_images", bind=True, max_retries=3)
+@celery_app.task(
+    name="app.tasks.maintenance.backup_kyc_images", bind=True, max_retries=3
+)
 def backup_kyc_images(self):
     """
     Weekly encrypted backup of KYC images volume to local storage.
@@ -235,7 +252,11 @@ def backup_kyc_images(self):
 
         result = subprocess.run(
             [script_path],
-            capture_output=True, text=True, check=True, timeout=3600, env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=3600,
+            env=env,
         )
 
         backup_info = {}

@@ -13,7 +13,6 @@ from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
-    decode_token,
     decode_refresh_token,
     revoke_token,
     get_current_user,
@@ -28,7 +27,6 @@ from app.modules.auth.utils import (
     generate_otp,
     store_otp,
     verify_otp_atomic,
-    delete_otp,
     mark_otp_session_used,
     increment_otp_attempts,
     increment_redis_otp_attempts,
@@ -139,7 +137,7 @@ async def send_otp(
     await reset_otp_attempts(identifier)
 
     # Record in Postgres (Audit)
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=settings.OTP_EXPIRY_MINUTES
@@ -341,7 +339,7 @@ async def send_email_otp(
     await reset_otp_attempts(email)
 
     # Record in Postgres (Audit) — code_hash uses bcrypt (salt embedded), hash_algo for auditability
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=settings.OTP_EXPIRY_MINUTES

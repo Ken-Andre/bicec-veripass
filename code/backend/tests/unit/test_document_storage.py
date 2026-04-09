@@ -1,12 +1,12 @@
 """Tests unitaires pour le Document Storage Service (CAPTURE-08)."""
+
 import pytest
 import hashlib
-from pathlib import Path
 from fastapi import UploadFile, HTTPException
 from io import BytesIO
 import os
 
-from app.modules.kyc.storage import DocumentStorage, DocumentStorageError
+from app.modules.kyc.storage import DocumentStorage
 
 
 @pytest.fixture
@@ -29,13 +29,15 @@ def storage(tmp_path):
 def sample_image():
     """Create a sample JPEG image bytes (minimal valid JPEG)."""
     # Minimal JPEG header (not a real image, but valid for testing)
-    return b'\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xFF\xD9'
+    return (
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+    )
 
 
 @pytest.fixture
 def sample_pdf():
     """Create a sample PDF bytes (minimal valid PDF header)."""
-    return b'%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF'
+    return b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF"
 
 
 class TestDocumentStorage:
@@ -52,14 +54,14 @@ class TestDocumentStorage:
         """Le hash SHA-256 doit être correct et reproductible."""
         hash1 = storage.calculate_sha256(sample_image)
         hash2 = storage.calculate_sha256(sample_image)
-        
+
         # Doit être le même hash
         assert hash1 == hash2
-        
+
         # Doit être un hex string de 64 caractères
         assert len(hash1) == 64
-        assert all(c in '0123456789abcdef' for c in hash1)
-        
+        assert all(c in "0123456789abcdef" for c in hash1)
+
         # Vérifier avec hashlib standard
         expected = hashlib.sha256(sample_image).hexdigest()
         assert hash1 == expected
@@ -95,8 +97,8 @@ class TestDocumentStorage:
     def test_validate_file_rejects_too_large(self, storage, sample_image):
         """Un fichier trop volumineux doit lever HTTPException."""
         # Créer un fichier de 11MB (limite = 10MB)
-        large_file = sample_image + (b'\x00' * (11 * 1024 * 1024))
-        
+        large_file = sample_image + (b"\x00" * (11 * 1024 * 1024))
+
         with pytest.raises(HTTPException) as exc_info:
             storage.validate_file("test.jpg", "image/jpeg", len(large_file))
         assert exc_info.value.status_code == 400
@@ -106,7 +108,7 @@ class TestDocumentStorage:
         """Le chemin de session doit être créé s'il n'existe pas."""
         session_id = "test-session-123"
         path = storage.get_session_path(session_id)
-        
+
         assert path.exists()
         assert path.is_dir()
         assert str(session_id) in str(path)
@@ -119,16 +121,16 @@ class TestDocumentStorage:
             file_content=sample_image,
             filename="cni_recto.jpg",
             content_type="image/jpeg",
-            document_type="CNI_RECTO"
+            document_type="CNI_RECTO",
         )
-        
+
         assert "path" in result
         assert "sha256" in result
         assert "size" in result
         assert "saved_at" in result
         assert "document_type" in result
         assert "filename" in result
-        
+
         assert result["document_type"] == "CNI_RECTO"
         assert result["size"] == len(sample_image)
         assert len(result["sha256"]) == 64
@@ -142,9 +144,9 @@ class TestDocumentStorage:
             session_id="session-456",
             file_content=sample_image,
             filename="selfie.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
-        
+
         assert "session-456" in result["path"]
         assert "CNI_RECTO" not in result["path"]
 
@@ -155,9 +157,9 @@ class TestDocumentStorage:
             session_id="session-789",
             file_content=sample_image,
             filename="test.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
-        
+
         # Le filename doit contenir les 8 premiers caractères du hash
         assert result["sha256"][:8] in result["filename"]
 
@@ -169,9 +171,9 @@ class TestDocumentStorage:
             session_id="session-get",
             file_content=sample_image,
             filename="test.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
-        
+
         # Récupérer
         content = await storage.get_document("session-get", "test.jpg")
         assert content == sample_image
@@ -190,14 +192,12 @@ class TestDocumentStorage:
             session_id="session-verify",
             file_content=sample_image,
             filename="test.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
-        
+
         # Vérifier avec le bon hash
         is_valid = await storage.verify_integrity(
-            "session-verify",
-            metadata["filename"],
-            metadata["sha256"]
+            "session-verify", metadata["filename"], metadata["sha256"]
         )
         assert is_valid is True
 
@@ -209,14 +209,14 @@ class TestDocumentStorage:
             session_id="session-verify2",
             file_content=sample_image,
             filename="test.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
-        
+
         # Vérifier avec un mauvais hash
         is_valid = await storage.verify_integrity(
             "session-verify2",
             metadata["filename"],
-            "wrong_hash_1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+            "wrong_hash_1234567890abcdef1234567890abcdef1234567890abcdef12345678",
         )
         assert is_valid is False
 
@@ -228,13 +228,13 @@ class TestDocumentStorage:
             session_id="session-delete",
             file_content=sample_image,
             filename="test.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
-        
+
         # Supprimer
         deleted = await storage.delete_document("session-delete", metadata["filename"])
         assert deleted is True
-        
+
         # Vérifier qu'il n'existe plus
         with pytest.raises(FileNotFoundError):
             await storage.get_document("session-delete", metadata["filename"])
@@ -253,18 +253,18 @@ class TestDocumentStorage:
             session_id="session-list",
             file_content=sample_image,
             filename="doc1.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
         await storage.save_document(
             session_id="session-list",
             file_content=sample_image,
             filename="doc2.jpg",
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
-        
+
         documents = storage.list_session_documents("session-list")
         assert len(documents) == 2
-        
+
         # Vérifier que les chemins contiennent session-list
         for doc in documents:
             assert "session-list" in doc
@@ -276,9 +276,9 @@ class TestDocumentStorage:
         session_path = storage.get_session_path("session-tmp")
         temp_file = session_path / "temp.jpg.tmp"
         temp_file.write_bytes(sample_image)
-        
+
         documents = storage.list_session_documents("session-tmp")
-        
+
         # Le fichier .tmp ne doit pas être dans la liste
         for doc in documents:
             assert ".tmp" not in doc
@@ -297,13 +297,13 @@ class TestSaveUploadedFile:
             filename="cni_verso.jpg",
             headers={"content-type": "image/jpeg"},
         )
-        
+
         result = await storage.save_uploaded_file(
             session_id="session-upload",
             upload_file=upload_file,
-            document_type="CNI_VERSO"
+            document_type="CNI_VERSO",
         )
-        
+
         assert result["document_type"] == "CNI_VERSO"
         assert "CNI_VERSO" in result["path"]
 
@@ -317,10 +317,10 @@ class TestSaveUploadedFile:
             filename="test.jpg",
             headers={"content-type": "image/jpeg"},
         )
-        
+
         # Lire une première fois
         await storage.save_uploaded_file("session-1", upload_file)
-        
+
         # Le pointer doit être reset (peut être relu)
         await upload_file.seek(0)
         content = await upload_file.read()
@@ -335,31 +335,29 @@ class TestDocumentStorageIntegration:
         """Tester le workflow complet: save → get → verify → delete."""
         session_id = "session-workflow"
         filename = "test_workflow.jpg"
-        
+
         # 1. Save
         metadata = await storage.save_document(
             session_id=session_id,
             file_content=sample_image,
             filename=filename,
-            content_type="image/jpeg"
+            content_type="image/jpeg",
         )
-        
+
         # 2. Get
         content = await storage.get_document(session_id, metadata["filename"])
         assert content == sample_image
-        
+
         # 3. Verify integrity
         is_valid = await storage.verify_integrity(
-            session_id,
-            metadata["filename"],
-            metadata["sha256"]
+            session_id, metadata["filename"], metadata["sha256"]
         )
         assert is_valid is True
-        
+
         # 4. Delete
         deleted = await storage.delete_document(session_id, metadata["filename"])
         assert deleted is True
-        
+
         # 5. Verify deletion
         with pytest.raises(FileNotFoundError):
             await storage.get_document(session_id, metadata["filename"])

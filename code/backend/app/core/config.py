@@ -1,23 +1,24 @@
-from typing import List, Union
+from typing import List
 from functools import lru_cache
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "BICEC VeriPass"
     PROJECT_VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
-    
+
     # Database - with defaults for dev/test
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/veripass"
-    
+
     # Redis - with defaults for dev/test
     REDIS_URL: str = "redis://localhost:6379/0"
-    
+
     # Security - with default for dev/test
     JWT_SECRET: str = "dev-secret-change-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 24 * 60
-    
+
     # Application
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
@@ -25,23 +26,28 @@ class Settings(BaseSettings):
 
     # Sentry
     SENTRY_DSN: str = ""
-    
+
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_DEFAULT: str = "100/minute"
     RATE_LIMIT_AUTH: str = "10/minute"
     RATE_LIMIT_OTP: str = "3/minute"
     RATE_LIMIT_ADMIN: str = "30/minute"
-    
+
     # CORS - simplified validator
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
 
     # Storage
     STORAGE_PATH: str = "/data/documents"  # Docker volume mount in production
     STORAGE_PATH_DEV: str = "./data/documents"  # Local development fallback
-    
+
     # Allowed file types and max size
-    ALLOWED_DOCUMENT_TYPES: List[str] = ["image/jpeg", "image/png", "image/jpg", "application/pdf"]
+    ALLOWED_DOCUMENT_TYPES: List[str] = [
+        "image/jpeg",
+        "image/png",
+        "image/jpg",
+        "application/pdf",
+    ]
     MAX_DOCUMENT_SIZE_MB: int = 10  # 10MB max per document
 
     # Backup
@@ -52,11 +58,11 @@ class Settings(BaseSettings):
     # BACKUP_ENCRYPTION_KEY: dedicated AES-256 passphrase for GPG-encrypted image archives.
     # MUST be distinct from JWT_SECRET. Set via secrets manager in production.
     BACKUP_ENCRYPTION_KEY: str = ""
-    
+
     # IA / OCR
     OCR_CONFIDENCE_THRESHOLD: float = 0.85
     PADDLE_LAZY_LOAD: bool = True
-    
+
     # Orange SMS API
     ORANGE_CLIENT_ID: str = ""
     ORANGE_CLIENT_SECRET: str = ""
@@ -64,7 +70,7 @@ class Settings(BaseSettings):
     ORANGE_BASE_URL: str = "https://api.orange.com"
     ORANGE_SENDER_NAME: str = "VeriPass"
     ORANGE_SENDER_PHONE: str = ""
-    
+
     # Email Configuration
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 1025
@@ -73,32 +79,38 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = False
     SMTP_SSL: bool = False
     SMTP_FROM: str = "noreply@bicec-veripass.cm"
-    
+
     # OTP Configuration
     # Modes: "orange" (SMS), "email" (direct Email if preferred), "dev_local" (logs only)
     OTP_MODE: str = "orange"
-    OTP_FALLBACK_EMAIL: bool = True  # If SMS fails, try Email if user has an email recorded
-    OTP_FALLBACK_EMAIL_ADDRESS: str = ""  # Fallback email for dev/staging when user has no email
-    OTP_EXPIRY_MINUTES: int = 10     # Aligned with ADR-016 (10 min)
+    OTP_FALLBACK_EMAIL: bool = (
+        True  # If SMS fails, try Email if user has an email recorded
+    )
+    OTP_FALLBACK_EMAIL_ADDRESS: str = (
+        ""  # Fallback email for dev/staging when user has no email
+    )
+    OTP_EXPIRY_MINUTES: int = 10  # Aligned with ADR-016 (10 min)
 
     # Redis TTL (secondes)  Required by ADR-016
-    REDIS_OTP_TTL: int = 600           # 10 min  AUTH-03
+    REDIS_OTP_TTL: int = 600  # 10 min  AUTH-03
     REDIS_OTP_ATTEMPTS_TTL: int = 600  # 10 min  AUTH-03
     REDIS_REFRESH_TOKEN_TTL: int = 604800  # 7 jours  AUTH-02
-    REDIS_RATELIMIT_OTP_TTL: int = 600     # 10 min  ADMIN-01
-    REDIS_RATELIMIT_AUTH_TTL: int = 60     # 1 min  ADMIN-01
-    REDIS_RATELIMIT_GLOBAL_TTL: int = 60   # 1 min  ADMIN-01
-    REDIS_LOCK_OCR_TTL: int = 120          # sécurité  ADR-003
-    REDIS_LOCK_GLM_TTL: int = 300          # sécurité  ADR-003
-    REDIS_LOCK_AGENT_TTL: int = 30         # sécurité  12.3
-    REDIS_ANALYTICS_CACHE_TTL: int = 60    # ANALYTICS-12
+    REDIS_RATELIMIT_OTP_TTL: int = 600  # 10 min  ADMIN-01
+    REDIS_RATELIMIT_AUTH_TTL: int = 60  # 1 min  ADMIN-01
+    REDIS_RATELIMIT_GLOBAL_TTL: int = 60  # 1 min  ADMIN-01
+    REDIS_LOCK_OCR_TTL: int = 120  # sécurité  ADR-003
+    REDIS_LOCK_GLM_TTL: int = 300  # sécurité  ADR-003
+    REDIS_LOCK_AGENT_TTL: int = 30  # sécurité  12.3
+    REDIS_ANALYTICS_CACHE_TTL: int = 60  # ANALYTICS-12
 
     @field_validator("OTP_MODE", mode="after")
     @classmethod
     def validate_otp_mode(cls, v: str, info) -> str:
         env = info.data.get("ENVIRONMENT", "development")
         if env == "production" and v == "dev_local":
-            raise ValueError("OTP_MODE 'dev_local' is NOT allowed in production environment")
+            raise ValueError(
+                "OTP_MODE 'dev_local' is NOT allowed in production environment"
+            )
         return v
 
     @field_validator("JWT_SECRET", mode="after")
@@ -117,13 +129,16 @@ class Settings(BaseSettings):
         env = info.data.get("ENVIRONMENT", "development")
         enable = info.data.get("ENABLE_BACKUPS", False)
         if env == "production" and enable and not v:
-            raise ValueError("BACKUP_ENCRYPTION_KEY must be set when ENABLE_BACKUPS=true in production")
+            raise ValueError(
+                "BACKUP_ENCRYPTION_KEY must be set when ENABLE_BACKUPS=true in production"
+            )
         return v
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v) -> list:
         import os
+
         if isinstance(v, str):
             origins = [i.strip() for i in v.split(",") if i.strip()]
             env = os.getenv("ENVIRONMENT", "development")
@@ -133,15 +148,15 @@ class Settings(BaseSettings):
         return v
 
     model_config = SettingsConfigDict(
-        case_sensitive=True,
-        env_file=".env",
-        extra="ignore"
+        case_sensitive=True, env_file=".env", extra="ignore"
     )
+
 
 @lru_cache()
 def get_settings() -> Settings:
     """Lazy loading of settings to avoid import-time validation errors."""
     return Settings()
+
 
 # For backward compatibility
 settings = get_settings()

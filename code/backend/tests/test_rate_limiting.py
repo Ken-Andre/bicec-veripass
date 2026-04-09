@@ -6,20 +6,21 @@ Vérifie que les limites de requêtes sont correctement appliquées :
 - 3 req/min par IP (OTP send)
 - Réponse 429 avec header Retry-After
 """
+
 import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, MagicMock, AsyncMock
-
-from app.core.config import settings
 
 
 # ============================================================
 # HELPERS
 # ============================================================
 
+
 def _auth_header(user_id: str = "test-user-id") -> dict:
     """Génère un header Authorization JWT pour un utilisateur."""
     from app.core.security import create_access_token
+
     token = create_access_token(
         subject=user_id,
         additional_claims={"role": "CLIENT", "user_type": "mobile"},
@@ -30,6 +31,7 @@ def _auth_header(user_id: str = "test-user-id") -> dict:
 def _agent_header(agent_id: str = "test-agent-id", role: str = "JE") -> dict:
     """Génère un header Authorization JWT pour un agent."""
     from app.core.security import create_access_token
+
     token = create_access_token(
         subject=agent_id,
         additional_claims={"role": role, "user_type": "agent"},
@@ -40,6 +42,7 @@ def _agent_header(agent_id: str = "test-agent-id", role: str = "JE") -> dict:
 # ============================================================
 # TEST RATE LIMITING — OTP ENDPOINTS (3 req/min)
 # ============================================================
+
 
 class TestOtpRateLimiting:
     """Tests de rate limiting pour les endpoints OTP (3 req/min par IP)."""
@@ -52,7 +55,11 @@ class TestOtpRateLimiting:
         mock_user.email = None
 
         with (
-            patch("app.modules.auth.router.store_otp", new_callable=AsyncMock, return_value=True),
+            patch(
+                "app.modules.auth.router.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
             patch("app.modules.auth.router.send_otp_task") as mock_task,
         ):
             mock_task.delay = MagicMock()
@@ -63,7 +70,7 @@ class TestOtpRateLimiting:
                     "/api/v1/auth/otp/send",
                     json={"phone": f"+23760000000{i}"},
                 )
-                assert response.status_code == 200, f"Request {i+1} should succeed"
+                assert response.status_code == 200, f"Request {i + 1} should succeed"
 
             # 4ème requête doit être bloquée (429)
             response = await client.post(
@@ -80,7 +87,11 @@ class TestOtpRateLimiting:
         mock_user.email = None
 
         with (
-            patch("app.modules.auth.router.store_otp", new_callable=AsyncMock, return_value=True),
+            patch(
+                "app.modules.auth.router.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
             patch("app.modules.auth.router.send_otp_task") as mock_task,
         ):
             mock_task.delay = MagicMock()
@@ -94,13 +105,15 @@ class TestOtpRateLimiting:
 
             # La dernière doit avoir le header Retry-After
             assert response.status_code == 429
-            assert "retry-after" in response.headers or "Retry-After" in response.headers, \
-                "429 response must include Retry-After header"
+            assert (
+                "retry-after" in response.headers or "Retry-After" in response.headers
+            ), "429 response must include Retry-After header"
 
 
 # ============================================================
 # TEST RATE LIMITING — AUTH ENDPOINTS (10 req/min)
 # ============================================================
+
 
 class TestAuthRateLimiting:
     """Tests de rate limiting pour les endpoints auth (10 req/min par IP)."""
@@ -121,7 +134,9 @@ class TestAuthRateLimiting:
                     json={"email": f"agent{i}@test.com", "password": "wrong"},
                 )
                 # 401 = auth failed, mais pas rate limited
-                assert response.status_code in [401, 429], f"Request {i+1} should be 401 or 429"
+                assert response.status_code in [401, 429], (
+                    f"Request {i + 1} should be 401 or 429"
+                )
 
             # 11ème requête doit être bloquée (429)
             response = await client.post(
@@ -146,13 +161,15 @@ class TestAuthRateLimiting:
 
             # La dernière doit avoir le header Retry-After
             assert response.status_code == 429
-            assert "retry-after" in response.headers or "Retry-After" in response.headers, \
-                "429 response must include Retry-After header"
+            assert (
+                "retry-after" in response.headers or "Retry-After" in response.headers
+            ), "429 response must include Retry-After header"
 
 
 # ============================================================
 # TEST RATE LIMITING — GENERAL API (100 req/min)
 # ============================================================
+
 
 class TestGeneralApiRateLimiting:
     """Tests de rate limiting pour l'API générale (100 req/min par IP)."""
@@ -163,12 +180,15 @@ class TestGeneralApiRateLimiting:
         # Le health check est à /api/health (pas sous /api/v1)
         response = await client.get("/api/health")
         # Doit retourner 200 ou 503 (degraded), mais pas 429
-        assert response.status_code in [200, 503], "Health check should not be rate limited"
+        assert response.status_code in [200, 503], (
+            "Health check should not be rate limited"
+        )
 
 
 # ============================================================
 # TEST RATE LIMITING — RESPONSE FORMAT
 # ============================================================
+
 
 class TestRateLimitResponseFormat:
     """Tests du format de la réponse 429."""
@@ -181,7 +201,11 @@ class TestRateLimitResponseFormat:
         mock_user.email = None
 
         with (
-            patch("app.modules.auth.router.store_otp", new_callable=AsyncMock, return_value=True),
+            patch(
+                "app.modules.auth.router.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
             patch("app.modules.auth.router.send_otp_task") as mock_task,
         ):
             mock_task.delay = MagicMock()
@@ -196,5 +220,7 @@ class TestRateLimitResponseFormat:
             assert response.status_code == 429
             data = response.json()
             assert "detail" in data, "429 response should contain 'detail' field"
-            assert "rate limit" in data["detail"].lower() or "too many" in data["detail"].lower(), \
-                "Detail should mention rate limiting"
+            assert (
+                "rate limit" in data["detail"].lower()
+                or "too many" in data["detail"].lower()
+            ), "Detail should mention rate limiting"

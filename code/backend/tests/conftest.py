@@ -11,8 +11,8 @@ TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
     os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/veripass_test"
-    )
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/veripass_test",
+    ),
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
@@ -38,9 +38,7 @@ async def _check_db_available():
     try:
         engine = _get_test_engine()
         async with engine.connect() as conn:
-            await conn.execute(
-                __import__("sqlalchemy").text("SELECT 1")
-            )
+            await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
         _db_available = True
     except Exception:
         _db_available = False
@@ -91,8 +89,10 @@ async def client(db_session):
     """Client HTTP avec override de la dépendance DB.
     Fallback sans DB si PostgreSQL n'est pas disponible."""
     if _db_available:
+
         async def override_get_db():
             yield db_session
+
         app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(

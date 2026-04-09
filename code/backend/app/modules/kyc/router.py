@@ -1,4 +1,5 @@
 """KYC Module Routes."""
+
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends, HTTPException, status, UploadFile, File
@@ -12,14 +13,28 @@ from app.core.security import get_current_user, make_session_handle
 from app.core.logging import logger
 from app.db.session import get_db
 from app.modules.auth.models import User
-from app.modules.kyc.models import KYCSession, Document, OCRField, BiometricResult, ConsentRecord
+from app.modules.kyc.models import (
+    KYCSession,
+    Document,
+    OCRField,
+    BiometricResult,
+    ConsentRecord,
+)
 from app.modules.kyc.schemas import (
-    KYCSessionResponse, KYCSubmitRequest, KYCSubmitResponse,
-    DocumentResponse, DocumentUploadRequest,
-    BiometricResultResponse, ConsentSubmitRequest, ConsentRecordResponse,
-    AddressSubmitRequest, LivenessSubmitRequest, LivenessResultResponse,
-    OCRReviewSubmitRequest, NIUSubmitRequest,
-    GeoRegionResponse, GeoCityResponse, GeoQuartierResponse,
+    KYCSessionResponse,
+    KYCSubmitResponse,
+    DocumentResponse,
+    BiometricResultResponse,
+    ConsentSubmitRequest,
+    ConsentRecordResponse,
+    AddressSubmitRequest,
+    LivenessSubmitRequest,
+    LivenessResultResponse,
+    OCRReviewSubmitRequest,
+    NIUSubmitRequest,
+    GeoRegionResponse,
+    GeoCityResponse,
+    GeoQuartierResponse,
 )
 
 router = APIRouter()
@@ -36,7 +51,7 @@ async def get_root(request: Request):
 async def get_current_session(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get the current active KYC session for the user."""
     result = await db.execute(
@@ -48,7 +63,9 @@ async def get_current_session(
         )
         .where(
             KYCSession.user_id == current_user.id,
-            KYCSession.status.in_(["DRAFT", "PENDING_INFO", "LOCKED_LIVENESS", "PENDING_KYC"])
+            KYCSession.status.in_(
+                ["DRAFT", "PENDING_INFO", "LOCKED_LIVENESS", "PENDING_KYC"]
+            ),
         )
         .order_by(KYCSession.started_at.desc())
     )
@@ -65,7 +82,9 @@ async def get_current_session(
         status=kyc_session.status,
         access_level=kyc_session.access_level,
         niu_type=kyc_session.niu_type,
-        confidence_score_global=float(kyc_session.confidence_score_global) if kyc_session.confidence_score_global else None,
+        confidence_score_global=float(kyc_session.confidence_score_global)
+        if kyc_session.confidence_score_global
+        else None,
         liveness_strike_count=kyc_session.liveness_strike_count,
         last_step_completed=kyc_session.last_step_completed,
         started_at=kyc_session.started_at,
@@ -97,11 +116,19 @@ async def get_current_session(
         ],
         biometric_result=BiometricResultResponse(
             id=make_session_handle(str(kyc_session.biometric_results.id)),
-            face_match_score=float(kyc_session.biometric_results.face_match_score) if kyc_session.biometric_results.face_match_score else None,
-            liveness_score=float(kyc_session.biometric_results.liveness_score) if kyc_session.biometric_results.liveness_score else None,
-            anti_spoofing_score=float(kyc_session.biometric_results.anti_spoofing_score) if kyc_session.biometric_results.anti_spoofing_score else None,
+            face_match_score=float(kyc_session.biometric_results.face_match_score)
+            if kyc_session.biometric_results.face_match_score
+            else None,
+            liveness_score=float(kyc_session.biometric_results.liveness_score)
+            if kyc_session.biometric_results.liveness_score
+            else None,
+            anti_spoofing_score=float(kyc_session.biometric_results.anti_spoofing_score)
+            if kyc_session.biometric_results.anti_spoofing_score
+            else None,
             processed_at=kyc_session.biometric_results.processed_at,
-        ) if kyc_session.biometric_results else None,
+        )
+        if kyc_session.biometric_results
+        else None,
         consent_record=ConsentRecordResponse(
             id=make_session_handle(str(kyc_session.consent_record.id)),
             cgu_accepted=kyc_session.consent_record.cgu_accepted,
@@ -111,7 +138,9 @@ async def get_current_session(
             cgu_version=kyc_session.consent_record.cgu_version,
             privacy_version=kyc_session.consent_record.privacy_version,
             signed_at=kyc_session.consent_record.signed_at,
-        ) if kyc_session.consent_record else None,
+        )
+        if kyc_session.consent_record
+        else None,
     )
 
 
@@ -120,19 +149,23 @@ async def get_current_session(
 async def start_kyc_session(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Start a new KYC session for the user."""
     # Check for existing active session
     result = await db.execute(
         select(KYCSession).where(
             KYCSession.user_id == current_user.id,
-            KYCSession.status.in_(["DRAFT", "PENDING_KYC", "PENDING_INFO"])
+            KYCSession.status.in_(["DRAFT", "PENDING_KYC", "PENDING_INFO"]),
         )
     )
     existing = result.scalars().first()
     if existing:
-        return {"session_id": make_session_handle(str(existing.id)), "status": existing.status, "message": "Existing session found"}
+        return {
+            "session_id": make_session_handle(str(existing.id)),
+            "status": existing.status,
+            "message": "Existing session found",
+        }
 
     # Create new session
     session = KYCSession(
@@ -146,7 +179,11 @@ async def start_kyc_session(
     await db.commit()
 
     logger.info(f"KYC session started for user {current_user.id}")
-    return {"session_id": make_session_handle(str(session.id)), "status": "DRAFT", "message": "Session started"}
+    return {
+        "session_id": make_session_handle(str(session.id)),
+        "status": "DRAFT",
+        "message": "Session started",
+    }
 
 
 @router.post("/document/upload", response_model=DocumentResponse)
@@ -156,37 +193,41 @@ async def upload_document(
     file: UploadFile = File(...),
     doc_type: str = "CNI_RECTO",
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Upload a KYC document (CNI recto/verso, selfie, bill, NIU)."""
+    from app.modules.kyc.storage import document_storage
+
     # Get current session
     result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status == "DRAFT"
-        ).order_by(KYCSession.started_at.desc())
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
         raise HTTPException(status_code=404, detail="No active KYC session")
 
-    # Read file content
-    content = await file.read()
-    import hashlib
-    sha256 = hashlib.sha256(content).hexdigest()
-
-    # Save file (in production, use MinIO/S3)
-    file_path = f"/uploads/{session.id}/{doc_type}_{uuid.uuid4().hex[:8]}.jpg"
+    # Save file using DocumentStorage (handles SHA-256 and storage)
+    try:
+        storage_result = await document_storage.save_uploaded_file(
+            session_id=str(session.id), upload_file=file, document_type=doc_type
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Document upload failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save document")
 
     # Create document record
     doc = Document(
         id=uuid.uuid4(),
         session_id=session.id,
         doc_type=doc_type,
-        file_path=file_path,
-        sha256_hash=sha256,
+        file_path=storage_result["path"],
+        sha256_hash=storage_result["sha256"],
         captured_at=datetime.now(timezone.utc),
-        file_size_bytes=len(content),
+        file_size_bytes=storage_result["size"],
     )
     db.add(doc)
 
@@ -213,7 +254,7 @@ async def get_document_ocr(
     request: Request,
     doc_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get OCR results for a document."""
     result = await db.execute(
@@ -250,15 +291,14 @@ async def submit_ocr_review(
     request: Request,
     body: OCRReviewSubmitRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Submit OCR field corrections."""
     # Get current session
     result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status == "DRAFT"
-        ).order_by(KYCSession.started_at.desc())
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
@@ -267,10 +307,9 @@ async def submit_ocr_review(
     # Update OCR fields
     for field_name, corrected_value in body.fields.items():
         result = await db.execute(
-            select(OCRField).join(Document).where(
-                Document.session_id == session.id,
-                OCRField.field_name == field_name
-            )
+            select(OCRField)
+            .join(Document)
+            .where(Document.session_id == session.id, OCRField.field_name == field_name)
         )
         field = result.scalars().first()
         if field:
@@ -289,14 +328,13 @@ async def submit_liveness(
     request: Request,
     body: LivenessSubmitRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Submit liveness challenge result."""
     result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status == "DRAFT"
-        ).order_by(KYCSession.started_at.desc())
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
@@ -345,14 +383,13 @@ async def submit_address(
     request: Request,
     body: AddressSubmitRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Submit address information."""
     result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status == "DRAFT"
-        ).order_by(KYCSession.started_at.desc())
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
@@ -372,20 +409,21 @@ async def submit_consent(
     request: Request,
     body: ConsentSubmitRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Submit consent checkboxes."""
     result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status == "DRAFT"
-        ).order_by(KYCSession.started_at.desc())
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
         raise HTTPException(status_code=404, detail="No active KYC session")
 
-    if not (body.cgu_accepted and body.privacy_accepted and body.data_processing_accepted):
+    if not (
+        body.cgu_accepted and body.privacy_accepted and body.data_processing_accepted
+    ):
         raise HTTPException(status_code=400, detail="All consents must be accepted")
 
     consent = ConsentRecord(
@@ -421,14 +459,13 @@ async def submit_niu(
     request: Request,
     body: NIUSubmitRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Submit NIU information."""
     result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status == "DRAFT"
-        ).order_by(KYCSession.started_at.desc())
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
@@ -446,23 +483,20 @@ async def submit_niu(
 async def submit_kyc(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Submit the complete KYC dossier for review."""
     result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status == "DRAFT"
-        ).order_by(KYCSession.started_at.desc())
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
         raise HTTPException(status_code=404, detail="No active KYC session")
 
     # Validate minimum requirements
-    result = await db.execute(
-        select(Document).where(Document.session_id == session.id)
-    )
+    result = await db.execute(select(Document).where(Document.session_id == session.id))
     docs = result.scalars().all()
     doc_types = {d.doc_type for d in docs}
 
@@ -470,8 +504,7 @@ async def submit_kyc(
     missing = required - doc_types
     if missing:
         raise HTTPException(
-            status_code=400,
-            detail=f"Missing required documents: {', '.join(missing)}"
+            status_code=400, detail=f"Missing required documents: {', '.join(missing)}"
         )
 
     # Check consent
@@ -492,11 +525,12 @@ async def submit_kyc(
     return KYCSubmitResponse(
         session_id=make_session_handle(str(session.id)),
         status="PENDING_KYC",
-        message="Dossier soumis avec succès. Un agent validera votre dossier sous 24-48h."
+        message="Dossier soumis avec succès. Un agent validera votre dossier sous 24-48h.",
     )
 
 
 # === Geo Data Endpoints ===
+
 
 @router.get("/geo/regions", response_model=list[GeoRegionResponse])
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
@@ -554,32 +588,122 @@ async def get_quartiers(request: Request, city_code: str):
     """Get quartiers for a city."""
     quartiers_by_city = {
         "YDE": [
-            {"code": "BAS", "name": "Bastos", "city_code": "YDE", "commune_name": "Yaoundé 1er"},
-            {"code": "NLG", "name": "Nlongkak", "city_code": "YDE", "commune_name": "Yaoundé 1er"},
-            {"code": "MEL", "name": "Melen", "city_code": "YDE", "commune_name": "Yaoundé 6e"},
-            {"code": "BYA", "name": "Biyem-Assi", "city_code": "YDE", "commune_name": "Yaoundé 6e"},
-            {"code": "MDS", "name": "Mendong", "city_code": "YDE", "commune_name": "Yaoundé 6e"},
-            {"code": "ESS", "name": "Essos", "city_code": "YDE", "commune_name": "Yaoundé 5e"},
-            {"code": "ODA", "name": "Odza", "city_code": "YDE", "commune_name": "Yaoundé 4e"},
+            {
+                "code": "BAS",
+                "name": "Bastos",
+                "city_code": "YDE",
+                "commune_name": "Yaoundé 1er",
+            },
+            {
+                "code": "NLG",
+                "name": "Nlongkak",
+                "city_code": "YDE",
+                "commune_name": "Yaoundé 1er",
+            },
+            {
+                "code": "MEL",
+                "name": "Melen",
+                "city_code": "YDE",
+                "commune_name": "Yaoundé 6e",
+            },
+            {
+                "code": "BYA",
+                "name": "Biyem-Assi",
+                "city_code": "YDE",
+                "commune_name": "Yaoundé 6e",
+            },
+            {
+                "code": "MDS",
+                "name": "Mendong",
+                "city_code": "YDE",
+                "commune_name": "Yaoundé 6e",
+            },
+            {
+                "code": "ESS",
+                "name": "Essos",
+                "city_code": "YDE",
+                "commune_name": "Yaoundé 5e",
+            },
+            {
+                "code": "ODA",
+                "name": "Odza",
+                "city_code": "YDE",
+                "commune_name": "Yaoundé 4e",
+            },
         ],
         "DLA": [
-            {"code": "AKW", "name": "Akwa", "city_code": "DLA", "commune_name": "Douala 1er"},
-            {"code": "DEI", "name": "Deido", "city_code": "DLA", "commune_name": "Douala 1er"},
-            {"code": "BPR", "name": "Bonapriso", "city_code": "DLA", "commune_name": "Douala 1er"},
-            {"code": "BMS", "name": "Bonamoussadi", "city_code": "DLA", "commune_name": "Douala 5e"},
-            {"code": "MKP", "name": "Makepe", "city_code": "DLA", "commune_name": "Douala 5e"},
+            {
+                "code": "AKW",
+                "name": "Akwa",
+                "city_code": "DLA",
+                "commune_name": "Douala 1er",
+            },
+            {
+                "code": "DEI",
+                "name": "Deido",
+                "city_code": "DLA",
+                "commune_name": "Douala 1er",
+            },
+            {
+                "code": "BPR",
+                "name": "Bonapriso",
+                "city_code": "DLA",
+                "commune_name": "Douala 1er",
+            },
+            {
+                "code": "BMS",
+                "name": "Bonamoussadi",
+                "city_code": "DLA",
+                "commune_name": "Douala 5e",
+            },
+            {
+                "code": "MKP",
+                "name": "Makepe",
+                "city_code": "DLA",
+                "commune_name": "Douala 5e",
+            },
         ],
         "BFM": [
-            {"code": "TGI", "name": "Tamdja", "city_code": "BFM", "commune_name": "Bafoussam 1er"},
-            {"code": "KAM", "name": "Kamkop", "city_code": "BFM", "commune_name": "Bafoussam 2e"},
+            {
+                "code": "TGI",
+                "name": "Tamdja",
+                "city_code": "BFM",
+                "commune_name": "Bafoussam 1er",
+            },
+            {
+                "code": "KAM",
+                "name": "Kamkop",
+                "city_code": "BFM",
+                "commune_name": "Bafoussam 2e",
+            },
         ],
         "BDA": [
-            {"code": "MNK", "name": "Mankon", "city_code": "BDA", "commune_name": "Bamenda 1er"},
-            {"code": "UPT", "name": "Up Station", "city_code": "BDA", "commune_name": "Bamenda 1er"},
+            {
+                "code": "MNK",
+                "name": "Mankon",
+                "city_code": "BDA",
+                "commune_name": "Bamenda 1er",
+            },
+            {
+                "code": "UPT",
+                "name": "Up Station",
+                "city_code": "BDA",
+                "commune_name": "Bamenda 1er",
+            },
         ],
         "BUE": [
-            {"code": "MOL", "name": "Molyko", "city_code": "BUE", "commune_name": "Buéa"},
-            {"code": "GCE", "name": "Great Soppo", "city_code": "BUE", "commune_name": "Buéa"},
+            {
+                "code": "MOL",
+                "name": "Molyko",
+                "city_code": "BUE",
+                "commune_name": "Buéa",
+            },
+            {
+                "code": "GCE",
+                "name": "Great Soppo",
+                "city_code": "BUE",
+                "commune_name": "Buéa",
+            },
         ],
     }
     return quartiers_by_city.get(city_code, [])

@@ -2,18 +2,20 @@
 Unit tests for app.tasks.maintenance
 - No PostgreSQL required (all subprocess calls are mocked)
 """
+
 import os
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 import pytest
 
-from app.tasks.maintenance import _run_pg_dump, _rotate_backups, backup_postgres, check_disk_usage
+from app.tasks.maintenance import _run_pg_dump, _rotate_backups, check_disk_usage
 
 
 # ---------------------------------------------------------------------------
 # _run_pg_dump
 # ---------------------------------------------------------------------------
+
 
 class TestRunPgDump:
     def test_success_writes_bytes(self, tmp_path):
@@ -25,7 +27,9 @@ class TestRunPgDump:
         mock_result.stdout = fake_dump
         mock_result.stderr = b""
 
-        with patch("app.tasks.maintenance.subprocess.run", return_value=mock_result) as mock_run:
+        with patch(
+            "app.tasks.maintenance.subprocess.run", return_value=mock_result
+        ) as mock_run:
             result = _run_pg_dump(backup_file)
 
         assert result is True
@@ -51,14 +55,18 @@ class TestRunPgDump:
 
     def test_uses_database_url_env(self, tmp_path, monkeypatch):
         backup_file = str(tmp_path / "test.dump")
-        monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://myuser:mypass@myhost:5433/mydb")
+        monkeypatch.setenv(
+            "DATABASE_URL", "postgresql+asyncpg://myuser:mypass@myhost:5433/mydb"
+        )
 
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = b"data"
         mock_result.stderr = b""
 
-        with patch("app.tasks.maintenance.subprocess.run", return_value=mock_result) as mock_run:
+        with patch(
+            "app.tasks.maintenance.subprocess.run", return_value=mock_result
+        ) as mock_run:
             _run_pg_dump(backup_file)
 
         args = mock_run.call_args[0][0]
@@ -78,7 +86,9 @@ class TestRunPgDump:
         mock_result.returncode = 0
         mock_result.stdout = b"data"
 
-        with patch("app.tasks.maintenance.subprocess.run", return_value=mock_result) as mock_run:
+        with patch(
+            "app.tasks.maintenance.subprocess.run", return_value=mock_result
+        ) as mock_run:
             _run_pg_dump(backup_file)
 
         env_passed = mock_run.call_args[1]["env"]
@@ -88,6 +98,7 @@ class TestRunPgDump:
 # ---------------------------------------------------------------------------
 # _rotate_backups
 # ---------------------------------------------------------------------------
+
 
 class TestRotateBackups:
     def test_deletes_old_files(self, tmp_path):
@@ -137,15 +148,19 @@ class TestRotateBackups:
 # backup_postgres task
 # ---------------------------------------------------------------------------
 
+
 class TestBackupPostgresTask:
     def test_success_returns_dict(self, tmp_path, monkeypatch):
         monkeypatch.setenv("DB_NAME", "veripass")
         monkeypatch.setenv("BACKUP_RETENTION_DAYS", "7")
 
-        with patch("app.tasks.maintenance._run_pg_dump") as mock_dump, \
-             patch("app.tasks.maintenance._rotate_backups", return_value=0) as mock_rotate, \
-             patch("app.tasks.maintenance.Path") as mock_path_cls:
-
+        with (
+            patch("app.tasks.maintenance._run_pg_dump") as mock_dump,
+            patch(
+                "app.tasks.maintenance._rotate_backups", return_value=0
+            ) as mock_rotate,
+            patch("app.tasks.maintenance.Path") as mock_path_cls,
+        ):
             # Setup Path mock
             mock_path_instance = MagicMock()
             mock_path_instance.stat.return_value.st_size = 1024 * 1024  # 1 MB
@@ -157,7 +172,10 @@ class TestBackupPostgresTask:
             mock_dump.return_value = True
 
             # Call the underlying function directly (bypass Celery retry machinery)
-            with patch("app.tasks.maintenance.backup_postgres.retry", side_effect=Exception("should not retry")):
+            with patch(
+                "app.tasks.maintenance.backup_postgres.retry",
+                side_effect=Exception("should not retry"),
+            ):
                 # Patch Path to use tmp_path for backup dir
                 with patch("app.tasks.maintenance.Path", wraps=Path) as real_path:
                     with patch.dict(os.environ, {"DB_NAME": "veripass"}):
@@ -168,9 +186,10 @@ class TestBackupPostgresTask:
 
     def test_pg_dump_failure_raises(self, tmp_path):
         """If _run_pg_dump fails, task should raise (triggering retry)."""
-        with patch("app.tasks.maintenance._run_pg_dump", return_value=False), \
-             patch("app.tasks.maintenance.Path") as mock_path_cls:
-
+        with (
+            patch("app.tasks.maintenance._run_pg_dump", return_value=False),
+            patch("app.tasks.maintenance.Path") as mock_path_cls,
+        ):
             mock_path_cls.return_value.mkdir.return_value = None
 
             # The task raises RuntimeError when pg_dump fails
@@ -185,6 +204,7 @@ class TestBackupPostgresTask:
 # check_disk_usage task
 # ---------------------------------------------------------------------------
 
+
 class TestCheckDiskUsage:
     def test_below_threshold_no_prune(self):
         """Disk usage 70% — no prune triggered."""
@@ -192,7 +212,9 @@ class TestCheckDiskUsage:
         mock_df.returncode = 0
         mock_df.stdout = "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1       200G  140G   60G  70% /"
 
-        with patch("app.tasks.maintenance.subprocess.run", return_value=mock_df) as mock_run:
+        with patch(
+            "app.tasks.maintenance.subprocess.run", return_value=mock_df
+        ) as mock_run:
             result = check_disk_usage()
 
         assert result is True
@@ -210,7 +232,9 @@ class TestCheckDiskUsage:
         mock_prune.returncode = 0
         mock_prune.stdout = "Total reclaimed space: 5GB"
 
-        with patch("app.tasks.maintenance.subprocess.run", side_effect=[mock_df, mock_prune]) as mock_run:
+        with patch(
+            "app.tasks.maintenance.subprocess.run", side_effect=[mock_df, mock_prune]
+        ) as mock_run:
             result = check_disk_usage()
 
         assert result is True
@@ -242,7 +266,9 @@ class TestCheckDiskUsage:
         mock_prune.returncode = 1
         mock_prune.stderr = "Cannot connect to Docker daemon"
 
-        with patch("app.tasks.maintenance.subprocess.run", side_effect=[mock_df, mock_prune]):
+        with patch(
+            "app.tasks.maintenance.subprocess.run", side_effect=[mock_df, mock_prune]
+        ):
             result = check_disk_usage()
 
         assert result is False
@@ -262,8 +288,10 @@ class TestCheckDiskUsage:
         """Subprocess timeout is caught."""
         import subprocess as sp
 
-        with patch("app.tasks.maintenance.subprocess.run",
-                   side_effect=sp.TimeoutExpired("df", 10)):
+        with patch(
+            "app.tasks.maintenance.subprocess.run",
+            side_effect=sp.TimeoutExpired("df", 10),
+        ):
             result = check_disk_usage()
 
         assert result is False

@@ -24,6 +24,7 @@ Idempotent : ne recrée pas si déjà existant.
 Conditions d'exécution : ENVIRONMENT=development OU SEED_DATA=true
 =============================================================================
 """
+
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -41,10 +42,30 @@ SEED_AGENCY = {
 }
 
 SEED_AGENTS = [
-    {"name": "Jean Dupont",   "email": "jean@bicec.cm",   "password": "password123", "role": "JEAN"},
-    {"name": "Thomas Martin", "email": "thomas@bicec.cm", "password": "password123", "role": "THOMAS"},
-    {"name": "Sylvie Bernard","email": "sylvie@bicec.cm", "password": "password123", "role": "SYLVIE"},
-    {"name": "Admin IT",      "email": "admin@bicec.cm",  "password": "password123", "role": "ADMIN_IT"},
+    {
+        "name": "Jean Dupont",
+        "email": "jean@bicec.cm",
+        "password": "password123",
+        "role": "JEAN",
+    },
+    {
+        "name": "Thomas Martin",
+        "email": "thomas@bicec.cm",
+        "password": "password123",
+        "role": "THOMAS",
+    },
+    {
+        "name": "Sylvie Bernard",
+        "email": "sylvie@bicec.cm",
+        "password": "password123",
+        "role": "SYLVIE",
+    },
+    {
+        "name": "Admin IT",
+        "email": "admin@bicec.cm",
+        "password": "password123",
+        "role": "ADMIN_IT",
+    },
 ]
 
 
@@ -69,7 +90,9 @@ async def seed_development_data(db: AsyncSession) -> None:
 
     # --- Agents ---
     for agent_data in SEED_AGENTS:
-        result = await db.execute(select(Agent).where(Agent.email == agent_data["email"]))
+        result = await db.execute(
+            select(Agent).where(Agent.email == agent_data["email"])
+        )
         existing = result.scalar_one_or_none()
         if not existing:
             agent = Agent(
@@ -81,7 +104,9 @@ async def seed_development_data(db: AsyncSession) -> None:
                 role=AgentRole(agent_data["role"]),
             )
             db.add(agent)
-            logger.info(f"Seed: created agent '{agent_data['email']}' (role={agent_data['role']})")
+            logger.info(
+                f"Seed: created agent '{agent_data['email']}' (role={agent_data['role']})"
+            )
         else:
             logger.info(f"Seed: agent '{agent_data['email']}' already exists, skipping")
 

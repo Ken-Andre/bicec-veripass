@@ -13,6 +13,7 @@ Security Note:
     These credentials are for DEVELOPMENT/STAGING only.
     In production, agents should be created via Admin IT interface with unique credentials.
 """
+
 import asyncio
 import os
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -33,11 +34,11 @@ DEFAULT_ADMIN_PASSWORD = os.getenv("SEED_ADMIN_PASSWORD", "admin123")
 
 async def seed_agents(db: AsyncSession):
     """Create default agencies and agents if they don't exist."""
-    
+
     # ===== Create default agency if not exists =====
     result = await db.execute(select(Agency).where(Agency.code == "DLA-001"))
     agency = result.scalar_one_or_none()
-    
+
     if not agency:
         agency = Agency(
             code="DLA-001",
@@ -51,7 +52,7 @@ async def seed_agents(db: AsyncSession):
         print(f"✓ Created agency: {agency.code} - {agency.name}")
     else:
         print(f"✓ Agency already exists: {agency.code}")
-    
+
     # ===== Create agents if not exist =====
     agents_data = [
         {
@@ -75,15 +76,17 @@ async def seed_agents(db: AsyncSession):
             "role": AgentRole.ADMIN_IT,
         },
     ]
-    
+
     for agent_data in agents_data:
         result = await db.execute(
             select(Agent).where(Agent.email == agent_data["email"])
         )
         existing_agent = result.scalar_one_or_none()
-        
+
         if existing_agent:
-            print(f"✓ Agent already exists: {agent_data['email']} ({agent_data['role'].value})")
+            print(
+                f"✓ Agent already exists: {agent_data['email']} ({agent_data['role'].value})"
+            )
         else:
             raw_password = (
                 DEFAULT_ADMIN_PASSWORD
@@ -99,8 +102,10 @@ async def seed_agents(db: AsyncSession):
                 is_available=True,
             )
             db.add(agent)
-            print(f"✓ Created agent: {agent.name} ({agent.email}) - Role: {agent.role.value}")
-    
+            print(
+                f"✓ Created agent: {agent.name} ({agent.email}) - Role: {agent.role.value}"
+            )
+
     await db.commit()
     print("\n✓ Seed completed successfully!")
     print("\n⚠️  WARNING: Default credentials are for DEVELOPMENT only!")
@@ -111,10 +116,10 @@ async def main():
     """Main entry point for seed script."""
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    
+
     async with async_session() as session:
         await seed_agents(session)
-    
+
     await engine.dispose()
 
 

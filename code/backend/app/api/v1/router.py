@@ -16,5 +16,7 @@ api_router.include_router(backoffice_router, prefix="/backoffice", tags=["backof
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_router.include_router(aml_router, prefix="/aml", tags=["aml"])
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
-api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(
+    notifications_router, prefix="/notifications", tags=["notifications"]
+)
 api_router.include_router(audit_router, prefix="/audit", tags=["audit"])

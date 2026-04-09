@@ -2,7 +2,7 @@
 Unit tests for security utilities: JWT, password hashing, session handles.
 No database or Redis required — pure function tests.
 """
-import pytest
+
 from datetime import timedelta
 
 from app.core.security import (
@@ -121,7 +121,10 @@ class TestSessionHandle:
     def test_verify_wrong_db_id(self):
         db_id = "123e4567-e89b-12d3-a456-426614174000"
         handle = make_session_handle(db_id)
-        assert verify_session_handle(handle, "999e4567-e89b-12d3-a456-426614174999") is False
+        assert (
+            verify_session_handle(handle, "999e4567-e89b-12d3-a456-426614174999")
+            is False
+        )
 
     def test_deterministic(self):
         """Same db_id must always produce the same handle."""

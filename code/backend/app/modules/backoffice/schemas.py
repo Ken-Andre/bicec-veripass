@@ -1,4 +1,5 @@
 """Backoffice Pydantic schemas."""
+
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 
 class KYCQueueItemSchema(BaseModel):
     """Minimal KYC session info for the backoffice queue view."""
+
     id: UUID
     status: str
     access_level: str
@@ -19,6 +21,7 @@ class KYCQueueItemSchema(BaseModel):
 
 class AuditLogSchema(BaseModel):
     """Minimal audit log entry for the backoffice view."""
+
     id: UUID
     action: str
     table_name: Optional[str] = None

@@ -1,6 +1,7 @@
 """Unit tests for seed_data.py — no DB required (pure logic tests)."""
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock
 from app.db.seed_data import SEED_AGENCY, SEED_AGENTS, seed_development_data
 from app.core.security import hash_password, verify_password
 
@@ -8,6 +9,7 @@ from app.core.security import hash_password, verify_password
 # ---------------------------------------------------------------------------
 # Password hashing
 # ---------------------------------------------------------------------------
+
 
 def test_seed_passwords_are_hashed():
     """Seed agents must not store plain-text passwords."""
@@ -27,6 +29,7 @@ def test_seed_passwords_are_unique_hashes():
 # ---------------------------------------------------------------------------
 # Seed data structure
 # ---------------------------------------------------------------------------
+
 
 def test_seed_agents_have_required_fields():
     required = {"name", "email", "password", "role"}
@@ -53,6 +56,7 @@ def test_seed_agency_has_required_fields():
 # ---------------------------------------------------------------------------
 # Idempotence — mock DB session
 # ---------------------------------------------------------------------------
+
 
 def _make_scalar_result(value):
     """Helper: mock scalar_one_or_none() returning value."""
@@ -87,7 +91,6 @@ async def test_seed_skips_existing_agency_and_agents():
 @pytest.mark.asyncio
 async def test_seed_creates_agency_and_agents_when_missing():
     """When nothing exists, db.add() is called for agency + all agents."""
-    import uuid
 
     db = AsyncMock()
     db.flush = AsyncMock()

@@ -1,12 +1,13 @@
 """Tests for EmailClient — kwargs mapping, TLS semantics, mailpit and production SMTP."""
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_client(
     host="smtp.example.com",
@@ -37,8 +38,10 @@ def _make_client(
 
 async def _send(client, environment="production"):
     """Call send_email with settings.ENVIRONMENT patched."""
-    with patch("app.core.email.settings") as ms, \
-         patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+    with (
+        patch("app.core.email.settings") as ms,
+        patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send,
+    ):
         ms.ENVIRONMENT = environment
         mock_send.return_value = ({}, "OK")
         result = await client.send_email("dest@example.com", "Subj", "Body")
@@ -145,8 +148,10 @@ class TestDevSimulationShortcut:
     async def test_dev_local_returns_true_without_calling_aiosmtplib(self):
         client = _make_client(host="localhost", user="", environment="development")
 
-        with patch("app.core.email.settings") as ms, \
-             patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+        with (
+            patch("app.core.email.settings") as ms,
+            patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send,
+        ):
             ms.ENVIRONMENT = "development"
             result = await client.send_email("dest@example.com", "Subj", "Body")
 
@@ -179,9 +184,12 @@ class TestMailpitIntegration:
     async def test_send_plain_smtp_no_auth(self):
         """Plain SMTP to mailpit — no TLS, no auth."""
         client = _make_client(
-            host="localhost", port=1025,
-            user="", password="",
-            smtp_tls=False, smtp_ssl=False,
+            host="localhost",
+            port=1025,
+            user="",
+            password="",
+            smtp_tls=False,
+            smtp_ssl=False,
         )
         with patch("app.core.email.settings") as ms:
             ms.ENVIRONMENT = "production"
@@ -196,9 +204,12 @@ class TestMailpitIntegration:
     async def test_send_html_content(self):
         """HTML email to mailpit."""
         client = _make_client(
-            host="localhost", port=1025,
-            user="", password="",
-            smtp_tls=False, smtp_ssl=False,
+            host="localhost",
+            port=1025,
+            user="",
+            password="",
+            smtp_tls=False,
+            smtp_ssl=False,
         )
         with patch("app.core.email.settings") as ms:
             ms.ENVIRONMENT = "production"
@@ -228,8 +239,13 @@ class TestProductionSmtpIntegration:
     def smtp_env(self):
         import os
 
-        required = ["TEST_SMTP_HOST", "TEST_SMTP_PORT", "TEST_SMTP_USER",
-                    "TEST_SMTP_PASSWORD", "TEST_SMTP_TO"]
+        required = [
+            "TEST_SMTP_HOST",
+            "TEST_SMTP_PORT",
+            "TEST_SMTP_USER",
+            "TEST_SMTP_PASSWORD",
+            "TEST_SMTP_TO",
+        ]
         missing = [k for k in required if not os.environ.get(k)]
         if missing:
             pytest.skip(f"Missing env vars for production SMTP: {missing}")
@@ -244,9 +260,12 @@ class TestProductionSmtpIntegration:
     async def test_starttls_send(self):
         """STARTTLS (SMTP_TLS=True) against a real relay."""
         client = _make_client(
-            host=self.host, port=self.port,
-            user=self.user, password=self.password,
-            smtp_tls=True, smtp_ssl=False,
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            password=self.password,
+            smtp_tls=True,
+            smtp_ssl=False,
         )
         with patch("app.core.email.settings") as ms:
             ms.ENVIRONMENT = "production"
@@ -261,12 +280,16 @@ class TestProductionSmtpIntegration:
     async def test_implicit_ssl_send(self):
         """Implicit TLS/SSL (SMTP_SSL=True, port 465) against a real relay."""
         import os
+
         ssl_port = int(os.environ.get("TEST_SMTP_SSL_PORT", 465))
 
         client = _make_client(
-            host=self.host, port=ssl_port,
-            user=self.user, password=self.password,
-            smtp_tls=False, smtp_ssl=True,
+            host=self.host,
+            port=ssl_port,
+            user=self.user,
+            password=self.password,
+            smtp_tls=False,
+            smtp_ssl=True,
         )
         with patch("app.core.email.settings") as ms:
             ms.ENVIRONMENT = "production"

@@ -18,9 +18,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("agents", sa.Column("failed_login_attempts", sa.Integer(), nullable=True, server_default="0"))
-    op.add_column("agents", sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True))
-    op.execute("UPDATE agents SET failed_login_attempts = 0 WHERE failed_login_attempts IS NULL")
+    op.add_column(
+        "agents",
+        sa.Column(
+            "failed_login_attempts", sa.Integer(), nullable=True, server_default="0"
+        ),
+    )
+    op.add_column(
+        "agents", sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True)
+    )
+    op.execute(
+        "UPDATE agents SET failed_login_attempts = 0 WHERE failed_login_attempts IS NULL"
+    )
     op.alter_column("agents", "failed_login_attempts", server_default=None)
 
 

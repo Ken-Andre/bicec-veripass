@@ -6,6 +6,7 @@ Usage:
     # ou en local:
     uv run python -m app.db.seed_kyc_test_data
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -13,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
-from app.db.base_class import Base
 import app.modules.kyc.models  # noqa: F401
 import app.modules.auth.models  # noqa: F401
 import app.modules.aml.models  # noqa: F401
@@ -30,12 +30,14 @@ async def seed():
         # --- Récupérer les agents existants ---
         from app.modules.auth.models import Agent
         from app.modules.kyc.models import KYCSession
-        from app.modules.aml.models import AmlAlert, NiuConflict, Agency, BatchJob
+        from app.modules.aml.models import AmlAlert, NiuConflict, BatchJob
         from sqlalchemy import select
 
         agents = (await db.execute(select(Agent))).scalars().all()
         if not agents:
-            print("[seed-kyc] ⚠ Aucun agent trouvé. Exécutez seed_admin_it.py et seed_agencies.py d'abord.")
+            print(
+                "[seed-kyc] ⚠ Aucun agent trouvé. Exécutez seed_admin_it.py et seed_agencies.py d'abord."
+            )
             return
 
         jean = next((a for a in agents if a.role == "JEAN"), None)
@@ -48,10 +50,26 @@ async def seed():
 
         # --- Créer des sessions KYC de test dans différents états ---
         test_sessions = [
-            {"status": "PENDING_KYC", "access_level": "RESTRICTED", "last_step": "submission"},
-            {"status": "PENDING_REVIEW", "access_level": "RESTRICTED", "last_step": "aml_clear"},
-            {"status": "MANUAL_REVIEW", "access_level": "RESTRICTED", "last_step": "assigned"},
-            {"status": "APPROVED", "access_level": "LIMITED_ACCESS", "last_step": "activated"},
+            {
+                "status": "PENDING_KYC",
+                "access_level": "RESTRICTED",
+                "last_step": "submission",
+            },
+            {
+                "status": "PENDING_REVIEW",
+                "access_level": "RESTRICTED",
+                "last_step": "aml_clear",
+            },
+            {
+                "status": "MANUAL_REVIEW",
+                "access_level": "RESTRICTED",
+                "last_step": "assigned",
+            },
+            {
+                "status": "APPROVED",
+                "access_level": "LIMITED_ACCESS",
+                "last_step": "activated",
+            },
         ]
 
         session_ids = []
@@ -86,7 +104,9 @@ async def seed():
             id=uuid.uuid4(),
             niu="M1234567890123",
             session_id_new=session_ids[0] if session_ids else uuid.uuid4(),
-            session_id_existing=session_ids[1] if len(session_ids) > 1 else uuid.uuid4(),
+            session_id_existing=session_ids[1]
+            if len(session_ids) > 1
+            else uuid.uuid4(),
             similarity_score=0.85,
             status="PENDING",
         )
@@ -104,9 +124,9 @@ async def seed():
 
         await db.commit()
         print(f"[seed-kyc] ✅ {len(session_ids)} sessions KYC créées")
-        print(f"[seed-kyc] ✅ 2 alertes AML créées")
-        print(f"[seed-kyc] ✅ 1 conflit NIU créé")
-        print(f"[seed-kyc] ✅ 1 batch job créé")
+        print("[seed-kyc] ✅ 2 alertes AML créées")
+        print("[seed-kyc] ✅ 1 conflit NIU créé")
+        print("[seed-kyc] ✅ 1 batch job créé")
         print("[seed-kyc] ✅ Terminé")
 
     await engine.dispose()

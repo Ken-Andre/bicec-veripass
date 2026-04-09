@@ -2,7 +2,7 @@
 Tâches Celery pour la gestion KYC (détection sessions abandonnées, doublons, AML screening)
 Source: architecture-bicec-veripass.md §17, G32
 """
-from datetime import datetime, timezone, timedelta
+
 from sqlalchemy import text
 from app.core.celery_config import celery
 from app.db.session import AsyncSessionLocal
@@ -20,21 +20,27 @@ async def detect_abandoned_sessions():
     async with AsyncSessionLocal() as db:
         try:
             # Sessions DRAFT inactives depuis 72h
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 UPDATE kyc_sessions 
                 SET status = 'ABANDONED', updated_at = NOW()
                 WHERE status = 'DRAFT'
                   AND updated_at < NOW() - INTERVAL '72 hours'
                 RETURNING id, user_id, last_step_completed
-            """))
+            """)
+            )
             abandoned = result.fetchall()
             await db.commit()
 
             for session in abandoned:
-                logger.info(f"[abandoned-sessions] Session {session.id} (user={session.user_id}) marked ABANDONED at step {session.last_step_completed}")
+                logger.info(
+                    f"[abandoned-sessions] Session {session.id} (user={session.user_id}) marked ABANDONED at step {session.last_step_completed}"
+                )
                 # TODO: Envoyer notification à Marie avec lien de reprise
 
-            logger.info(f"[abandoned-sessions] Marked {len(abandoned)} sessions as ABANDONED")
+            logger.info(
+                f"[abandoned-sessions] Marked {len(abandoned)} sessions as ABANDONED"
+            )
             return len(abandoned)
 
         except Exception as e:
@@ -61,7 +67,8 @@ async def check_duplicates(session_id: str):
     async with AsyncSessionLocal() as db:
         try:
             # Fuzzy matching nom + date naissance
-            result = await db.execute(text("""
+            result = await db.execute(
+                text("""
                 SELECT 
                     ks.id, ks.user_id,
                     u.firstname, u.lastname, u.date_of_birth,
@@ -81,19 +88,27 @@ async def check_duplicates(session_id: str):
                                   WHERE ks2.id = :session_id)) >= 0.7
                 ORDER BY similarity_score DESC
                 LIMIT 10
-            """), {"session_id": session_id})
+            """),
+                {"session_id": session_id},
+            )
             matches = result.fetchall()
 
             if matches:
-                logger.warning(f"[duplicates] Found {len(matches)} potential duplicates for session {session_id}")
+                logger.warning(
+                    f"[duplicates] Found {len(matches)} potential duplicates for session {session_id}"
+                )
                 # TODO: Créer des entrées duplicate_checks + alerter Thomas
             else:
-                logger.info(f"[duplicates] No duplicates found for session {session_id}")
+                logger.info(
+                    f"[duplicates] No duplicates found for session {session_id}"
+                )
 
             return len(matches)
 
         except Exception as e:
-            logger.error(f"[duplicates] Check failed for {session_id}: {e}", exc_info=True)
+            logger.error(
+                f"[duplicates] Check failed for {session_id}: {e}", exc_info=True
+            )
             raise
 
 

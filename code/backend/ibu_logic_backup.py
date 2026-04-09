@@ -1,6 +1,7 @@
 import random
 import string
 
+
 def calculate_mod97(ibu_base):
     """
     Calculates the Modulo 97 checksum for a numerical string.
@@ -13,11 +14,12 @@ def calculate_mod97(ibu_base):
         if char.isdigit():
             digits += char
         else:
-            digits += str(ord(char.upper()) - ord('A') + 10)
-    
+            digits += str(ord(char.upper()) - ord("A") + 10)
+
     remainder = int(digits) % 97
     check_digit = 98 - remainder
     return f"{check_digit:02d}"
+
 
 def generate_shadow_ibu(bank_code="BICEC"):
     """
@@ -25,23 +27,24 @@ def generate_shadow_ibu(bank_code="BICEC"):
     Structure: CM (Country) + Type (1) + Year (2) + Bank (5) + Seq (8) + Key (2)
     Total: 20 characters.
     """
-    country_code = "CM" # Cameroon
+    country_code = "CM"  # Cameroon
     account_type = "1"  # Individual
-    year = "26"         # 2026
-    
+    year = "26"  # 2026
+
     # Normalize bank code to 5 chars
-    bank_id = bank_code[:5].upper().ljust(5, 'X')
-    
+    bank_id = bank_code[:5].upper().ljust(5, "X")
+
     # Random sequential number (simulating database ID)
-    seq = ''.join(random.choices(string.digits, k=8))
-    
+    seq = "".join(random.choices(string.digits, k=8))
+
     # Base for checksum: Country code converted to digits (C=12, M=22) -> 1222 + ...
     # Standard IBAN logic puts CC at the end for calculation: Account + CC + 00
     base_for_key = f"{account_type}{year}{bank_id}{seq}122200"
-    
+
     key = calculate_mod97(base_for_key)
-    
+
     return f"{country_code}{key}{account_type}{year}{bank_id}{seq}"
+
 
 if __name__ == "__main__":
     # Test generation

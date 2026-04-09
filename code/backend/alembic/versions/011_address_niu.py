@@ -21,23 +21,56 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Address fields + NIU persistence
-    op.add_column("kyc_sessions", sa.Column("address_city", sa.String(length=100), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("address_commune", sa.String(length=100), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("address_quartier", sa.String(length=100), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("address_lieu_dit", sa.String(length=150), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("address_details", sa.Text(), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("gps_latitude", sa.Numeric(precision=10, scale=7), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("gps_longitude", sa.Numeric(precision=10, scale=7), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("utility_provider", sa.String(length=30), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("utility_bill_date", sa.Date(), nullable=True))
-    op.add_column("kyc_sessions", sa.Column("niu_number", sa.String(length=32), nullable=True))
+    op.add_column(
+        "kyc_sessions", sa.Column("address_city", sa.String(length=100), nullable=True)
+    )
     op.add_column(
         "kyc_sessions",
-        sa.Column("niu_declarative", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("address_commune", sa.String(length=100), nullable=True),
+    )
+    op.add_column(
+        "kyc_sessions",
+        sa.Column("address_quartier", sa.String(length=100), nullable=True),
+    )
+    op.add_column(
+        "kyc_sessions",
+        sa.Column("address_lieu_dit", sa.String(length=150), nullable=True),
+    )
+    op.add_column(
+        "kyc_sessions", sa.Column("address_details", sa.Text(), nullable=True)
+    )
+    op.add_column(
+        "kyc_sessions",
+        sa.Column("gps_latitude", sa.Numeric(precision=10, scale=7), nullable=True),
+    )
+    op.add_column(
+        "kyc_sessions",
+        sa.Column("gps_longitude", sa.Numeric(precision=10, scale=7), nullable=True),
+    )
+    op.add_column(
+        "kyc_sessions",
+        sa.Column("utility_provider", sa.String(length=30), nullable=True),
+    )
+    op.add_column(
+        "kyc_sessions", sa.Column("utility_bill_date", sa.Date(), nullable=True)
+    )
+    op.add_column(
+        "kyc_sessions", sa.Column("niu_number", sa.String(length=32), nullable=True)
+    )
+    op.add_column(
+        "kyc_sessions",
+        sa.Column(
+            "niu_declarative",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
     )
 
     # Query index for lookups by NIU
-    op.create_index("ix_kyc_sessions_niu_number", "kyc_sessions", ["niu_number"], unique=False)
+    op.create_index(
+        "ix_kyc_sessions_niu_number", "kyc_sessions", ["niu_number"], unique=False
+    )
 
     # Unique NIU per user when NIU is present (allows NULL NIU values)
     op.create_index(
@@ -53,10 +86,30 @@ def upgrade() -> None:
         "consents",
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("session_id", sa.UUID(), nullable=False),
-        sa.Column("cgu_accepted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("privacy_accepted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("data_processing_accepted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("consent_method", sa.String(length=50), nullable=False, server_default=sa.text("'CHECKBOX_DIGITAL'")),
+        sa.Column(
+            "cgu_accepted",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+        sa.Column(
+            "privacy_accepted",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+        sa.Column(
+            "data_processing_accepted",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+        sa.Column(
+            "consent_method",
+            sa.String(length=50),
+            nullable=False,
+            server_default=sa.text("'CHECKBOX_DIGITAL'"),
+        ),
         sa.Column("consent_version", sa.String(length=20), nullable=True),
         sa.Column("signed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("client_ip", postgresql.INET(), nullable=True),

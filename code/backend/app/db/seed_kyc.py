@@ -6,6 +6,7 @@ All data comes from the database via Python seeds — NO hardcoded mocks in fron
 Usage:
     uv run python app/db/seed_kyc.py
 """
+
 import asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -14,8 +15,14 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.db.base import Base, User
-from app.modules.kyc.models import KYCSession, Document, OCRField, BiometricResult, ConsentRecord
+from app.db.base import User
+from app.modules.kyc.models import (
+    KYCSession,
+    Document,
+    OCRField,
+    BiometricResult,
+    ConsentRecord,
+)
 
 
 async def seed_kyc_sessions(db: AsyncSession):
@@ -94,7 +101,9 @@ async def seed_kyc_sessions(db: AsyncSession):
             access_level=session_data["access_level"],
             last_step_completed=session_data["last_step_completed"],
             started_at=datetime.now(timezone.utc) - timedelta(hours=2),
-            submitted_at=datetime.now(timezone.utc) if session_data.get("submitted") else None,
+            submitted_at=datetime.now(timezone.utc)
+            if session_data.get("submitted")
+            else None,
         )
         db.add(session)
         await db.flush()
@@ -119,13 +128,32 @@ async def seed_kyc_sessions(db: AsyncSession):
                 db.add(doc)
 
                 # Add OCR fields for CNI documents
-                if session_data.get("add_ocr_fields") and doc_data["type"] in ("CNI_RECTO", "CNI_VERSO"):
+                if session_data.get("add_ocr_fields") and doc_data["type"] in (
+                    "CNI_RECTO",
+                    "CNI_VERSO",
+                ):
                     ocr_fields = [
                         {"field": "nom", "value": "NGUEMO", "confidence": 0.95},
-                        {"field": "prenom", "value": "Marie Claire", "confidence": 0.92},
-                        {"field": "date_naissance", "value": "15/03/1992", "confidence": 0.88},
-                        {"field": "lieu_naissance", "value": "Douala", "confidence": 0.72},
-                        {"field": "numero_cni", "value": "123456789", "confidence": 0.96},
+                        {
+                            "field": "prenom",
+                            "value": "Marie Claire",
+                            "confidence": 0.92,
+                        },
+                        {
+                            "field": "date_naissance",
+                            "value": "15/03/1992",
+                            "confidence": 0.88,
+                        },
+                        {
+                            "field": "lieu_naissance",
+                            "value": "Douala",
+                            "confidence": 0.72,
+                        },
+                        {
+                            "field": "numero_cni",
+                            "value": "123456789",
+                            "confidence": 0.96,
+                        },
                     ]
                     for ocr_data in ocr_fields:
                         ocr = OCRField(
@@ -164,7 +192,9 @@ async def seed_kyc_sessions(db: AsyncSession):
             )
             db.add(consent)
 
-        print(f"✓ Created: {session_data['description']} (status={session_data['status']})")
+        print(
+            f"✓ Created: {session_data['description']} (status={session_data['status']})"
+        )
 
     await db.commit()
     print("\n✓ KYC seed completed successfully!")

@@ -9,6 +9,7 @@ Usage:
         query = select(MyModel).order_by(MyModel.created_at.desc())
         return await paginate(db, query, page)
 """
+
 from typing import TypeVar, Generic, List, Type
 from math import ceil
 
@@ -22,6 +23,7 @@ T = TypeVar("T")
 
 class PageParams:
     """Query params for pagination — injected via Depends()."""
+
     def __init__(
         self,
         page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
@@ -37,6 +39,7 @@ class PageParams:
 
 class PageResponse(BaseModel, Generic[T]):
     """Unified paginated response — same structure on every list endpoint."""
+
     items: List[T]
     total: int
     page: int
@@ -44,7 +47,9 @@ class PageResponse(BaseModel, Generic[T]):
     limit: int
 
 
-async def paginate(db: AsyncSession, query, params: PageParams, schema: Type[T]) -> PageResponse[T]:
+async def paginate(
+    db: AsyncSession, query, params: PageParams, schema: Type[T]
+) -> PageResponse[T]:
     """
     Execute a paginated SELECT query.
 
@@ -62,7 +67,11 @@ async def paginate(db: AsyncSession, query, params: PageParams, schema: Type[T])
     total: int = (await db.execute(count_q)).scalar_one()
 
     # Fetch the page
-    rows = (await db.execute(query.offset(params.offset).limit(params.limit))).scalars().all()
+    rows = (
+        (await db.execute(query.offset(params.offset).limit(params.limit)))
+        .scalars()
+        .all()
+    )
 
     return PageResponse(
         items=[schema.model_validate(row) for row in rows],

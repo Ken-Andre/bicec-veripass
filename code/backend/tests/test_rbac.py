@@ -1,4 +1,5 @@
 """Tests unitaires pour le RBAC (Issue #49 — AUTH-03)."""
+
 import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock
@@ -10,6 +11,7 @@ from app.modules.auth.models import AgentRole
 # ============================================================
 # TESTS REQUIRE_ROLE DECORATOR
 # ============================================================
+
 
 class TestRequireRole:
     """Tests pour le décorateur require_role()."""
@@ -34,6 +36,7 @@ class TestRequireRole:
 # TESTS RBAC ENDPOINTS (mocks — pas de DB)
 # ============================================================
 
+
 class TestRBACEndpoints:
     """Tests des endpoints avec RBAC."""
 
@@ -50,8 +53,15 @@ class TestRBACEndpoints:
             subject="agent-jean-123",
             additional_claims={"role": AgentRole.JEAN.value, "user_type": "agent"},
         )
-        with patch("app.modules.backoffice.router.paginate", new_callable=AsyncMock) as mock_paginate:
-            mock_paginate.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
+        with patch(
+            "app.modules.backoffice.router.paginate", new_callable=AsyncMock
+        ) as mock_paginate:
+            mock_paginate.return_value = {
+                "items": [],
+                "total": 0,
+                "page": 1,
+                "page_size": 10,
+            }
             response = await client.get(
                 "/api/v1/backoffice/queue",
                 headers={"Authorization": f"Bearer {token}"},
@@ -65,8 +75,15 @@ class TestRBACEndpoints:
             subject="agent-thomas-456",
             additional_claims={"role": AgentRole.THOMAS.value, "user_type": "agent"},
         )
-        with patch("app.modules.backoffice.router.paginate", new_callable=AsyncMock) as mock_paginate:
-            mock_paginate.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
+        with patch(
+            "app.modules.backoffice.router.paginate", new_callable=AsyncMock
+        ) as mock_paginate:
+            mock_paginate.return_value = {
+                "items": [],
+                "total": 0,
+                "page": 1,
+                "page_size": 10,
+            }
             response = await client.get(
                 "/api/v1/backoffice/queue",
                 headers={"Authorization": f"Bearer {token}"},
@@ -93,8 +110,15 @@ class TestRBACEndpoints:
             subject="agent-thomas-456",
             additional_claims={"role": AgentRole.THOMAS.value, "user_type": "agent"},
         )
-        with patch("app.modules.backoffice.router.paginate", new_callable=AsyncMock) as mock_paginate:
-            mock_paginate.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
+        with patch(
+            "app.modules.backoffice.router.paginate", new_callable=AsyncMock
+        ) as mock_paginate:
+            mock_paginate.return_value = {
+                "items": [],
+                "total": 0,
+                "page": 1,
+                "page_size": 10,
+            }
             response = await client.get(
                 "/api/v1/backoffice/audit-logs",
                 headers={"Authorization": f"Bearer {token}"},
@@ -120,8 +144,15 @@ class TestRBACEndpoints:
             subject="agent-admin-789",
             additional_claims={"role": AgentRole.ADMIN_IT.value, "user_type": "agent"},
         )
-        with patch("app.modules.admin.router.paginate", new_callable=AsyncMock) as mock_paginate:
-            mock_paginate.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
+        with patch(
+            "app.modules.admin.router.paginate", new_callable=AsyncMock
+        ) as mock_paginate:
+            mock_paginate.return_value = {
+                "items": [],
+                "total": 0,
+                "page": 1,
+                "page_size": 10,
+            }
             response = await client.get(
                 "/api/v1/admin/users",
                 headers={"Authorization": f"Bearer {admin_token}"},
@@ -186,6 +217,7 @@ class TestRBACEndpoints:
 # ============================================================
 # TESTS RBAC MATRIX VALIDATION
 # ============================================================
+
 
 class TestRBACMatrix:
     """Validation de la matrice RBAC."""

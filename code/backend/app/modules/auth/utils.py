@@ -1,7 +1,7 @@
 """OTP generation and Redis-backed storage with TTL."""
+
 import secrets
 from datetime import datetime, timezone
-from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -19,7 +19,9 @@ def generate_otp(length: int = 6) -> str:
     return "".join(secrets.choice("0123456789") for _ in range(length))
 
 
-async def store_otp(identifier: str, otp: str, expire_seconds: int = settings.REDIS_OTP_TTL) -> bool:
+async def store_otp(
+    identifier: str, otp: str, expire_seconds: int = settings.REDIS_OTP_TTL
+) -> bool:
     """
     Store bcrypt-hashed OTP in Redis with a TTL.
     Uses SET ... EX (not deprecated SETEX) per ADR-016 R3.
@@ -27,6 +29,7 @@ async def store_otp(identifier: str, otp: str, expire_seconds: int = settings.RE
     """
     try:
         from app.core.security import hash_password
+
         redis = await get_redis()
         key = otp_key(identifier)
         otp_hash = hash_password(otp)
@@ -67,7 +70,9 @@ async def increment_redis_otp_attempts(identifier: str) -> int:
         await redis.expire(key, settings.REDIS_OTP_ATTEMPTS_TTL)
         return count
     except Exception as e:
-        logger.exception(f"Failed to increment Redis OTP attempts for {identifier}: {e}")
+        logger.exception(
+            f"Failed to increment Redis OTP attempts for {identifier}: {e}"
+        )
         return 0
 
 

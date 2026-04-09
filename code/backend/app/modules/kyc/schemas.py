@@ -1,4 +1,5 @@
 """KYC Module Pydantic Schemas."""
+
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -18,7 +19,9 @@ class OCRFieldResponse(BaseModel):
 
 # === Document ===
 class DocumentUploadRequest(BaseModel):
-    doc_type: str = Field(..., description="CNI_RECTO, CNI_VERSO, SELFIE, BILL_ENEO, BILL_CAMWATER, NIU")
+    doc_type: str = Field(
+        ..., description="CNI_RECTO, CNI_VERSO, SELFIE, BILL_ENEO, BILL_CAMWATER, NIU"
+    )
 
 
 class DocumentResponse(BaseModel):
@@ -88,6 +91,7 @@ class KYCSessionResponse(BaseModel):
 
 class KYCSubmitRequest(BaseModel):
     """Submit KYC dossier for review."""
+
     pass
 
 
@@ -110,7 +114,9 @@ class AddressSubmitRequest(BaseModel):
 
 # === Liveness ===
 class LivenessSubmitRequest(BaseModel):
-    landmarks_json: List[dict] = Field(..., description="Landmark frames from MediaPipe")
+    landmarks_json: List[dict] = Field(
+        ..., description="Landmark frames from MediaPipe"
+    )
     challenge_type: str = Field(..., description="smile, blink, turn_left, turn_right")
 
 

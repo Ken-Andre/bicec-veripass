@@ -24,7 +24,7 @@ Validation rules enforced at decode time:
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any, BinaryIO
+from typing import Optional, Any
 import hashlib
 import hmac
 import uuid as _uuid
@@ -39,8 +39,6 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.db.session import get_db
 from app.modules.auth.models import User, Agent, AgentRole
-from app.db.session import get_db
-from app.modules.auth.models import User, Agent
 
 # JWT Bearer security scheme
 security = HTTPBearer(auto_error=False)
@@ -117,7 +115,7 @@ def create_access_token(
         for k, v in additional_claims.items():
             if k in _allowed:
                 # Sanitize: convert Enums to their .value representation
-                sanitized_claims[k] = v.value if hasattr(v, 'value') else v
+                sanitized_claims[k] = v.value if hasattr(v, "value") else v
         to_encode.update(sanitized_claims)
 
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm="HS256")
@@ -172,7 +170,6 @@ async def is_token_revoked(jti: str, db: AsyncSession) -> bool:
 async def revoke_token(jti: str, expires_at, db: AsyncSession) -> None:
     """Add a refresh token jti to the revocation list."""
     from app.modules.auth.models import TokenRevocation
-    from datetime import datetime
     import uuid as _uuid_mod
 
     revocation = TokenRevocation(jti=_uuid_mod.UUID(jti), expires_at=expires_at)
@@ -226,7 +223,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
         )
-    
+
     # Validate UUID format to prevent DB errors
     try:
         parsed_uuid = _uuid.UUID(user_id)
@@ -280,7 +277,7 @@ async def get_current_agent(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
         )
-    
+
     # Validate UUID format to prevent DB errors
     try:
         parsed_uuid = _uuid.UUID(agent_id)

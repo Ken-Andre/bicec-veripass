@@ -1,4 +1,5 @@
 """Tests pour les endpoints Email OTP (AUTH-01 — fallback email)."""
+
 import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -9,6 +10,7 @@ from app.core.security import create_access_token
 # ============================================================
 # HELPERS
 # ============================================================
+
 
 def _auth_header(user_id: str = "test-user-id") -> dict:
     """Génère un header Authorization JWT pour un utilisateur."""
@@ -23,12 +25,14 @@ def _auth_header(user_id: str = "test-user-id") -> dict:
 # TEST EMAIL OTP — SCHÉMAS
 # ============================================================
 
+
 class TestEmailOtpSchemas:
     """Validation Pydantic des schémas Email OTP."""
 
     def test_email_otp_send_valid(self):
         """Un email valide doit passer la validation."""
         from app.modules.auth.schemas import EmailOtpSendRequest
+
         req = EmailOtpSendRequest(email="marie@example.com")
         assert req.email == "marie@example.com"
 
@@ -36,12 +40,14 @@ class TestEmailOtpSchemas:
         """Un email invalide doit lever une ValidationError."""
         from app.modules.auth.schemas import EmailOtpSendRequest
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             EmailOtpSendRequest(email="pas-un-email")
 
     def test_email_otp_verify_valid_otp(self):
         """Un OTP de 6 chiffres doit passer."""
         from app.modules.auth.schemas import EmailOtpVerifyRequest
+
         req = EmailOtpVerifyRequest(otp="123456")
         assert req.otp == "123456"
 
@@ -49,6 +55,7 @@ class TestEmailOtpSchemas:
         """Un OTP trop court doit lever une ValidationError."""
         from app.modules.auth.schemas import EmailOtpVerifyRequest
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             EmailOtpVerifyRequest(otp="12345")  # 5 chiffres
 
@@ -56,6 +63,7 @@ class TestEmailOtpSchemas:
         """Un OTP non numérique doit lever une ValidationError."""
         from app.modules.auth.schemas import EmailOtpVerifyRequest
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             EmailOtpVerifyRequest(otp="12345A")
 
@@ -63,6 +71,7 @@ class TestEmailOtpSchemas:
 # ============================================================
 # TEST EMAIL OTP — ENDPOINT /auth/email/send
 # ============================================================
+
 
 class TestEmailOtpSendEndpoint:
     """Tests de l'endpoint POST /auth/email/send."""
@@ -95,7 +104,11 @@ class TestEmailOtpSendEndpoint:
 
         with (
             patch("app.modules.auth.router.get_current_user", return_value=mock_user),
-            patch("app.modules.auth.router.store_otp", new_callable=AsyncMock, return_value=True),
+            patch(
+                "app.modules.auth.router.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
             patch("app.modules.auth.router.send_only_email_otp_task") as mock_task,
         ):
             mock_task.delay = MagicMock()
@@ -119,7 +132,11 @@ class TestEmailOtpSendEndpoint:
 
         with (
             patch("app.modules.auth.router.get_current_user", return_value=mock_user),
-            patch("app.modules.auth.router.store_otp", new_callable=AsyncMock, return_value=False),
+            patch(
+                "app.modules.auth.router.store_otp",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
         ):
             response = await client.post(
                 "/api/v1/auth/email/send",
@@ -138,11 +155,15 @@ class TestEmailOtpSendEndpoint:
 
         with (
             patch("app.modules.auth.router.get_current_user", return_value=mock_user),
-            patch("app.modules.auth.router.store_otp", new_callable=AsyncMock, return_value=True),
+            patch(
+                "app.modules.auth.router.store_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
             patch("app.modules.auth.router.send_only_email_otp_task") as mock_task,
         ):
             mock_task.delay = MagicMock()
-            
+
             # Paramètres de test : RATE_LIMIT_OTP="3/minute"
             # On envoie 3 requêtes (OK)
             for _ in range(3):
@@ -152,7 +173,7 @@ class TestEmailOtpSendEndpoint:
                     json={"email": "marie@example.com"},
                 )
                 assert req.status_code == 200
-                
+
             # La 4ème doit être bloquée (429 Too Many Requests)
             req4 = await client.post(
                 "/api/v1/auth/email/send",
@@ -166,11 +187,14 @@ class TestEmailOtpSendEndpoint:
 # TEST EMAIL OTP — ENDPOINT /auth/email/verify
 # ============================================================
 
+
 class TestEmailOtpVerifyEndpoint:
     """Tests de l'endpoint POST /auth/email/verify."""
 
     @pytest.mark.asyncio
-    async def test_verify_email_otp_without_token_returns_401(self, client: AsyncClient):
+    async def test_verify_email_otp_without_token_returns_401(
+        self, client: AsyncClient
+    ):
         """Sans JWT, l'endpoint doit retourner 401."""
         response = await client.post(
             "/api/v1/auth/email/verify",
@@ -189,7 +213,9 @@ class TestEmailOtpVerifyEndpoint:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_verify_email_otp_no_email_on_user_returns_400(self, client: AsyncClient):
+    async def test_verify_email_otp_no_email_on_user_returns_400(
+        self, client: AsyncClient
+    ):
         """Si l'utilisateur n'a pas d'email enregistré, retourner 400."""
         mock_user = MagicMock()
         mock_user.email = None  # Pas d'email
@@ -211,7 +237,11 @@ class TestEmailOtpVerifyEndpoint:
 
         with (
             patch("app.modules.auth.router.get_current_user", return_value=mock_user),
-            patch("app.modules.auth.router.verify_otp", new_callable=AsyncMock, return_value=False),
+            patch(
+                "app.modules.auth.router.verify_otp",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
         ):
             response = await client.post(
                 "/api/v1/auth/email/verify",
@@ -229,7 +259,11 @@ class TestEmailOtpVerifyEndpoint:
 
         with (
             patch("app.modules.auth.router.get_current_user", return_value=mock_user),
-            patch("app.modules.auth.router.verify_otp", new_callable=AsyncMock, return_value=True),
+            patch(
+                "app.modules.auth.router.verify_otp",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
             patch("app.modules.auth.router.delete_otp", new_callable=AsyncMock),
         ):
             response = await client.post(
@@ -247,6 +281,7 @@ class TestEmailOtpVerifyEndpoint:
 # TEST EMAIL TASK — _send_only_email_flow
 # ============================================================
 
+
 class TestEmailOtpTask:
     """Tests unitaires de la logique de la tâche Celery email-only."""
 
@@ -254,6 +289,7 @@ class TestEmailOtpTask:
     async def test_dev_local_mode_returns_true_without_sending(self):
         """En mode dev_local, la tâche doit retourner True sans envoyer d'email."""
         from app.modules.auth.tasks import _send_only_email_flow
+
         with patch("app.modules.auth.tasks.settings") as mock_settings:
             mock_settings.OTP_MODE = "dev_local"
             mock_settings.OTP_EXPIRY_MINUTES = 5
@@ -264,6 +300,7 @@ class TestEmailOtpTask:
     async def test_email_mode_calls_email_client(self):
         """En mode email, la tâche doit appeler email_client.send_email."""
         from app.modules.auth.tasks import _send_only_email_flow
+
         with (
             patch("app.modules.auth.tasks.settings") as mock_settings,
             patch("app.modules.auth.tasks.email_client") as mock_email,
@@ -284,6 +321,7 @@ class TestEmailOtpTask:
     async def test_email_failure_returns_false(self):
         """Si l'email échoue, la tâche doit retourner False."""
         from app.modules.auth.tasks import _send_only_email_flow
+
         with (
             patch("app.modules.auth.tasks.settings") as mock_settings,
             patch("app.modules.auth.tasks.email_client") as mock_email,
@@ -300,6 +338,7 @@ class TestEmailOtpTask:
     async def test_fallback_to_email_on_sms_failure(self):
         """Tester que si l'envoi SMS échoue, on fallback sur l'email si OTP_FALLBACK_EMAIL=True."""
         from app.modules.auth.tasks import _send_otp_flow
+
         with (
             patch("app.modules.auth.tasks.settings") as mock_settings,
             patch("app.modules.auth.tasks.sms_client") as mock_sms,
@@ -309,11 +348,13 @@ class TestEmailOtpTask:
             mock_settings.ENVIRONMENT = "production"
             mock_settings.OTP_FALLBACK_EMAIL = True
             mock_settings.OTP_EXPIRY_MINUTES = 5
-            
+
             mock_sms.send_sms = AsyncMock(return_value=False)
             mock_email.send_email = AsyncMock(return_value=True)
 
-            result = await _send_otp_flow("237600000000", "123456", "fallback@example.com")
+            result = await _send_otp_flow(
+                "237600000000", "123456", "fallback@example.com"
+            )
 
         assert result is True
         mock_sms.send_sms.assert_called_once()

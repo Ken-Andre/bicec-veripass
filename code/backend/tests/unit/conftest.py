@@ -1,4 +1,4 @@
-﻿# conftest.py  unit tests (no database, no Redis required)
+# conftest.py  unit tests (no database, no Redis required)
 # Overrides session-scoped DB fixture and provides an HTTP client
 # with all DB/Redis dependencies mocked out.
 import uuid
@@ -55,14 +55,21 @@ async def client():
     def _extract_role_from_request(request: Request) -> str:
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+            )
         token = auth_header.split(" ", 1)[1]
         payload = decode_token(token)
         if not payload or payload.get("type") != "access":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+            )
         role_str = payload.get("role")
         if not role_str:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing role claim")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing role claim"
+            )
         return role_str
 
     async def _mock_get_current_user(request: Request) -> User:
@@ -78,7 +85,10 @@ async def client():
         try:
             role = AgentRole(role_str)
         except ValueError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Unknown role: {role_str}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Unknown role: {role_str}",
+            )
         agent = MagicMock(spec=Agent)
         agent.id = uuid.uuid4()
         agent.role = role

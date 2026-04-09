@@ -2,6 +2,7 @@
 Unit tests for RBAC — role enum, require_role factory, and endpoint access control.
 Uses the mocked HTTP client from conftest (no DB, no Redis).
 """
+
 import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock
@@ -13,6 +14,7 @@ from app.modules.auth.models import AgentRole
 # ---------------------------------------------------------------------------
 # AgentRole enum
 # ---------------------------------------------------------------------------
+
 
 class TestAgentRoleEnum:
     """AgentRole values are functional role identifiers, not person names."""
@@ -38,6 +40,7 @@ class TestAgentRoleEnum:
 # require_role factory
 # ---------------------------------------------------------------------------
 
+
 class TestRequireRoleFactory:
     def test_single_role_creates_dependency(self):
         dep = require_role(AgentRole.JEAN)
@@ -56,6 +59,7 @@ class TestRequireRoleFactory:
 # ---------------------------------------------------------------------------
 # Endpoint access control (HTTP level)
 # ---------------------------------------------------------------------------
+
 
 def _agent_token(role: AgentRole, subject: str = "agent-test-id") -> str:
     """Helper: create a valid JWT for a given functional role."""
@@ -76,7 +80,9 @@ class TestBackofficeQueueAccess:
     @pytest.mark.asyncio
     async def test_jean_role_can_access(self, client: AsyncClient):
         token = _agent_token(AgentRole.JEAN)
-        with patch("app.modules.backoffice.router.paginate", new_callable=AsyncMock) as mock_p:
+        with patch(
+            "app.modules.backoffice.router.paginate", new_callable=AsyncMock
+        ) as mock_p:
             mock_p.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
             response = await client.get(
                 "/api/v1/backoffice/queue",
@@ -87,7 +93,9 @@ class TestBackofficeQueueAccess:
     @pytest.mark.asyncio
     async def test_thomas_role_can_access(self, client: AsyncClient):
         token = _agent_token(AgentRole.THOMAS)
-        with patch("app.modules.backoffice.router.paginate", new_callable=AsyncMock) as mock_p:
+        with patch(
+            "app.modules.backoffice.router.paginate", new_callable=AsyncMock
+        ) as mock_p:
             mock_p.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
             response = await client.get(
                 "/api/v1/backoffice/queue",
@@ -111,7 +119,9 @@ class TestAuditLogsAccess:
     @pytest.mark.asyncio
     async def test_thomas_role_allowed(self, client: AsyncClient):
         token = _agent_token(AgentRole.THOMAS)
-        with patch("app.modules.backoffice.router.paginate", new_callable=AsyncMock) as mock_p:
+        with patch(
+            "app.modules.backoffice.router.paginate", new_callable=AsyncMock
+        ) as mock_p:
             mock_p.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
             response = await client.get(
                 "/api/v1/backoffice/audit-logs",
@@ -144,7 +154,9 @@ class TestAdminUsersAccess:
     @pytest.mark.asyncio
     async def test_admin_it_role_allowed(self, client: AsyncClient):
         token = _agent_token(AgentRole.ADMIN_IT)
-        with patch("app.modules.admin.router.paginate", new_callable=AsyncMock) as mock_p:
+        with patch(
+            "app.modules.admin.router.paginate", new_callable=AsyncMock
+        ) as mock_p:
             mock_p.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
             response = await client.get(
                 "/api/v1/admin/users",

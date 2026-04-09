@@ -1,15 +1,13 @@
-
-import ssl
 from email.mime.text import MIMEText
-from typing import Optional
 
 import aiosmtplib
 from app.core.config import settings
 from app.core.logging import logger
 
+
 class EmailClient:
     """Standard SMTP email client using aiosmtplib for async support."""
-    
+
     def __init__(self):
         self.host = settings.SMTP_HOST
         self.port = settings.SMTP_PORT
@@ -20,21 +18,21 @@ class EmailClient:
         self.sender = settings.SMTP_FROM
 
     async def send_email(
-        self,
-        to_email: str,
-        subject: str,
-        content: str,
-        content_type: str = "plain"
+        self, to_email: str, subject: str, content: str, content_type: str = "plain"
     ) -> bool:
         """Send an email asynchronously."""
         if not to_email:
             logger.warning("Empty recipient email, skipping send.")
             return False
-            
-        if settings.ENVIRONMENT != "production" and not self.user and self.host == "localhost":
-             logger.info(f"[SIMULATED EMAIL] to {to_email}: {subject}")
-             # Optional: log content
-             return True
+
+        if (
+            settings.ENVIRONMENT != "production"
+            and not self.user
+            and self.host == "localhost"
+        ):
+            logger.info(f"[SIMULATED EMAIL] to {to_email}: {subject}")
+            # Optional: log content
+            return True
 
         message = MIMEText(content, content_type, "utf-8")
         message["From"] = self.sender
@@ -54,8 +52,8 @@ class EmailClient:
                 port=self.port,
                 username=self.user or None,
                 password=self.password or None,
-                use_tls=self.use_ssl,      # SMTP_SSL  → implicit TLS (port 465)
-                start_tls=self.use_tls,    # SMTP_TLS  → STARTTLS upgrade (port 587)
+                use_tls=self.use_ssl,  # SMTP_SSL  → implicit TLS (port 465)
+                start_tls=self.use_tls,  # SMTP_TLS  → STARTTLS upgrade (port 587)
                 timeout=10,
             )
             logger.info(f"Email sent to {to_email}")
@@ -63,6 +61,7 @@ class EmailClient:
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {e}")
             return False
+
 
 # Global instance
 email_client = EmailClient()

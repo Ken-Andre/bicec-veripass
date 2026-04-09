@@ -1,4 +1,5 @@
 """Module Pydantic schemas AML/CFT."""
+
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
@@ -73,6 +74,7 @@ class AmlAlertResponse(BaseModel):
     def mask_session_id(cls, v):
         """Mask internal session ID to avoid exposing raw database IDs."""
         from app.core.security import make_session_handle
+
         if v and isinstance(v, str):
             return make_session_handle(v)
         return v
@@ -80,11 +82,13 @@ class AmlAlertResponse(BaseModel):
 
 class AmlAlertAction(BaseModel):
     """Action sur une alerte AML (clear/confirm/escalate)"""
+
     justification: str = Field(..., min_length=1, max_length=500)
 
 
 class AmlEscalation(BaseModel):
     """Escalade d'alerte AML"""
+
     reason: str = Field(..., min_length=1, max_length=500)
 
 
@@ -100,6 +104,7 @@ class NiuConflictSession(BaseModel):
     def mask_session_id(cls, v):
         """Mask internal session ID to avoid exposing raw database IDs."""
         from app.core.security import make_session_handle
+
         if v and isinstance(v, str):
             return make_session_handle(v)
         return v
@@ -116,6 +121,7 @@ class NiuConflictResponse(BaseModel):
 
 class NiuConflictResolve(BaseModel):
     """Résolution de conflit NIU"""
+
     action: NiuConflictStatus  # MERGED ou FRAUD
     justification: str = Field(..., min_length=1, max_length=500)
 

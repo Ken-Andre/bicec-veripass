@@ -34,10 +34,22 @@ def upgrade() -> None:
         sa.Column("country", sa.String(length=80), nullable=True),
         sa.Column("programs", postgresql.ARRAY(sa.Text()), nullable=True),
         sa.Column("entity_type", sa.String(length=40), nullable=True),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column(
+            "is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")
+        ),
         sa.Column("last_synced_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
 
@@ -48,7 +60,9 @@ def upgrade() -> None:
     )
 
     # Keep existing aml_alerts table but wire it to sanctions_entries for AML matching lifecycle.
-    op.add_column("aml_alerts", sa.Column("sanctions_entry_id", sa.UUID(), nullable=True))
+    op.add_column(
+        "aml_alerts", sa.Column("sanctions_entry_id", sa.UUID(), nullable=True)
+    )
     op.create_foreign_key(
         "fk_aml_alerts_sanctions_entry_id",
         "aml_alerts",
@@ -56,7 +70,12 @@ def upgrade() -> None:
         ["sanctions_entry_id"],
         ["id"],
     )
-    op.create_index("ix_aml_alerts_sanctions_entry_id", "aml_alerts", ["sanctions_entry_id"], unique=False)
+    op.create_index(
+        "ix_aml_alerts_sanctions_entry_id",
+        "aml_alerts",
+        ["sanctions_entry_id"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:

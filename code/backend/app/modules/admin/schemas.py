@@ -1,4 +1,5 @@
 """Admin Pydantic schemas."""
+
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 
 class UserSchema(BaseModel):
     """Minimal user info for admin listing."""
+
     id: UUID
     phone: Optional[str] = None
     email: Optional[str] = None

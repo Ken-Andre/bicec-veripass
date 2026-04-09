@@ -13,10 +13,10 @@ celery = Celery(
     include=[
         "app.tasks.maintenance",  # Tâches de maintenance
         "app.tasks_demo",  # Tâches de démonstration
-        "app.modules.auth.tasks", # Tâches d'authentification (OTP SMS/Email)
-        "app.tasks.sanctions",    # Sync PEP/Sanctions listes (AML)
-        "app.tasks.kyc",          # Sessions abandonnées, doublons
-    ]
+        "app.modules.auth.tasks",  # Tâches d'authentification (OTP SMS/Email)
+        "app.tasks.sanctions",  # Sync PEP/Sanctions listes (AML)
+        "app.tasks.kyc",  # Sessions abandonnées, doublons
+    ],
 )
 
 # Optional configuration
@@ -27,7 +27,7 @@ celery.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=3600, # 1 hour max for any task
+    task_time_limit=3600,  # 1 hour max for any task
 )
 
 # Beat Schedule

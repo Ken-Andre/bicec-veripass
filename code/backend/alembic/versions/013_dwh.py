@@ -30,7 +30,12 @@ def upgrade() -> None:
         sa.Column("region", sa.String(length=100), nullable=True),
         sa.Column("language", sa.String(length=10), nullable=True),
         sa.Column("cohort_month", sa.Date(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.PrimaryKeyConstraint("id"),
         schema="dwh",
     )
@@ -42,7 +47,12 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=120), nullable=True),
         sa.Column("city", sa.String(length=100), nullable=True),
         sa.Column("region", sa.String(length=100), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.PrimaryKeyConstraint("id"),
         schema="dwh",
     )
@@ -54,7 +64,12 @@ def upgrade() -> None:
         sa.Column("agency_dim_id", sa.UUID(), nullable=True),
         sa.Column("name", sa.String(length=120), nullable=True),
         sa.Column("role", sa.String(length=50), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.ForeignKeyConstraint(["agency_dim_id"], ["dwh.dim_agencies.id"]),
         sa.PrimaryKeyConstraint("id"),
         schema="dwh",
@@ -125,7 +140,12 @@ def upgrade() -> None:
         sa.Column("confidence_avg", sa.Numeric(5, 4), nullable=True),
         sa.Column("low_confidence_fields_count", sa.Integer(), nullable=True),
         sa.Column("human_correction_needed", sa.Boolean(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.ForeignKeyConstraint(["time_dim_id"], ["dwh.dim_time.id"]),
         schema="dwh",
     )
@@ -147,8 +167,16 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_dwh_fact_ocr_performance_extraction_date", table_name="fact_ocr_performance", schema="dwh")
-    op.drop_index("ix_dwh_fact_kyc_funnel_session_date", table_name="fact_kyc_funnel", schema="dwh")
+    op.drop_index(
+        "ix_dwh_fact_ocr_performance_extraction_date",
+        table_name="fact_ocr_performance",
+        schema="dwh",
+    )
+    op.drop_index(
+        "ix_dwh_fact_kyc_funnel_session_date",
+        table_name="fact_kyc_funnel",
+        schema="dwh",
+    )
 
     op.drop_table("fact_ocr_performance", schema="dwh")
 

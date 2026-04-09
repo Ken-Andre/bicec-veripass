@@ -2,13 +2,15 @@
 Unit tests for OTP Redis storage, anti-replay, and rate-limiting logic.
 All Redis calls are mocked — no real Redis required.
 """
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_redis(stored_hash: str | None = None):
     """Return a mock Redis client pre-configured for OTP tests."""
@@ -26,13 +28,17 @@ def _make_redis(stored_hash: str | None = None):
 # store_otp
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_store_otp_sets_key_with_ttl():
     redis = _make_redis()
-    with patch("app.modules.auth.utils.get_redis", return_value=redis), \
-         patch("app.core.security.hash_password", return_value="hashed"):
+    with (
+        patch("app.modules.auth.utils.get_redis", return_value=redis),
+        patch("app.core.security.hash_password", return_value="hashed"),
+    ):
         from app.modules.auth.utils import store_otp
         from app.core.config import settings
+
         result = await store_otp("237600000000", "123456")
 
     assert result is True
@@ -47,9 +53,12 @@ async def test_store_otp_sets_key_with_ttl():
 async def test_store_otp_returns_false_on_redis_error():
     redis = _make_redis()
     redis.set = AsyncMock(side_effect=Exception("connection refused"))
-    with patch("app.modules.auth.utils.get_redis", return_value=redis), \
-         patch("app.core.security.hash_password", return_value="hashed"):
+    with (
+        patch("app.modules.auth.utils.get_redis", return_value=redis),
+        patch("app.core.security.hash_password", return_value="hashed"),
+    ):
         from app.modules.auth.utils import store_otp
+
         result = await store_otp("237600000000", "123456")
 
     assert result is False
@@ -59,15 +68,19 @@ async def test_store_otp_returns_false_on_redis_error():
 # verify_otp_atomic — anti-replay
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_verify_otp_atomic_success_deletes_key():
     """Valid OTP: key is deleted inside the lock (anti-replay)."""
     redis = _make_redis(stored_hash="hashed_otp")
     redis.set = AsyncMock(return_value=True)  # lock acquired
 
-    with patch("app.modules.auth.utils.get_redis", return_value=redis), \
-         patch("app.core.security.verify_password", return_value=True):
+    with (
+        patch("app.modules.auth.utils.get_redis", return_value=redis),
+        patch("app.core.security.verify_password", return_value=True),
+    ):
         from app.modules.auth.utils import verify_otp_atomic
+
         result = await verify_otp_atomic("237600000000", "123456")
 
     assert result is True
@@ -83,9 +96,12 @@ async def test_verify_otp_atomic_wrong_otp_does_not_delete():
     redis = _make_redis(stored_hash="hashed_otp")
     redis.set = AsyncMock(return_value=True)
 
-    with patch("app.modules.auth.utils.get_redis", return_value=redis), \
-         patch("app.core.security.verify_password", return_value=False):
+    with (
+        patch("app.modules.auth.utils.get_redis", return_value=redis),
+        patch("app.core.security.verify_password", return_value=False),
+    ):
         from app.modules.auth.utils import verify_otp_atomic
+
         result = await verify_otp_atomic("237600000000", "000000")
 
     assert result is False
@@ -102,6 +118,7 @@ async def test_verify_otp_atomic_no_otp_in_redis():
 
     with patch("app.modules.auth.utils.get_redis", return_value=redis):
         from app.modules.auth.utils import verify_otp_atomic
+
         result = await verify_otp_atomic("237600000000", "123456")
 
     assert result is False
@@ -115,6 +132,7 @@ async def test_verify_otp_atomic_lock_contention_returns_false():
 
     with patch("app.modules.auth.utils.get_redis", return_value=redis):
         from app.modules.auth.utils import verify_otp_atomic
+
         result = await verify_otp_atomic("237600000000", "123456")
 
     assert result is False
@@ -126,6 +144,7 @@ async def test_verify_otp_atomic_lock_contention_returns_false():
 # Attempt counter (rate-limiting storage backend)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_increment_redis_otp_attempts_increments_and_sets_ttl():
     redis = _make_redis()
@@ -133,6 +152,7 @@ async def test_increment_redis_otp_attempts_increments_and_sets_ttl():
 
     with patch("app.modules.auth.utils.get_redis", return_value=redis):
         from app.modules.auth.utils import increment_redis_otp_attempts
+
         count = await increment_redis_otp_attempts("237600000000")
 
     assert count == 2
@@ -147,6 +167,7 @@ async def test_get_otp_attempts_returns_zero_when_no_key():
 
     with patch("app.modules.auth.utils.get_redis", return_value=redis):
         from app.modules.auth.utils import get_otp_attempts
+
         count = await get_otp_attempts("237600000000")
 
     assert count == 0
@@ -159,6 +180,7 @@ async def test_get_otp_attempts_returns_current_count():
 
     with patch("app.modules.auth.utils.get_redis", return_value=redis):
         from app.modules.auth.utils import get_otp_attempts
+
         count = await get_otp_attempts("237600000000")
 
     assert count == 2
@@ -170,6 +192,7 @@ async def test_reset_otp_attempts_deletes_key():
 
     with patch("app.modules.auth.utils.get_redis", return_value=redis):
         from app.modules.auth.utils import reset_otp_attempts
+
         await reset_otp_attempts("237600000000")
 
     redis.delete.assert_awaited_once_with("otp_verify_attempts:237600000000")
@@ -179,6 +202,8 @@ async def test_reset_otp_attempts_deletes_key():
 # OTP_MAX_ATTEMPTS constant
 # ---------------------------------------------------------------------------
 
+
 def test_otp_max_attempts_is_three():
     from app.modules.auth.utils import OTP_MAX_ATTEMPTS
+
     assert OTP_MAX_ATTEMPTS == 3

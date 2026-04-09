@@ -22,5 +22,5 @@ def _get_rate_limit_key(request: Request) -> str:
 limiter = Limiter(
     key_func=_get_rate_limit_key,
     enabled=settings.RATE_LIMIT_ENABLED,
-    default_limits=[settings.RATE_LIMIT_DEFAULT]
+    default_limits=[settings.RATE_LIMIT_DEFAULT],
 )

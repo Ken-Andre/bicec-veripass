@@ -11,6 +11,7 @@ Security threat model (ADR-016):
   If Redis were ever exposed, identifiers should be HMAC-hashed before use as keys.
 - decode_responses=True is set globally so all get() calls return str, never bytes.
 """
+
 from typing import Optional
 
 import redis.asyncio as redis
@@ -25,6 +26,7 @@ redis_client = None
 # ============================================================
 # REDIS KEY HELPERS  ADR-016 Namespaces
 # ============================================================
+
 
 def otp_key(identifier: str) -> str:
     """otp:{identifier}  TTL: REDIS_OTP_TTL"""
@@ -61,6 +63,7 @@ def analytics_key(report: str) -> str:
 
 from urllib.parse import urlparse
 
+
 async def get_redis():
     """
     Returns the global Redis client, initialising if needed.
@@ -83,7 +86,9 @@ async def get_redis():
             if parsed_url.hostname and parsed_url.port:
                 redacted_url = f"{parsed_url.scheme}://***:***@{parsed_url.hostname}:{parsed_url.port}{parsed_url.path}"
             else:
-                redacted_url = f"{parsed_url.scheme}://***:***@localhost:6379{parsed_url.path}"
+                redacted_url = (
+                    f"{parsed_url.scheme}://***:***@localhost:6379{parsed_url.path}"
+                )
             logger.error(f"Failed to connect to Redis at {redacted_url}: {e}")
             raise ConnectionError(f"Redis connection failed: {type(e).__name__}") from e
     return redis_client

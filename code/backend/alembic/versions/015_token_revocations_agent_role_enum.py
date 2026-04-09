@@ -8,6 +8,7 @@ Changes:
 - Creates token_revocations table for refresh token revocation list (H4)
 - Creates agent_role enum type and migrates agents.role column (M7)
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -20,7 +21,10 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 agent_role_enum = postgresql.ENUM(
-    "JEAN", "THOMAS", "SYLVIE", "ADMIN_IT",
+    "JEAN",
+    "THOMAS",
+    "SYLVIE",
+    "ADMIN_IT",
     name="agent_role",
     create_type=True,
 )
@@ -50,16 +54,14 @@ def upgrade() -> None:
     # M7: agent_role enum — create type then migrate column
     agent_role_enum.create(op.get_bind(), checkfirst=True)
     op.execute(
-        "ALTER TABLE agents ALTER COLUMN role TYPE agent_role "
-        "USING role::agent_role"
+        "ALTER TABLE agents ALTER COLUMN role TYPE agent_role USING role::agent_role"
     )
 
 
 def downgrade() -> None:
     # Revert agents.role back to VARCHAR
     op.execute(
-        "ALTER TABLE agents ALTER COLUMN role TYPE VARCHAR(20) "
-        "USING role::VARCHAR"
+        "ALTER TABLE agents ALTER COLUMN role TYPE VARCHAR(20) USING role::VARCHAR"
     )
     agent_role_enum.drop(op.get_bind(), checkfirst=True)
 

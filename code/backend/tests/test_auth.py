@@ -1,14 +1,22 @@
 """Tests unitaires pour le module Auth (Issue #50 — AUTH-04)."""
+
 import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock
 
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+)
 
 
 # ============================================================
 # TESTS SECURITY UTILITIES (pure functions — no DB needed)
 # ============================================================
+
 
 class TestSecurityUtilities:
     """Tests pour les fonctions de sécurité (hashing, JWT)."""
@@ -73,9 +81,10 @@ class TestSecurityUtilities:
     def test_make_and_verify_session_handle(self):
         """Tester la création et la vérification constante du session_handle HMAC."""
         from app.core.security import make_session_handle, verify_session_handle
+
         db_id = "123e4567-e89b-12d3-a456-426614174000"
         handle = make_session_handle(db_id)
-        
+
         # Le handle ne doit pas être le db_id brut
         assert handle != db_id
         # La vérification du bon handle doit réussir
@@ -83,12 +92,16 @@ class TestSecurityUtilities:
         # La vérification d'un mauvais handle doit échouer
         assert verify_session_handle("bad-handle", db_id) is False
         # La vérification contre un autre DB ID doit échouer
-        assert verify_session_handle(handle, "999e4567-e89b-12d3-a456-426614174999") is False
+        assert (
+            verify_session_handle(handle, "999e4567-e89b-12d3-a456-426614174999")
+            is False
+        )
 
 
 # ============================================================
 # TESTS API ENDPOINTS (sans DB — mocks)
 # ============================================================
+
 
 class TestAuthEndpointsNoDB:
     """Tests des endpoints auth sans dépendance DB (mocks)."""
@@ -96,7 +109,11 @@ class TestAuthEndpointsNoDB:
     @pytest.mark.asyncio
     async def test_send_otp_dev_local(self, client: AsyncClient):
         """En mode dev_local, l'OTP doit être retourné dans la réponse."""
-        with patch("app.modules.auth.router.store_otp", new_callable=AsyncMock, return_value=True):
+        with patch(
+            "app.modules.auth.router.store_otp",
+            new_callable=AsyncMock,
+            return_value=True,
+        ):
             response = await client.post(
                 "/api/v1/auth/otp/send",
                 json={"phone": "+237612345678"},
@@ -117,7 +134,11 @@ class TestAuthEndpointsNoDB:
     @pytest.mark.asyncio
     async def test_verify_otp_invalid(self, client: AsyncClient):
         """Un OTP invalide doit retourner 401."""
-        with patch("app.modules.auth.router.verify_otp", new_callable=AsyncMock, return_value=False):
+        with patch(
+            "app.modules.auth.router.verify_otp",
+            new_callable=AsyncMock,
+            return_value=False,
+        ):
             response = await client.post(
                 "/api/v1/auth/otp/verify",
                 json={"phone": "+237612345678", "otp": "000000"},
@@ -178,12 +199,14 @@ class TestAuthEndpointsNoDB:
 # TESTS SCHÉMAS PYDANTIC
 # ============================================================
 
+
 class TestAuthSchemas:
     """Tests de validation des schémas Pydantic."""
 
     def test_token_response_valid(self):
         """Un TokenResponse valide doit se construire."""
         from app.modules.auth.schemas import TokenResponse
+
         token = TokenResponse(
             access_token="abc123",
             refresh_token="def456",
@@ -194,6 +217,7 @@ class TestAuthSchemas:
     def test_otp_send_valid_phone(self):
         """Un numéro valide doit passer la validation."""
         from app.modules.auth.schemas import OtpSendRequest
+
         req = OtpSendRequest(phone="+237612345678")
         assert req.phone == "+237612345678"
 
@@ -201,12 +225,14 @@ class TestAuthSchemas:
         """Un numéro invalide doit lever une erreur."""
         from app.modules.auth.schemas import OtpSendRequest
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             OtpSendRequest(phone="abc")
 
     def test_pin_setup_valid(self):
         """Un PIN valide doit passer la validation."""
         from app.modules.auth.schemas import PinSetupRequest
+
         req = PinSetupRequest(pin="1234")
         assert req.pin == "1234"
 
@@ -214,11 +240,13 @@ class TestAuthSchemas:
         """Un PIN trop court doit lever une erreur."""
         from app.modules.auth.schemas import PinSetupRequest
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             PinSetupRequest(pin="12")  # min_length=4
 
     def test_agent_login_valid(self):
         """Un login agent valide doit passer la validation."""
         from app.modules.auth.schemas import AgentLoginRequest
+
         req = AgentLoginRequest(email="jean@bicec.cm", password="password123")
         assert req.email == "jean@bicec.cm"

@@ -4,6 +4,7 @@ Revision ID: 014_merge_heads
 Revises: 013_dwh, a1b2c3d4e5f6
 Create Date: 2026-03-21 12:00:00.000000
 """
+
 from typing import Sequence, Union
 
 revision: str = "014_merge_heads"

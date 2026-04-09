@@ -3,7 +3,7 @@ COMPREHENSIVE SYSTEM TEST SUITE - BICEC VeriPass
 Tests: All personas, all modules, all infrastructure
 """
 
-import httpx, json, subprocess, time
+import httpx
 
 BASE = "http://localhost:8000/api/v1"
 passed = 0
@@ -57,7 +57,7 @@ r = httpx.post(
     BASE + "/auth/otp/verify", json={"phone": "+237691000001", "otp": mobile_otp}
 )
 MOBILE_TOKEN = r.json().get("access_token", "")
-results.append(f"Mobile user created, token obtained")
+results.append("Mobile user created, token obtained")
 
 # Set email on mobile user
 r = httpx.post(
@@ -71,7 +71,7 @@ r = httpx.post(
     json={"otp": email_otp},
     headers={"Authorization": "Bearer " + MOBILE_TOKEN},
 )
-results.append(f"Email set on mobile user, email OTP verified")
+results.append("Email set on mobile user, email OTP verified")
 
 
 # Agent tokens
@@ -86,7 +86,7 @@ JEAN_TOKEN = agent_token("jean@bicec.cm")
 THOMAS_TOKEN = agent_token("thomas@bicec.cm")
 SYLVIE_TOKEN = agent_token("sylvie@bicec.cm")
 ADMIN_TOKEN = agent_token("admin@bicec.cm")
-results.append(f"All agent tokens obtained")
+results.append("All agent tokens obtained")
 
 # ===== MARIE (MOBILE USER) JOURNEY =====
 section("MARIE JOURNEY - Mobile User")
