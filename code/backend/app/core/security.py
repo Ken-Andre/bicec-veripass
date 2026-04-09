@@ -113,7 +113,12 @@ def create_access_token(
     # Allowlist: only include claims that are explicitly needed
     _allowed = {"role", "user_type", "sid"}
     if additional_claims:
-        to_encode.update({k: v for k, v in additional_claims.items() if k in _allowed})
+        sanitized_claims = {}
+        for k, v in additional_claims.items():
+            if k in _allowed:
+                # Sanitize: convert Enums to their .value representation
+                sanitized_claims[k] = v.value if hasattr(v, 'value') else v
+        to_encode.update(sanitized_claims)
 
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm="HS256")
     return encoded_jwt
@@ -221,8 +226,17 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
         )
+    
+    # Validate UUID format to prevent DB errors
+    try:
+        parsed_uuid = _uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(User.id == parsed_uuid))
     user = result.scalar_one_or_none()
 
     if not user:
@@ -266,8 +280,17 @@ async def get_current_agent(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
         )
+    
+    # Validate UUID format to prevent DB errors
+    try:
+        parsed_uuid = _uuid.UUID(agent_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
 
-    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    result = await db.execute(select(Agent).where(Agent.id == parsed_uuid))
     agent = result.scalar_one_or_none()
 
     if not agent:

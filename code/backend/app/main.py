@@ -116,7 +116,3 @@ async def health_check():
         "redis": "ok" if redis_status else "error"
     }
 
-@app.get("/api/sentry-debug", tags=["sentry"])
-async def trigger_error():
-    """Sentry test endpoint — intentionally raises ZeroDivisionError."""
-    division_by_zero = 1 / 0

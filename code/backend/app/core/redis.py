@@ -59,6 +59,8 @@ def analytics_key(report: str) -> str:
     return f"analytics:{report}"
 
 
+from urllib.parse import urlparse
+
 async def get_redis():
     """
     Returns the global Redis client, initialising if needed.
@@ -75,8 +77,15 @@ async def get_redis():
             )
             await redis_client.ping()
         except Exception as e:
-            logger.error(f"Failed to connect to Redis at {settings.REDIS_URL}: {e}")
-            raise e
+            # Parse and redact credentials from Redis URL to avoid logging passwords
+            parsed_url = urlparse(settings.REDIS_URL)
+            # Rebuild URL without credentials
+            if parsed_url.hostname and parsed_url.port:
+                redacted_url = f"{parsed_url.scheme}://***:***@{parsed_url.hostname}:{parsed_url.port}{parsed_url.path}"
+            else:
+                redacted_url = f"{parsed_url.scheme}://***:***@localhost:6379{parsed_url.path}"
+            logger.error(f"Failed to connect to Redis at {redacted_url}: {e}")
+            raise ConnectionError(f"Redis connection failed: {type(e).__name__}") from e
     return redis_client
 
 

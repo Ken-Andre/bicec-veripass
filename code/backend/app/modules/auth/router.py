@@ -102,6 +102,8 @@ async def send_otp(
             await db.refresh(user)
             logger.info(f"New user created: {phone}")
         identifier = phone
+        # Set rate limit identifier for per-identifier throttling
+        request.state.rate_limit_identifier = identifier
     elif email:
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
@@ -116,6 +118,8 @@ async def send_otp(
                 detail="Email OTP is only for login, not signup.",
             )
         identifier = email
+        # Set rate limit identifier for per-identifier throttling
+        request.state.rate_limit_identifier = identifier
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -548,7 +552,7 @@ async def agent_login(
     # Create tokens
     access_token = create_access_token(
         subject=str(agent.id),
-        additional_claims={"role": agent.role, "user_type": "agent"},
+        additional_claims={"role": agent.role.value, "user_type": "agent"},
     )
     refresh_token = create_refresh_token(subject=str(agent.id))
 
