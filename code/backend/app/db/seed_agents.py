@@ -57,25 +57,21 @@ async def seed_agents(db: AsyncSession):
         {
             "email": "jean.mbarga@bicec.cm",
             "name": "Jean Mbarga",
-            "password": DEFAULT_AGENT_PASSWORD,
             "role": AgentRole.JEAN,
         },
         {
             "email": "thomas.ndongo@bicec.cm",
             "name": "Thomas Ndongo",
-            "password": DEFAULT_AGENT_PASSWORD,
             "role": AgentRole.THOMAS,
         },
         {
             "email": "sylvie.fouda@bicec.cm",
             "name": "Sylvie Fouda",
-            "password": DEFAULT_AGENT_PASSWORD,
             "role": AgentRole.SYLVIE,
         },
         {
             "email": "admin@bicec.cm",
             "name": "Administrateur Système",
-            "password": DEFAULT_ADMIN_PASSWORD,
             "role": AgentRole.ADMIN_IT,
         },
     ]
@@ -89,11 +85,16 @@ async def seed_agents(db: AsyncSession):
         if existing_agent:
             print(f"✓ Agent already exists: {agent_data['email']} ({agent_data['role'].value})")
         else:
+            raw_password = (
+                DEFAULT_ADMIN_PASSWORD
+                if agent_data["role"] == AgentRole.ADMIN_IT
+                else DEFAULT_AGENT_PASSWORD
+            )
             agent = Agent(
                 agency_id=agency.id,
                 name=agent_data["name"],
                 email=agent_data["email"],
-                password_hash=hash_password(agent_data["password"]),
+                password_hash=hash_password(raw_password),
                 role=agent_data["role"],
                 is_available=True,
             )
