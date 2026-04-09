@@ -4,6 +4,8 @@ const API_BASE = '/api/v1';
 const TOKEN_KEY = 'veripass_access_token';
 const REFRESH_KEY = 'veripass_refresh_token';
 const USER_KEY = 'veripass_user';
+const MOCK_STORAGE_ENCRYPTION_SECRET = 'veripass-mock-storage-secret';
+const MOCK_STORAGE_ENCRYPTION_SALT = 'veripass-mock-storage-salt';
 
 // Mock users matching backend seed_data.py personas
 const MOCK_USERS: Record<string, User & { password: string }> = {
@@ -62,6 +64,58 @@ export class AuthService {
     return this.apiLogin(email, password);
   }
 
+  private async getMockCryptoKey(): Promise<CryptoKey> {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(MOCK_STORAGE_ENCRYPTION_SECRET),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+
+    return crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: encoder.encode(MOCK_STORAGE_ENCRYPTION_SALT),
+        iterations: 100000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  private async encryptForStorage(value: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const key = await this.getMockCryptoKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encoder.encode(value)
+    );
+
+    const ivBase64 = btoa(String.fromCharCode(...iv));
+    const dataBase64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+    return `${ivBase64}:${dataBase64}`;
+  }
+
+  private async decryptFromStorage(payload: string): Promise<string> {
+    const [ivBase64, dataBase64] = payload.split(':');
+    const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
+    const data = Uint8Array.from(atob(dataBase64), c => c.charCodeAt(0));
+    const key = await this.getMockCryptoKey();
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      data
+    );
+    return new TextDecoder().decode(decrypted);
+  }
+
   private async mockLogin(email: string, password: string): Promise<LoginResponse | null> {
     await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -69,15 +123,19 @@ export class AuthService {
     if (userWithPassword && userWithPassword.password === password) {
       const { password: _, ...user } = userWithPassword;
       const mockToken = `mock_token_${user.id}_${Date.now()}`;
+      const mockRefresh = `mock_refresh_${user.id}`;
+      const encryptedToken = await this.encryptForStorage(mockToken);
+      const encryptedRefresh = await this.encryptForStorage(mockRefresh);
+      const encryptedUser = await this.encryptForStorage(JSON.stringify(user));
       
-      localStorage.setItem(TOKEN_KEY, mockToken);
-      localStorage.setItem(REFRESH_KEY, `mock_refresh_${user.id}`);
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      localStorage.setItem(TOKEN_KEY, encryptedToken);
+      localStorage.setItem(REFRESH_KEY, encryptedRefresh);
+      localStorage.setItem(USER_KEY, encryptedUser);
       
       return {
         user,
         accessToken: mockToken,
-        refreshToken: `mock_refresh_${user.id}`,
+        refreshToken: mockRefresh,
       };
     }
     return null;
