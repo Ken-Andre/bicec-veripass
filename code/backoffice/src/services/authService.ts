@@ -69,15 +69,15 @@ export class AuthService {
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
       encoder.encode(MOCK_STORAGE_ENCRYPTION_SECRET),
+      const mockRefreshToken = `mock_refresh_${user.id}`;
       'PBKDF2',
       false,
-      ['deriveKey']
     );
 
     return crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: encoder.encode(MOCK_STORAGE_ENCRYPTION_SALT),
+        refreshToken: mockRefreshToken,
         iterations: 100000,
         hash: 'SHA-256',
       },
