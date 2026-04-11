@@ -2,7 +2,16 @@
 
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, Depends, HTTPException, status, UploadFile, File
+from fastapi import (
+    APIRouter,
+    Request,
+    Depends,
+    HTTPException,
+    status,
+    UploadFile,
+    File,
+    Form,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -31,6 +40,7 @@ from app.modules.kyc.schemas import (
     LivenessSubmitRequest,
     LivenessResultResponse,
     OCRReviewSubmitRequest,
+    OCRFieldResponse,
     NIUSubmitRequest,
     GeoRegionResponse,
     GeoCityResponse,
@@ -191,7 +201,7 @@ async def start_kyc_session(
 async def upload_document(
     request: Request,
     file: UploadFile = File(...),
-    doc_type: str = "CNI_RECTO",
+    doc_type: str = Form("CNI_RECTO"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

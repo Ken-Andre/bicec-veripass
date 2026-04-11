@@ -336,5 +336,14 @@ class DocumentStorage:
         return documents
 
 
-# Singleton instance for use across the application
-document_storage = DocumentStorage()
+# Lazy singleton instance for use across the application
+# Initialize on first access to avoid import-time directory creation failures in CI/test environments
+_document_storage_instance = None
+
+def get_document_storage():
+    global _document_storage_instance
+    if _document_storage_instance is None:
+        _document_storage_instance = DocumentStorage()
+    return _document_storage_instance
+
+document_storage = get_document_storage
