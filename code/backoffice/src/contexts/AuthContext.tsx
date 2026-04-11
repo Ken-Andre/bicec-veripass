@@ -58,22 +58,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json()
       const { access_token, refresh_token } = data
 
-      // Decode role from JWT payload (base64)
-      const payload = JSON.parse(atob(access_token.split('.')[1]))
-      const role = payload.role as User['role']
-
-      // Fetch agent profile
+      // Fetch agent profile (authoritative source, no client-side JWT parsing)
       const meRes = await fetch(`${API_BASE}/auth/agent/me`, {
         headers: { Authorization: `Bearer ${access_token}` },
       })
-      const agentData = meRes.ok ? await meRes.json() : null
+      
+      if (!meRes.ok) {
+        setState(prev => ({ ...prev, isLoading: false }))
+        return false
+      }
+      
+      const agentData = await meRes.json()
 
       const user: User = {
-        id: agentData?.id ?? payload.sub,
-        email,
-        name: agentData?.name ?? email,
-        role,
-        agencyId: agentData?.agency_id,
+        id: agentData.id,
+        email: agentData.email,
+        name: agentData.name,
+        role: agentData.role,
+        agencyId: agentData.agency_id,
       }
 
       localStorage.setItem(TOKEN_KEY, access_token)
