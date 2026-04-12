@@ -47,7 +47,8 @@ export function ImageViewer({ src, alt, focusRegion, className }: ImageViewerPro
 
   useEffect(() => {
     if (focusRegion) {
-      focusOn(focusRegion);
+      const timer = setTimeout(() => focusOn(focusRegion), 0);
+      return () => clearTimeout(timer);
     }
   }, [focusRegion, focusOn]);
 

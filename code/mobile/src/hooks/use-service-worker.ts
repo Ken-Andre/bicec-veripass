@@ -44,7 +44,9 @@ export function useServiceWorker(): ServiceWorkerState {
       },
     });
 
-    setUpdateFn(() => update);
+    setTimeout(() => {
+      setUpdateFn(() => update);
+    }, 0);
   }, []);
 
   const updateSW = useCallback(() => {

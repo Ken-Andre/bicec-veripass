@@ -20,8 +20,7 @@ export default function AmlAlertDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [justification, setJustification] = useState('');
-  const [_action, setAction] = useState<'clear' | 'confirm' | 'escalate' | null>(null);
-
+  const [, setAction] = useState<'clear' | 'confirm' | 'escalate' | null>(null);
   // TODO: Fetch alert from API
   const alert = {
     id: id || '',

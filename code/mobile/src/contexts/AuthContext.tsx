@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticatedRef = useRef(isAuthenticated);
   const isLockedRef = useRef(isLocked);
   const timerRef = useRef<number | null>(null);
-  const lastActivityRef = useRef(Date.now());
+  const lastActivityRef = useRef(0);
 
   useEffect(() => { isAuthenticatedRef.current = isAuthenticated; }, [isAuthenticated]);
   useEffect(() => { isLockedRef.current = isLocked; }, [isLocked]);
@@ -123,17 +123,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load persisted session on mount
   useEffect(() => {
+    lastActivityRef.current = Date.now();
     const token = localStorage.getItem('vp_token');
     const savedUser = localStorage.getItem('vp_user');
 
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
-      if (token) {
-        setIsAuthenticated(true);
-      }
+      setTimeout(() => {
+        setUser(parsedUser);
+        if (token) {
+          setIsAuthenticated(true);
+        }
+        setLoading(false);
+      }, 0);
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = (token: string, userData: User) => {

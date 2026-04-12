@@ -126,9 +126,9 @@ export const KycProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Backward compatibility - computed from state, not using 'this'
       step,
-      setStep: (_n: number) => { /* no-op, use setCurrentStep */ },
+      setStep: () => { /* no-op, use setCurrentStep */ },
       kycData,
-      updateKycData: (_data: Partial<import('../types').KycData>) => { /* no-op, use individual setters */ },
+      updateKycData: () => { /* no-op, use individual setters */ },
     }}>
       {children}
     </KycContext.Provider>

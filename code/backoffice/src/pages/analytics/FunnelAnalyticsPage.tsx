@@ -67,7 +67,10 @@ export default function FunnelAnalyticsPage() {
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '6px',
                   }}
-                  formatter={(value: unknown) => [`${Number(value) ?? 0}%`, 'Conversion']}
+                  formatter={(value: unknown) => {
+                    const num = Number(value);
+                    return [`${isNaN(num) ? 0 : num}%`, 'Conversion'];
+                  }}
                 />
                 <Bar dataKey="value" name="Conversion" radius={[4, 4, 0, 0]}>
                   {funnelSteps.map((entry, index) => (

@@ -4,6 +4,12 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { CheckSquare, Square, FileText } from 'lucide-react';
 
+const Checkbox = ({ checked, onClick }: { checked: boolean; onClick: () => void }) => (
+  <button onClick={onClick} className="flex-shrink-0">
+    {checked ? <CheckSquare className="w-6 h-6 text-primary" /> : <Square className="w-6 h-6 text-muted-foreground" />}
+  </button>
+);
+
 export default function ConsentScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -29,16 +35,11 @@ export default function ConsentScreen() {
         }),
       });
       navigate('/kyc/review');
-    } catch {
+    } catch (error) {
+      console.error('Failed to submit consent:', error);
       navigate('/kyc/review');
     }
   };
-
-  const Checkbox = ({ checked, onClick }: { checked: boolean; onClick: () => void }) => (
-    <button onClick={onClick} className="flex-shrink-0">
-      {checked ? <CheckSquare className="w-6 h-6 text-primary" /> : <Square className="w-6 h-6 text-muted-foreground" />}
-    </button>
-  );
 
   return (
     <ScreenLayout title={t('consent.title')} showBack>

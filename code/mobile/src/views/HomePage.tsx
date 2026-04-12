@@ -73,7 +73,7 @@ export function HomePage() {
               navigate('/auth/pin-login', { replace: true });
               return;
             }
-          } catch (e) {
+          } catch {
             localStorage.removeItem('vp_user');
           }
         }
@@ -181,21 +181,37 @@ export function HomePage() {
     setLanguage(language === 'fr' ? 'en' : 'fr');
   };
 
+  // State for 3D Rays initialized after mount to keep render pure
+  const [rays, setRays] = useState<{ delay: number; duration: number; zDepth: number; thickness: number }[]>([]);
+
+  useEffect(() => {
+    if (!showContent) {
+      setTimeout(() => {
+        setRays(Array.from({ length: 60 }, () => ({
+          delay: Math.random() * 2,
+          duration: 0.8 + Math.random() * 1.5,
+          zDepth: Math.random() * 1000,
+          thickness: 1 + Math.random() * 3
+        })));
+      }, 0);
+    }
+  }, [showContent]);
+
   if (!showContent) {
     return (
       <div className="fixed inset-0 min-h-[100dvh] bg-[#001D45] flex items-center justify-center overflow-hidden perspective-[1200px]">
         {/* CSS Warp Speed Rays */}
         <div className="absolute inset-x-0 bottom-0 top-1/2 -translate-y-1/2 overflow-hidden pointer-events-none mix-blend-screen transform-style-3d z-0">
-          {[...Array(60)].map((_, i) => (
+          {rays.map((ray, i) => (
             <div
               key={i}
               className="ray-3d"
               style={{
                 '--angle': `${i * 6}deg`,
-                '--delay': `${Math.random() * 2}s`,
-                '--duration': `${0.8 + Math.random() * 1.5}s`,
-                '--z-depth': `${Math.random() * 1000}px`,
-                '--thickness': `${1 + Math.random() * 3}px`
+                '--delay': `${ray.delay}s`,
+                '--duration': `${ray.duration}s`,
+                '--z-depth': `${ray.zDepth}px`,
+                '--thickness': `${ray.thickness}px`
               } as React.CSSProperties}
             />
           ))}

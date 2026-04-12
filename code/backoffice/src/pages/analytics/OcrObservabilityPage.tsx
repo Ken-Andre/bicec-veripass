@@ -68,7 +68,12 @@ export default function OcrObservabilityPage() {
             <BarChart data={fieldData} layout="vertical">
               <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12 }} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} />
-              <Tooltip formatter={(v: unknown) => `${Number(v) ?? 0}%`} />
+              <Tooltip
+                formatter={(value: unknown) => {
+                  const num = Number(value);
+                  return [`${isNaN(num) ? 0 : num}%`, 'Taux de succès'];
+                }}
+              />
               <Bar dataKey="confidence" name="Confiance" radius={[0, 4, 4, 0]}>
                 {fieldData.map((entry, i) => (
                   <Cell key={i} fill={entry.confidence >= 85 ? 'hsl(var(--success))' : entry.confidence >= 60 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))'} />

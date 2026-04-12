@@ -1,5 +1,11 @@
 // TODO INFRA-02 intégration : pointer vers FastAPI backend sur :8000
 
+export interface ApiError extends Error {
+  response?: {
+    data: unknown;
+  };
+}
+
 export const createApiClient = (baseUrl: string) => {
   const getHeaders = (extraHeaders?: Record<string, string>) => {
     const token = localStorage.getItem('vp_token');
@@ -12,8 +18,8 @@ export const createApiClient = (baseUrl: string) => {
 
   return {
     get: async <T>(path: string, options?: { headers?: Record<string, string> }): Promise<T> => {
-      const response = await fetch(`${baseUrl}${path}`, { 
-        headers: getHeaders(options?.headers) 
+      const response = await fetch(`${baseUrl}${path}`, {
+        headers: getHeaders(options?.headers)
       });
       if (!response.ok) throw new Error(response.statusText);
       return response.json();
@@ -26,8 +32,8 @@ export const createApiClient = (baseUrl: string) => {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const error = new Error(errorData.detail || response.statusText);
-        (error as any).response = { data: errorData };
+        const error = new Error(errorData.detail || response.statusText) as ApiError;
+        error.response = { data: errorData };
         throw error;
       }
       return response.json();
@@ -40,8 +46,8 @@ export const createApiClient = (baseUrl: string) => {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const error = new Error(errorData.detail || response.statusText);
-        (error as any).response = { data: errorData };
+        const error = new Error(errorData.detail || response.statusText) as ApiError;
+        error.response = { data: errorData };
         throw error;
       }
       return response.json();
@@ -53,8 +59,8 @@ export const createApiClient = (baseUrl: string) => {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const error = new Error(errorData.detail || response.statusText);
-        (error as any).response = { data: errorData };
+        const error = new Error(errorData.detail || response.statusText) as ApiError;
+        error.response = { data: errorData };
         throw error;
       }
       return response.json();

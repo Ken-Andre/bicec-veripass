@@ -22,8 +22,13 @@ const EmailEntryScreen = () => {
       // Keep email in some state or pass it to next screen if needed
       // For now, next screen assumes we sent it
       navigate('/auth/email-otp', { state: { email } });
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Erreur lors de l'envoi du code");
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'response' in err) {
+        const apiErr = err as { response: { data?: { detail?: string } } };
+        setError(apiErr.response.data?.detail || "Erreur lors de l'envoi du code");
+      } else {
+        setError("Erreur lors de l'envoi du code");
+      }
     } finally {
       setLoading(false);
     }
