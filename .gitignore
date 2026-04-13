@@ -92,3 +92,4 @@ service-account*.json
 # ========================
 paddleocr_test/.venv_ocr/*
 docs/issue-183-implementation-report.md
+.codex_slides_rapport/*
