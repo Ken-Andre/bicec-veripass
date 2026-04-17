@@ -11,7 +11,7 @@ Run:  marimo edit 01_interactive_ocr_testing.py
 import marimo
 
 __generated_with = "0.23.1"
-app = marimo.App()
+app = marimo.App(layout_file="layouts/01_interactive_ocr_testing.slides.json")
 
 
 @app.cell
@@ -47,17 +47,16 @@ def _():
     # Base directory for sample images
     images_dir = _notebook_dir.parent / "images"
     return (
+        DEFAULT_GLM_KYC_PROMPT,
         Image,
         Path,
         compute_sha256,
         draw_ocr_boxes,
         find_gguf_models,
         glm_ocr_extract,
-        DEFAULT_GLM_KYC_PROMPT,
         image_to_bytes,
         images_dir,
         io,
-        json,
         mo,
         numpy_to_pil,
         paddle_ocr_pipeline,
@@ -246,7 +245,7 @@ def _(DEFAULT_GLM_KYC_PROMPT, mo):
         glm_prompt,
         run_button,
     ])
-    return DEFAULT_GLM_KYC_PROMPT, engine_choice, glm_prompt, run_button, show_blocks
+    return engine_choice, glm_prompt, run_button, show_blocks
 
 
 @app.cell
@@ -357,7 +356,7 @@ def _(annotated_pil, image_to_bytes, mo, paddle_result, show_blocks):
 
 
 @app.cell
-def _(glm_result, json, mo):
+def _(glm_result, mo):
     """Display GLM-OCR results."""
     if glm_result is None:
         _glm_output = mo.md("")
@@ -406,7 +405,7 @@ def _(glm_result, json, mo):
 
 
 @app.cell
-def _(glm_result, json, mo, paddle_result):
+def _(glm_result, mo, paddle_result):
     """Side-by-side comparison table."""
     _comparison_output = mo.md("")
 

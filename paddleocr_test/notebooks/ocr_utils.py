@@ -41,87 +41,203 @@ def get_paddle_ocr():
 
 
 # ---------------------------------------------------------------------------
-# GLM-OCR via llama-cpp-python (lazy-loaded)
+# GLM-OCR via llama-mtmd-cli subprocess
 # ---------------------------------------------------------------------------
-_glm_ocr_model = None
+# NOTE: llama-cpp-python >= 0.3.x removed the `clip_model_path` parameter from
+# Llama.__init__ (silently swallowed by **kwargs). The old llava/clip Python API
+# no longer works. Multimodal inference now requires `llama-mtmd-cli` (from
+# llama.cpp releases) invoked as a subprocess, which is the same approach used
+# by the backend's _run_glm_cli().
+# ---------------------------------------------------------------------------
 _glm_ocr_path: str | None = None
+_glm_mtmd_cli_path: str | None = None
 
-# FIX #1 — constante supprimée par l'IA, remise en place.
 DEFAULT_GLM_KYC_PROMPT = (
     "Extract the following fields from this Cameroonian national identity card "
-    "and return ONLY a valid JSON object (no markdown, no explanation) with these keys: "
-    "nom, prenom, numero_cni, date_naissance, lieu_naissance, "
-    "profession, date_delivrance, date_expiration, sexe. "
-    "Use null for any field that is not visible or legible."
+    "and return ONLY a valid JSON object (no markdown, no explanation) with these exact keys: "
+    "nom, prenom, numero_cni, date_naissance, lieu_naissance, sexe, taille, "
+    "profession, date_delivrance, date_expiration. "
+    "Use null for any field that is not visible or legible. "
+    "Important rules:\n"
+    "- Dates must be returned in DD/MM/YYYY format whenever possible.\n"
+    "- Sexe is usually 'F' or 'M'.\n"
+    "- Taille is usually a number like '1.54'.\n"
 )
 
 
 def set_glm_ocr_model_path(path: str) -> None:
     """Set the path to the GLM-OCR main GGUF model file."""
-    global _glm_ocr_path, _glm_ocr_model
+    global _glm_ocr_path
     _glm_ocr_path = path
-    _glm_ocr_model = None  # reset so it re-loads
 
 
-def get_glm_ocr(model_path: str | None = None, mmproj_path: str | None = None):
-    """Return a shared llama-cpp Llama instance for GLM-OCR.
+def _find_mmproj_path() -> str | None:
+    """Auto-detect the mmproj GGUF file near the main model."""
+    if not _glm_ocr_path:
+        return None
+    _search_dirs = [os.path.dirname(_glm_ocr_path)]
+    _models_sibling = os.path.join(os.path.dirname(_glm_ocr_path), "models")
+    if os.path.isdir(_models_sibling):
+        _search_dirs.append(_models_sibling)
+    _ocr_test_models_dir = str(Path(__file__).resolve().parent.parent / "models")
+    if os.path.isdir(_ocr_test_models_dir) and _ocr_test_models_dir not in _search_dirs:
+        _search_dirs.append(_ocr_test_models_dir)
+    for _mdir in _search_dirs:
+        for f in os.listdir(_mdir):
+            if "mmproj" in f.lower() and f.endswith(".gguf"):
+                return os.path.join(_mdir, f)
+    return None
+
+
+def _find_mtmd_cli() -> str | None:
+    """Find the llama-mtmd-cli executable.
+
+    Search order:
+      1. Explicit path set via set_glm_ocr_mtmd_cli_path()
+      2. paddleocr_test/llama-cpp-bin/llama-mtmd-cli.exe (downloaded release)
+      3. System PATH
+    """
+    global _glm_mtmd_cli_path
+
+    if _glm_mtmd_cli_path and os.path.isfile(_glm_mtmd_cli_path):
+        return _glm_mtmd_cli_path
+
+    # Check for downloaded binary next to paddleocr_test/
+    _local_bin = str(Path(__file__).resolve().parent.parent / "llama-cpp-bin" / "llama-mtmd-cli.exe")
+    if os.path.isfile(_local_bin):
+        _glm_mtmd_cli_path = _local_bin
+        return _local_bin
+
+    # Check system PATH
+    import shutil
+    found = shutil.which("llama-mtmd-cli")
+    if found:
+        _glm_mtmd_cli_path = found
+        return found
+
+    return None
+
+
+def set_glm_ocr_mtmd_cli_path(path: str) -> None:
+    """Explicitly set the path to the llama-mtmd-cli executable."""
+    global _glm_mtmd_cli_path
+    _glm_mtmd_cli_path = path
+
+
+def _glm_ocr_extract_via_cli(
+    image_path: str,
+    model_path: str,
+    mmproj_path: str,
+    cli_path: str,
+    prompt: str,
+    timeout: int = 120,
+) -> dict:
+    """Run GLM-OCR via llama-mtmd-cli subprocess.
+
+    This is the only working method for multimodal inference with
+    llama-cpp-python >= 0.3.x, since the old clip_model_path API
+    was removed and the mtmd_cpp low-level API has no Python wrapper.
 
     Args:
-        model_path: Path to GLM-OCR GGUF model. If None, uses previously set path.
-        mmproj_path: Path to multimodal projector GGUF. Auto-detected if None.
+        image_path: Path to the image file on disk.
+        model_path: Path to the main GGUF model.
+        mmproj_path: Path to the mmproj GGUF.
+        cli_path: Path to llama-mtmd-cli executable.
+        prompt: Text prompt for the model.
+        timeout: Max seconds to wait for the subprocess.
+
+    Returns:
+        dict with raw_text, parsed_fields, parsing_mode, model, success.
     """
-    global _glm_ocr_model, _glm_ocr_path
+    import subprocess
 
-    if model_path:
-        _glm_ocr_path = model_path
-
-    if _glm_ocr_model is not None and not model_path:
-        return _glm_ocr_model
+    cmd = [
+        cli_path,
+        "-m", model_path,
+        "--mmproj", mmproj_path,
+        "--image", image_path,
+        "-p", prompt,
+        "-n", "2048",
+        "--temp", "0.1",
+        "--no-warmup",  # skip warmup on repeat calls
+    ]
 
     try:
-        from llama_cpp import Llama
-    except ImportError:
-        raise ImportError(
-            "llama-cpp-python is not installed. "
-            "Install with: uv pip install llama-cpp-python "
-            "--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu"
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
         )
+    except FileNotFoundError:
+        return {
+            "raw_text": "",
+            "parsed_fields": {},
+            "parsing_mode": "error",
+            "model": "glm-ocr",
+            "success": False,
+            "error": f"llama-mtmd-cli not found at {cli_path}",
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "raw_text": "",
+            "parsed_fields": {},
+            "parsing_mode": "error",
+            "model": "glm-ocr",
+            "success": False,
+            "error": f"llama-mtmd-cli timed out after {timeout}s",
+        }
 
-    if not _glm_ocr_path or not os.path.isfile(_glm_ocr_path):
-        raise FileNotFoundError(
-            f"GLM-OCR model not found at '{_glm_ocr_path}'. "
-            "Use set_glm_ocr_model_path() or pass model_path argument."
-        )
+    combined = f"{proc.stdout}\n{proc.stderr}"
 
-    # Auto-detect mmproj: search model's own directory first, then sibling models/ dir
-    if mmproj_path is None:
-        _search_dirs = [os.path.dirname(_glm_ocr_path)]
-        _models_sibling = os.path.join(os.path.dirname(_glm_ocr_path), "models")
-        if os.path.isdir(_models_sibling):
-            _search_dirs.append(_models_sibling)
-        # Also search paddleocr_test/models/ relative to this file
-        _ocr_test_models_dir = str(Path(__file__).resolve().parent.parent / "models")
-        if os.path.isdir(_ocr_test_models_dir) and _ocr_test_models_dir not in _search_dirs:
-            _search_dirs.append(_ocr_test_models_dir)
-        for _mdir in _search_dirs:
-            for f in os.listdir(_mdir):
-                if "mmproj" in f.lower() and f.endswith(".gguf"):
-                    mmproj_path = os.path.join(_mdir, f)
-                    break
-            if mmproj_path:
-                break
+    # The CLI outputs the model response after the loading/diagnostic lines.
+    # The actual generated text appears after the last "---" separator or after
+    # the image decode message. We look for the JSON block in the combined output.
+    _cni_keys = [
+        "nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
+        "profession", "date_delivrance", "date_expiration", "sexe", "taille",
+    ]
+    parsed_fields: dict[str, Any] = {k: None for k in _cni_keys}
+    parsing_mode = "plaintext"
 
-    kwargs: dict[str, Any] = {
-        "model_path": _glm_ocr_path,
-        "n_ctx": 16384,
-        "n_threads": 4,
-        "verbose": False,
+    # Extract the generated text (after model loading logs)
+    # llama-mtmd-cli outputs the response as plain text, possibly wrapped in ```json```
+    # We search for JSON blocks in the combined output
+    raw_text = proc.stdout.strip()
+
+    # Strip markdown fences
+    _clean = re.sub(r"```(?:json)?", "", raw_text, flags=re.IGNORECASE).replace("```", "").strip()
+    _json_match = re.search(r"\{[\s\S]*\}", _clean)
+    if _json_match:
+        try:
+            _data = json.loads(_json_match.group())
+            for k in _cni_keys:
+                _val = _data.get(k)
+                if _val in ("", "null", "NULL", "N/A", "n/a"):
+                    _val = None
+                parsed_fields[k] = _val
+            parsing_mode = "json"
+        except (json.JSONDecodeError, ValueError):
+            parsing_mode = "json_fallback_plaintext"
+            _fallback = _json_match.group()
+            for k in _cni_keys:
+                _m = re.search(
+                    rf'"{k}"\s*:\s*"([^"]*)"', _fallback, re.IGNORECASE
+                )
+                if _m and _m.group(1) not in ("", "null", "NULL"):
+                    parsed_fields[k] = _m.group(1)
+    else:
+        parsing_mode = "json_fallback_plaintext"
+
+    return {
+        "raw_text": raw_text,
+        "parsed_fields": parsed_fields,
+        "parsing_mode": parsing_mode,
+        "model": "glm-ocr",
+        "success": bool(parsed_fields and any(v is not None for v in parsed_fields.values())),
     }
-    if mmproj_path and os.path.isfile(mmproj_path):
-        kwargs["clip_model_path"] = mmproj_path
-
-    _glm_ocr_model = Llama(**kwargs)
-    return _glm_ocr_model
 
 
 def glm_ocr_extract(
@@ -132,6 +248,9 @@ def glm_ocr_extract(
 ) -> dict:
     """Run GLM-OCR on image bytes and return extracted text + parsed fields.
 
+    Uses llama-mtmd-cli subprocess for multimodal inference since
+    llama-cpp-python >= 0.3.x removed the clip_model_path parameter.
+
     Args:
         image_bytes: Raw image bytes (JPEG/PNG).
         prompt: Instruction prompt for the model. Defaults to DEFAULT_GLM_KYC_PROMPT.
@@ -141,93 +260,72 @@ def glm_ocr_extract(
     Returns:
         dict with keys:
           - raw_text      : raw model output string
-          - parsed_fields : dict of CNI fields (nom, prenom, numero_cni, …)
+          - parsed_fields : dict of CNI fields (nom, prenom, numero_cni, ...)
           - parsing_mode  : "json" | "json_fallback_plaintext" | "plaintext"
           - model         : model identifier string
           - success       : bool
     """
-    import base64
+    import tempfile
 
-    llm = get_glm_ocr(model_path=model_path, mmproj_path=mmproj_path)
+    if model_path:
+        set_glm_ocr_model_path(model_path)
 
-    b64 = base64.b64encode(image_bytes).decode("utf-8")
+    if not _glm_ocr_path or not os.path.isfile(_glm_ocr_path):
+        return {
+            "raw_text": "",
+            "parsed_fields": {},
+            "parsing_mode": "error",
+            "model": "glm-ocr",
+            "success": False,
+            "error": f"GLM-OCR model not found at '{_glm_ocr_path}'. Use set_glm_ocr_model_path().",
+        }
 
-    # Determine mime type from magic bytes
-    mime = "image/jpeg"
-    if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
-        mime = "image/png"
+    cli_path = _find_mtmd_cli()
+    if not cli_path:
+        return {
+            "raw_text": "",
+            "parsed_fields": {},
+            "parsing_mode": "error",
+            "model": "glm-ocr",
+            "success": False,
+            "error": (
+                "llama-mtmd-cli not found. Download from "
+                "https://github.com/ggml-org/llama.cpp/releases and place in "
+                "paddleocr_test/llama-cpp-bin/ or set via set_glm_ocr_mtmd_cli_path()."
+            ),
+        }
 
-    # Detect native OCR mode (user typed "OCR" as prompt shorthand)
-    _native_ocr = prompt.strip().upper() == "OCR"
-    _actual_prompt = (
-        "Read all text from this image exactly as it appears, line by line."
-        if _native_ocr
-        else prompt
-    )
+    if mmproj_path is None:
+        mmproj_path = _find_mmproj_path()
+    if not mmproj_path or not os.path.isfile(mmproj_path):
+        return {
+            "raw_text": "",
+            "parsed_fields": {},
+            "parsing_mode": "error",
+            "model": "glm-ocr",
+            "success": False,
+            "error": f"mmproj GGUF not found (searched near {_glm_ocr_path}).",
+        }
 
-    response = llm.create_chat_completion(
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                    {"type": "text", "text": _actual_prompt},
-                ],
-            }
-        ],
-        max_tokens=2048,
-        temperature=0.1,
-    )
+    # Write image to a temporary file for the CLI (it needs a file path, not bytes)
+    _suffix = ".png" if image_bytes[:8] == b"\x89PNG\r\n\x1a\n" else ".jpg"
+    with tempfile.NamedTemporaryFile(suffix=_suffix, delete=False) as tmp:
+        tmp.write(image_bytes)
+        tmp_image_path = tmp.name
 
-    raw_text = response["choices"][0]["message"]["content"]
-
-    # ------------------------------------------------------------------
-    # FIX #2 — parsing de la réponse JSON supprimé par l'IA, remis en place.
-    # Tente de parser le JSON retourné par le modèle pour alimenter
-    # parsed_fields. Fallback sur plaintext si le JSON est invalide.
-    # ------------------------------------------------------------------
-    _cni_keys = [
-        "nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
-        "profession", "date_delivrance", "date_expiration", "sexe",
-    ]
-    parsed_fields: dict[str, Any] = {k: None for k in _cni_keys}
-    parsing_mode = "plaintext"
-
-    if not _native_ocr:
-        # Strip optional markdown fences the model may add (```json … ```)
-        _clean = re.sub(r"```(?:json)?", "", raw_text, flags=re.IGNORECASE).replace("```", "").strip()
-        # Find the first {...} JSON block in the output
-        _json_match = re.search(r"\{[\s\S]*\}", _clean)
-        if _json_match:
-            try:
-                _data = json.loads(_json_match.group())
-                for k in _cni_keys:
-                    _val = _data.get(k)
-                    # Normalize: empty string and "null" string → None
-                    if _val in ("", "null", "NULL", "N/A", "n/a"):
-                        _val = None
-                    parsed_fields[k] = _val
-                parsing_mode = "json"
-            except (json.JSONDecodeError, ValueError):
-                # JSON malformed: try light regex extraction on raw text as fallback
-                parsing_mode = "json_fallback_plaintext"
-                _fallback = _json_match.group() if _json_match else raw_text
-                for k in _cni_keys:
-                    _m = re.search(
-                        rf'"{k}"\s*:\s*"([^"]*)"', _fallback, re.IGNORECASE
-                    )
-                    if _m and _m.group(1) not in ("", "null", "NULL"):
-                        parsed_fields[k] = _m.group(1)
-        else:
-            parsing_mode = "json_fallback_plaintext"
-
-    return {
-        "raw_text": raw_text,
-        "parsed_fields": parsed_fields,
-        "parsing_mode": parsing_mode,
-        "model": "glm-ocr",
-        "success": True,
-    }
+    try:
+        return _glm_ocr_extract_via_cli(
+            image_path=tmp_image_path,
+            model_path=_glm_ocr_path,
+            mmproj_path=mmproj_path,
+            cli_path=cli_path,
+            prompt=prompt,
+        )
+    finally:
+        try:
+            os.unlink(tmp_image_path)
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +469,7 @@ STOP_WORDS = {
 }
 
 CNI_FIELDS = ["nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
-               "profession", "date_delivrance", "date_expiration", "sexe"]
+               "sexe", "taille", "profession", "date_delivrance", "date_expiration"]
 
 
 def extract_spatial_data(blocks: list[dict]) -> dict:

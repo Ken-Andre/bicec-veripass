@@ -65,7 +65,7 @@ def _(mo):
 def _(mo, find_gguf_models, Path):
     """GLM-OCR model selector."""
     _gguf_models = find_gguf_models()
-    # Only show main LLM models in dropdown; mmproj is auto-detected by get_glm_ocr()
+    # Only show main LLM models in dropdown; mmproj is auto-detected by glm_ocr_extract()
     _main_models = [m for m in _gguf_models if m.get("role") != "mmproj"]
 
     if _main_models:
