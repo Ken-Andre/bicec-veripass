@@ -294,7 +294,7 @@ def _(
 
 
 @app.cell
-def _(annotated_pil, image_to_bytes, mo, paddle_result, show_blocks):
+def _(CNI_FIELDS, annotated_pil, image_to_bytes, mo, paddle_result, show_blocks):
     """Display PaddleOCR results."""
     if paddle_result is None:
         _paddle_output = mo.md("")
@@ -307,7 +307,7 @@ def _(annotated_pil, image_to_bytes, mo, paddle_result, show_blocks):
 
         # Build field table
         _paddle_rows = []
-        for _key in ("nom", "prenom", "numero_cni"):
+        for _key in CNI_FIELDS:
             _field = _extraction.get(_key, {})
             _val = _field.get("value", "—") if isinstance(_field, dict) else _field
             _conf = _field.get("conf", 0.0) if isinstance(_field, dict) else 0.0
@@ -356,7 +356,7 @@ def _(annotated_pil, image_to_bytes, mo, paddle_result, show_blocks):
 
 
 @app.cell
-def _(glm_result, mo):
+def _(CNI_FIELDS, glm_result, mo):
     """Display GLM-OCR results."""
     if glm_result is None:
         _glm_output = mo.md("")
@@ -374,9 +374,7 @@ def _(glm_result, mo):
 
         if _parsed and any(v is not None for v in _parsed.values()):
             _glm_rows = []
-            for _gkey in ("nom", "prenom", "numero_cni", "date_naissance",
-                         "lieu_naissance", "profession", "date_delivrance",
-                         "date_expiration", "sexe"):
+            for _gkey in CNI_FIELDS:
                 _gval = _parsed.get(_gkey, "—") or "—"
                 _glm_rows.append(f"| {_gkey} | `{_gval}` |")
             _glm_table = (
@@ -405,7 +403,7 @@ def _(glm_result, mo):
 
 
 @app.cell
-def _(glm_result, mo, paddle_result):
+def _(CNI_FIELDS, glm_result, mo, paddle_result):
     """Side-by-side comparison table."""
     _comparison_output = mo.md("")
 
@@ -414,7 +412,7 @@ def _(glm_result, mo, paddle_result):
         _g_parsed = glm_result.get("parsed_fields", {})
 
         _comp_rows = []
-        for _ckey in ("nom", "prenom", "numero_cni"):
+        for _ckey in CNI_FIELDS:
             _p_val = _p_ext.get(_ckey, {})
             _p_v = _p_val.get("value", "—") if isinstance(_p_val, dict) else _p_val
             _p_c = _p_val.get("conf", 0.0) if isinstance(_p_val, dict) else 0.0

@@ -482,11 +482,10 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
         Parsed field dict with per-field value and confidence.
     """
     parsed_data = {
-        "nom": {"value": None, "conf": 0.0},
-        "prenom": {"value": None, "conf": 0.0},
-        "numero_cni": {"value": None, "conf": 0.0},
-        "methode": "ANCRAGE_SPATIAL",
+        field: {"value": None, "conf": 0.0}
+        for field in CNI_FIELDS
     }
+    parsed_data["methode"] = "ANCRAGE_SPATIAL"
 
     for i, block in enumerate(blocks):
         text = block["text"].upper()
@@ -499,6 +498,29 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
         match_nin = re.search(r"\b\d{17}\b", text)
         if match_nin and parsed_data["numero_cni"]["value"] is None:
             parsed_data["numero_cni"] = {"value": match_nin.group(), "conf": block["conf"]}
+
+        # Dates (Regex simple DD.MM.YY or DD/MM/YYYY)
+        match_date = re.search(r"\b(\d{2}[./-]\d{2}[./-]\d{2,4})\b", text)
+        if match_date:
+            clean_date = match_date.group(1).replace(".", "/")
+            if len(clean_date) == 8: # e.g. 07/02/18
+                clean_date = clean_date[:6] + ("19" if int(clean_date[6:]) > 30 else "20") + clean_date[6:]
+            if parsed_data["date_naissance"]["value"] is None:
+                parsed_data["date_naissance"] = {"value": clean_date, "conf": block["conf"]}
+        
+        # Sexe (F / M isole)
+        if text in ["F", "M"] and parsed_data["sexe"]["value"] is None:
+            parsed_data["sexe"] = {"value": text, "conf": block["conf"]}
+        
+        # Taille (ex: 1.54, 1,75)
+        match_taille = re.search(r"\b(1[.,]\d{2})\b", text)
+        if match_taille and parsed_data["taille"]["value"] is None:
+            parsed_data["taille"] = {"value": match_taille.group(1).replace(",", "."), "conf": block["conf"]}
+        
+        # Profession (often below DATE OF BIRTH / DSCHANG line)
+        if "MENAGERE" in text or "COMMERCANT" in text or "ETUDIANT" in text or "ELEVE" in text or "INGENIEUR" in text:
+            if parsed_data["profession"]["value"] is None:
+                parsed_data["profession"] = {"value": text, "conf": block["conf"]}
 
         # Spatial anchor: NOM / SURNAME
         if "NOM" in text or "SURNAME" in text:
