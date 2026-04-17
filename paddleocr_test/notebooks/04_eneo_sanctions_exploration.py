@@ -43,6 +43,9 @@ def _():
         compute_sha256,
         CAMEROON_CITIES,
         CAMEROON_REGIONS,
+        CAMEROON_SURNAMES,    # ← ajouter
+        CAMEROON_FIRSTNAMES,  # ← ajouter
+
     )
 
     images_dir = _notebook_dir.parent / "images"
