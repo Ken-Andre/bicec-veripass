@@ -34,7 +34,9 @@ def _():
         get_paddle_ocr,
         paddle_ocr_pipeline,
         glm_ocr_extract,
-        DEFAULT_GLM_KYC_PROMPT,
+        DEFAULT_GLM_RECTO_PROMPT,
+        DEFAULT_GLM_VERSO_PROMPT,
+        sanitize_glm_output,
         set_glm_ocr_model_path,
         find_gguf_models,
         draw_ocr_boxes,
@@ -47,7 +49,8 @@ def _():
     # Base directory for sample images
     images_dir = _notebook_dir.parent / "images"
     return (
-        DEFAULT_GLM_KYC_PROMPT,
+        DEFAULT_GLM_RECTO_PROMPT,
+        DEFAULT_GLM_VERSO_PROMPT,
         Image,
         Path,
         compute_sha256,
@@ -60,6 +63,7 @@ def _():
         mo,
         numpy_to_pil,
         paddle_ocr_pipeline,
+        sanitize_glm_output,
         set_glm_ocr_model_path,
     )
 
@@ -212,7 +216,7 @@ def _(
 
 
 @app.cell
-def _(DEFAULT_GLM_KYC_PROMPT, mo):
+def _(DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMPT, mo):
     """Engine selection and options."""
     engine_choice = mo.ui.dropdown(
         options={
@@ -224,33 +228,60 @@ def _(DEFAULT_GLM_KYC_PROMPT, mo):
         label="Engine",
     )
 
+    card_side = mo.ui.radio(
+        options={
+            "🤖 Auto-detect": "auto",
+            "📄 Recto (Identity)": "recto",
+            "📂 Verso (NIN/Validity)": "verso",
+        },
+        value="🤖 Auto-detect",
+        label="Card Side",
+    )
+
     show_blocks = mo.ui.checkbox(label="Show OCR block details", value=True)
 
-    # GLM-OCR prompt — two modes:
-    # - KYC structured extraction (default): asks model for JSON output
-    # - Native OCR transcription: type "OCR" to use the fine-tuned prompt
-    glm_prompt = mo.ui.text(
-        value=DEFAULT_GLM_KYC_PROMPT,
-        label="🟣 GLM-OCR Prompt",
-        placeholder="KYC JSON prompt (default) or 'OCR' for native transcription",
+    # GLM-OCR prompt — dynamically updated based on card_side
+    glm_prompt = mo.ui.text_area(
+        value=DEFAULT_GLM_RECTO_PROMPT,
+        label="🟣 GLM-OCR Prompt (edit if needed)",
+        placeholder="JSON prompt...",
         full_width=True,
     )
 
-    run_button = mo.ui.run_button(label="🚀 Run OCR")
+    run_button = mo.ui.run_button(label="🚀 Run OCR", kind="neutral")
 
     mo.vstack([
         mo.md("### ⚙️ OCR Engine & Options"),
-        engine_choice,
+        mo.hstack([engine_choice, card_side]),
         show_blocks,
         glm_prompt,
         run_button,
     ])
-    return engine_choice, glm_prompt, run_button, show_blocks
+    return card_side, engine_choice, glm_prompt, run_button, show_blocks
+
+
+@app.cell
+def _(DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMPT, card_side, mo):
+    """Show the active prompt for the selected card side (read-only info)."""
+    _side_val = card_side.value
+    if _side_val == "verso":
+        _active_prompt = DEFAULT_GLM_VERSO_PROMPT
+        _side_label = "📂 VERSO — NIN & Validity only"
+    elif _side_val == "recto":
+        _active_prompt = DEFAULT_GLM_RECTO_PROMPT
+        _side_label = "📄 RECTO — Identity fields only"
+    else:
+        _active_prompt = "(auto-selected at runtime based on PaddleOCR detection)"
+        _side_label = "🤖 AUTO — prompt chosen after PaddleOCR detection"
+    mo.md(f"**Active prompt mode:** {_side_label}\n\n```\n{_active_prompt}\n```")
+    return
 
 
 @app.cell
 def _(
-    DEFAULT_GLM_KYC_PROMPT,
+    DEFAULT_GLM_RECTO_PROMPT,
+    DEFAULT_GLM_VERSO_PROMPT,
+    card_side,
     draw_ocr_boxes,
     engine_choice,
     glm_ocr_extract,
@@ -260,19 +291,26 @@ def _(
     paddle_ocr_pipeline,
     pil_image,
     run_button,
+    sanitize_glm_output,
     show_blocks,
 ):
     """Run OCR on the loaded image."""
     paddle_result = None
     glm_result = None
     annotated_pil = None
+    detected_side = "recto"
 
     if run_button.value and pil_image is not None:
         _engine = engine_choice.value
 
-        # --- PaddleOCR ---
+        # --- PaddleOCR (Run first to allow auto-detection) ---
         if _engine in ("paddleocr", "both"):
             paddle_result = paddle_ocr_pipeline(pil_image)
+            if "extraction" in paddle_result:
+                _method = paddle_result["extraction"].get("methode", "")
+                if "VERSO" in _method:
+                    detected_side = "verso"
+
             if "aligned_image" in paddle_result and paddle_result["aligned_image"] is not None:
                 _aligned = paddle_result["aligned_image"]
                 if show_blocks.value and "blocks" in paddle_result:
@@ -281,16 +319,26 @@ def _(
                     _annotated = _aligned
                 annotated_pil = numpy_to_pil(_annotated)
 
+        # --- Card Side Final Choice ---
+        final_side = card_side.value if card_side.value != "auto" else detected_side
+
         # --- GLM-OCR ---
         if _engine in ("glm_ocr", "both") and image_bytes:
+            # Determine prompt
+            _prompt = glm_prompt.value.strip()
+            if card_side.value == "auto":
+                _prompt = DEFAULT_GLM_VERSO_PROMPT if final_side == "verso" else DEFAULT_GLM_RECTO_PROMPT
+
             try:
-                glm_result = glm_ocr_extract(
-                    image_bytes,
-                    prompt=glm_prompt.value.strip() or DEFAULT_GLM_KYC_PROMPT,
-                )
+                glm_res = glm_ocr_extract(image_bytes, prompt=_prompt)
+                # Apply sanitization to kill hallucinations
+                if glm_res.get("success") and "parsed_fields" in glm_res:
+                    glm_res["parsed_fields"] = sanitize_glm_output(glm_res["parsed_fields"], side=final_side)
+                    glm_res["detected_side"] = final_side
+                glm_result = glm_res
             except Exception as _e:
                 glm_result = {"error": str(_e), "model": "glm_ocr", "success": False}
-    return annotated_pil, glm_result, paddle_result
+    return annotated_pil, detected_side, glm_result, paddle_result
 
 
 @app.cell
