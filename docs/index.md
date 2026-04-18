@@ -12,11 +12,11 @@
 
 ### Project Parts
 
-| Part | Type | Technology | Description |
-|------|------|------------|-------------|
-| **backoffice** | Web SPA | React 19, TypeScript, Vite, TailwindCSS | Back-office for Jean (Validator), Thomas (Supervisor), Sylvie (Director), Admin IT |
-| **mobile** | PWA | React 19, TypeScript, Vite, TailwindCSS | Mobile onboarding journey for Marie (customer) |
-| **backend** | API | Python 3.11, FastAPI, PostgreSQL 16, Redis, Celery | KYC API, OCR, biometrics, state machine |
+| Part           | Type    | Technology                                         | Description                                                                        |
+| -------------- | ------- | -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **backoffice** | Web SPA | React 19, TypeScript, Vite, TailwindCSS            | Back-office for Jean (Validator), Thomas (Supervisor), Sylvie (Director), Admin IT |
+| **mobile**     | PWA     | React 19, TypeScript, Vite, TailwindCSS            | Mobile onboarding journey for Marie (customer)                                     |
+| **backend**    | API     | Python 3.11, FastAPI, PostgreSQL 16, Redis, Celery | KYC API, OCR, biometrics, state machine                                            |
 
 ---
 
@@ -24,6 +24,7 @@
 
 ### Core Documentation
 - [`index.md`](index.md) — This file (documentation index)
+- [`GEMINI.md`](../GEMINI.md) — Golden Rules for AI Agents (Antigravity/Gemini)
 - [`project-scan-report.json`](project-scan-report.json) — Project scan state and metadata
 
 ### Project Knowledge (this folder)

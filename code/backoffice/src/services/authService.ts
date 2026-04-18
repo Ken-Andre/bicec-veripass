@@ -53,8 +53,8 @@ export class AuthService {
 
   constructor() {
     // Use mock mode if VITE_AUTH_MODE=mock or not in production
-    this.useMock = import.meta.env.VITE_AUTH_MODE === 'mock' || 
-                   import.meta.env.MODE !== 'production';
+    this.useMock = import.meta.env.VITE_AUTH_MODE === 'mock' ||
+      import.meta.env.MODE !== 'production';
   }
 
   async login(email: string, password: string): Promise<LoginResponse | null> {
@@ -69,15 +69,15 @@ export class AuthService {
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
       encoder.encode(MOCK_STORAGE_ENCRYPTION_SECRET),
-      const mockRefreshToken = `mock_refresh_${user.id}`;
       'PBKDF2',
       false,
+      ['deriveKey']
     );
 
     return crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        refreshToken: mockRefreshToken,
+        salt: encoder.encode(MOCK_STORAGE_ENCRYPTION_SALT),
         iterations: 100000,
         hash: 'SHA-256',
       },
@@ -118,20 +118,21 @@ export class AuthService {
 
   private async mockLogin(email: string, password: string): Promise<LoginResponse | null> {
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     const userWithPassword = MOCK_USERS[email.toLowerCase()];
     if (userWithPassword && userWithPassword.password === password) {
-      const { password: _, ...user } = userWithPassword;
+      const { password: _password, ...user } = userWithPassword;
+      void _password; // Explicitly consume to satisfy strict linting
       const mockToken = `mock_token_${user.id}_${Date.now()}`;
       const mockRefresh = `mock_refresh_${user.id}`;
       const encryptedToken = await this.encryptForStorage(mockToken);
       const encryptedRefresh = await this.encryptForStorage(mockRefresh);
       const encryptedUser = await this.encryptForStorage(JSON.stringify(user));
-      
+
       localStorage.setItem(TOKEN_KEY, encryptedToken);
       localStorage.setItem(REFRESH_KEY, encryptedRefresh);
       localStorage.setItem(USER_KEY, encryptedUser);
-      
+
       return {
         user,
         accessToken: mockToken,
@@ -149,73 +150,102 @@ export class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
-      if (!res.ok) {
-        return null;
-      }
+      if (!res.ok) return null;
 
       const data = await res.json();
-      
-      // Store tokens
-      localStorage.setItem(TOKEN_KEY, data.access_token);
-      localStorage.setItem(REFRESH_KEY, data.refresh_token);
-      
-      // Fetch user profile
-      const userRes = await fetch(`${API_BASE}/auth/agent/me`, {
-        headers: { 'Authorization': `Bearer ${data.access_token}` },
-      });
-      
-      if (!userRes.ok) {
-        return null;
-      }
-      
-      const userData = await userRes.json();
-      const user: User = {
-        id: userData.id,
-        email: userData.email,
-        name: userData.name,
-        role: userData.role as AgentRole,
-        agencyId: userData.agency_id,
-        isActive: userData.is_available,
-      };
-      
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-      
+      const encryptedToken = await this.encryptForStorage(data.access_token);
+      const encryptedRefresh = await this.encryptForStorage(data.refresh_token);
+      const encryptedUser = await this.encryptForStorage(JSON.stringify(data.user));
+
+      localStorage.setItem(TOKEN_KEY, encryptedToken);
+      localStorage.setItem(REFRESH_KEY, encryptedRefresh);
+      localStorage.setItem(USER_KEY, encryptedUser);
+
       return {
-        user,
+        user: data.user,
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
-    } catch (error) {
-      console.error('API login failed:', error);
+    } catch (err) {
+      console.error('API login error:', err);
       return null;
     }
   }
 
-  logout(): void {
+  async logout(): Promise<void> {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(USER_KEY);
+    window.location.href = '/login';
   }
 
-  getStoredUser(): User | null {
+  async getCurrentUser(): Promise<User | null> {
+    const encryptedUser = localStorage.getItem(USER_KEY);
+    if (!encryptedUser) return null;
+
     try {
-      const stored = localStorage.getItem(USER_KEY);
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (stored && token) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // ignore parse errors
+      const userStr = await this.decryptFromStorage(encryptedUser);
+      return JSON.parse(userStr);
+    } catch (err) {
+      console.error('Error getting current user:', err);
+      return null;
     }
-    return null;
   }
 
-  getAuthHeader(): Record<string, string> {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      return { 'Authorization': `Bearer ${token}` };
+  async getAccessToken(): Promise<string | null> {
+    const encryptedToken = localStorage.getItem(TOKEN_KEY);
+    if (!encryptedToken) return null;
+
+    try {
+      return await this.decryptFromStorage(encryptedToken);
+    } catch (err) {
+      console.error('Error getting access token:', err);
+      return null;
     }
-    return {};
+  }
+
+  async refreshAccessToken(): Promise<string | null> {
+    const encryptedRefresh = localStorage.getItem(REFRESH_KEY);
+    if (!encryptedRefresh) return null;
+
+    try {
+      const refreshToken = await this.decryptFromStorage(encryptedRefresh);
+
+      if (this.useMock) {
+        const user = await this.getCurrentUser();
+        if (!user) return null;
+        const newToken = `mock_token_${user.id}_${Date.now()}`;
+        const encryptedNewToken = await this.encryptForStorage(newToken);
+        localStorage.setItem(TOKEN_KEY, encryptedNewToken);
+        return newToken;
+      }
+
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        this.logout();
+        return null;
+      }
+
+      const data = await res.json();
+      const encryptedNewToken = await this.encryptForStorage(data.access_token);
+      localStorage.setItem(TOKEN_KEY, encryptedNewToken);
+      return data.access_token;
+    } catch (err) {
+      console.error('Error refreshing token:', err);
+      this.logout();
+      return null;
+    }
+  }
+
+  isAuthenticated(): boolean {
+    return !!localStorage.getItem(TOKEN_KEY);
   }
 }
 

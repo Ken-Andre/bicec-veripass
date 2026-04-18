@@ -49,15 +49,35 @@
 
 ---
 
-## 🟡 M2 - Auth & KYC Flows (Deadline: 05/04 ✅ DONE)
+## 🟡 M2 - Capture MVP (Deadline: XX/04 — EN COURS)
 
 | # | Issue | Description | LOCAL | CLOUD | Dépendances |
 |---|-------|-------------|-------|-------|-------------|
-| 400 | AUTH-09 | Mobile Auth complete (OTP, PIN, biometric, auto-lock) | [x] | [x] | #52 |
-| 401 | AUTH-10 | Forgot PIN & Lock Screen | [x] | [x] | #400 |
-| 402 | CAPTURE-06 | MediaPipe WASM Client-Side Quality Gate | [-] | [ ] | #308 |
+| 55 | CAPTURE-01 | Mobile — CNI Recto Capture logic | [x] | [ ] | #50 |
+| 56 | CAPTURE-02 | Mobile — CNI Verso Capture logic | [x] | [ ] | #55 |
+| 57 | CAPTURE-03 | Backend — Multipart upload handler for documents | [x] | [ ] | #50 |
+| 58 | CAPTURE-04 | Infrastructure — Docker filesystem volume for doc storage | [x] | [ ] | #9 |
+| 59 | CAPTURE-05 | UI — Camera Preview & Framing Overlay | [x] | [ ] | #55 |
+| 60 | CAPTURE-06 | Integration — MediaPipe WASM Client-Side Quality Gate | [x] | [ ] | #55, #59 |
+| 61 | CAPTURE-07 | Database — Documents table migration | [x] | [ ] | #50 |
+| 62 | CAPTURE-08 | Security — SHA-256 integrity hash calculation | [x] | [ ] | #57 |
 
-**Flux logique :** #400 → #401, #308 → #402
+**Flux logique :** #50/#9 → #57/#61 → #58 → #62 → #55 → #59 → #60
+
+---
+
+## 🟡 M2 - Stories (Epic 2)
+
+| # | Issue | Description | LOCAL | CLOUD | Dépendances |
+|---|-------|-------------|-------|-------|-------------|
+| 13 | Story 2.1 | CNI Recto Capture with Client-Side Quality Gate (MediaPipe WASM) | [ ] | [ ] | #60 |
+| 14 | Story 2.2 | CNI Verso Capture | [ ] | [ ] | #56 |
+| 15 | Story 2.3 | Liveness Selfie with 3-Strike Lockout | [ ] | [ ] | #13 |
+| 16 | Story 2.4 | OCR Extraction Review Screen (confidence badges + manual correction) | [ ] | [ ] | #62 |
+| 17 | Story 2.5 | Session Resumption After Network Loss (Service Worker + IndexedDB) | [ ] | [ ] | #13 |
+| 182 | ADMIN-09 | Frontend — Sentry integration pour error reporting | [ ] | [ ] | #9 |
+
+**Flux logique :** #60 → #13 → #14 → #15 → #16 → #17
 
 ---
 
@@ -109,4 +129,4 @@
 
 ---
 
-*Dernière mise à jour : 2026-04-05*
+*Dernière mise à jour : 2026-04-09*
