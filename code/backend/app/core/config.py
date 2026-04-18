@@ -60,8 +60,22 @@ class Settings(BaseSettings):
     BACKUP_ENCRYPTION_KEY: str = ""
 
     # IA / OCR
-    OCR_CONFIDENCE_THRESHOLD: float = 0.85
+    # Confidence threshold: minimum required to accept OCR without fallback
+    OCR_CONFIDENCE_THRESHOLD: float = 0.90
+    # User edit threshold: below this, user can modify the extracted value
+    OCR_USER_EDIT_THRESHOLD: float = 0.95
     PADDLE_LAZY_LOAD: bool = True
+    PADDLE_USE_GPU: bool = False
+    PADDLE_LANG: str = "french"
+    GLM_OCR_QUEUE: str = "glm_ocr_jobs"
+    GLM_OCR_ENABLED: bool = True
+    GLM_OCR_CLI_PATH: str = ""
+    GLM_OCR_MODEL_PATH: str = ""
+    GLM_OCR_MMPROJ_PATH: str = ""
+    GLM_OCR_TIMEOUT_SECONDS: int = 90
+    OCR_GLM_FALLBACK_MIN_FIELDS: int = 2
+    FACE_MATCH_MIN_SCORE: float = 0.8
+    ANTI_SPOOFING_MIN_SCORE: float = 0.7
 
     # Orange SMS API
     ORANGE_CLIENT_ID: str = ""

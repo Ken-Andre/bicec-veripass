@@ -25,15 +25,6 @@ class EmailClient:
             logger.warning("Empty recipient email, skipping send.")
             return False
 
-        if (
-            settings.ENVIRONMENT != "production"
-            and not self.user
-            and self.host == "localhost"
-        ):
-            logger.info(f"[SIMULATED EMAIL] to {to_email}: {subject}")
-            # Optional: log content
-            return True
-
         message = MIMEText(content, content_type, "utf-8")
         message["From"] = self.sender
         message["To"] = to_email

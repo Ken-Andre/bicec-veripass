@@ -7,6 +7,7 @@ from app.modules.aml.router import router as aml_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.audit.router import router as audit_router
+from app.api.v1.ocr import router as ocr_router
 
 api_router = APIRouter()
 
@@ -20,3 +21,4 @@ api_router.include_router(
     notifications_router, prefix="/notifications", tags=["notifications"]
 )
 api_router.include_router(audit_router, prefix="/audit", tags=["audit"])
+api_router.include_router(ocr_router, prefix="/ocr", tags=["ocr"])

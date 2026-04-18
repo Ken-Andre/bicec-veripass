@@ -2,6 +2,11 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
+# CRITICAL: Import all database models FIRST before creating Celery app
+# This ensures all SQLAlchemy mappers are configured before Celery worker starts
+# and prevents "expression 'X' failed to locate a name ('X')" errors
+import app.db  # noqa: F401
+
 # Celery application configuration
 # The broker and backend URLs are taken from environment variables
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -15,7 +20,8 @@ celery = Celery(
         "app.tasks_demo",  # Tâches de démonstration
         "app.modules.auth.tasks",  # Tâches d'authentification (OTP SMS/Email)
         "app.tasks.sanctions",  # Sync PEP/Sanctions listes (AML)
-        "app.tasks.kyc",  # Sessions abandonnées, doublons
+        "app.tasks.kyc",  # Sessions abandonnees, doublons
+        "app.tasks.ocr",  # Fallback OCR GLM
     ],
 )
 

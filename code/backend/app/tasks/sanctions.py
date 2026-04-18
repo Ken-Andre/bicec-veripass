@@ -42,12 +42,15 @@ async def sync_pep_sanctions():
             raise
 
 
-celery_async = celery.task(
-    "app.tasks.sanctions.sync_pep_sanctions",
+@celery.task(
+    name="app.tasks.sanctions.sync_pep_sanctions",
     bind=True,
     max_retries=3,
-    default_retry_delay=300,  # 5min
-)(sync_pep_sanctions)
+    default_retry_delay=300,
+)  # 5min
+async def celery_sync_sanctions(self):
+    """Celery task wrapper for sync_pep_sanctions."""
+    await sync_pep_sanctions()
 
 
 async def _download_and_upsert(db: AsyncSession) -> int:

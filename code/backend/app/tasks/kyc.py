@@ -49,12 +49,15 @@ async def detect_abandoned_sessions():
             raise
 
 
-celery_abandoned = celery.task(
-    "app.tasks.kyc.detect_abandoned_sessions",
+@celery.task(
+    name="app.tasks.kyc.detect_abandoned_sessions",
     bind=True,
     max_retries=2,
     default_retry_delay=600,
-)(detect_abandoned_sessions)
+)
+async def celery_abandoned(self):
+    """Celery task wrapper for detect_abandoned_sessions."""
+    return await detect_abandoned_sessions()
 
 
 async def check_duplicates(session_id: str):
@@ -112,9 +115,12 @@ async def check_duplicates(session_id: str):
             raise
 
 
-celery_duplicates = celery.task(
-    "app.tasks.kyc.check_duplicates",
+@celery.task(
+    name="app.tasks.kyc.check_duplicates",
     bind=True,
     max_retries=1,
     default_retry_delay=60,
-)(check_duplicates)
+)
+async def celery_duplicates(self, session_id: str):
+    """Celery task wrapper for check_duplicates."""
+    return await check_duplicates(session_id)
