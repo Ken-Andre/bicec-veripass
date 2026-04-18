@@ -124,6 +124,31 @@ paddleocr_test/*.png
 paddleocr_test/nul
 paddleocr_test/result_*.png_annotated.png
 paddleocr_test/template_dump.json
+paddleocr_test/notebooks/_tmpl_raw.bin
+paddleocr_test/notebooks/layouts/
+
+# ========================
+# Scripts debug/test OCR
+# ========================
+paddleocr_test/check_multimodal.py
+paddleocr_test/debug_addr.py
+paddleocr_test/debug_glm_ocr.py
+paddleocr_test/run_notebook01_headless.py
+paddleocr_test/test_recto_senior.py
+paddleocr_test/test_verso.py
+
+# ========================
+# Rapports et analyses
+# ========================
+*_ERROR_ANALYSIS.md
+*_DEPLOYMENT*.md
+*_HEARTBEAT*.md
+*_MIGRATION*.md
+COMMIT_PLAN*.md
+*_COMPLETE.md
+*_PLAN.md
+*_FIX.md
+all_changes.txt
 
 # ========================
 # Build & Lint outputs
