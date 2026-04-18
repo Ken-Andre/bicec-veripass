@@ -1,7 +1,9 @@
 """KYC Module Routes."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import re
+from statistics import mean
 from fastapi import (
     APIRouter,
     Request,
@@ -29,6 +31,11 @@ from app.modules.kyc.models import (
     BiometricResult,
     ConsentRecord,
 )
+from app.modules.kyc.service import (
+    process_document_ocr_pipeline,
+    compute_anti_spoofing_score_from_landmarks,
+    compute_face_match_score_for_session,
+)
 from app.modules.kyc.schemas import (
     KYCSessionResponse,
     KYCSubmitResponse,
@@ -40,6 +47,7 @@ from app.modules.kyc.schemas import (
     LivenessSubmitRequest,
     LivenessResultResponse,
     OCRReviewSubmitRequest,
+    OCRConfirmSubmitRequest,
     OCRFieldResponse,
     NIUSubmitRequest,
     GeoRegionResponse,
@@ -48,6 +56,163 @@ from app.modules.kyc.schemas import (
 )
 
 router = APIRouter()
+SHA256_HEX_RE = re.compile(r"^[a-fA-F0-9]{64}$")
+VALID_CAPTURE_SIDES = {"RECTO", "VERSO"}
+LIVENESS_LOCKOUT_COOLDOWN_SECONDS = 60
+LIVENESS_LOCKOUT_WINDOW_HOURS = 24
+MAX_LIVENESS_LOCKOUTS_PER_WINDOW = 3
+
+
+def _normalize_sha256(value: str) -> str:
+    return value.strip().lower()
+
+
+def _is_valid_sha256(value: str) -> bool:
+    return bool(SHA256_HEX_RE.fullmatch(value.strip()))
+
+
+def _normalize_capture_side(side: str) -> str:
+    normalized = side.strip().upper()
+    if normalized not in VALID_CAPTURE_SIDES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid side. Expected RECTO or VERSO.",
+        )
+    return normalized
+
+
+def _reset_user_lockout_window_if_needed(current_user: User) -> None:
+    now = datetime.now(timezone.utc)
+    if (
+        current_user.last_lockout_reset_at is None
+        or now - current_user.last_lockout_reset_at
+        >= timedelta(hours=LIVENESS_LOCKOUT_WINDOW_HOURS)
+    ):
+        current_user.liveness_lockout_count_24h = 0
+        current_user.last_lockout_reset_at = now
+
+
+def _locked_liveness_response(lockout_count_24h: int) -> LivenessResultResponse:
+    return LivenessResultResponse(
+        is_alive=False,
+        confidence=0.0,
+        attempts_remaining=0,
+        strikes_remaining=0,
+        face_match_score=None,
+        anti_spoofing_score=None,
+        is_locked=True,
+        cooldown_seconds=LIVENESS_LOCKOUT_COOLDOWN_SECONDS,
+        lockout_count_24h=lockout_count_24h,
+        branch_fallback_available=True,
+    )
+
+
+async def _get_active_draft_session(
+    db: AsyncSession, current_user: User
+) -> KYCSession:
+    result = await db.execute(
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
+    )
+    session = result.scalars().first()
+    if not session:
+        raise HTTPException(status_code=404, detail="No active KYC session")
+    return session
+
+
+async def _store_document_and_create_record(
+    *,
+    session: KYCSession,
+    file: UploadFile,
+    doc_type: str,
+    db: AsyncSession,
+    client_sha256: str | None = None,
+) -> DocumentResponse:
+    from app.modules.kyc.storage import document_storage
+
+    if client_sha256 and not _is_valid_sha256(client_sha256):
+        raise HTTPException(
+            status_code=400, detail="Invalid client_sha256 format (expected 64-char hex)"
+        )
+
+    # Save file using DocumentStorage (handles SHA-256 and storage)
+    try:
+        storage_result = await document_storage.save_uploaded_file(
+            session_id=str(session.id), upload_file=file, document_type=doc_type
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Document upload failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save document")
+
+    # Optional client/server integrity check with explicit retry semantics.
+    if client_sha256:
+        server_sha256 = _normalize_sha256(storage_result["sha256"])
+        normalized_client_sha256 = _normalize_sha256(client_sha256)
+        if normalized_client_sha256 != server_sha256:
+            await document_storage.delete_relative_path(storage_result["path"])
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "HASH_MISMATCH",
+                    "message": "Uploaded file hash does not match client hash. Please re-upload.",
+                    "client_sha256": normalized_client_sha256,
+                    "server_sha256": server_sha256,
+                    "retryable": True,
+                },
+            )
+
+    # Create document record
+    doc = Document(
+        id=uuid.uuid4(),
+        session_id=session.id,
+        doc_type=doc_type,
+        file_path=storage_result["path"],
+        sha256_hash=storage_result["sha256"],
+        captured_at=datetime.now(timezone.utc),
+        file_size_bytes=storage_result["size"],
+    )
+    db.add(doc)
+
+    # Update session step
+    session.last_step_completed = f"upload_{doc_type.lower()}"
+    await db.commit()
+    await db.refresh(doc, attribute_names=["ocr_fields"])
+
+    try:
+        await process_document_ocr_pipeline(document_id=doc.id, db=db)
+        await db.refresh(doc, attribute_names=["ocr_fields"])
+    except Exception as exc:
+        logger.warning(
+            "OCR pipeline failed for document %s (doc_type=%s): %s",
+            doc.id,
+            doc_type,
+            exc,
+        )
+
+    logger.info(f"Document {doc_type} uploaded for session {session.id}")
+    return DocumentResponse(
+        id=make_session_handle(str(doc.id)),
+        doc_type=doc.doc_type,
+        file_path=doc.file_path,
+        sha256_hash=doc.sha256_hash,
+        ocr_engine=doc.ocr_engine,
+        confidence_per_field=doc.confidence_per_field,
+        captured_at=doc.captured_at,
+        ocr_fields=[
+            OCRFieldResponse(
+                id=make_session_handle(str(field.id)),
+                field_name=field.field_name,
+                extracted_value=field.extracted_value,
+                confidence_score=float(field.confidence_score),
+                human_corrected=field.human_corrected,
+                corrected_value=field.corrected_value,
+            )
+            for field in doc.ocr_fields
+        ],
+    )
 
 
 @router.get("/")
@@ -202,59 +367,48 @@ async def upload_document(
     request: Request,
     file: UploadFile = File(...),
     doc_type: str = Form("CNI_RECTO"),
+    client_sha256: str | None = Form(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload a KYC document (CNI recto/verso, selfie, bill, NIU)."""
-    from app.modules.kyc.storage import document_storage
-
-    # Get current session
-    result = await db.execute(
-        select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
-        .order_by(KYCSession.started_at.desc())
-    )
-    session = result.scalars().first()
-    if not session:
-        raise HTTPException(status_code=404, detail="No active KYC session")
-
-    # Save file using DocumentStorage (handles SHA-256 and storage)
-    try:
-        storage_result = await document_storage.save_uploaded_file(
-            session_id=str(session.id), upload_file=file, document_type=doc_type
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Document upload failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save document")
-
-    # Create document record
-    doc = Document(
-        id=uuid.uuid4(),
-        session_id=session.id,
+    session = await _get_active_draft_session(db, current_user)
+    return await _store_document_and_create_record(
+        session=session,
+        file=file,
         doc_type=doc_type,
-        file_path=storage_result["path"],
-        sha256_hash=storage_result["sha256"],
-        captured_at=datetime.now(timezone.utc),
-        file_size_bytes=storage_result["size"],
+        db=db,
+        client_sha256=client_sha256,
     )
-    db.add(doc)
 
-    # Update session step
-    session.last_step_completed = f"upload_{doc_type.lower()}"
 
-    await db.commit()
+@router.post("/capture/cni", response_model=DocumentResponse)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def capture_cni(
+    request: Request,
+    file: UploadFile = File(...),
+    side: str = Form(...),
+    session_id: str | None = Form(None),
+    client_sha256: str | None = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Story-aligned CNI upload endpoint.
 
-    logger.info(f"Document {doc_type} uploaded for session {session.id}")
-    return DocumentResponse(
-        id=make_session_handle(str(doc.id)),
-        doc_type=doc.doc_type,
-        file_path=doc.file_path,
-        sha256_hash=doc.sha256_hash,
-        ocr_engine=doc.ocr_engine,
-        captured_at=doc.captured_at,
-        ocr_fields=[],
+    Expected contract:
+    - multipart file
+    - side: RECTO|VERSO
+    - optional session_id (accepted for compatibility; server uses active DRAFT session)
+    """
+    _ = session_id
+    normalized_side = _normalize_capture_side(side)
+    session = await _get_active_draft_session(db, current_user)
+    return await _store_document_and_create_record(
+        session=session,
+        file=file,
+        doc_type=f"CNI_{normalized_side}",
+        db=db,
+        client_sha256=client_sha256,
     )
 
 
@@ -314,7 +468,17 @@ async def submit_ocr_review(
     if not session:
         raise HTTPException(status_code=404, detail="No active KYC session")
 
-    # Update OCR fields
+    result = await db.execute(
+        select(Document)
+        .where(
+            Document.session_id == session.id,
+            Document.doc_type.in_(["CNI_RECTO", "CNI_VERSO"]),
+        )
+        .order_by(Document.captured_at.desc())
+    )
+    target_doc = result.scalars().first()
+
+    # Update OCR fields (or create manual ones when OCR extraction is empty)
     for field_name, corrected_value in body.fields.items():
         result = await db.execute(
             select(OCRField)
@@ -325,11 +489,47 @@ async def submit_ocr_review(
         if field:
             field.human_corrected = True
             field.corrected_value = corrected_value
+            if not field.extracted_value:
+                field.extracted_value = corrected_value
+        elif target_doc:
+            db.add(
+                OCRField(
+                    id=uuid.uuid4(),
+                    document_id=target_doc.id,
+                    field_name=field_name,
+                    extracted_value=corrected_value,
+                    confidence_score=1.0,
+                    human_corrected=True,
+                    corrected_value=corrected_value,
+                    corrected_at=datetime.now(timezone.utc),
+                )
+            )
 
     session.last_step_completed = "ocr_review"
     await db.commit()
 
     return {"status": "success", "message": "OCR review submitted"}
+
+
+@router.post("/ocr/confirm")
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def confirm_ocr_review(
+    request: Request,
+    body: OCRConfirmSubmitRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Story-aligned OCR confirmation endpoint.
+
+    Expected contract:
+    - corrected_fields: { field_name: value }
+    """
+    return await submit_ocr_review(
+        request=request,
+        body=OCRReviewSubmitRequest(fields=body.corrected_fields),
+        current_user=current_user,
+        db=db,
+    )
 
 
 @router.post("/liveness/submit", response_model=LivenessResultResponse)
@@ -341,14 +541,28 @@ async def submit_liveness(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit liveness challenge result."""
+    _reset_user_lockout_window_if_needed(current_user)
+
     result = await db.execute(
         select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .where(
+            KYCSession.user_id == current_user.id,
+            KYCSession.status.in_(["DRAFT", "LOCKED_LIVENESS"]),
+        )
         .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
         raise HTTPException(status_code=404, detail="No active KYC session")
+
+    if session.status == "LOCKED_LIVENESS":
+        await db.commit()
+        return _locked_liveness_response(current_user.liveness_lockout_count_24h or 0)
+
+    if (current_user.liveness_lockout_count_24h or 0) >= MAX_LIVENESS_LOCKOUTS_PER_WINDOW:
+        session.status = "LOCKED_LIVENESS"
+        await db.commit()
+        return _locked_liveness_response(current_user.liveness_lockout_count_24h or 0)
 
     # In production, validate landmarks and compute liveness score
     # For now, accept if landmarks are provided
@@ -359,23 +573,61 @@ async def submit_liveness(
         session.liveness_strike_count += 1
         if session.liveness_strike_count >= 3:
             session.status = "LOCKED_LIVENESS"
-            await db.commit()
-            return LivenessResultResponse(
-                is_alive=False,
-                confidence=0.0,
-                attempts_remaining=0,
-                strikes_remaining=0,
+            current_user.liveness_lockout_count_24h = (
+                (current_user.liveness_lockout_count_24h or 0) + 1
             )
+            await db.commit()
+            return _locked_liveness_response(current_user.liveness_lockout_count_24h)
 
-    # Create biometric result
-    biometric = BiometricResult(
-        id=uuid.uuid4(),
-        session_id=session.id,
-        liveness_score=confidence,
-        face_match_score=confidence,
-        processed_at=datetime.now(timezone.utc),
+        await db.commit()
+        return LivenessResultResponse(
+            is_alive=False,
+            confidence=0.0,
+            attempts_remaining=3 - session.liveness_strike_count,
+            strikes_remaining=3 - session.liveness_strike_count,
+            face_match_score=None,
+            anti_spoofing_score=None,
+            is_locked=False,
+            cooldown_seconds=None,
+            lockout_count_24h=current_user.liveness_lockout_count_24h or 0,
+            branch_fallback_available=False,
+        )
+
+    anti_spoofing_score = compute_anti_spoofing_score_from_landmarks(
+        body.landmarks_json,
+        body.challenge_type,
     )
-    db.add(biometric)
+    face_match_score = await compute_face_match_score_for_session(
+        session_id=session.id,
+        db=db,
+    )
+    resolved_face_match_score = face_match_score if face_match_score is not None else confidence
+    if (
+        anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
+        or resolved_face_match_score < settings.FACE_MATCH_MIN_SCORE
+    ):
+        session.priority_flag = True
+
+    result = await db.execute(
+        select(BiometricResult).where(BiometricResult.session_id == session.id)
+    )
+    biometric = result.scalar_one_or_none()
+    if biometric is None:
+        biometric = BiometricResult(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            liveness_score=confidence,
+            face_match_score=resolved_face_match_score,
+            anti_spoofing_score=anti_spoofing_score,
+            processed_at=datetime.now(timezone.utc),
+        )
+        db.add(biometric)
+    else:
+        biometric.liveness_score = confidence
+        biometric.face_match_score = resolved_face_match_score
+        biometric.anti_spoofing_score = anti_spoofing_score
+        biometric.processed_at = datetime.now(timezone.utc)
+    session.liveness_strike_count = 0
     session.last_step_completed = "liveness"
     await db.commit()
 
@@ -384,6 +636,29 @@ async def submit_liveness(
         confidence=confidence,
         attempts_remaining=3 - session.liveness_strike_count,
         strikes_remaining=3 - session.liveness_strike_count,
+        face_match_score=resolved_face_match_score,
+        anti_spoofing_score=anti_spoofing_score,
+        is_locked=False,
+        cooldown_seconds=None,
+        lockout_count_24h=current_user.liveness_lockout_count_24h or 0,
+        branch_fallback_available=False,
+    )
+
+
+@router.post("/capture/liveness", response_model=LivenessResultResponse)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def capture_liveness(
+    request: Request,
+    body: LivenessSubmitRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Story-aligned liveness endpoint alias."""
+    return await submit_liveness(
+        request=request,
+        body=body,
+        current_user=current_user,
+        db=db,
     )
 
 
@@ -506,7 +781,11 @@ async def submit_kyc(
         raise HTTPException(status_code=404, detail="No active KYC session")
 
     # Validate minimum requirements
-    result = await db.execute(select(Document).where(Document.session_id == session.id))
+    result = await db.execute(
+        select(Document)
+        .options(selectinload(Document.ocr_fields))
+        .where(Document.session_id == session.id)
+    )
     docs = result.scalars().all()
     doc_types = {d.doc_type for d in docs}
 
@@ -525,6 +804,49 @@ async def submit_kyc(
     if not consent:
         raise HTTPException(status_code=400, detail="Consent not submitted")
 
+    # OCR review gate: at least one extracted/corrected CNI field must exist
+    cni_docs = [d for d in docs if d.doc_type in {"CNI_RECTO", "CNI_VERSO"}]
+    ocr_scores: list[float] = []
+    for doc in cni_docs:
+        for field in doc.ocr_fields:
+            score = 1.0 if field.human_corrected else float(field.confidence_score)
+            ocr_scores.append(score)
+    if not ocr_scores:
+        raise HTTPException(
+            status_code=400,
+            detail="OCR review not completed. Please confirm identity fields first.",
+        )
+
+    # Biometric checkpoint gate (liveness + derived scores)
+    result = await db.execute(
+        select(BiometricResult).where(BiometricResult.session_id == session.id)
+    )
+    biometric = result.scalar_one_or_none()
+    if not biometric:
+        raise HTTPException(status_code=400, detail="Liveness step not completed")
+
+    liveness_score = float(biometric.liveness_score or 0.0)
+    face_match_score = float(biometric.face_match_score or 0.0)
+    anti_spoofing_score = float(biometric.anti_spoofing_score or 0.0)
+    ocr_avg_score = float(mean(ocr_scores))
+
+    # Flag for stronger manual review, but keep submission path available.
+    low_face_match = face_match_score < settings.FACE_MATCH_MIN_SCORE
+    low_anti_spoofing = anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
+    if low_face_match or low_anti_spoofing:
+        session.priority_flag = True
+
+    session.confidence_score_global = float(
+        mean(
+            [
+                ocr_avg_score,
+                liveness_score,
+                face_match_score,
+                anti_spoofing_score,
+            ]
+        )
+    )
+
     # Submit
     session.status = "PENDING_KYC"
     session.submitted_at = datetime.now(timezone.utc)
@@ -532,10 +854,16 @@ async def submit_kyc(
     await db.commit()
 
     logger.info(f"KYC submitted for user {current_user.id}, session {session.id}")
+    message = "Dossier soumis avec succès. Un agent validera votre dossier sous 24-48h."
+    if session.priority_flag:
+        message = (
+            "Dossier soumis avec succès et marqué en revue prioritaire "
+            "(vérification biométrique renforcée)."
+        )
     return KYCSubmitResponse(
         session_id=make_session_handle(str(session.id)),
         status="PENDING_KYC",
-        message="Dossier soumis avec succès. Un agent validera votre dossier sous 24-48h.",
+        message=message,
     )
 
 

@@ -311,6 +311,30 @@ class DocumentStorage:
             return True
         return False
 
+    async def delete_relative_path(self, relative_path: str) -> bool:
+        """Delete a stored file using its relative storage path.
+
+        Args:
+            relative_path: Relative path from storage root (e.g. session/type/file.jpg)
+
+        Returns:
+            True if the file existed and was deleted, False otherwise.
+        """
+        relative = Path(relative_path)
+        target = (self.base_path / relative).resolve()
+        base = self.base_path.resolve()
+
+        # Prevent path traversal outside storage root
+        if base not in target.parents and target != base:
+            raise DocumentStorageError("Invalid relative path outside storage root")
+
+        if target.exists() and target.is_file():
+            target.unlink()
+            logger.info(f"Document deleted by relative path: {relative_path}")
+            return True
+
+        return False
+
     def list_session_documents(self, session_id: str) -> list:
         """List all documents for a session.
 
@@ -340,10 +364,11 @@ class DocumentStorage:
 # Initialize on first access to avoid import-time directory creation failures in CI/test environments
 _document_storage_instance = None
 
+
 def get_document_storage():
     global _document_storage_instance
     if _document_storage_instance is None:
         _document_storage_instance = DocumentStorage()
     return _document_storage_instance
 
-document_storage = get_document_storage
+document_storage = get_document_storage()

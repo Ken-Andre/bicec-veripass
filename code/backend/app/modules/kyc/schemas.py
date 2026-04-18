@@ -125,11 +125,22 @@ class LivenessResultResponse(BaseModel):
     confidence: float
     attempts_remaining: int
     strikes_remaining: int
+    face_match_score: float | None = None
+    anti_spoofing_score: float | None = None
+    is_locked: bool = False
+    cooldown_seconds: int | None = None
+    lockout_count_24h: int | None = None
+    branch_fallback_available: bool = False
 
 
 # === OCR Review ===
 class OCRReviewSubmitRequest(BaseModel):
     fields: dict = Field(..., description="Field name → confirmed/corrected value")
+
+class OCRConfirmSubmitRequest(BaseModel):
+    corrected_fields: dict = Field(
+        ..., description="Field name to corrected value mapping"
+    )
 
 
 # === NIU ===
