@@ -142,11 +142,12 @@ class TestTlsMutualExclusion:
 
 
 class TestDevSimulationShortcut:
-    """In non-production with no user and host=localhost, skip real send."""
+    """Simulation mode removed - emails now always sent via SMTP (works with Mailpit)."""
 
     @pytest.mark.asyncio
-    async def test_dev_local_returns_true_without_calling_aiosmtplib(self):
-        client = _make_client(host="localhost", user="", environment="development")
+    async def test_dev_mode_still_sends_via_smtp(self):
+        """Even in dev mode, emails are sent via SMTP (to Mailpit or other SMTP server)."""
+        client = _make_client(host="mailpit", port=1025, user="", environment="development")
 
         with (
             patch("app.core.email.settings") as ms,
@@ -156,7 +157,7 @@ class TestDevSimulationShortcut:
             result = await client.send_email("dest@example.com", "Subj", "Body")
 
         assert result is True
-        mock_send.assert_not_called()
+        mock_send.assert_called_once()  # Now actually calls SMTP
 
 
 # ---------------------------------------------------------------------------

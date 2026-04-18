@@ -6,7 +6,7 @@ from fastapi import UploadFile, HTTPException
 from io import BytesIO
 import os
 
-from app.modules.kyc.storage import DocumentStorage
+from app.modules.kyc.storage import DocumentStorage, document_storage
 
 
 @pytest.fixture
@@ -49,6 +49,11 @@ class TestDocumentStorage:
         DocumentStorage(storage_path=str(new_path))
         assert new_path.exists()
         assert new_path.is_dir()
+
+    def test_singleton_document_storage_is_instance(self):
+        """Le singleton exporte une instance utilisable, pas une fonction."""
+        assert hasattr(document_storage, "save_uploaded_file")
+        assert callable(document_storage.save_uploaded_file)
 
     def test_calculate_sha256_returns_correct_hash(self, storage, sample_image):
         """Le hash SHA-256 doit être correct et reproductible."""
@@ -243,6 +248,25 @@ class TestDocumentStorage:
     async def test_delete_document_not_exists(self, storage):
         """delete_document doit retourner False si le fichier n'existe pas."""
         deleted = await storage.delete_document("nonexistent", "test.jpg")
+        assert deleted is False
+
+    @pytest.mark.asyncio
+    async def test_delete_relative_path(self, storage, sample_image):
+        """delete_relative_path doit supprimer via le chemin relatif stocke."""
+        metadata = await storage.save_document(
+            session_id="session-rel-delete",
+            file_content=sample_image,
+            filename="test.jpg",
+            content_type="image/jpeg",
+            document_type="CNI_RECTO",
+        )
+        deleted = await storage.delete_relative_path(metadata["path"])
+        assert deleted is True
+
+    @pytest.mark.asyncio
+    async def test_delete_relative_path_missing_returns_false(self, storage):
+        """delete_relative_path retourne False si la cible n'existe pas."""
+        deleted = await storage.delete_relative_path("missing-session/missing.jpg")
         assert deleted is False
 
     @pytest.mark.asyncio
