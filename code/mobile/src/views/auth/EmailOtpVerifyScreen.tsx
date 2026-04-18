@@ -10,7 +10,8 @@ const EmailOtpVerifyScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const email = (location.state as any)?.email || user?.email;
+  const state = location.state as { email?: string } | null;
+  const email = state?.email || user?.email;
 
   const [code, setCode] = useState<string[]>(Array(6).fill(''));
   const [loading, setLoading] = useState(false);
@@ -74,8 +75,9 @@ const EmailOtpVerifyScreen = () => {
       } else {
         navigate('/dashboard');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Code invalide ou expiré');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { detail?: string } } };
+      setError(apiErr.response?.data?.detail || 'Code invalide ou expiré');
       setCode(Array(6).fill(''));
       inputRefs.current[0]?.focus();
     } finally {

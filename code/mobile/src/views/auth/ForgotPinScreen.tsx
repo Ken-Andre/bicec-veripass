@@ -75,7 +75,10 @@ const ForgotPinScreen = () => {
       setLoading(true);
       setError('');
       try {
-        const res: any = await apiClient.post('/auth/otp/verify', {
+        interface VerifyResponse {
+          access_token?: string;
+        }
+        const res = await apiClient.post<VerifyResponse, { phone: string; otp: string }>('/auth/otp/verify', {
           phone: user.phone,
           otp: fullCode
         });
@@ -89,7 +92,7 @@ const ForgotPinScreen = () => {
         } else {
           setStep('pin');
         }
-      } catch (err: any) {
+      } catch {
         setError('Code invalide ou expiré');
         setPhoneCode(Array(6).fill(''));
       } finally {
@@ -211,7 +214,7 @@ const ForgotPinScreen = () => {
         const headers = authHeaders();
         await apiClient.post('/auth/email/verify', { otp: fullCode }, { headers });
         setStep('pin');
-      } catch (err: any) {
+      } catch {
         setError('Code invalide ou expiré');
         setEmailCode(Array(6).fill(''));
       } finally {
@@ -328,7 +331,13 @@ const ForgotPinScreen = () => {
     try {
       const headers = authHeaders();
       await apiClient.post('/auth/pin/setup', { pin }, { headers });
-      const userRes: any = await apiClient.get('/auth/me', { headers });
+      const userRes = await apiClient.get<unknown>('/auth/me', { headers }) as unknown as {
+        id?: string;
+        phone?: string;
+        email?: string;
+        role?: string;
+        access_token?: string;
+      };
       login(userRes.access_token || recoveryToken || '', {
         id: userRes.id || '',
         phone: userRes.phone || user?.phone || '',
@@ -337,8 +346,9 @@ const ForgotPinScreen = () => {
         has_pin: true
       });
       navigate('/dashboard', { replace: true });
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Erreur lors de la configuration du PIN');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { detail?: string } } };
+      setError(apiErr.response?.data?.detail || 'Erreur lors de la configuration du PIN');
       console.error(err);
     } finally {
       setLoading(false);

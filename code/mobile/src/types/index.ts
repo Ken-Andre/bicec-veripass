@@ -2,14 +2,16 @@
 
 export interface User {
   id: string;
-  // Autres champs utilisateur
+  phone?: string;
+  email?: string;
+  role: string;
+  has_pin: boolean;
 }
 
 export interface KycData {
   idDocumentFront?: File | Blob;
   idDocumentBack?: File | Blob;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  mrzData?: any;
+  mrzData?: unknown;
   faceVideoLength?: number;
   livenessScore?: number;
 }
@@ -149,7 +151,12 @@ export interface LivenessResult {
   confidence: number;
   attempts_remaining: number;
   face_match_score?: number;
+  anti_spoofing_score?: number;
   strikes_remaining?: number;
+  is_locked?: boolean;
+  cooldown_seconds?: number | null;
+  lockout_count_24h?: number | null;
+  branch_fallback_available?: boolean;
 }
 
 export interface LandmarkPoint {

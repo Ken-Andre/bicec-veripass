@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
@@ -28,7 +28,7 @@ const PinSetupScreen = () => {
     setCurrentPin(currentPin.slice(0, -1));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (step === 'create') {
       if (pin.length !== 6) return;
       setStep('confirm');
@@ -41,7 +41,7 @@ const PinSetupScreen = () => {
     }
     setLoading(true);
     try {
-      await apiClient.post('/auth/pin/setup', { pin });
+      await apiClient.post<void, { pin: string }>('/auth/pin/setup', { pin });
       setPinSetupCompleted();
       navigate('/dashboard');
     } catch (err) {
@@ -50,18 +50,21 @@ const PinSetupScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [step, pin, confirmPin, navigate, setPinSetupCompleted]);
 
   // Auto-submit when 6 digits are entered for better UX
   useEffect(() => {
     if (currentPin.length === 6) {
       const timer = setTimeout(() => {
-        if (step === 'confirm') handleSubmit();
-        else setStep('confirm');
+        if (step === 'confirm') {
+          handleSubmit();
+        } else {
+          setStep('confirm');
+        }
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [currentPin.length, step]);
+  }, [currentPin.length, step, handleSubmit]);
 
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 

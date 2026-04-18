@@ -5,6 +5,7 @@ import { ScreenLayout } from '../../components/ScreenLayout';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { MessageSquareCheck } from 'lucide-react';
+import type { OtpVerifyResponse, User } from '../../types';
 
 const OtpVerifyScreen = () => {
   const navigate = useNavigate();
@@ -69,14 +70,14 @@ const OtpVerifyScreen = () => {
     setError('');
     try {
       const payload = isEmail ? { email: identifier, otp: fullCode } : { phone: identifier, otp: fullCode };
-      const res: any = await apiClient.post('/auth/otp/verify', payload);
+      const res = await apiClient.post<OtpVerifyResponse, typeof payload>('/auth/otp/verify', payload);
 
       const token = res.access_token;
-      const userRes: any = await apiClient.get('/auth/me', {
+      const userRes = await apiClient.get<User>('/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      (login as any)(token, userRes);
+      login(token, userRes);
 
       // Login flow: after phone OTP verify, go directly to PIN login
       if (mode === 'login') {
@@ -85,8 +86,9 @@ const OtpVerifyScreen = () => {
         // Signup flow: go to email entry
         navigate('/auth/email', { state: { mode } });
       }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Code invalide ou expiré');
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { detail?: string } } };
+      setError(apiErr.response?.data?.detail || 'Code invalide ou expiré');
       setCode(Array(6).fill(''));
       inputRefs.current[0]?.focus();
     } finally {

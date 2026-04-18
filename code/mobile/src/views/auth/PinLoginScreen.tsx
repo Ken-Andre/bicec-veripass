@@ -36,7 +36,7 @@ const PinLoginScreen = () => {
 
     setLoading(true);
     try {
-      const res: any = await apiClient.post('/auth/pin/verify', {
+      const res = await apiClient.post<{ access_token: string }, { phone: string; pin: string }>('/auth/pin/verify', {
         phone: user.phone,
         pin: code
       });
@@ -50,7 +50,7 @@ const PinLoginScreen = () => {
       });
 
       navigate('/dashboard');
-    } catch (err) {
+    } catch {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       setShake(true);

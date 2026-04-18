@@ -46,7 +46,7 @@ const LockScreen = () => {
       // Strip any /mobile prefix to avoid double-basename issue
       const cleanRoute = lastRoute.replace(/^\/mobile/, '') || '/dashboard';
       navigate(cleanRoute, { replace: true });
-    } catch (err) {
+    } catch {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       setShake(true);

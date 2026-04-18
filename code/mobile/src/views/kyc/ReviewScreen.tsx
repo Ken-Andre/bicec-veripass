@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { CheckCircle, FileText, User, MapPin, Shield, Loader2 } from 'lucide-react';
+import { getSubmissionBlockerStatus, runKycSyncNow } from '../../services/kycSyncService';
 
 interface SessionData {
   status: string;
@@ -16,10 +17,12 @@ export default function ReviewScreen() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitBlockedReason, setSubmitBlockedReason] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSession = async () => {
       try {
+        await runKycSyncNow();
         const token = localStorage.getItem('access_token');
         const res = await fetch('/api/v1/kyc/session/current', {
           headers: { Authorization: `Bearer ${token}` },
@@ -28,9 +31,22 @@ export default function ReviewScreen() {
           const data = await res.json();
           setSession(data);
         }
-      } catch {}
+      } catch (error) {
+        console.error('Failed to fetch session:', error);
+      }
     };
-    fetchSession();
+
+    const refreshSubmissionGate = async () => {
+      try {
+        const status = await getSubmissionBlockerStatus();
+        setSubmitBlockedReason(status.canSubmit ? null : status.blockingReason);
+      } catch (error) {
+        console.error('Failed to compute offline submission gate:', error);
+      }
+    };
+
+    void fetchSession();
+    void refreshSubmissionGate();
   }, []);
 
   const docTypes = session?.documents?.map(d => d.doc_type) || [];
@@ -38,10 +54,18 @@ export default function ReviewScreen() {
   const hasSelfie = docTypes.includes('SELFIE');
   const hasBill = docTypes.some(d => d.startsWith('BILL_'));
   const hasConsent = session?.consent_record?.cgu_accepted;
+  const canSubmitOnlineChecklist = Boolean(hasCni && hasSelfie && hasConsent);
+  const canSubmit = canSubmitOnlineChecklist && !submitBlockedReason;
 
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      const status = await getSubmissionBlockerStatus();
+      if (!status.canSubmit) {
+        setSubmitBlockedReason(status.blockingReason);
+        return;
+      }
+
       const token = localStorage.getItem('access_token');
       const res = await fetch('/api/v1/kyc/submit', {
         method: 'POST',
@@ -49,8 +73,15 @@ export default function ReviewScreen() {
       });
       if (res.ok) {
         setSubmitted(true);
+      } else {
+        const body = await res.json().catch(() => null);
+        setSubmitBlockedReason(
+          body?.detail || 'La soumission a echoue. Verifiez les etapes precedentes.',
+        );
       }
-    } catch {
+    } catch (error) {
+      console.error('Failed to submit KYC:', error);
+      setSubmitBlockedReason('La soumission a echoue. Verifiez la connexion et reessayez.');
     } finally {
       setSubmitting(false);
     }
@@ -124,12 +155,15 @@ export default function ReviewScreen() {
 
         <button
           onClick={handleSubmit}
-          disabled={submitting || !hasCni || !hasSelfie || !hasConsent}
+          disabled={submitting || !canSubmit}
           className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium disabled:opacity-50 mt-4 flex items-center justify-center gap-2"
         >
           {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
           {t('review.submit')}
         </button>
+        {submitBlockedReason ? (
+          <p className="text-xs text-red-600 mt-2">{submitBlockedReason}</p>
+        ) : null}
       </div>
     </ScreenLayout>
   );

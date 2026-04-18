@@ -34,42 +34,43 @@ const PhoneEntryScreen = () => {
         // LOGIN FLOW: verify credentials exist before sending OTP
         if (loginMethod === 'phone') {
           const fullPhone = `+237${phone}`;
-          const checkRes: any = await apiClient.get(`/auth/user/exists?phone=${encodeURIComponent(fullPhone)}`);
+          const checkRes = await apiClient.get<{ exists: boolean; phone?: string }>(`/auth/user/exists?phone=${encodeURIComponent(fullPhone)}`);
           if (!checkRes.exists) {
             setError('Numéro non reconnu. Créez d\'abord un compte.');
             setLoading(false);
             return;
           }
           setPhone(fullPhone);
-          await apiClient.post('/auth/otp/send', { phone: fullPhone });
+          await apiClient.post<void, { phone?: string; email?: string }>('/auth/otp/send', { phone: fullPhone });
           navigate('/auth/otp', { state: { mode: 'login', identifier: fullPhone } });
         } else {
           // Login by email — check if any user has this email
-          const checkRes: any = await apiClient.get(`/auth/user/exists?email=${encodeURIComponent(email)}`);
+          const checkRes = await apiClient.get<{ exists: boolean; phone: string }>(`/auth/user/exists?email=${encodeURIComponent(email)}`);
           if (!checkRes.exists) {
             setError('Email non reconnu. Créez d\'abord un compte.');
             setLoading(false);
             return;
           }
           setPhone(checkRes.phone);
-          await apiClient.post('/auth/otp/send', { email: email });
+          await apiClient.post<void, { phone?: string; email?: string }>('/auth/otp/send', { email: email });
           navigate('/auth/otp', { state: { mode: 'login', identifier: email } });
         }
       } else {
         // SIGNUP FLOW: user must NOT exist
         const fullPhone = `+237${phone}`;
-        const checkRes: any = await apiClient.get(`/auth/user/exists?phone=${encodeURIComponent(fullPhone)}`);
+        const checkRes = await apiClient.get<{ exists: boolean }>(`/auth/user/exists?phone=${encodeURIComponent(fullPhone)}`);
         if (checkRes.exists) {
           setError('Ce numéro est déjà utilisé. Connectez-vous.');
           setLoading(false);
           return;
         }
         setPhone(fullPhone);
-        await apiClient.post('/auth/otp/send', { phone: fullPhone });
+        await apiClient.post<void, { phone?: string; email?: string }>('/auth/otp/send', { phone: fullPhone });
         navigate('/auth/otp', { state: { mode: 'signup', identifier: fullPhone } });
       }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Erreur lors de l'envoi du code");
+    } catch (err) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || "Erreur lors de l'envoi du code");
     } finally {
       setLoading(false);
     }
@@ -89,18 +90,16 @@ const PhoneEntryScreen = () => {
             <div className="flex rounded-2xl bg-slate-100 p-1">
               <button
                 onClick={() => setLoginMethod('phone')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${
-                  loginMethod === 'phone' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${loginMethod === 'phone' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'
+                  }`}
               >
                 <Phone className="w-4 h-4" />
                 Téléphone
               </button>
               <button
                 onClick={() => setLoginMethod('email')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${
-                  loginMethod === 'email' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'
-                }`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${loginMethod === 'email' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'
+                  }`}
               >
                 <Mail className="w-4 h-4" />
                 Email

@@ -128,52 +128,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedUser = localStorage.getItem('vp_user');
 
     if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setTimeout(() => {
+      try {
+        const parsedUser = JSON.parse(savedUser) as User;
         setUser(parsedUser);
         if (token) {
           setIsAuthenticated(true);
         }
-        setLoading(false);
-      }, 0);
-    } else {
-      setLoading(false);
+      } catch (err) {
+        console.error("Auth session parsing error", err);
+        localStorage.removeItem('vp_token');
+        localStorage.removeItem('vp_user');
+      }
     }
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = (token: string, userData: User) => {
+  const login = useCallback((token: string, userData: User) => {
     localStorage.setItem('vp_token', token);
     localStorage.setItem('vp_user', JSON.stringify(userData));
     setIsAuthenticated(true);
     setIsLocked(false);
     setUser(userData);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('vp_token');
     localStorage.removeItem('vp_user');
     setUser(null);
     setIsAuthenticated(false);
     setIsLocked(false);
     clearTimer();
-  };
+  }, [clearTimer]);
 
-  const setPinSetupCompleted = () => {
-    if (user) {
-      const updatedUser = { ...user, has_pin: true };
+  const setPinSetupCompleted = useCallback(() => {
+    setUser(prev => {
+      if (!prev) return null;
+      const updatedUser = { ...prev, has_pin: true };
       localStorage.setItem('vp_user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-    }
-  };
+      return updatedUser;
+    });
+  }, []);
 
-  const resetAccount = () => {
+  const resetAccount = useCallback(() => {
     localStorage.removeItem('vp_token');
     localStorage.removeItem('vp_user');
     setIsAuthenticated(false);
     setUser(null);
     setIsLocked(false);
     clearTimer();
-  };
+  }, [clearTimer]);
 
   const deleteAccount = async () => {
     try {
@@ -210,10 +214,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export const useAuth = () => {
+// eslint-disable-next-line react-refresh/only-export-components
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}

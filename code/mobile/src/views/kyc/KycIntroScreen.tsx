@@ -1,11 +1,38 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { FileText, Camera, CheckCircle, Shield } from 'lucide-react';
+import { useKyc } from '../../contexts/KycContext';
 
 export default function KycIntroScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { setSessionId } = useKyc();
+  const [starting, setStarting] = useState(false);
+
+  const ensureKycSession = async () => {
+    if (starting) return;
+    setStarting(true);
+    try {
+      const token = localStorage.getItem('vp_token');
+      const res = await fetch('/api/v1/kyc/session/start', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { session_id?: string };
+        if (data.session_id) {
+          setSessionId(data.session_id);
+        }
+      }
+    } catch {
+      setSessionId(`offline-${Date.now()}`);
+    } finally {
+      setStarting(false);
+      navigate('/kyc/cni-intro');
+    }
+  };
 
   return (
     <ScreenLayout title={t('kyc.progress.title')} showBack>
@@ -37,8 +64,9 @@ export default function KycIntroScreen() {
         </div>
 
         <button
-          onClick={() => navigate('/kyc/cni-intro')}
-          className="w-full max-w-sm bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+          onClick={ensureKycSession}
+          disabled={starting}
+          className="w-full max-w-sm bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
         >
           {t('kyc.whatYouNeed.ready')}
         </button>

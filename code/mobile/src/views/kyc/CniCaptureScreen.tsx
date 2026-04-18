@@ -1,126 +1,377 @@
-import { useState, useRef, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useKyc } from '../../contexts/KycContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
-import { Camera, CheckCircle, AlertTriangle } from 'lucide-react';
+import { computeLaplacianVariance } from '../../services/mediapipeService';
+import { Camera, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { enqueueOfflineCniCapture, runKycSyncNow } from '../../services/kycSyncService';
+import { captureKycException, captureKycMessage } from '../../services/sentry';
 
-export default function CniCaptureScreen() {
-  const { t } = useLanguage();
+type QualityStatus = 'checking' | 'good' | 'blurry' | 'dark' | 'glare';
+
+interface CniCaptureScreenProps {
+  side: 'recto' | 'verso';
+  nextRoute: string;
+}
+
+const BLUR_THRESHOLD = 100;
+const DARK_THRESHOLD = 40;
+const GLARE_THRESHOLD = 245;
+
+export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenProps) {
   const navigate = useNavigate();
-  const location = useLocation();
-  const side = location.pathname.includes('verso') ? 'verso' : 'recto';
-
-  const [status, setStatus] = useState<'ready' | 'capturing' | 'success' | 'error'>('ready');
-  const [quality, setQuality] = useState<string>('');
+  const { t } = useLanguage();
+  const { setCniCapture, completeStep, sessionId, setSessionId } = useKyc();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [quality, setQuality] = useState<QualityStatus>('checking');
+  const [capturing, setCapturing] = useState(false);
+  const [error, setError] = useState('');
+  const [cameraReady, setCameraReady] = useState(false);
+  const capturedRef = useRef(false);
+  const ensureSessionId = useCallback(() => {
+    if (sessionId) return sessionId;
+    const generated = `offline-${Date.now()}`;
+    setSessionId(generated);
+    return generated;
+  }, [sessionId, setSessionId]);
 
-  const startCamera = useCallback(async () => {
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+    setCameraReady(false);
+  }, []);
+
+  const toHex = (buffer: ArrayBuffer): string =>
+    Array.from(new Uint8Array(buffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+  const computeSha256 = useCallback(async (blob: Blob): Promise<string | null> => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setStatus('capturing');
+      if (!globalThis.crypto?.subtle) return null;
+      const bytes = await blob.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return toHex(digest);
     } catch {
-      setStatus('error');
+      return null;
     }
   }, []);
 
-  const capture = useCallback(async () => {
-    if (!videoRef.current) return;
-
-    // Simulate quality check
-    setQuality(t('capture.quality.analyzing'));
-
-    // Create canvas and capture
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(videoRef.current, 0, 0);
-
-    // Convert to blob
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-
-      // Upload to API
+  const uploadDocument = useCallback(async (blob: Blob, dataUrl: string) => {
+    const clientSha = await computeSha256(blob);
+    try {
+      const token = localStorage.getItem('vp_token');
       const formData = new FormData();
       formData.append('file', blob, `cni_${side}.jpg`);
-      formData.append('doc_type', `CNI_${side.toUpperCase()}`);
+      formData.append('side', side.toUpperCase());
+      if (sessionId) {
+        formData.append('session_id', sessionId);
+      }
+      if (clientSha) {
+        formData.append('client_sha256', clientSha);
+      }
+
+      const res = await fetch('/api/v1/kyc/capture/cni', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`capture_cni_failed_${res.status}`);
+      }
+
+      await runKycSyncNow();
+    } catch (err) {
+      const stableSessionId = ensureSessionId();
+      captureKycException(err, 'upload_failure', {
+        sessionId: stableSessionId,
+        step: side === 'recto' ? 'cni_recto' : 'cni_verso',
+        operation: 'capture_cni_direct_upload',
+        extra: { side: side.toUpperCase(), queued_offline: true },
+      });
+      await enqueueOfflineCniCapture({
+        sessionId: stableSessionId,
+        side: side.toUpperCase() as 'RECTO' | 'VERSO',
+        step: side === 'recto' ? 'cni_recto' : 'cni_verso',
+        fileDataUrl: dataUrl,
+        clientSha256: clientSha,
+      });
+      console.warn('Upload error, queued offline replay:', err);
+    }
+  }, [side, sessionId, computeSha256, ensureSessionId]);
+
+  const doCapture = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || capturedRef.current) return;
+    capturedRef.current = true;
+    setCapturing(true);
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    setCniCapture(side, dataUrl);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((nextBlob) => resolve(nextBlob), 'image/jpeg', 0.85);
+    });
+    if (blob) {
+      await uploadDocument(blob, dataUrl);
+    } else {
+      captureKycMessage('Failed to create image blob from CNI capture canvas', 'upload_failure', {
+        sessionId,
+        step: side === 'recto' ? 'cni_recto' : 'cni_verso',
+        operation: 'capture_cni_blob_generation',
+      });
+    }
+
+    completeStep(side === 'recto' ? 'cni_recto' : 'cni_verso');
+    stopCamera();
+    navigate(nextRoute);
+  }, [side, nextRoute, setCniCapture, completeStep, stopCamera, navigate, uploadDocument]);
+
+  const startCamera = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not available in this browser context (requires HTTPS or localhost).');
+      }
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
+      } catch (err) {
+        console.warn('Environment camera failed, trying user camera', err);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        });
+      }
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        const markReady = () => setCameraReady(true);
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().then(markReady).catch(markReady);
+        };
+        videoRef.current.onplaying = markReady;
+        setTimeout(markReady, 2000);
+      }
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      console.error('Camera access error:', error);
+      captureKycException(error, 'camera_error', {
+        sessionId,
+        step: side === 'recto' ? 'cni_recto' : 'cni_verso',
+        operation: 'capture_cni_camera_init',
+        extra: { side: side.toUpperCase() },
+      });
+      setError(`${t('capture.camera.error')} - ${error.message}`);
+    }
+  }, [t, sessionId, side]);
+
+  useEffect(() => {
+    if (!cameraReady) return;
+
+    const interval = setInterval(() => {
+      if (!videoRef.current || !canvasRef.current || capturedRef.current) return;
+      const video = videoRef.current;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (!vw || !vh) { setQuality('good'); return; }
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = vw;
+      canvas.height = vh;
+      ctx.drawImage(video, 0, 0);
 
       try {
-        const token = localStorage.getItem('access_token');
-        const res = await fetch('/api/v1/kyc/document/upload', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-
-        if (res.ok) {
-          setQuality(t('capture.quality.good'));
-          setStatus('success');
-          setTimeout(() => {
-            navigate(side === 'recto' ? '/kyc/cni-verso' : '/kyc/ocr-review');
-          }, 1500);
-        } else {
-          setQuality(t('capture.quality.adjust'));
+        const imageData = ctx.getImageData(0, 0, vw, vh);
+        const data = imageData.data;
+        let totalBrightness = 0;
+        let maxBrightness = 0;
+        const step = 32;
+        let samples = 0;
+        for (let i = 0; i < data.length; i += step * 4) {
+          const b = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          totalBrightness += b;
+          if (b > maxBrightness) maxBrightness = b;
+          samples++;
         }
+        const avgBrightness = totalBrightness / samples;
+
+        if (avgBrightness < DARK_THRESHOLD) {
+          setQuality('dark');
+          return;
+        }
+        if (maxBrightness > GLARE_THRESHOLD && avgBrightness > 200) {
+          setQuality('glare');
+          return;
+        }
+
+        const smallW = Math.min(vw, 320);
+        const smallH = Math.round((smallW / vw) * vh);
+        const offscreen = document.createElement('canvas');
+        offscreen.width = smallW;
+        offscreen.height = smallH;
+        const offCtx = offscreen.getContext('2d')!;
+        offCtx.drawImage(video, 0, 0, smallW, smallH);
+
+        const variance = computeLaplacianVariance(offCtx, smallW, smallH);
+
+        if (variance < BLUR_THRESHOLD) {
+          setQuality('blurry');
+          return;
+        }
+
+        setQuality('good');
       } catch {
-        setQuality(t('capture.quality.adjust'));
+        setQuality('good');
       }
-    }, 'image/jpeg', 0.9);
-  }, [side, t, navigate]);
+    }, 800);
+
+    return () => clearInterval(interval);
+  }, [cameraReady]);
+
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, [startCamera, stopCamera]);
+
+  const qualityLabel = () => {
+    switch (quality) {
+      case 'good': return t('capture.quality.good');
+      case 'blurry': return t('capture.quality.blurry');
+      case 'dark': return t('capture.quality.dark');
+      case 'glare': return t('capture.quality.glare');
+      default: return t('capture.quality.analyzing');
+    }
+  };
+
+  const qualityColor = () => {
+    switch (quality) {
+      case 'good': return 'bg-green-500 text-white';
+      case 'blurry': return 'bg-orange-500 text-white';
+      case 'dark': return 'bg-blue-500 text-white';
+      case 'glare': return 'bg-yellow-500 text-black';
+      default: return 'bg-gray-500 text-white';
+    }
+  };
+
+  const borderColor = () => {
+    switch (quality) {
+      case 'good': return 'border-green-500';
+      case 'blurry': return 'border-orange-500';
+      case 'dark': return 'border-blue-500';
+      case 'glare': return 'border-yellow-500';
+      default: return 'border-white/50';
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center text-white p-6 text-center">
+        <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+        <p className="mb-4">{error}</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="text-primary underline"
+        >
+          {t('common.back')}
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <ScreenLayout title={t(`cni.${side}.title`)} showBack>
-      <div className="flex flex-col items-center gap-4 py-4">
-        <div className="relative w-full max-w-md aspect-[1.6] rounded-xl overflow-hidden bg-black">
-          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-          <div className="absolute inset-4 border-2 border-white/50 rounded-lg" />
-          <p className="absolute bottom-4 left-0 right-0 text-center text-white text-sm bg-black/50 py-2">
-            {t(`cni.${side}.tip`)}
-          </p>
+    <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      <div className="relative flex-1 overflow-hidden">
+        <video
+          ref={videoRef}
+          className="h-full w-full object-cover"
+          playsInline
+          muted
+          autoPlay
+        />
+        <canvas ref={canvasRef} className="hidden" />
+
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className={`relative w-[85%] aspect-[1.586/1] border-4 ${borderColor()} rounded-lg`}
+            style={{
+              boxShadow: quality === 'good' ? '0 0 20px rgba(34, 197, 94, 0.5)' : '0 0 20px rgba(249, 115, 22, 0.5)'
+            }}
+          >
+            <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 rounded-tl-lg" style={{ borderColor: 'inherit' }} />
+            <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 rounded-tr-lg" style={{ borderColor: 'inherit' }} />
+            <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 rounded-bl-lg" style={{ borderColor: 'inherit' }} />
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 rounded-br-lg" style={{ borderColor: 'inherit' }} />
+          </div>
         </div>
 
-        {quality && (
-          <div className={`flex items-center gap-2 text-sm ${status === 'success' ? 'text-green-600' : 'text-yellow-600'}`}>
-            {status === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-            {quality}
+        <div className="absolute bottom-24 left-0 right-0 flex flex-col items-center gap-3">
+          <div className={`rounded-full px-4 py-2 text-sm font-medium ${qualityColor()}`}>
+            {qualityLabel()}
           </div>
-        )}
 
-        {status === 'ready' && (
-          <button
-            onClick={startCamera}
-            className="w-full max-w-sm bg-primary text-primary-foreground py-3 rounded-lg font-medium flex items-center justify-center gap-2"
-          >
-            <Camera className="w-5 h-5" />
-            {t('capture.open.camera')}
-          </button>
-        )}
-
-        {status === 'capturing' && (
-          <div className="flex gap-3 w-full max-w-sm">
-            <button onClick={capture} className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg font-medium">
+          {!capturing && quality === 'good' && (
+            <button
+              onClick={doCapture}
+              className="flex items-center gap-2 rounded-full bg-green-500 px-6 py-3 text-white font-semibold text-sm shadow-lg"
+            >
+              <Camera className="h-5 w-5" />
               {t('capture.manual')}
             </button>
-          </div>
-        )}
+          )}
 
-        {status === 'success' && (
-          <div className="flex items-center gap-2 text-green-600">
-            <CheckCircle className="w-5 h-5" />
-            <span>{t('capture.success')}</span>
-          </div>
-        )}
+          {quality !== 'good' && !capturing && (
+            <div className="text-white/80 text-sm text-center">
+              {t('capture.adjust')}
+            </div>
+          )}
 
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>💡 {t('capture.tip.light')}</span>
-          <span>💡 {t('capture.tip.steady')}</span>
+          {capturing && (
+            <div className="text-white">Capturing...</div>
+          )}
+        </div>
+
+        <div className="absolute top-4 left-4">
+          <button
+            onClick={() => { stopCamera(); navigate(-1); }}
+            className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          {quality === 'good' ? (
+            <CheckCircle className="w-6 h-6 text-green-500" />
+          ) : (
+            <AlertTriangle className="w-6 h-6 text-orange-500" />
+          )}
         </div>
       </div>
-    </ScreenLayout>
+
+      <div className="bg-black p-6">
+        <div className="text-center text-white/60 text-sm mb-4">
+          {side === 'recto' ? t('cni.recto.tip') : t('cni.verso.tip')}
+        </div>
+        <button
+          onClick={() => { stopCamera(); navigate(-1); }}
+          className="text-white/60 text-sm w-full text-center hover:text-white"
+        >
+          {t('common.cancel')}
+        </button>
+      </div>
+    </div>
   );
 }

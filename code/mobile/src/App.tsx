@@ -10,6 +10,8 @@ import { PinSetupScreen, PinLoginScreen, PhoneEntryScreen, OtpVerifyScreen, Emai
 import KycIntroScreen from './views/kyc/KycIntroScreen';
 import CniIntroScreen from './views/kyc/CniIntroScreen';
 import CniCaptureScreen from './views/kyc/CniCaptureScreen';
+import CniRectoGuideScreen from './views/kyc/CniRectoGuideScreen';
+import CniVersoGuideScreen from './views/kyc/CniVersoGuideScreen';
 import OcrReviewScreen from './views/kyc/OcrReviewScreen';
 import LivenessScreen from './views/kyc/LivenessScreen';
 import AddressScreen from './views/kyc/AddressScreen';
@@ -17,6 +19,8 @@ import NiuScreen from './views/kyc/NiuScreen';
 import ConsentScreen from './views/kyc/ConsentScreen';
 import ReviewScreen from './views/kyc/ReviewScreen';
 import DeleteAccountScreen from './views/settings/DeleteAccountScreen';
+import { KycResumeBanner } from './components/KycResumeBanner';
+import { OfflineBanner } from './components/OfflineBanner';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +30,14 @@ function LockGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function CniRectoCapture() {
+  return <CniCaptureScreen side="recto" nextRoute="/kyc/cni-verso" />;
+}
+
+function CniVersoCapture() {
+  return <CniCaptureScreen side="verso" nextRoute="/kyc/ocr-review" />;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -33,6 +45,8 @@ function App() {
         <BrowserRouter basename="/mobile">
           <AuthProvider>
             <KycProvider>
+              <OfflineBanner />
+              <KycResumeBanner />
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/auth/phone" element={<PhoneEntryScreen />} />
@@ -47,8 +61,12 @@ function App() {
                 <Route path="/settings/delete-account" element={<LockGuard><DeleteAccountScreen /></LockGuard>} />
                 <Route path="/kyc/intro" element={<LockGuard><KycIntroScreen /></LockGuard>} />
                 <Route path="/kyc/cni-intro" element={<LockGuard><CniIntroScreen /></LockGuard>} />
-                <Route path="/kyc/cni-recto" element={<LockGuard><CniCaptureScreen /></LockGuard>} />
-                <Route path="/kyc/cni-verso" element={<LockGuard><CniCaptureScreen /></LockGuard>} />
+                <Route path="/kyc/cni-recto-guide" element={<LockGuard><CniRectoGuideScreen /></LockGuard>} />
+                <Route path="/kyc/cni-recto-capture" element={<LockGuard><CniRectoCapture /></LockGuard>} />
+                <Route path="/kyc/cni-verso-guide" element={<LockGuard><CniVersoGuideScreen /></LockGuard>} />
+                <Route path="/kyc/cni-verso-capture" element={<LockGuard><CniVersoCapture /></LockGuard>} />
+                <Route path="/kyc/cni-recto" element={<LockGuard><CniRectoGuideScreen /></LockGuard>} />
+                <Route path="/kyc/cni-verso" element={<LockGuard><CniVersoGuideScreen /></LockGuard>} />
                 <Route path="/kyc/ocr-review" element={<LockGuard><OcrReviewScreen /></LockGuard>} />
                 <Route path="/kyc/liveness" element={<LockGuard><LivenessScreen /></LockGuard>} />
                 <Route path="/kyc/address" element={<LockGuard><AddressScreen /></LockGuard>} />

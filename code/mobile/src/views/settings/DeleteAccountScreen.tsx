@@ -35,8 +35,9 @@ const DeleteAccountScreen = () => {
       setTimeout(() => {
         navigate('/', { replace: true });
       }, 3000);
-    } catch (err: any) {
-      setError(err.message || 'Erreur lors de la suppression du compte');
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Erreur inconnue');
+      setError(error.message || 'Erreur lors de la suppression du compte');
       setStep('confirm');
     } finally {
       setLoading(false);
