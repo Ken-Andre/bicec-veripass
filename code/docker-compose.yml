@@ -29,6 +29,7 @@ services:
       - "80:8080"
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
       - ./infra/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       api:
@@ -141,6 +142,14 @@ services:
       - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
       - OCR_CONFIDENCE_THRESHOLD=0.85
       - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
+      - FACE_MATCH_MIN_SCORE=${FACE_MATCH_MIN_SCORE:-0.8}
+      - ANTI_SPOOFING_MIN_SCORE=${ANTI_SPOOFING_MIN_SCORE:-0.7}
+      - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
+      - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
+      - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/data/models/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
+      - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/data/models/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
+      - GLM_OCR_QUEUE=${GLM_OCR_QUEUE:-glm_ocr_jobs}
+      - GLM_OCR_TIMEOUT_SECONDS=${GLM_OCR_TIMEOUT_SECONDS:-90}
       - SENTRY_DSN=${SENTRY_DSN_BACKEND}
     volumes:
       - documents_storage:/data/documents
@@ -183,6 +192,12 @@ services:
       - STORAGE_PATH=/data/documents
       - MODELS_PATH=/data/models
       - GLM_LAZY_LOAD=true      # GLM-OCR chargé à la 1ère tâche de la queue
+      - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
+      - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
+      - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/data/models/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
+      - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/data/models/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
+      - GLM_OCR_QUEUE=${GLM_OCR_QUEUE:-glm_ocr_jobs}
+      - GLM_OCR_TIMEOUT_SECONDS=${GLM_OCR_TIMEOUT_SECONDS:-90}
       - SKIP_MIGRATIONS=1
       - SENTRY_DSN=${SENTRY_DSN_BACKEND}
     volumes:
