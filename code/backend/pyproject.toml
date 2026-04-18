@@ -29,8 +29,7 @@ dependencies = [
     "numpy>=1.24",
     "Pillow>=10.0",
     # Biometrics
-    "deepface>=0.7",
-    "mediapipe>=0.10",
+    "deepface>=0.0.89",
 ]
 
 [project.optional-dependencies]

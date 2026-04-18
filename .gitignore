@@ -86,10 +86,75 @@ secrets/
 credentials.json
 service-account*.json
 
-
 # ========================
 # Tests code
 # ========================
 paddleocr_test/.venv_ocr/*
 docs/issue-183-implementation-report.md
 .codex_slides_rapport/*
+
+# ========================
+# Artefacts & Rapports
+# ========================
+artifacts/
+_bmad-output/
+board.kanban.*.json
+openapi-spec.json
+*_changes*.md
+git_*.txt
+files_to_review.md
+final_changes_report.md
+
+# ========================
+# PaddleOCR & Models
+# ========================
+paddleocr_test/llama-cpp-bin/
+paddleocr_test/llama-cpp-bin.zip
+paddleocr_test/llama-mtmd-cli.zip
+paddleocr_test/models/
+paddleocr_test/images/
+paddleocr_test/notebooks/__marimo__/
+*.gguf
+paddleocr_test/*.zip
+paddleocr_test/*.gguf
+paddleocr_test/_*.py
+paddleocr_test/_*.txt
+paddleocr_test/_*.json
+paddleocr_test/*.png
+paddleocr_test/nul
+paddleocr_test/result_*.png_annotated.png
+paddleocr_test/template_dump.json
+
+# ========================
+# Build & Lint outputs
+# ========================
+code/mobile/lint*.json
+code/mobile/lint_output.txt
+code/mobile/lint_results.txt
+code/backoffice/build_errors*.txt
+
+# ========================
+# Logs système
+# ========================
+code/b_logs.txt
+code/celery_logs.txt
+nul
+
+# ========================
+# Docs agents (générés)
+# ========================
+docs/agents_output/
+docs/integration-analysis
+docs/integration-analysis-*.md
+
+# ========================
+# Clinerules custom
+# ========================
+.clinerules/
+
+# ========================
+# Test data
+# ========================
+code/test_cni.png
+code/test_otp.py
+test_mailpit_otp.py

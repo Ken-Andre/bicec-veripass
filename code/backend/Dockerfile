@@ -1,11 +1,14 @@
 # Build stage
-FROM python:3.11-alpine AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 # Install build dependencies
-RUN apk add --no-cache \
-    build-base \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     curl \
-    libffi-dev
+    libffi-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -24,24 +27,21 @@ RUN uv sync --frozen --no-dev --no-install-project && \
     find /app/.venv -name "*.pyc" -delete
 
 # Final stage
-FROM python:3.11-alpine
+FROM python:3.11-slim-bookworm
 
 # Install runtime dependencies:
-# - OCR: mesa-gl, glib, libstdc++
-# - PostgreSQL client tools: postgresql-client (pg_dump, pg_restore, psql)
-# - Docker CLI: docker-cli (for disk prune task)
-RUN apk add --no-cache \
-    mesa-gl \
-    glib \
-    libstdc++ \
+# - OCR: libgl1, libglib2.0-0, libstdc++
+# - PostgreSQL client tools: postgresql-client
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libstdc++6 \
     postgresql-client \
-    docker-cli \
-    gnupg && \
-    # Clean apk cache to reduce image size
-    rm -rf /var/cache/apk/*
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
-RUN addgroup -S vpgroup && adduser -S vpuser -G vpgroup
+RUN groupadd vpgroup && useradd -m vpuser -G vpgroup
 
 WORKDIR /app
 
