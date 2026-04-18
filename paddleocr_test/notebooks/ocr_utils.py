@@ -68,13 +68,15 @@ DEFAULT_GLM_VERSO_PROMPT = (
     "You are a KYC expert. Extract the following fields from the BACK (VERSO) of this "
     "Cameroonian national identity card. The back contains VALIDITY and IDENTIFICATION info. "
     "Return ONLY a valid JSON object with EXACTLY these keys (no extras): "
-    '"numero_cni", "date_delivrance", "date_expiration". '
+    '"numero_cni", "date_delivrance", "date_expiration", "adresse", "poste_identification". '
     "Rules:\n"
     "- 'numero_cni' is the UNIQUE IDENTIFIER labeled 'IDENTIFIANT UNIQUE / UNIQUE IDENTIFIER'. "
     "It is a LONG number with AT LEAST 15+ digits (e.g. 20210474231620883). "
     "It is NOT the short serial number (usually 9 digits) printed alone at the bottom of the card.\n"
     "- 'date_delivrance' is labeled 'DATE DE DELIVRANCE / DATE OF ISSUE'.\n"
     "- 'date_expiration' is labeled 'DATE D EXPIRATION / DATE OF EXPIRY'.\n"
+    "- 'adresse': The physical address, below 'ADRESSE / ADDRESS'.\n"
+    "- 'poste_identification': 4 chars (e.g. CE01, LT04) near 'POSTE D'IDENTIFICATION'.\n"
     "- Dates must be in DD.MM.YYYY format (e.g. 23.06.2021).\n"
     "- IGNORE names under PERE/FATHER and MERE/MOTHER labels entirely.\n"
     "- DO NOT include nom, prenom, sexe, taille, or profession.\n"
@@ -109,8 +111,8 @@ def sanitize_glm_output(data: dict[str, Any], side: str = "recto") -> dict[str, 
             if len(digits_only) < 15:
                 clean_data["numero_cni"] = None  # was card serial, not NIN
     elif side.lower() == "recto":
-        # Recto should NOT contain validity fields
-        for field in ["numero_cni", "date_delivrance", "date_expiration"]:
+        # Recto should NOT contain validity fields and versos fields
+        for field in ["numero_cni", "date_delivrance", "date_expiration", "adresse", "poste_identification"]:
             clean_data[field] = None
 
     # Cross-validate verso dates: if expiration <= delivrance, model confused similar dates.
@@ -291,7 +293,23 @@ def _glm_ocr_extract_via_cli(
     prompt: str,
     timeout: int = 120,
 ) -> dict:
-    """Run GLM-OCR via llama-mtmd-cli subprocess."""
+    """Run GLM-OCR via llama-mtmd-cli subprocess.
+
+    This is the only working method for multimodal inference with
+    llama-cpp-python >= 0.3.x, since the old clip_model_path API
+    was removed and the mtmd_cpp low-level API has no Python wrapper.
+
+    Args:
+        image_path: Path to the image file on disk.
+        model_path: Path to the main GGUF model.
+        mmproj_path: Path to the mmproj GGUF.
+        cli_path: Path to llama-mtmd-cli executable.
+        prompt: Text prompt for the model.
+        timeout: Max seconds to wait for the subprocess.
+
+    Returns:
+        dict with raw_text, parsed_fields, parsing_mode, model, success.
+    """
     import subprocess
 
     cmd = [
@@ -302,7 +320,7 @@ def _glm_ocr_extract_via_cli(
         "-p", prompt,
         "-n", "2048",
         "--temp", "0.1",
-        "--no-warmup",
+        "--no-warmup",  # skip warmup on repeat calls
     ]
 
     try:
@@ -599,7 +617,8 @@ STOP_WORDS = {
 }
 
 CNI_FIELDS = ["nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
-               "sexe", "taille", "profession", "date_delivrance", "date_expiration"]
+               "sexe", "taille", "profession", "date_delivrance", "date_expiration",
+               "adresse", "poste_identification"]
 
 
 def extract_spatial_data(blocks: list[dict]) -> dict:
@@ -621,7 +640,7 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
     is_verso = any(
         kw in b["text"].upper()
         for b in blocks
-        for kw in ["PERE", "FATHER", "MERE", "MOTHER", "AUTORITE", "AUTHORITY", "DELIVRANCE", "UNIQUE", "IDENTIFIER"]
+        for kw in ["PERE", "FATHER", "MERE", "MOTHER", "AUTORITE", "AUTHORITY", "DELIVRANCE", "UNIQUE", "IDENTIFIER", "ADRESSE", "POSTE"]
     )
     if is_verso:
         parsed_data["methode"] = "ANCRAGE_SPATIAL (VERSO DETEC. -> IGNORE USER FIELDS)"
@@ -661,6 +680,47 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
                     if "recto_dates" not in locals():
                         recto_dates = []
                     recto_dates.append((clean_date, block["conf"]))
+        
+        if is_verso:
+            # Adresse
+            # Use regex for label to handle LDDRES, ADRES, ORESS, etc.
+            if re.search(r"(AD[D]?RES|DRESS|ORESS|DDRES|ADR\.)", text) and parsed_data["adresse"]["value"] is None:
+                candidates = []
+                for b in blocks:
+                    # Look below the label, and within a reasonable horizontal distance
+                    if b["cy"] > block["cy"] + 2 and abs(b["cx"] - block["cx"]) < 400:
+                        # CRITICAL: Exclude other labels (STOP_WORDS) and the label itself
+                        b_text = b["text"].upper()
+                        if not any(sw in b_text for sw in STOP_WORDS) and not re.search(r"(AD[D]?RES|DRESS|ORESS|DDRES|ADR\.)", b_text):
+                            if len(b_text) > 2: # Ignore noise
+                                candidates.append(b)
+                
+                if candidates:
+                    # Sort by a weighted score: vertical distance is primary, but horizontal matters
+                    # If vertical distance is very similar (e.g. within 10px), pick horizontally closer one
+                    candidates.sort(key=lambda b: (b["cy"] - block["cy"]) // 10 * 1000 + abs(b["cx"] - block["cx"]))
+                    meilleur = candidates[0]
+                    parsed_data["adresse"] = {"value": meilleur["text"], "conf": meilleur["conf"]}
+
+            # Poste d'identification
+            # Regex CE01, LT04, etc. 2 upper case letters + 2 digits possibly with space
+            match_poste = re.search(r"\b([A-Z]{2}\s?[0-9]{2})\b", text)
+            if match_poste and parsed_data["poste_identification"]["value"] is None:
+                parsed_data["poste_identification"] = {"value": match_poste.group(1).replace(" ", ""), "conf": block["conf"]}
+                
+            # If not found by regex, look below the label
+            if ("POST" in text or "IDENTIFICATIO" in text) and parsed_data["poste_identification"]["value"] is None:
+                candidates = [
+                    b for b in blocks
+                    if b["cy"] > block["cy"] + 5 and abs(b["cx"] - block["cx"]) < 250
+                ]
+                if candidates:
+                    candidates.sort(key=lambda b: b["cy"] - block["cy"])
+                    meilleur = candidates[0]
+                    # if it is short, it is highly likely to be the poste code (like "LT 02" or "SW04")
+                    if len(meilleur["text"]) <= 6 and not any(kw in meilleur["text"].upper() for kw in ["POST", "IDENT"]):
+                        parsed_data["poste_identification"] = {"value": meilleur["text"].replace(" ", ""), "conf": meilleur["conf"]}
+
         
         if not is_verso:
             # Sexe (F / M isole)
