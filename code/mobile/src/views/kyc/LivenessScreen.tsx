@@ -14,6 +14,7 @@ type ChallengeType = 'smile' | 'blink' | 'turn_left' | 'turn_right';
 const CHALLENGES: ChallengeType[] = ['smile', 'blink', 'turn_left'];
 const HOLD_FRAMES = 8;
 const NO_FACE_TIMEOUT_MS = 5000;
+const MAX_LANDMARK_FRAMES = 48;
 
 export default function LivenessScreen() {
   const { t } = useLanguage();
@@ -31,6 +32,7 @@ export default function LivenessScreen() {
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number>(0);
   const lastFaceTimeRef = useRef<number>(0);
+  const capturedLandmarksRef = useRef<Array<Record<string, unknown>>>([]);
 
   const getChallengeInstruction = (type: ChallengeType) => {
     switch (type) {
@@ -80,6 +82,7 @@ export default function LivenessScreen() {
       setHoldCount(0);
       setMessage('');
       lastFaceTimeRef.current = Date.now();
+      capturedLandmarksRef.current = [];
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err));
       console.error('Camera access error:', error);
@@ -123,6 +126,25 @@ export default function LivenessScreen() {
           lastFaceTimeRef.current = Date.now();
           setMessage('');
           const landmarks = result.faceLandmarks[0];
+          const normalizedLandmarks = Array.isArray(landmarks)
+            ? landmarks.map((point: unknown) => {
+              const candidate = point as { x?: number; y?: number; z?: number };
+              return {
+                x: Number(candidate?.x ?? 0),
+                y: Number(candidate?.y ?? 0),
+                z: Number(candidate?.z ?? 0),
+              };
+            })
+            : [];
+          if (normalizedLandmarks.length > 0) {
+            capturedLandmarksRef.current.push({
+              timestamp: Date.now(),
+              landmarks: normalizedLandmarks,
+            });
+            if (capturedLandmarksRef.current.length > MAX_LANDMARK_FRAMES) {
+              capturedLandmarksRef.current = capturedLandmarksRef.current.slice(-MAX_LANDMARK_FRAMES);
+            }
+          }
           const type = CHALLENGES[currentChallenge];
 
           if (checkChallenge(type, landmarks)) {
@@ -173,9 +195,16 @@ export default function LivenessScreen() {
   }, [status, cooldownSeconds]);
 
   const handleSubmit = async () => {
-    const payload = [{ timestamp: Date.now(), landmarks: [{ x: 0.1, y: 0.1, z: 0 }] }];
+    const payload = capturedLandmarksRef.current.slice(-40);
+    if (payload.length === 0) {
+      setMessage('Aucune donnee biometrie capturee. Veuillez recommencer la verification.');
+      setStatus('fail');
+      return;
+    }
+
     try {
-      const result = await submitLiveness(payload, CHALLENGES[currentChallenge]);
+      const finalChallenge = CHALLENGES[Math.min(currentChallenge, CHALLENGES.length - 1)];
+      const result = await submitLiveness(payload, finalChallenge);
 
       if (result.is_locked || result.strikes_remaining === 0) {
         setCooldownSeconds(result.cooldown_seconds ?? 60);
@@ -194,7 +223,7 @@ export default function LivenessScreen() {
       if (networkLike) {
         await enqueueOfflineLivenessCapture({
           sessionId: ensureSessionId(),
-          challengeType: CHALLENGES[currentChallenge],
+          challengeType: CHALLENGES[Math.min(currentChallenge, CHALLENGES.length - 1)],
           landmarks: payload,
         });
         completeStep('liveness');
@@ -214,43 +243,21 @@ export default function LivenessScreen() {
   };
 
   const handleRetry = async () => {
-    try {
-      const retryPayload: Array<Record<string, unknown>> = [];
-      const result = await submitLiveness(retryPayload, CHALLENGES[currentChallenge]);
-      incrementLivenessAttempt();
-
-      if (result.is_locked || result.strikes_remaining === 0 || livenessAttempts >= 2) {
-        setCooldownSeconds(result.cooldown_seconds ?? 60);
-        setMessage('Desole pour la gene, mais pour des raisons techniques/securite, cette session est terminee.');
-        setStatus('locked');
-        stopCamera();
-        return;
-      }
-
-      setMessage('Tentative enregistree. Veuillez recommencer le challenge.');
-      startCamera();
-      await runKycSyncNow();
-    } catch (err) {
-      const networkLike = err instanceof TypeError || (err instanceof Error && err.message.toLowerCase().includes('fetch'));
-      if (networkLike) {
-        await enqueueOfflineLivenessCapture({
-          sessionId: ensureSessionId(),
-          challengeType: CHALLENGES[currentChallenge],
-          landmarks: [],
-        });
-        incrementLivenessAttempt();
-        setMessage('Tentative queue offline. Synchronisation automatique au retour reseau.');
-        startCamera();
-        return;
-      }
-      captureKycException(err, 'liveness_failure', {
-        sessionId,
-        step: 'liveness',
-        operation: 'liveness_retry',
-      });
-      setMessage('Impossible d enregistrer la tentative. Verifiez votre connexion.');
-      setStatus('fail');
+    incrementLivenessAttempt();
+    if (livenessAttempts >= 2) {
+      setCooldownSeconds(60);
+      setMessage('Desole pour la gene, mais pour des raisons techniques/securite, cette session est terminee.');
+      setStatus('locked');
+      stopCamera();
+      return;
     }
+
+    setMessage('Tentative relancee. Veuillez recommencer le challenge.');
+    capturedLandmarksRef.current = [];
+    startCamera();
+    await runKycSyncNow().catch(() => {
+      // Best effort sync on retry restart.
+    });
   };
 
   const handleRestartSession = async () => {

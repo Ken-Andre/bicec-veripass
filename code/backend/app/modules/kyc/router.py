@@ -39,6 +39,7 @@ from app.modules.kyc.service import (
 from app.modules.kyc.schemas import (
     KYCSessionResponse,
     KYCSubmitResponse,
+    KYCReadinessResponse,
     DocumentResponse,
     BiometricResultResponse,
     ConsentSubmitRequest,
@@ -763,6 +764,92 @@ async def submit_niu(
     return {"status": "success", "niu_type": body.niu_type}
 
 
+async def _compute_kyc_readiness(
+    *,
+    session: KYCSession,
+    db: AsyncSession,
+) -> KYCReadinessResponse:
+    result = await db.execute(
+        select(Document)
+        .options(selectinload(Document.ocr_fields))
+        .where(Document.session_id == session.id)
+    )
+    docs = result.scalars().all()
+    doc_types = {d.doc_type for d in docs}
+
+    required = {"CNI_RECTO", "CNI_VERSO", "SELFIE"}
+    missing = sorted(required - doc_types)
+    blocking_reasons: list[str] = []
+    warnings: list[str] = []
+
+    if missing:
+        blocking_reasons.append(f"Missing required documents: {', '.join(missing)}")
+
+    result = await db.execute(
+        select(ConsentRecord).where(ConsentRecord.session_id == session.id)
+    )
+    consent = result.scalar_one_or_none()
+    has_consent = consent is not None
+    if not has_consent:
+        blocking_reasons.append("Consent not submitted")
+
+    cni_docs = [d for d in docs if d.doc_type in {"CNI_RECTO", "CNI_VERSO"}]
+    ocr_scores: list[float] = []
+    for doc in cni_docs:
+        for field in doc.ocr_fields:
+            ocr_scores.append(1.0 if field.human_corrected else float(field.confidence_score))
+    has_ocr_review = len(ocr_scores) > 0
+    if not has_ocr_review:
+        blocking_reasons.append("OCR review not completed. Please confirm identity fields first.")
+
+    result = await db.execute(
+        select(BiometricResult).where(BiometricResult.session_id == session.id)
+    )
+    biometric = result.scalar_one_or_none()
+    has_biometric_result = biometric is not None
+    if not has_biometric_result:
+        blocking_reasons.append("Liveness step not completed")
+
+    confidence_score_global: float | None = None
+    if biometric and ocr_scores:
+        liveness_score = float(biometric.liveness_score or 0.0)
+        face_match_score = float(biometric.face_match_score or 0.0)
+        anti_spoofing_score = float(biometric.anti_spoofing_score or 0.0)
+        ocr_avg_score = float(mean(ocr_scores))
+        confidence_score_global = float(
+            mean(
+                [ocr_avg_score, liveness_score, face_match_score, anti_spoofing_score]
+            )
+        )
+        if face_match_score < settings.FACE_MATCH_MIN_SCORE:
+            warnings.append("Face match below threshold: priority manual review will be applied.")
+        if anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE:
+            warnings.append("Anti-spoofing below threshold: priority manual review will be applied.")
+
+    return KYCReadinessResponse(
+        can_submit=len(blocking_reasons) == 0,
+        blocking_reasons=blocking_reasons,
+        warnings=warnings,
+        required_missing_documents=missing,
+        has_ocr_review=has_ocr_review,
+        has_consent=has_consent,
+        has_biometric_result=has_biometric_result,
+        confidence_score_global=confidence_score_global,
+    )
+
+
+@router.get("/readiness", response_model=KYCReadinessResponse)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def get_kyc_readiness(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return readiness gates before KYC submission."""
+    session = await _get_active_draft_session(db, current_user)
+    return await _compute_kyc_readiness(session=session, db=db)
+
+
 @router.post("/submit", response_model=KYCSubmitResponse)
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def submit_kyc(
@@ -780,55 +867,18 @@ async def submit_kyc(
     if not session:
         raise HTTPException(status_code=404, detail="No active KYC session")
 
-    # Validate minimum requirements
-    result = await db.execute(
-        select(Document)
-        .options(selectinload(Document.ocr_fields))
-        .where(Document.session_id == session.id)
-    )
-    docs = result.scalars().all()
-    doc_types = {d.doc_type for d in docs}
+    readiness = await _compute_kyc_readiness(session=session, db=db)
+    if not readiness.can_submit:
+        raise HTTPException(status_code=400, detail=readiness.blocking_reasons[0])
 
-    required = {"CNI_RECTO", "CNI_VERSO", "SELFIE"}
-    missing = required - doc_types
-    if missing:
-        raise HTTPException(
-            status_code=400, detail=f"Missing required documents: {', '.join(missing)}"
-        )
-
-    # Check consent
-    result = await db.execute(
-        select(ConsentRecord).where(ConsentRecord.session_id == session.id)
-    )
-    consent = result.scalar_one_or_none()
-    if not consent:
-        raise HTTPException(status_code=400, detail="Consent not submitted")
-
-    # OCR review gate: at least one extracted/corrected CNI field must exist
-    cni_docs = [d for d in docs if d.doc_type in {"CNI_RECTO", "CNI_VERSO"}]
-    ocr_scores: list[float] = []
-    for doc in cni_docs:
-        for field in doc.ocr_fields:
-            score = 1.0 if field.human_corrected else float(field.confidence_score)
-            ocr_scores.append(score)
-    if not ocr_scores:
-        raise HTTPException(
-            status_code=400,
-            detail="OCR review not completed. Please confirm identity fields first.",
-        )
-
-    # Biometric checkpoint gate (liveness + derived scores)
     result = await db.execute(
         select(BiometricResult).where(BiometricResult.session_id == session.id)
     )
     biometric = result.scalar_one_or_none()
     if not biometric:
         raise HTTPException(status_code=400, detail="Liveness step not completed")
-
-    liveness_score = float(biometric.liveness_score or 0.0)
     face_match_score = float(biometric.face_match_score or 0.0)
     anti_spoofing_score = float(biometric.anti_spoofing_score or 0.0)
-    ocr_avg_score = float(mean(ocr_scores))
 
     # Flag for stronger manual review, but keep submission path available.
     low_face_match = face_match_score < settings.FACE_MATCH_MIN_SCORE
@@ -836,16 +886,7 @@ async def submit_kyc(
     if low_face_match or low_anti_spoofing:
         session.priority_flag = True
 
-    session.confidence_score_global = float(
-        mean(
-            [
-                ocr_avg_score,
-                liveness_score,
-                face_match_score,
-                anti_spoofing_score,
-            ]
-        )
-    )
+    session.confidence_score_global = readiness.confidence_score_global
 
     # Submit
     session.status = "PENDING_KYC"

@@ -101,6 +101,17 @@ class KYCSubmitResponse(BaseModel):
     message: str
 
 
+class KYCReadinessResponse(BaseModel):
+    can_submit: bool
+    blocking_reasons: list[str] = []
+    warnings: list[str] = []
+    required_missing_documents: list[str] = []
+    has_ocr_review: bool
+    has_consent: bool
+    has_biometric_result: bool
+    confidence_score_global: float | None = None
+
+
 # === Address ===
 class AddressSubmitRequest(BaseModel):
     region: str

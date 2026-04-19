@@ -11,6 +11,12 @@ interface SessionData {
   consent_record: { cgu_accepted: boolean } | null;
 }
 
+interface ReadinessData {
+  can_submit: boolean;
+  blocking_reasons: string[];
+  warnings: string[];
+}
+
 export default function ReviewScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -18,12 +24,13 @@ export default function ReviewScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitBlockedReason, setSubmitBlockedReason] = useState<string | null>(null);
+  const [backendReadinessWarning, setBackendReadinessWarning] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSession = async () => {
       try {
         await runKycSyncNow();
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('vp_token') || localStorage.getItem('access_token');
         const res = await fetch('/api/v1/kyc/session/current', {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -38,8 +45,23 @@ export default function ReviewScreen() {
 
     const refreshSubmissionGate = async () => {
       try {
-        const status = await getSubmissionBlockerStatus();
-        setSubmitBlockedReason(status.canSubmit ? null : status.blockingReason);
+        const offlineStatus = await getSubmissionBlockerStatus();
+        const token = localStorage.getItem('vp_token') || localStorage.getItem('access_token');
+        const readinessRes = await fetch('/api/v1/kyc/readiness', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const readinessBody = readinessRes.ok
+          ? (await readinessRes.json() as ReadinessData)
+          : null;
+
+        const backendBlockReason =
+          readinessBody && !readinessBody.can_submit
+            ? readinessBody.blocking_reasons?.[0] || 'Dossier incomplet pour soumission.'
+            : null;
+        const offlineBlockReason = offlineStatus.canSubmit ? null : offlineStatus.blockingReason;
+
+        setSubmitBlockedReason(offlineBlockReason || backendBlockReason);
+        setBackendReadinessWarning(readinessBody?.warnings?.[0] || null);
       } catch (error) {
         console.error('Failed to compute offline submission gate:', error);
       }
@@ -60,13 +82,24 @@ export default function ReviewScreen() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const status = await getSubmissionBlockerStatus();
-      if (!status.canSubmit) {
-        setSubmitBlockedReason(status.blockingReason);
+      const offlineStatus = await getSubmissionBlockerStatus();
+      const token = localStorage.getItem('vp_token') || localStorage.getItem('access_token');
+      const readinessRes = await fetch('/api/v1/kyc/readiness', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const readinessBody = readinessRes.ok
+        ? (await readinessRes.json() as ReadinessData)
+        : null;
+
+      if (!offlineStatus.canSubmit) {
+        setSubmitBlockedReason(offlineStatus.blockingReason);
+        return;
+      }
+      if (readinessBody && !readinessBody.can_submit) {
+        setSubmitBlockedReason(readinessBody.blocking_reasons?.[0] || 'Dossier incomplet pour soumission.');
         return;
       }
 
-      const token = localStorage.getItem('access_token');
       const res = await fetch('/api/v1/kyc/submit', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -163,6 +196,9 @@ export default function ReviewScreen() {
         </button>
         {submitBlockedReason ? (
           <p className="text-xs text-red-600 mt-2">{submitBlockedReason}</p>
+        ) : null}
+        {!submitBlockedReason && backendReadinessWarning ? (
+          <p className="text-xs text-amber-600 mt-2">{backendReadinessWarning}</p>
         ) : null}
       </div>
     </ScreenLayout>
