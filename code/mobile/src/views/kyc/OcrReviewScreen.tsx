@@ -25,7 +25,7 @@ export default function OcrReviewScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { setOcrFields, completeStep, setCurrentStep, sessionId } = useKyc();
-  
+
   const [fields, setFields] = useState<OcrField[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
@@ -59,7 +59,7 @@ export default function OcrReviewScreen() {
     const fetchOcr = async () => {
       try {
         setStatusMessage(t('ocr.loading.text') || 'Analyse de votre document...');
-        
+
         // Get current session to find CNI document
         const sessionRes = await apiClient.get<any>('/kyc/session/current');
         if (!mounted) return;
@@ -75,14 +75,12 @@ export default function OcrReviewScreen() {
 
         // Call OCR extraction API for this document
         try {
-          const ocrRes = await apiClient.post<any>(`/ocr/extract`, null, {
-            params: { document_id: cniDoc.id }
-          });
+          const ocrRes = await apiClient.post<any, any>(`/ocr/extract?document_id=${cniDoc.id}`, null);
 
           if (!mounted) return;
 
           const ocrData = ocrRes.data;
-          
+
           // Map API response to UI fields
           const extractedFields: OcrField[] = Object.entries(ocrData.fields || {}).map(
             ([fieldName, fieldData]: [string, any]) => ({
@@ -95,22 +93,18 @@ export default function OcrReviewScreen() {
 
           setStatusMessage(null);
           setFields(extractedFields);
-          
+
           // Store in KycContext
-          setOcrFields(extractedFields.map(f => ({
-            field_name: f.field_name,
-            extracted_value: f.value,
-            confidence_score: f.confidence,
-          })));
+          setOcrFields(extractedFields);
 
         } catch (ocrErr) {
           // If OCR extraction fails, show empty fields for manual entry
           console.warn('OCR extraction failed, using manual entry:', ocrErr);
           setStatusMessage(t('ocr.manual_entry') || 'Saisissez vos informations manuellement');
-          
+
           const fallbackFields: OcrField[] = [
-            'nom', 'prenom', 'date_naissance', 'lieu_naissance', 'sexe', 
-            'taille', 'profession', 'numero_cni', 'date_delivrance', 
+            'nom', 'prenom', 'date_naissance', 'lieu_naissance', 'sexe',
+            'taille', 'profession', 'numero_cni', 'date_delivrance',
             'date_expiration', 'adresse', 'poste_identification'
           ].map(name => ({
             field_name: name,
@@ -118,7 +112,7 @@ export default function OcrReviewScreen() {
             confidence: 0,
             editable: true,
           }));
-          
+
           setFields(fallbackFields);
         }
 
@@ -153,7 +147,7 @@ export default function OcrReviewScreen() {
     if (editable) {
       return { color: 'text-orange-600', bg: 'bg-orange-100', icon: <AlertCircle className="w-3 h-3" /> };
     }
-    
+
     const level = getConfidenceLevel(score);
     switch (level) {
       case 'high': return { color: 'text-green-600', bg: 'bg-green-100', icon: <ShieldCheck className="w-3 h-3" /> };
@@ -179,12 +173,8 @@ export default function OcrReviewScreen() {
         await apiClient.post('/kyc/ocr/confirm', { fields: corrections });
       }
 
-      setOcrFields(updatedFields.map(f => ({
-        field_name: f.field_name,
-        extracted_value: f.value,
-        confidence_score: f.confidence,
-      })));
-      
+      setOcrFields(updatedFields);
+
       completeStep('ocr_review');
       navigate('/kyc/liveness');
     } catch (err) {

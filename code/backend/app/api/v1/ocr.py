@@ -114,8 +114,6 @@ async def extract_ocr_from_document(
 @router.post("/extract/upload")
 async def extract_ocr_from_upload(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
     """Extract OCR from an uploaded image directly.
 
@@ -171,4 +169,33 @@ async def get_ocr_thresholds():
     return {
         "confidence_threshold": settings.OCR_CONFIDENCE_THRESHOLD,
         "user_edit_threshold": settings.OCR_USER_EDIT_THRESHOLD,
+    }
+
+
+@router.get("/test/extract")
+async def test_ocr_extract():
+    """Test endpoint - extract from a test image inside the container.
+
+    This is for testing OCR without uploading a file.
+    """
+    import os
+
+    test_image_path = Path("/tmp/test_cni_valid.png")
+    if not test_image_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Test image not found on server",
+        )
+
+    ocr_result = ocr_service.extract_from_path(test_image_path)
+
+    avg_conf = ocr_result.get("avg_confidence", 0.0)
+    can_edit = avg_conf < settings.OCR_USER_EDIT_THRESHOLD
+
+    return {
+        "engine": ocr_result["engine"],
+        "fields": ocr_result["fields"],
+        "avg_confidence": avg_conf,
+        "can_user_edit": can_edit,
+        "needs_glm_fallback": ocr_result.get("needs_glm_fallback", False),
     }

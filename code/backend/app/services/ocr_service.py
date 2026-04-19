@@ -24,30 +24,39 @@ def get_paddle_ocr():
     """Return a shared PaddleOCR instance (CPU, French)."""
     global _paddle_ocr
     if _paddle_ocr is None:
-        from paddleocr import PaddleOCR
+        try:
+            from paddleocr import PaddleOCR
 
-        _paddle_ocr = PaddleOCR(
-            use_angle_cls=True,
-            lang=settings.PADDLE_LANG,
-            use_gpu=settings.PADDLE_USE_GPU,
-        )
-        logger.info(
-            "PaddleOCR initialized (lang=%s, gpu=%s)",
-            settings.PADDLE_LANG,
-            settings.PADDLE_USE_GPU,
-        )
+            _paddle_ocr = PaddleOCR(use_angle_cls=True, lang=settings.PADDLE_LANG)
+            logger.info("PaddleOCR initialized (lang=%s)", settings.PADDLE_LANG)
+        except Exception as exc:
+            logger.warning("PaddleOCR unavailable: %s", exc)
+            return None
     return _paddle_ocr
 
 
 def _load_image_from_bytes(image_bytes: bytes) -> np.ndarray:
     """Load image from bytes as numpy array (BGR format for OpenCV)."""
     import cv2
+    from PIL import Image
+    import io
 
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError("Failed to decode image")
-    return img
+    try:
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is not None:
+            return img
+    except Exception:
+        pass
+
+    try:
+        pil_img = Image.open(io.BytesIO(image_bytes))
+        if pil_img.mode != "RGB":
+            pil_img = pil_img.convert("RGB")
+        img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        return img
+    except Exception as exc:
+        raise ValueError(f"Failed to decode image: {exc}")
 
 
 def _load_image_from_path(image_path: Path) -> np.ndarray:
@@ -224,7 +233,26 @@ class OCRService:
     def _extract_from_array(self, img: np.ndarray) -> dict[str, Any]:
         """Extract text from numpy array (BGR format)."""
         ocr = get_paddle_ocr()
-        results = ocr.ocr(img, cls=True)
+        if ocr is None:
+            logger.warning("PaddleOCR not available, returning empty results")
+            return {
+                "fields": {},
+                "blocks": [],
+                "engine": "paddleocr_unavailable",
+                "needs_glm_fallback": True,
+                "avg_confidence": 0.0,
+            }
+        try:
+            results = ocr.ocr(img, cls=True)
+        except Exception as exc:
+            logger.error("OCR failed: %s", exc)
+            return {
+                "fields": {},
+                "blocks": [],
+                "engine": "paddleocr_error",
+                "needs_glm_fallback": True,
+                "avg_confidence": 0.0,
+            }
 
         if not results or not results[0]:
             logger.warning("No text detected in image")

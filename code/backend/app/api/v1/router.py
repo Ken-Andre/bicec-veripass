@@ -21,4 +21,4 @@ api_router.include_router(
     notifications_router, prefix="/notifications", tags=["notifications"]
 )
 api_router.include_router(audit_router, prefix="/audit", tags=["audit"])
-api_router.include_router(ocr_router, prefix="/ocr", tags=["ocr"])
+api_router.include_router(ocr_router, tags=["ocr"])

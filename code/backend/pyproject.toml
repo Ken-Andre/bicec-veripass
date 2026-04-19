@@ -25,6 +25,7 @@ dependencies = [
     "sentry-sdk[fastapi]>=2.0",
     # OCR dependencies
     "paddleocr>=2.8",
+    "paddlepaddle>=2.6",
     "opencv-python-headless>=4.9",
     "numpy>=1.24",
     "Pillow>=10.0",

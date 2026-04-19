@@ -140,7 +140,7 @@ services:
       - SMTP_TLS=${SMTP_TLS:-false}
       - SMTP_SSL=${SMTP_SSL:-false}
       - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
-      - OCR_CONFIDENCE_THRESHOLD=0.85
+      - OCR_CONFIDENCE_THRESHOLD=0.90
       - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
       - FACE_MATCH_MIN_SCORE=${FACE_MATCH_MIN_SCORE:-0.8}
       - ANTI_SPOOFING_MIN_SCORE=${ANTI_SPOOFING_MIN_SCORE:-0.7}

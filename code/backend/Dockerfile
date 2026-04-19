@@ -2,13 +2,15 @@
 FROM python:3.11-slim-bookworm AS builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     libffi-dev \
     libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -19,7 +21,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # Install dependencies
-RUN uv sync --frozen --no-dev --no-install-project && \
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project && \
     uv pip install --upgrade pip>=25.3 && \
     # Clean up pip cache to reduce layer size
     find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
@@ -32,13 +35,15 @@ FROM python:3.11-slim-bookworm
 # Install runtime dependencies:
 # - OCR: libgl1, libglib2.0-0, libstdc++
 # - PostgreSQL client tools: postgresql-client
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libstdc++6 \
     postgresql-client \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Create a non-root user
 RUN groupadd vpgroup && useradd -m vpuser -G vpgroup
