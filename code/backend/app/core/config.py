@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     # Storage
     STORAGE_PATH: str = "/data/documents"  # Docker volume mount in production
     STORAGE_PATH_DEV: str = "./data/documents"  # Local development fallback
+    MODELS_PATH: str = "/data/models"
 
     # Allowed file types and max size
     ALLOWED_DOCUMENT_TYPES: List[str] = [
@@ -67,6 +68,13 @@ class Settings(BaseSettings):
     PADDLE_LAZY_LOAD: bool = True
     PADDLE_USE_GPU: bool = False
     PADDLE_LANG: str = "french"
+    OCR_MODELS_ROOT: str = "/opt/models-offline"
+    PADDLE_OFFLINE: bool = True
+    PADDLE_DET_MODEL_DIR: str = ""
+    PADDLE_REC_MODEL_DIR: str = ""
+    PADDLE_CLS_MODEL_DIR: str = ""
+    PADDLE_CACHE_DIR: str = "/tmp/paddle-cache"
+    PADDLE_WARMUP_ON_START: bool = False
     GLM_OCR_QUEUE: str = "glm_ocr_jobs"
     GLM_OCR_ENABLED: bool = True
     GLM_OCR_CLI_PATH: str = ""

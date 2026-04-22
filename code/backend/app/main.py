@@ -33,6 +33,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 from app.db.session import check_db_connection, AsyncSessionLocal
 from app.core.redis import check_redis_connection
+from app.modules.kyc.service import get_shared_paddle_ocr
 
 
 @asynccontextmanager
@@ -53,6 +54,16 @@ async def lifespan(app: FastAPI):
                 await seed_development_data(db)
         except Exception as e:
             logger.warning(f"Seed data failed (non-fatal): {e}")
+
+    if settings.PADDLE_WARMUP_ON_START:
+        try:
+            ocr = get_shared_paddle_ocr()
+            if ocr is None:
+                raise RuntimeError("PaddleOCR is unavailable after warmup")
+            logger.info("PaddleOCR warmup on startup complete")
+        except Exception as e:
+            logger.error(f"PaddleOCR warmup failed: {e}")
+            raise
 
     yield
     # Shutdown

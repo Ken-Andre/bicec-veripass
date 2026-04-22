@@ -36,7 +36,6 @@ def _():
         glm_ocr_extract,
         DEFAULT_GLM_RECTO_PROMPT,
         DEFAULT_GLM_VERSO_PROMPT,
-        DEFAULT_GLM_AUTO_PROMPT,
         sanitize_glm_output,
         set_glm_ocr_model_path,
         find_gguf_models,
@@ -44,14 +43,12 @@ def _():
         numpy_to_pil,
         image_to_bytes,
         compute_sha256,
-        combine_extractions,
         CNI_FIELDS,
     )
 
     # Base directory for sample images
     images_dir = _notebook_dir.parent / "images"
     return (
-        DEFAULT_GLM_AUTO_PROMPT,
         DEFAULT_GLM_RECTO_PROMPT,
         DEFAULT_GLM_VERSO_PROMPT,
         Image,
@@ -61,7 +58,6 @@ def _():
         find_gguf_models,
         glm_ocr_extract,
         image_to_bytes,
-        combine_extractions,
         images_dir,
         io,
         mo,
@@ -140,7 +136,7 @@ def _(mo, sample_files):
     source_radio = mo.ui.radio(
         options=["Upload Image", "Sample Images"],
         value="Sample Images" if sample_files else "Upload Image",
-        label="📸 Primary image source",
+        label="📸 Image source",
     )
 
     file_upload = mo.ui.file(
@@ -155,43 +151,17 @@ def _(mo, sample_files):
         label="Pick from paddleocr_test/images/",
         value=sample_files[0] if sample_files else None,
     )
-
-    # Second image (for auto-combine mode: upload the OTHER side)
-    source_radio2 = mo.ui.radio(
-        options=["None", "Upload Image", "Sample Images"],
-        value="None",
-        label="📸 Second image (other side, for AUTO combine)",
-    )
-
-    file_upload2 = mo.ui.file(
-        label="Drop the OTHER side image",
-        filetypes=[".png", ".jpg", ".jpeg", ".webp"],
-        kind="area",
-        multiple=False,
-    )
-
-    sample_dropdown2 = mo.ui.dropdown(
-        options={f: f for f in sample_files} if sample_files else {"(none)": ""},
-        label="Pick second image from paddleocr_test/images/",
-        value=sample_files[1] if len(sample_files) > 1 else None,
-    )
-    return file_upload, file_upload2, sample_dropdown, sample_dropdown2, source_radio, source_radio2
+    return file_upload, sample_dropdown, source_radio
 
 
 @app.cell
-def _(file_upload, file_upload2, mo, sample_dropdown, sample_dropdown2, source_radio, source_radio2):
+def _(file_upload, mo, sample_dropdown, source_radio):
     """Display image source widgets — reactive on source_radio.value."""
     _source_widget = file_upload if source_radio.value == "Upload Image" else sample_dropdown
-    _source_widget2 = file_upload2 if source_radio2.value == "Upload Image" else sample_dropdown2
 
     mo.vstack([
-        mo.md("### 📸 Primary Image (main side)"),
         source_radio,
         _source_widget,
-        mo.md("---"),
-        mo.md("### 📸 Second Image (other side, optional — for AUTO combine)"),
-        source_radio2,
-        _source_widget2,
     ])
     return
 
@@ -201,25 +171,18 @@ def _(
     Image,
     compute_sha256,
     file_upload,
-    file_upload2,
     images_dir,
     io,
     mo,
     sample_dropdown,
-    sample_dropdown2,
     source_radio,
-    source_radio2,
 ):
-    """Load the selected images into memory."""
+    """Load the selected image into memory."""
     pil_image = None
     image_name = ""
     image_sha256 = ""
     image_bytes = b""
-    pil_image2 = None
-    image_name2 = ""
-    image_bytes2 = b""
 
-    # --- Primary image ---
     if source_radio.value == "Upload Image":
         if file_upload.value:  # tuple of FileUploadResults
             image_bytes = file_upload.contents(0)
@@ -236,27 +199,6 @@ def _(
                 image_name = _fname
                 image_sha256 = compute_sha256(image_bytes)
 
-    # --- Second image (other side, for auto-combine) ---
-    if source_radio2.value == "Upload Image":
-        if file_upload2.value:
-            image_bytes2 = file_upload2.contents(0)
-            image_name2 = file_upload2.name(0) or "uploaded-2"
-            pil_image2 = Image.open(io.BytesIO(image_bytes2)).convert("RGB")
-    elif source_radio2.value == "Sample Images":
-        _fname2 = sample_dropdown2.value
-        if _fname2 and _fname2 != "(none)":
-            _fpath2 = images_dir / _fname2
-            if _fpath2.exists():
-                image_bytes2 = _fpath2.read_bytes()
-                pil_image2 = Image.open(io.BytesIO(image_bytes2)).convert("RGB")
-                image_name2 = _fname2
-
-    _img2_md = (
-        mo.md(f"**2nd image:** `{image_name2}`")
-        if pil_image2
-        else mo.md("*No 2nd image (combine mode disabled).*")
-    )
-
     _load_output = (
         mo.vstack([
             mo.image(src=image_bytes),
@@ -265,17 +207,16 @@ def _(
                 f"**Size:** {pil_image.size[0]}\u00d7{pil_image.size[1]}  \n"
                 f"**SHA-256:** `{image_sha256[:16]}\u2026`"
             ),
-            _img2_md,
         ])
         if pil_image
         else mo.md("*No image loaded yet. Upload or select one above.*")
     )
     _load_output
-    return image_bytes, image_bytes2, pil_image, pil_image2
+    return image_bytes, pil_image
 
 
 @app.cell
-def _(mo):
+def _(DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMPT, mo):
     """Engine selection and options."""
     engine_choice = mo.ui.dropdown(
         options={
@@ -289,15 +230,23 @@ def _(mo):
 
     card_side = mo.ui.radio(
         options={
-            "🤖 Auto-detect (god mode with 2 images)": "auto",
+            "🤖 Auto-detect": "auto",
             "📄 Recto (Identity)": "recto",
             "📂 Verso (NIN/Validity)": "verso",
         },
-        value="🤖 Auto-detect (god mode with 2 images)",
+        value="🤖 Auto-detect",
         label="Card Side",
     )
 
     show_blocks = mo.ui.checkbox(label="Show OCR block details", value=True)
+
+    # GLM-OCR prompt — dynamically updated based on card_side
+    glm_prompt = mo.ui.text_area(
+        value=DEFAULT_GLM_RECTO_PROMPT,
+        label="🟣 GLM-OCR Prompt (edit if needed)",
+        placeholder="JSON prompt...",
+        full_width=True,
+    )
 
     run_button = mo.ui.run_button(label="🚀 Run OCR", kind="neutral")
 
@@ -305,13 +254,14 @@ def _(mo):
         mo.md("### ⚙️ OCR Engine & Options"),
         mo.hstack([engine_choice, card_side]),
         show_blocks,
+        glm_prompt,
         run_button,
     ])
-    return card_side, engine_choice, run_button, show_blocks
+    return card_side, engine_choice, glm_prompt, run_button, show_blocks
 
 
 @app.cell
-def _(DEFAULT_GLM_AUTO_PROMPT, DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMPT, card_side, mo):
+def _(DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMPT, card_side, mo):
     """Show the active prompt for the selected card side (read-only info)."""
     _side_val = card_side.value
     if _side_val == "verso":
@@ -321,47 +271,39 @@ def _(DEFAULT_GLM_AUTO_PROMPT, DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMP
         _active_prompt = DEFAULT_GLM_RECTO_PROMPT
         _side_label = "📄 RECTO — Identity fields only"
     else:
-        _active_prompt = DEFAULT_GLM_AUTO_PROMPT
-        _side_label = "🤖 AUTO — Extract ALL fields from any side"
+        _active_prompt = "(auto-selected at runtime based on PaddleOCR detection)"
+        _side_label = "🤖 AUTO — prompt chosen after PaddleOCR detection"
     mo.md(f"**Active prompt mode:** {_side_label}\n\n```\n{_active_prompt}\n```")
     return
 
 
 @app.cell
 def _(
-    DEFAULT_GLM_AUTO_PROMPT,
     DEFAULT_GLM_RECTO_PROMPT,
     DEFAULT_GLM_VERSO_PROMPT,
     card_side,
-    combine_extractions,
     draw_ocr_boxes,
     engine_choice,
     glm_ocr_extract,
+    glm_prompt,
     image_bytes,
-    image_bytes2,
     numpy_to_pil,
     paddle_ocr_pipeline,
-
     pil_image,
-    pil_image2,
     run_button,
     sanitize_glm_output,
     show_blocks,
 ):
-    """Run OCR on the loaded image(s). In AUTO mode with 2 images, combines both sides."""
+    """Run OCR on the loaded image."""
     paddle_result = None
-    paddle_result2 = None
-    combined_result = None
     glm_result = None
     annotated_pil = None
     detected_side = "recto"
 
     if run_button.value and pil_image is not None:
         _engine = engine_choice.value
-        _is_auto = card_side.value == "auto"
-        _has_second = pil_image2 is not None
 
-        # --- PaddleOCR on primary image ---
+        # --- PaddleOCR (Run first to allow auto-detection) ---
         if _engine in ("paddleocr", "both"):
             paddle_result = paddle_ocr_pipeline(pil_image)
             if "extraction" in paddle_result:
@@ -377,39 +319,26 @@ def _(
                     _annotated = _aligned
                 annotated_pil = numpy_to_pil(_annotated)
 
-        # --- PaddleOCR on second image (for auto-combine) ---
-        if _is_auto and _has_second and _engine in ("paddleocr", "both"):
-            paddle_result2 = paddle_ocr_pipeline(pil_image2)
-
         # --- Card Side Final Choice ---
         final_side = card_side.value if card_side.value != "auto" else detected_side
-
-        # --- Combine extractions (auto + 2 images = god mode) ---
-        if _is_auto and paddle_result and paddle_result2:
-            combined_result = combine_extractions(paddle_result, paddle_result2)
-            # Replace the extraction in paddle_result with the combined one
-            paddle_result = {**paddle_result, "extraction": combined_result}
 
         # --- GLM-OCR ---
         if _engine in ("glm_ocr", "both") and image_bytes:
             # Determine prompt
-            if _is_auto:
-                _prompt = DEFAULT_GLM_AUTO_PROMPT
-            elif final_side == "verso":
-                _prompt = DEFAULT_GLM_VERSO_PROMPT
-            else:
-                _prompt = DEFAULT_GLM_RECTO_PROMPT
+            _prompt = glm_prompt.value.strip()
+            if card_side.value == "auto":
+                _prompt = DEFAULT_GLM_VERSO_PROMPT if final_side == "verso" else DEFAULT_GLM_RECTO_PROMPT
 
             try:
                 glm_res = glm_ocr_extract(image_bytes, prompt=_prompt)
-                # Apply sanitization — auto mode doesn't suppress fields
+                # Apply sanitization to kill hallucinations
                 if glm_res.get("success") and "parsed_fields" in glm_res:
-                    glm_res["parsed_fields"] = sanitize_glm_output(glm_res["parsed_fields"], side=card_side.value)
+                    glm_res["parsed_fields"] = sanitize_glm_output(glm_res["parsed_fields"], side=final_side)
                     glm_res["detected_side"] = final_side
                 glm_result = glm_res
             except Exception as _e:
                 glm_result = {"error": str(_e), "model": "glm_ocr", "success": False}
-    return annotated_pil, combined_result, detected_side, glm_result, paddle_result, paddle_result2
+    return annotated_pil, detected_side, glm_result, paddle_result
 
 
 @app.cell
@@ -425,32 +354,18 @@ def _(CNI_FIELDS, annotated_pil, image_to_bytes, mo, paddle_result, show_blocks)
         _method = _extraction.get("methode", "N/A")
 
         # Build field table
-        _has_source = any(
-            isinstance(_extraction.get(_k), dict) and "source" in _extraction.get(_k, {})
-            for _k in CNI_FIELDS
-        )
         _paddle_rows = []
         for _key in CNI_FIELDS:
             _field = _extraction.get(_key, {})
             _val = _field.get("value", "—") if isinstance(_field, dict) else _field
             _conf = _field.get("conf", 0.0) if isinstance(_field, dict) else 0.0
-            _src = _field.get("source", "") if isinstance(_field, dict) else ""
             _status = "✅" if _conf >= 0.85 else "⚠️" if _conf >= 0.6 else "❌"
-            if _has_source:
-                _paddle_rows.append(f"| {_key} | `{_val}` | {_conf:.2f} | {_status} | {_src or '—'} |")
-            else:
-                _paddle_rows.append(f"| {_key} | `{_val}` | {_conf:.2f} | {_status} |")
+            _paddle_rows.append(f"| {_key} | `{_val}` | {_conf:.2f} | {_status} |")
 
-        if _has_source:
-            _paddle_table = (
-                "| Field | Value | Confidence | Status | Source |\n|-------|-------|-----------|--------|--------|\n"
-                + "\n".join(_paddle_rows)
-            )
-        else:
-            _paddle_table = (
-                "| Field | Value | Confidence | Status |\n|-------|-------|-----------|--------|\n"
-                + "\n".join(_paddle_rows)
-            )
+        _paddle_table = (
+            "| Field | Value | Confidence | Status |\n|-------|-------|-----------|--------|\n"
+            + "\n".join(_paddle_rows)
+        )
 
         # Block details
         _blocks_md = ""
@@ -532,64 +447,6 @@ def _(CNI_FIELDS, glm_result, mo):
         ])
 
     _glm_output
-    return
-
-
-@app.cell
-def _(CNI_FIELDS, combined_result, mo, paddle_result2):
-    """Show second image extraction and combined summary (auto-combine mode)."""
-    _combine_output = mo.md("")
-
-    if combined_result is not None:
-        # Combined results table with source per field
-        _comb_rows = []
-        _filled = 0
-        for _ckey in CNI_FIELDS:
-            _field = combined_result.get(_ckey, {})
-            _val = _field.get("value", "—") if isinstance(_field, dict) else _field
-            _conf = _field.get("conf", 0.0) if isinstance(_field, dict) else 0.0
-            _src = _field.get("source", "—") if isinstance(_field, dict) else "—"
-            if _val and _val != "—":
-                _filled += 1
-            _comb_rows.append(f"| {_ckey} | `{_val}` | {_conf:.2f} | {_src} |")
-
-        _comb_table = (
-            "| Field | Value | Conf | Source |\n"
-            "|-------|-------|------|--------|\n"
-            + "\n".join(_comb_rows)
-        )
-
-        # Second image individual extraction
-        _side2_md = ""
-        if paddle_result2 and "extraction" in paddle_result2:
-            _ext2 = paddle_result2["extraction"]
-            _side2_detected = _ext2.get("detected_side", "?")
-            _side2_rows = []
-            for _sk in CNI_FIELDS:
-                _sf = _ext2.get(_sk, {})
-                _sv = _sf.get("value", "—") if isinstance(_sf, dict) else _sf
-                if _sv and _sv != "—":
-                    _side2_rows.append(f"| {_sk} | `{_sv}` |")
-            _side2_table = (
-                "| Field | Value |\n|-------|-------|\n" + "\n".join(_side2_rows)
-            ) if _side2_rows else "*No fields extracted*"
-            _side2_md = (
-                f"\n\n#### 2nd Image Extraction (detected: **{_side2_detected}**)\n\n"
-                + _side2_table
-            )
-
-        _combine_output = mo.md(
-            f"### 🔗 Combined Result (Auto God Mode)\n\n"
-            f"**Fields filled:** {_filled}/{len(CNI_FIELDS)}  \n"
-            f"**Method:** `{combined_result.get('methode', 'N/A')}`  \n\n"
-            f"{_comb_table}\n"
-            f"{_side2_md}"
-        )
-    elif paddle_result2 is not None:
-        # 2nd image was processed but no combine (non-auto mode)
-        _combine_output = mo.md("*2nd image processed but not combined (select Auto mode to combine).*")
-
-    _combine_output
     return
 
 

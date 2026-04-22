@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Build stage
 FROM python:3.11-slim-bookworm AS builder
 
@@ -20,11 +21,12 @@ WORKDIR /app
 # Copy dependency files only (for better layer caching)
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies
+
+
+# Install all dependencies via uv (BuildKit cache avoids re-downloading on rebuilds)
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project && \
-    uv pip install --upgrade pip>=25.3 && \
-    # Clean up pip cache to reduce layer size
+    # Clean up to reduce image size
     find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
     find /app/.venv -name "wheel*" -exec rm -rf {} + 2>/dev/null || true && \
     find /app/.venv -name "*.pyc" -delete
@@ -42,6 +44,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libstdc++6 \
     postgresql-client \
     gnupg \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -57,14 +60,21 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --chown=vpuser:vpgroup . .
 
 # Ensure storage directory exists and set entrypoint permissions
-RUN mkdir -p /data/documents /backups/db && \
-    chown -R vpuser:vpgroup /data/documents /backups/db && \
+RUN mkdir -p /data/documents /data/models /backups/db /tmp/paddle-cache /home/vpuser/.paddlex && \
+    chown -R vpuser:vpgroup /data/documents /data/models /backups/db /tmp/paddle-cache /home/vpuser/.paddlex && \
     chmod +x /app/entrypoint.sh
+
+# Models are pre-downloaded into models_storage volume by the model_init service
+# (docker compose service: model_init → scripts/download_models.py)
+# Set env var to prevent PaddleOCR from checking the model source on each startup
+ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \

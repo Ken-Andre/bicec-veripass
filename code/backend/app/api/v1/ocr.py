@@ -6,8 +6,9 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -15,6 +16,7 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.modules.auth.models import User
 from app.modules.kyc.models import Document, KYCSession
+from app.modules.kyc.service import process_document_ocr_pipeline
 from app.services.ocr_service import ocr_service
 
 
@@ -72,9 +74,12 @@ async def extract_ocr_from_document(
             detail="Document file not found on storage",
         )
 
-    # Run OCR
+    # Run the same OCR pipeline used by the capture flow
     try:
-        ocr_result = ocr_service.extract_from_path(file_path)
+        pipeline_result = await process_document_ocr_pipeline(
+            document_id=document.id,
+            db=db,
+        )
     except Exception as exc:
         logger.error("OCR extraction failed for document %s: %s", document_id, exc)
         raise HTTPException(
@@ -82,32 +87,37 @@ async def extract_ocr_from_document(
             detail=f"OCR extraction failed: {str(exc)}",
         )
 
-    # Update document with OCR results
-    if ocr_result["fields"]:
-        # Store raw OCR data as JSON
-        import json
+    refreshed_result = await db.execute(
+        select(Document)
+        .options(selectinload(Document.ocr_fields))
+        .where(Document.id == document.id)
+    )
+    document = refreshed_result.scalars().first() or document
+    confidence_map = document.confidence_per_field or {}
+    confidence_values = [
+        float(v)
+        for v in confidence_map.values()
+        if isinstance(v, (int, float))
+    ]
+    avg_conf = sum(confidence_values) / len(confidence_values) if confidence_values else 0.0
+    fields = {
+        row.field_name: {
+            "value": row.corrected_value if row.human_corrected and row.corrected_value else row.extracted_value,
+            "conf": float(row.confidence_score),
+            "human_corrected": row.human_corrected,
+        }
+        for row in document.ocr_fields
+    }
 
-        document.ocr_raw_json = json.dumps(ocr_result["fields"])
-        document.ocr_engine = ocr_result["engine"]
-
-        # Calculate average confidence for the whole document
-        conf_values = [f.get("conf", 0) for f in ocr_result["fields"].values()]
-        avg_conf = sum(conf_values) / len(conf_values) if conf_values else 0.0
-        document.confidence_per_field = {"avg_confidence": avg_conf}
-
-        await db.commit()
-
-    # Determine if user can edit (confidence below threshold)
-    avg_conf = ocr_result.get("avg_confidence", 0.0)
     can_edit = avg_conf < settings.OCR_USER_EDIT_THRESHOLD
 
     return {
         "document_id": document_id,
-        "engine": ocr_result["engine"],
-        "fields": ocr_result["fields"],
+        "engine": pipeline_result["engine"],
+        "fields": fields,
         "avg_confidence": avg_conf,
         "can_user_edit": can_edit,
-        "needs_glm_fallback": ocr_result.get("needs_glm_fallback", False),
+        "needs_glm_fallback": pipeline_result.get("fallback_queued", False),
     }
 
 
