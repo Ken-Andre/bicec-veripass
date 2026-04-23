@@ -51,6 +51,7 @@ from app.modules.kyc.schemas import (
     OCRConfirmSubmitRequest,
     OCRFieldResponse,
     NIUSubmitRequest,
+    SignatureSubmitRequest,
     GeoRegionResponse,
     GeoCityResponse,
     GeoQuartierResponse,
@@ -413,6 +414,41 @@ async def capture_cni(
     )
 
 
+@router.post("/capture/bill", response_model=DocumentResponse)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def capture_bill(
+    request: Request,
+    file: UploadFile = File(...),
+    bill_type: str = Form("ENEO"),
+    session_id: str | None = Form(None),
+    client_sha256: str | None = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload utility bill (ENEO or CAMWATER) as proof of residence.
+
+    Expected contract:
+    - multipart file (PNG/JPG)
+    - bill_type: ENEO|CAMWATER
+    - optional session_id
+    """
+    _ = session_id
+    bill_type_upper = bill_type.strip().upper()
+    if bill_type_upper not in {"ENEO", "CAMWATER"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid bill_type. Expected 'ENEO' or 'CAMWATER'.",
+        )
+    session = await _get_active_draft_session(db, current_user)
+    return await _store_document_and_create_record(
+        session=session,
+        file=file,
+        doc_type=f"BILL_{bill_type_upper}",
+        db=db,
+        client_sha256=client_sha256,
+    )
+
+
 @router.get("/document/{doc_id}/ocr")
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_document_ocr(
@@ -671,7 +707,7 @@ async def submit_address(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Submit address information."""
+    """Submit address information with GPS validation."""
     result = await db.execute(
         select(KYCSession)
         .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
@@ -681,12 +717,22 @@ async def submit_address(
     if not session:
         raise HTTPException(status_code=404, detail="No active KYC session")
 
-    # Store address in session metadata (JSONB)
-    # In production, you might have a dedicated Address table
+    # Validate GPS is within Cameroon bounds (~2°N-13°N, 8°E-17°E)
+    if body.gps_lat is not None and body.gps_lng is not None:
+        if not (2.0 <= body.gps_lat <= 13.0) or not (8.0 <= body.gps_lng <= 17.0):
+            raise HTTPException(
+                status_code=400,
+                detail="GPS coordinates outside Cameroon bounds. Please ensure location services are enabled.",
+            )
+
     session.last_step_completed = "address"
     await db.commit()
 
-    return {"status": "success", "message": "Address submitted"}
+    return {
+        "status": "success",
+        "message": "Address and GPS validated",
+        "gps_validated": body.gps_lat is not None and body.gps_lng is not None,
+    }
 
 
 @router.post("/consent/submit", response_model=ConsentRecordResponse)
@@ -764,6 +810,57 @@ async def submit_niu(
     return {"status": "success", "niu_type": body.niu_type}
 
 
+@router.post("/signature/submit")
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def submit_signature(
+    request: Request,
+    body: SignatureSubmitRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit electronic signature. Stored in consent metadata."""
+    result = await db.execute(
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .order_by(KYCSession.started_at.desc())
+    )
+    session = result.scalars().first()
+    if not session:
+        raise HTTPException(status_code=404, detail="No active KYC session")
+
+    # Find or create consent record to attach signature
+    result = await db.execute(
+        select(ConsentRecord).where(ConsentRecord.session_id == session.id)
+    )
+    consent = result.scalar_one_or_none()
+
+    if consent is None:
+        consent = ConsentRecord(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            cgu_accepted=False,
+            privacy_accepted=False,
+            data_processing_accepted=False,
+            consent_method="SIGNATURE_ONLY",
+            signed_at=datetime.now(timezone.utc),
+            consent_metadata={
+                "signature_data": body.signature_data,
+                "signature_timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        db.add(consent)
+    else:
+        if consent.consent_metadata is None:
+            consent.consent_metadata = {}
+        consent.consent_metadata["signature_data"] = body.signature_data
+        consent.consent_metadata["signature_timestamp"] = datetime.now(timezone.utc).isoformat()
+
+    session.last_step_completed = "signature"
+    await db.commit()
+
+    return {"status": "success", "message": "Signature recorded"}
+
+
 async def _compute_kyc_readiness(
     *,
     session: KYCSession,
@@ -784,6 +881,10 @@ async def _compute_kyc_readiness(
 
     if missing:
         blocking_reasons.append(f"Missing required documents: {', '.join(missing)}")
+
+    has_bill_document = bool({"BILL_ENEO", "BILL_CAMWATER"} & doc_types)
+    if not has_bill_document:
+        blocking_reasons.append("Missing required bill document (ENEO or CAMWATER)")
 
     result = await db.execute(
         select(ConsentRecord).where(ConsentRecord.session_id == session.id)
@@ -834,6 +935,7 @@ async def _compute_kyc_readiness(
         has_ocr_review=has_ocr_review,
         has_consent=has_consent,
         has_biometric_result=has_biometric_result,
+        has_bill_document=has_bill_document,
         confidence_score_global=confidence_score_global,
     )
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from pathlib import Path
 
@@ -147,9 +148,9 @@ async def extract_ocr_from_upload(
             detail="File too small to be a valid image",
         )
 
-    # Run OCR
+    # Run OCR in thread pool so the event loop stays free
     try:
-        ocr_result = ocr_service.extract_from_bytes(image_bytes)
+        ocr_result = await asyncio.to_thread(ocr_service.extract_from_bytes, image_bytes)
     except Exception as exc:
         logger.error("OCR extraction from upload failed: %s", exc)
         raise HTTPException(
@@ -166,6 +167,7 @@ async def extract_ocr_from_upload(
         "avg_confidence": avg_conf,
         "can_user_edit": can_edit,
         "needs_glm_fallback": ocr_result.get("needs_glm_fallback", False),
+        "process_time_ms": ocr_result.get("process_time_ms", 0.0),
     }
 
 
@@ -197,7 +199,7 @@ async def test_ocr_extract():
             detail="Test image not found on server",
         )
 
-    ocr_result = ocr_service.extract_from_path(test_image_path)
+    ocr_result = await asyncio.to_thread(ocr_service.extract_from_path, test_image_path)
 
     avg_conf = ocr_result.get("avg_confidence", 0.0)
     can_edit = avg_conf < settings.OCR_USER_EDIT_THRESHOLD
@@ -208,4 +210,5 @@ async def test_ocr_extract():
         "avg_confidence": avg_conf,
         "can_user_edit": can_edit,
         "needs_glm_fallback": ocr_result.get("needs_glm_fallback", False),
+        "process_time_ms": ocr_result.get("process_time_ms", 0.0),
     }

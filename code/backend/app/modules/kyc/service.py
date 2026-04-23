@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
+import os
 import re
 import subprocess
 from collections import Counter
@@ -31,6 +33,7 @@ DEFAULT_REQUIRED_FIELDS: dict[str, list[str]] = {
     "CNI_VERSO": ["date_expiration"],
 }
 OCR_ENABLED_DOC_TYPES = {"CNI_RECTO", "CNI_VERSO", "BILL_ENEO", "BILL_CAMWATER", "NIU"}
+_shared_paddle_ocr: Any | None = None
 
 
 @dataclass
@@ -55,6 +58,97 @@ def _threshold_ratio() -> float:
 
 def _resolve_document_path(document: Document) -> Path:
     return (document_storage.base_path / document.file_path).resolve()
+
+
+def _paddle_lang() -> str:
+    lang = settings.PADDLE_LANG.strip().lower()
+    if lang in {"fr", "french", "france"}:
+        return "fr"
+    return settings.PADDLE_LANG
+
+
+def _configured_model_dir(value: str, label: str) -> str | None:
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    model_path = Path(cleaned)
+    if model_path.is_dir():
+        return str(model_path)
+    logger.warning(f"Configured {label} does not exist or is not a directory: {cleaned}")
+    return None
+
+
+def _resolve_offline_model_dir(default_subdir: str, override_value: str, label: str) -> str | None:
+    override_dir = _configured_model_dir(override_value, label)
+    if override_dir:
+        return override_dir
+    candidate = Path(settings.OCR_MODELS_ROOT) / "paddlex" / "official_models" / default_subdir
+    if candidate.is_dir():
+        return str(candidate)
+    logger.error(f"Missing offline Paddle model directory for {label}: {candidate}")
+    return None
+
+
+def get_shared_paddle_ocr() -> Any | None:
+    """Initialize and return a shared PaddleOCR v3 instance in offline-first mode.
+
+    This initializer avoids runtime downloads by requiring local model directories
+    when PADDLE_OFFLINE is enabled.
+    """
+    global _shared_paddle_ocr
+    if _shared_paddle_ocr is not None:
+        return _shared_paddle_ocr
+
+    os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+    os.environ.setdefault("PADDLE_PDX_MODEL_SOURCE_CHECK", "0")
+    if settings.PADDLE_CACHE_DIR:
+        os.environ.setdefault("PADDLE_HOME", settings.PADDLE_CACHE_DIR)
+        os.environ.setdefault("XDG_CACHE_HOME", settings.PADDLE_CACHE_DIR)
+
+    try:
+        from paddleocr import PaddleOCR  # type: ignore
+    except Exception as exc:
+        logger.warning(f"PaddleOCR unavailable: {exc}")
+        return None
+
+    det_model_dir = _resolve_offline_model_dir(
+        default_subdir="PP-OCRv5_server_det",
+        override_value=settings.PADDLE_DET_MODEL_DIR,
+        label="PADDLE_DET_MODEL_DIR",
+    )
+    rec_model_dir = _resolve_offline_model_dir(
+        default_subdir="latin_PP-OCRv5_mobile_rec",
+        override_value=settings.PADDLE_REC_MODEL_DIR,
+        label="PADDLE_REC_MODEL_DIR",
+    )
+    if settings.PADDLE_OFFLINE and (det_model_dir is None or rec_model_dir is None):
+        logger.error(
+            f"Offline Paddle mode enabled but required models are missing (det={det_model_dir}, rec={rec_model_dir})."
+        )
+        return None
+
+    kwargs: dict[str, Any] = {
+        "lang": _paddle_lang(),
+        "use_doc_orientation_classify": False,
+        "use_doc_unwarping": False,
+        "use_textline_orientation": False,
+        "enable_mkldnn": False,
+    }
+    if det_model_dir:
+        kwargs["text_detection_model_dir"] = det_model_dir
+        kwargs["text_detection_model_name"] = Path(det_model_dir).name
+    if rec_model_dir:
+        kwargs["text_recognition_model_dir"] = rec_model_dir
+        kwargs["text_recognition_model_name"] = Path(rec_model_dir).name
+
+    try:
+        _shared_paddle_ocr = PaddleOCR(**kwargs)
+        logger.info(f"PaddleOCR v3 initialized (lang={kwargs.get('lang')}) in offline mode")
+    except Exception as exc:
+        logger.warning(f"PaddleOCR unavailable: {exc}", exc_info=True)
+        return None
+
+    return _shared_paddle_ocr
 
 
 def _extract_fields_from_lines(lines: list[tuple[str, float]]) -> tuple[dict[str, str], dict[str, float]]:
@@ -104,22 +198,21 @@ def _extract_fields_from_lines(lines: list[tuple[str, float]]) -> tuple[dict[str
 
 
 def _run_paddle_ocr(image_path: Path) -> OCRExtractionResult:
-    try:
-        from paddleocr import PaddleOCR  # type: ignore
-    except Exception as exc:
-        logger.warning("PaddleOCR unavailable: %s", exc)
-        return OCRExtractionResult(
-            engine="PADDLE_UNAVAILABLE",
-            raw_payload={"error": "paddleocr_not_installed"},
-            fields={},
-            confidences={},
-        )
+    """Run PaddleOCR and extract fields using the improved spatial extraction.
+    
+    Delegates to app.services.ocr_service to reuse the improved field extraction
+    logic (spatial anchoring, label-following, etc.) while keeping the same
+    OCRExtractionResult return format for compatibility.
+    """
+    # Lazy import to avoid circular dependency at module load time.
+    # ocr_service.py imports get_shared_paddle_ocr from this module,
+    # so we import ocr_service lazily inside the function.
+    from app.services.ocr_service import ocr_service
 
     try:
-        ocr = PaddleOCR(use_angle_cls=True, lang="fr")
-        raw = ocr.ocr(str(image_path), cls=True) or []
+        result = ocr_service.extract_from_path(image_path)
     except Exception as exc:
-        logger.error("PaddleOCR failed on %s: %s", image_path, exc, exc_info=True)
+        logger.error("PaddleOCR extraction failed on %s: %s", image_path, exc, exc_info=True)
         return OCRExtractionResult(
             engine="PADDLE_ERROR",
             raw_payload={"error": str(exc)},
@@ -127,23 +220,25 @@ def _run_paddle_ocr(image_path: Path) -> OCRExtractionResult:
             confidences={},
         )
 
-    lines: list[tuple[str, float]] = []
-    for page in raw:
-        if not page:
-            continue
-        for item in page:
-            try:
-                text = str(item[1][0]).strip()
-                score = float(item[1][1])
-            except Exception:
-                continue
-            if text:
-                lines.append((text, score))
+    # Convert ocr_service result format to OCRExtractionResult
+    fields: dict[str, str] = {}
+    confidences: dict[str, float] = {}
+    
+    for field_name, field_data in result.get("fields", {}).items():
+        if isinstance(field_data, dict):
+            fields[field_name] = field_data.get("value", "")
+            confidences[field_name] = field_data.get("conf", 0.0)
+        else:
+            fields[field_name] = str(field_data)
+            confidences[field_name] = 0.8
 
-    fields, confidences = _extract_fields_from_lines(lines)
+    engine = result.get("engine", "paddleocr")
+    if engine == "paddleocr_unavailable":
+        engine = "PADDLE_UNAVAILABLE"
+
     return OCRExtractionResult(
-        engine="PADDLE",
-        raw_payload={"lines": [{"text": t, "confidence": c} for t, c in lines]},
+        engine=engine,
+        raw_payload=result,
         fields=fields,
         confidences=confidences,
     )
@@ -302,7 +397,7 @@ async def process_document_ocr_pipeline(
         }
 
     image_path = _resolve_document_path(document)
-    paddle_result = _run_paddle_ocr(image_path)
+    paddle_result = await asyncio.to_thread(_run_paddle_ocr, image_path)
 
     await _upsert_ocr_fields(db, document, paddle_result.fields, paddle_result.confidences)
     document.ocr_engine = paddle_result.engine

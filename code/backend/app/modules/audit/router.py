@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.security import require_role
+from app.core.security import require_agent_role
 from app.db.session import get_db
 from app.modules.auth.models import AgentRole
 from app.modules.audit import service
@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 @router.get("/")
-async def get_root():
+async def get_root(_agent=Depends(require_agent_role(AgentRole.ADMIN_IT, AgentRole.SYLVIE))):
     return {"module": "audit", "status": "active"}
 
 
@@ -27,7 +27,7 @@ async def get_audit_log(
     agent_id: str | None = None,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    _agent=Depends(require_role(AgentRole.ADMIN_IT, AgentRole.SYLVIE)),
+    _agent=Depends(require_agent_role(AgentRole.ADMIN_IT, AgentRole.SYLVIE)),
 ):
     """
     Récupère le journal d'audit avec filtres optionnels.
@@ -44,7 +44,7 @@ async def export_audit_log_cobac(
     date_from: str,
     date_to: str,
     db: AsyncSession = Depends(get_db),
-    _agent=Depends(require_role(AgentRole.SYLVIE)),
+    _agent=Depends(require_agent_role(AgentRole.SYLVIE)),
 ):
     """
     Export du journal d'audit pour le régulateur COBAC.

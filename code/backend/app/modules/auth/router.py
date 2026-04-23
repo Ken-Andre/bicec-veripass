@@ -8,6 +8,7 @@ from sqlalchemy import select, delete
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
+from app.core.redis import get_redis, lock_key
 from app.core.security import (
     hash_password,
     verify_password,
@@ -538,14 +539,46 @@ async def agent_login(
     request: Request, body: AgentLoginRequest, db: AsyncSession = Depends(get_db)
 ):
     """Agent login for back-office (Jean, Thomas, Sylvie)."""
+    # Granular rate limiting by email
+    request.state.rate_limit_identifier = body.email
+
+    redis = await get_redis()
+    lockout_key = f"agent_lockout:{body.email}"
+    attempts_key = f"agent_attempts:{body.email}"
+
+    # 1. Check if account is locked
+    if await redis.get(lockout_key):
+        logger.warning(f"Login attempt on locked agent account: {body.email}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account locked for 15 minutes due to multiple failed attempts.",
+        )
+
     result = await db.execute(select(Agent).where(Agent.email == body.email))
     agent = result.scalar_one_or_none()
 
+    # 2. Verify credentials
     if not agent or not verify_password(body.password, agent.password_hash):
+        # Increment failed attempts
+        attempts = await redis.incr(attempts_key)
+        await redis.expire(attempts_key, 3600)  # window of 1 hour
+
+        if attempts >= 5:
+            await redis.set(lockout_key, "locked", ex=900)  # 15 minutes
+            await redis.delete(attempts_key)
+            logger.warning(f"Agent account locked: {body.email}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account locked for 15 minutes due to multiple failed attempts.",
+            )
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail=f"Invalid email or password. Attempt {attempts}/5.",
         )
+
+    # 3. Success: Reset attempts
+    await redis.delete(attempts_key)
 
     # Create tokens
     access_token = create_access_token(

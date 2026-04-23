@@ -109,6 +109,7 @@ class KYCReadinessResponse(BaseModel):
     has_ocr_review: bool
     has_consent: bool
     has_biometric_result: bool
+    has_bill_document: bool = False
     confidence_score_global: float | None = None
 
 
@@ -158,6 +159,11 @@ class OCRConfirmSubmitRequest(BaseModel):
 class NIUSubmitRequest(BaseModel):
     niu_type: str = Field(..., description="DECLARATIVE, UPLOADED")
     niu_value: Optional[str] = None
+
+
+# === Signature ===
+class SignatureSubmitRequest(BaseModel):
+    signature_data: str = Field(..., description="Base64 data URL of the signature image")
 
 
 # === Geo Data ===

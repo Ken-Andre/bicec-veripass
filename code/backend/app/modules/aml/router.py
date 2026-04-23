@@ -25,7 +25,7 @@ router = APIRouter()
 
 
 @router.get("/")
-async def get_root():
+async def get_root(_agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT))):
     return {"module": "aml", "status": "active"}
 
 
