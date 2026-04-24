@@ -26,10 +26,61 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.modules.kyc.service import get_shared_paddle_ocr
 
+
+# ---------------------------------------------------------------------------
+# Warmup image generation
+# ---------------------------------------------------------------------------
+def generate_warmup_image() -> np.ndarray:
+    """Generate a synthetic text image for PaddleOCR predict() warmup.
+
+    Creates a white image with black text lines mimicking a document layout.
+    This ensures both the detection AND recognition sub-models are exercised
+    during startup — a pure noise or black image short-circuits detection,
+    leaving recognition unwarmed and causing garbage results on the first
+    real OCR request.
+
+    Returns:
+        BGR numpy array suitable for ocr.predict().
+    """
+    from PIL import ImageDraw, ImageFont
+
+    img = Image.new("RGB", (600, 380), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    # Try a monospace font; fall back to default if unavailable
+    try:
+        font = ImageFont.truetype("DejaVuSansMono.ttf", 18)
+    except (IOError, OSError):
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 18)
+        except (IOError, OSError):
+            font = ImageFont.load_default()
+
+    # Draw text lines similar to a CNI card layout
+    lines = [
+        "REPUBLIQUE DU CAMEROUN",
+        "REPUBLIC OF CAMEROON",
+        "NOM / SURNAME: DUPONT",
+        "PRENOMS / GIVEN NAMES: MARIE",
+        "DATE DE NAISSANCE: 15/03/1990",
+        "LIEU DE NAISSANCE: YAOUNDE",
+        "SEXE: F   TAILLE: 1.65",
+        "PROFESSION: ENSEIGNANTE",
+    ]
+    y = 20
+    for line in lines:
+        draw.text((30, y), line, fill=(0, 0, 0), font=font)
+        y += 36
+
+    # Convert PIL RGB → OpenCV BGR
+    return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
 # ---------------------------------------------------------------------------
 # Card alignment (perspective correction)
 # ---------------------------------------------------------------------------
-STANDARD_WIDTH = 800
+# Image width for OCR pipeline — configurable via OCR_IMAGE_WIDTH env var (default 600).
+# Profiling showed: 800w → ~94s predict(), 600w → ~44s predict() (2.1x faster,
+# same 12 blocks detected). See config.py for the setting definition.
 
 
 def align_card_image(image_input: str | np.ndarray | Image.Image) -> np.ndarray | None:
@@ -39,7 +90,7 @@ def align_card_image(image_input: str | np.ndarray | Image.Image) -> np.ndarray 
         image_input: File path (str), numpy array (BGR), or PIL Image.
 
     Returns:
-        Aligned BGR numpy array normalized to STANDARD_WIDTH, or None on failure.
+        Aligned BGR numpy array normalized to OCR_IMAGE_WIDTH, or None on failure.
     """
     if isinstance(image_input, str):
         img = cv2.imread(image_input)
@@ -81,11 +132,13 @@ def align_card_image(image_input: str | np.ndarray | Image.Image) -> np.ndarray 
         if area < 0.1 * img_area:
             screen_cnt = None
 
+    _width = settings.OCR_IMAGE_WIDTH
+
     if screen_cnt is None:
         # Fallback: just normalize width
-        fallback_ratio = STANDARD_WIDTH / float(orig.shape[1])
+        fallback_ratio = _width / float(orig.shape[1])
         fallback_height = int(orig.shape[0] * fallback_ratio)
-        return cv2.resize(orig, (STANDARD_WIDTH, fallback_height))
+        return cv2.resize(orig, (_width, fallback_height))
 
     pts = screen_cnt.reshape(4, 2) * ratio
     rect = np.zeros((4, 2), dtype="float32")
@@ -113,9 +166,26 @@ def align_card_image(image_input: str | np.ndarray | Image.Image) -> np.ndarray 
     M = cv2.getPerspectiveTransform(rect, dst)
     warped = cv2.warpPerspective(orig, M, (maxWidth, maxHeight))
 
-    ratio_warp = STANDARD_WIDTH / float(maxWidth)
+    # Sanity check: CNI cards (ISO 7810 ID-1) are landscape (~1.586:1).
+    # If the warp produces a portrait or extreme aspect ratio, the contour
+    # was likely wrong (e.g. a vertical strip or text block on the card).
+    # In that case, fall back to simple resize to avoid destroying the image.
+    _warp_ratio = maxWidth / max(maxHeight, 1)
+    _CNI_MIN_RATIO = 1.1  # card must be noticeably landscape (1.586:1 is standard)
+    _CNI_MAX_RATIO = 2.5  # extremely wide warp is also wrong (e.g. horizontal strip)
+    if _warp_ratio < _CNI_MIN_RATIO or _warp_ratio > _CNI_MAX_RATIO:
+        logger.info(
+            f"Aligned aspect ratio {_warp_ratio:.2f} outside expected range "
+            f"[{_CNI_MIN_RATIO}, {_CNI_MAX_RATIO}] (CNI ~1.6) — "
+            f"falling back to simple resize"
+        )
+        fallback_ratio = _width / float(orig.shape[1])
+        fallback_height = int(orig.shape[0] * fallback_ratio)
+        return cv2.resize(orig, (_width, fallback_height))
+
+    ratio_warp = _width / float(maxWidth)
     standard_height = int(maxHeight * ratio_warp)
-    return cv2.resize(warped, (STANDARD_WIDTH, standard_height))
+    return cv2.resize(warped, (_width, standard_height))
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +315,9 @@ def _sanitize_date(val: str) -> str:
     """
     if not val or not isinstance(val, str):
         return val
-    # Normalize separators
-    d = val.replace("/", ".").replace("-", ".").replace(",", ".").strip()
+    # Normalize separators (including colon — PaddleOCR v3 at 600w reads
+    # "07.02:1989" where the colon replaces the final dot).
+    d = val.replace("/", ".").replace("-", ".").replace(",", ".").replace(":", ".").strip()
     parts = d.split(".")
     if len(parts) != 3:
         return val  # not a recognizable date format
@@ -307,11 +378,314 @@ def _is_stop_word(text: str) -> bool:
     return any(w in STOP_WORDS for w in words)
 
 
-def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
-    """Extract structured CNI fields using spatial anchoring + regex + MRZ.
+# ---------------------------------------------------------------------------
+# Positional template zones for CNI field extraction
+# ---------------------------------------------------------------------------
+# Instead of matching specific values (city names, profession names),
+# we use spatial zones on the aligned card image. Each zone defines where
+# a particular field's VALUE appears on the card. Content validators check
+# that the block text matches the expected FORMAT (date, name, etc.) without
+# relying on predefined value lists.
+#
+# Zone format: (field_name, cy_min_frac, cy_max_frac, cx_min_frac, cx_max_frac, validator_key)
+# Positions are fractions of the aligned image dimensions.
+# Calibrated on standard CNI Camerounaise (ISO 7810 ID-1, ~86×54mm).
 
-    Supports BOTH old and new Cameroonian CNI formats.
-    This is a direct port of the proven notebook logic from ocr_utils.py.
+CNI_RECTO_ZONES = [
+    # Zone            cy_min  cy_max  cx_min  cx_max  validator
+    ("nom",            0.18,   0.30,   0.05,   0.60, "is_name"),
+    ("prenom",         0.30,   0.42,   0.05,   0.60, "is_name"),
+    ("date_naissance", 0.42,   0.56,   0.10,   0.60, "is_date"),
+    ("lieu_naissance", 0.53,   0.64,   0.05,   0.60, "is_place"),
+    ("sexe",           0.60,   0.72,   0.05,   0.40, "is_sex"),
+    ("taille",         0.60,   0.72,   0.35,   0.60, "is_height"),
+    ("profession",     0.68,   0.82,   0.05,   0.60, "is_profession"),
+]
+
+CNI_VERSO_ZONES = [
+    # Zone             cy_min  cy_max  cx_min  cx_max  validator
+    ("nom",             0.02,   0.16,   0.02,   0.40, "is_name"),
+    ("prenom",          0.16,   0.30,   0.02,   0.40, "is_name"),
+    ("lieu_naissance",  0.38,   0.55,   0.02,   0.25, "is_place"),
+    ("date_delivrance", 0.33,   0.48,   0.40,   0.75, "is_date"),
+    ("date_expiration", 0.46,   0.58,   0.40,   0.75, "is_date"),
+    ("numero_cni",      0.48,   0.60,   0.60,   0.95, "is_nin"),
+    # adresse is below the authority signature area, near bottom-left.
+    # Authority name (e.g. "Martin MBARGA NGUELE") sits at cy≈0.56 — skip it.
+    # NOTE: Low detection rate at 600w — PaddleOCR often misses address text.
+    # Falls back to legacy label-based extraction when ADRESSE label is detected.
+    ("adresse",          0.68,   0.82,   0.02,   0.40, "is_address"),
+    # poste_identification: short code (e.g. "CE012") on the right side.
+    # NOTE: Low detection rate at 600w — falls back to legacy label-based extraction.
+    ("poste_identification", 0.60, 0.75, 0.55, 0.85, "is_poste"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Content validators — check FORMAT, not specific values
+# ---------------------------------------------------------------------------
+def _is_date_text(text: str) -> bool:
+    """Check if text contains a date pattern."""
+    return bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", text))
+
+
+def _is_alphabetic_text(text: str, min_len: int = 2, reject_numbers: bool = False) -> bool:
+    """Check if text is mostly alphabetic (name, place, profession)."""
+    t = text.strip()
+    if len(t) < min_len:
+        return False
+    if _is_stop_word(t):
+        return False
+    if _is_date_text(t):
+        return False
+    if reject_numbers and re.search(r"\b\d{5,}\b", t):
+        return False
+    if "<" in t:
+        return False  # MRZ line
+    alpha_count = sum(1 for c in t if c.isalpha() or c in " -'àâäéèêëîïôöùûüÿç")
+    return alpha_count / max(len(t), 1) >= 0.7
+
+
+def _is_name_text(text: str) -> bool:
+    """Check if text looks like a person's name."""
+    return _is_alphabetic_text(text, min_len=2)
+
+
+def _is_sex_text(text: str) -> bool:
+    """Check if text indicates sex (F or M)."""
+    t = text.upper().strip()
+    if t in ("F", "M"):
+        return True
+    if len(text) <= 8:
+        return bool(re.search(r"([FM])\s*$", t))
+    return False
+
+
+def _is_height_text(text: str) -> bool:
+    """Check if text contains a height measurement (1.XX)."""
+    return bool(re.search(r"\b1[.,]\d{2}\b", text))
+
+
+def _is_nin_text(text: str) -> bool:
+    """Check if text contains a national ID number (9+ digits)."""
+    return len(re.sub(r"\D", "", text)) >= 9
+
+
+def _is_place_text(text: str) -> bool:
+    """Check if text looks like a place name."""
+    return _is_alphabetic_text(text, min_len=2)
+
+
+def _is_profession_text(text: str) -> bool:
+    """Check if text looks like a profession."""
+    return _is_alphabetic_text(text, min_len=3, reject_numbers=True)
+
+
+def _is_address_text(text: str) -> bool:
+    """Check if text looks like an address (requires digit or address keyword).
+
+    Addresses on Cameroonian CNI typically contain numbers or keywords
+    like QUARTIER, RUE, CARREFOUR, B.P. Pure alphabetic text (person names)
+    should NOT match — they are authority names, not addresses.
+    """
+    t = text.strip()
+    if len(t) < 3:
+        return False
+    if _is_stop_word(t):
+        return False
+    if _is_date_text(t):
+        return False
+    if "<" in t:
+        return False  # MRZ line
+    # Must contain at least one digit OR an address-related keyword
+    has_digit = any(c.isdigit() for c in t)
+    _addr_keywords = ["QUARTIER", "QRT", "RUE", "CARREFOUR", "B.P", "BP", "LOT", "ARROND"]
+    has_addr_kw = any(kw in t.upper() for kw in _addr_keywords)
+    if not (has_digit or has_addr_kw):
+        return False
+    alpha_count = sum(1 for c in t if c.isalpha() or c in " -'àâäéèêëîïôöùûüÿç")
+    return alpha_count / max(len(t), 1) >= 0.3
+
+
+def _is_poste_text(text: str) -> bool:
+    """Check if text looks like a poste d'identification code (e.g. CE012, CM24)."""
+    t = text.strip().upper()
+    # Typical format: 2-3 uppercase letters + 2-3 digits, or short alphanumeric
+    return bool(re.match(r'^[A-Z]{1,4}[0-9]{2,4}$', t)) or (len(t) <= 6 and len(re.sub(r'\D', '', t)) >= 2 and len(re.sub(r'[^A-Z]', '', t)) >= 1)
+
+
+_VALIDATORS = {
+    "is_name": _is_name_text,
+    "is_date": _is_date_text,
+    "is_place": _is_place_text,
+    "is_sex": _is_sex_text,
+    "is_height": _is_height_text,
+    "is_nin": _is_nin_text,
+    "is_profession": _is_profession_text,
+    "is_address": _is_address_text,
+    "is_poste": _is_poste_text,
+}
+
+
+# ---------------------------------------------------------------------------
+# Value extractors — pull the specific value from block text
+# ---------------------------------------------------------------------------
+def _extract_date_value(text: str) -> str | None:
+    """Extract and sanitize a date value from text."""
+    match = re.search(r"\b(\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4})\b", text)
+    if match:
+        raw_date = match.group(1).replace(".", "/").replace("-", "/").replace(",", "/").replace(":", "/")
+        parts = raw_date.split("/")
+        if len(parts) == 3:
+            clean_date = f"{parts[0]}/{parts[1]}/{parts[2]}"
+            return _sanitize_date(clean_date)
+    return None
+
+
+def _extract_sex_value(text: str) -> str | None:
+    """Extract sex (F/M) from text."""
+    t = text.upper().strip()
+    if t in ("F", "M"):
+        return t
+    if len(text) <= 8:
+        m = re.search(r"([FM])\s*$", t)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _extract_height_value(text: str) -> str | None:
+    """Extract height (1.XX) from text."""
+    m = re.search(r"\b(1[.,]\d{2})\b", text)
+    if m:
+        return m.group(1).replace(",", ".")
+    return None
+
+
+def _extract_nin_value(text: str) -> str | None:
+    """Extract NIN (15+ digits preferred, fallback 9 digits) from text."""
+    m = re.search(r"\b(\d{15,})\b", text)
+    if m:
+        return m.group(1)
+    m = re.search(r"\b(\d{9})\b", text)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _extract_poste_value(text: str) -> str | None:
+    """Extract poste d'identification code, stripping spaces."""
+    t = text.strip().replace(" ", "")
+    if len(t) <= 6 and len(re.sub(r'\D', '', t)) >= 2:
+        return t
+    return None
+
+
+def _extract_by_template(
+    blocks: list[dict[str, Any]],
+    img_height: int,
+    img_width: int,
+    side: str,
+) -> dict[str, Any]:
+    """Extract CNI fields using positional template zones.
+
+    PRIMARY extraction method: for each field, find the OCR block whose
+    centroid falls within the expected spatial zone on the aligned card AND
+    passes the content validator. This approach doesn't depend on label
+    detection (PaddleOCR often misses small label text) or predefined value
+    lists (cities, professions) — it uses POSITION + FORMAT only.
+
+    Args:
+        blocks: OCR blocks with 'text', 'cx', 'cy', 'conf' keys.
+        img_height: Height of the aligned image in pixels.
+        img_width: Width of the aligned image in pixels.
+        side: "recto" or "verso".
+
+    Returns:
+        Parsed field dict with per-field value and confidence.
+        Only fields that were successfully extracted are populated;
+        others remain None.
+    """
+    parsed = {field: {"value": None, "conf": 0.0} for field in CNI_FIELDS}
+    parsed["methode"] = "TEMPLATE_POSITIONNEL"
+    parsed["detected_side"] = side
+
+    zones = CNI_RECTO_ZONES if side == "recto" else CNI_VERSO_ZONES
+
+    for field_name, cy_min, cy_max, cx_min, cx_max, validator_key in zones:
+        validator = _VALIDATORS.get(validator_key)
+        if validator is None:
+            continue
+
+        # Convert fractional zone to pixel coordinates
+        cy_lo = cy_min * img_height
+        cy_hi = cy_max * img_height
+        cx_lo = cx_min * img_width
+        cx_hi = cx_max * img_width
+
+        # Find blocks within this zone that pass the validator
+        candidates = []
+        for b in blocks:
+            b_cy = b.get("cy", 0)
+            b_cx = b.get("cx", 0)
+            if not (cy_lo <= b_cy <= cy_hi and cx_lo <= b_cx <= cx_hi):
+                continue
+            b_text = b.get("text", "")
+            if not validator(b_text):
+                continue
+            # Score: prefer blocks closer to zone center
+            zone_cx = (cx_lo + cx_hi) / 2
+            zone_cy = (cy_lo + cy_hi) / 2
+            dist = ((b_cx - zone_cx) ** 2 + (b_cy - zone_cy) ** 2) ** 0.5
+            candidates.append((b, dist))
+
+        if not candidates:
+            continue
+
+        # Sort by distance to zone center (closest first)
+        candidates.sort(key=lambda x: x[1])
+        best_block = candidates[0][0]
+        best_text = best_block["text"].strip()
+        best_conf = float(best_block.get("conf", 0.0))
+
+        # Apply field-specific extraction
+        value: str | None = best_text  # default: use the whole text
+        if field_name in ("date_naissance", "date_delivrance", "date_expiration"):
+            value = _extract_date_value(best_text)
+            if value is None:
+                continue  # validator said yes but extractor said no — skip
+        elif field_name == "sexe":
+            value = _extract_sex_value(best_text)
+            if value is None:
+                continue
+        elif field_name == "taille":
+            value = _extract_height_value(best_text)
+            if value is None:
+                continue
+        elif field_name == "numero_cni":
+            value = _extract_nin_value(best_text)
+            if value is None:
+                continue
+        elif field_name == "poste_identification":
+            value = _extract_poste_value(best_text)
+            if value is None:
+                continue
+
+        parsed[field_name] = {"value": value, "conf": best_conf}
+
+    return parsed
+
+
+def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
+    """Legacy spatial anchoring extraction (used as FALLBACK).
+
+    This is the original extraction logic using label-based spatial anchoring,
+    regex, and value-list matching (CAMEROON_CITIES, CAMEROON_PROFESSIONS).
+    It serves as a fallback for fields that the template-based extraction
+    misses (e.g. adresse, poste_identification which lack template zones).
+
+    NOTE: Post-processing (dedup, re-scan, DOB_SUSPECT) is NOT done here —
+    it runs centrally in _extract_from_array() after the template/legacy merge.
 
     Args:
         blocks: List of dicts with 'text', 'cx', 'cy', 'conf' keys.
@@ -361,11 +735,11 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                 parsed_data["numero_cni"] = {"value": match_9.group(1), "conf": conf}
 
         # --- Dates (collect ALL regardless of side) ---
-        # Accept comma as separator too (PaddleOCR v3 sometimes reads
-        # "07.02.2018" as "07.02,2018" or "07/02,2018").
-        match_date = re.search(r"\b(\d{2}[./,\-]\d{2}[./,\-]\d{2,4})\b", text)
+        # Accept comma/colon as separator too (PaddleOCR v3 sometimes reads
+        # "07.02.2018" as "07.02,2018", "07/02,2018", or "07.02:1989").
+        match_date = re.search(r"\b(\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4})\b", text)
         if match_date:
-            raw_date = match_date.group(1).replace(".", "/").replace("-", "/").replace(",", "/")
+            raw_date = match_date.group(1).replace(".", "/").replace("-", "/").replace(",", "/").replace(":", "/")
             parts = raw_date.split("/")
             if len(parts) == 3:
                 clean_date = f"{parts[0]}/{parts[1]}/{parts[2]}"
@@ -431,9 +805,8 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
             parsed_data["profession"] = {"value": text, "conf": conf}
 
         # Lieu de naissance (Cameroonian city names)
-        # NOTE: Déduplication with nom is done in POST-PROCESSING below,
-        # because the NOM spatial anchor may not have been assigned yet
-        # when we encounter a city-name block earlier in the loop.
+        # NOTE: Déduplication with nom is done centrally in
+        # _extract_from_array() after the template/legacy merge, not here.
         _city_matches = [c for c in CAMEROON_CITIES if c in text_upper]
         if _city_matches and parsed_data["lieu_naissance"]["value"] is None:
             # Verify it's not inside an MRZ line
@@ -570,100 +943,9 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                 if "HEURISTIQUE" not in parsed_data["methode"]:
                     parsed_data["methode"] += " + HEURISTIQUE"
 
-    # --- Post-processing: deduplicate lieu_naissance vs nom AND prenom ---
-    # This MUST run AFTER all fields are assigned (including spatial anchors)
-    # because the inline check can't know the final nom/prenom values yet.
-    # A city name that exactly matches the holder's surname OR given name
-    # is almost certainly a false positive from the same text block.
-    if parsed_data["lieu_naissance"]["value"] is not None:
-        _lieu_upper = parsed_data["lieu_naissance"]["value"].upper()
-        # Exact match only — substring is too aggressive ("BONOU" in "BONOUA")
-        for _field in ["nom", "prenom"]:
-            if parsed_data[_field]["value"] is not None:
-                if _lieu_upper == parsed_data[_field]["value"].upper():
-                    logger.debug(
-                        f"lieu_naissance '{_lieu_upper}' matches {_field} "
-                        f"'{parsed_data[_field]['value']}' — clearing false positive"
-                    )
-                    parsed_data["lieu_naissance"] = {"value": None, "conf": 0.0}
-                    break
-
-    # --- Re-scan for lieu_naissance after dedup ---
-    # If dedup cleared a false positive (e.g. "Kana" matched both nom and city),
-    # we need to try other city blocks that were skipped because lieu_naissance
-    # was already filled. Example: "DSCHANG" exists as block 7 but was never
-    # assigned because "KANA" (block 3) was found first.
-    if parsed_data["lieu_naissance"]["value"] is None:
-        _nom_upper = (parsed_data["nom"]["value"].upper()
-                      if parsed_data["nom"]["value"] else "")
-        _prenom_upper = (parsed_data["prenom"]["value"].upper()
-                         if parsed_data["prenom"]["value"] else "")
-        # Collect city-name candidates from all blocks, then pick the one
-        # closest to the date_naissance block (on a CNI recto, lieu_naissance
-        # is always just below date_naissance). Fallback: sort by cy.
-        _city_candidates = []
-        _dob_cy = None
-        if parsed_data["date_naissance"]["value"] is not None:
-            # Find the block whose text contains the detected DOB.
-            # The sanitized date uses '/' but the raw OCR block may use
-            # '.', ',', or '-' as separators.
-            _dob_val = (parsed_data["date_naissance"]["value"]
-                        .replace("/", ".").replace(",", "."))
-            _dob_year = parsed_data["date_naissance"]["value"][-4:]
-            for b in blocks:
-                # Normalize block text the same way as _dob_val so commas,
-                # dashes etc. don't break the match.
-                b_text_norm = (b.get("text", "")
-                               .replace(",", ".").replace("-", "."))
-                if _dob_val in b_text_norm or _dob_year in b_text_norm:
-                    _dob_cy = b.get("cy", 0)
-                    break
-        for b in blocks:
-            b_text_upper = b["text"].strip().upper()
-            if "<" in b_text_upper:
-                continue  # skip MRZ lines
-            _city_matches = [c for c in CAMEROON_CITIES if c in b_text_upper]
-            if _city_matches:
-                _city_name = _city_matches[0]
-                # Skip if it matches nom or prenom (same false-positive risk)
-                if _city_name == _nom_upper or _city_name == _prenom_upper:
-                    continue
-                _city_candidates.append({"name": _city_name, "conf": float(b.get("conf", 0.0)), "cy": b.get("cy", 0)})
-        if _city_candidates:
-            # Sort by proximity to date_naissance block, or by cy if no DOB found
-            if _dob_cy is not None:
-                _city_candidates.sort(key=lambda c: abs(c["cy"] - _dob_cy))
-            else:
-                _city_candidates.sort(key=lambda c: c["cy"])
-            best = _city_candidates[0]
-            parsed_data["lieu_naissance"] = {
-                "value": best["name"].title(),
-                "conf": best["conf"],
-            }
-            if "RESCAN_VILLE" not in parsed_data["methode"]:
-                parsed_data["methode"] += " + RESCAN_VILLE"
-
-    # --- DOB plausibility check ---
-    # CNI dates of birth before 1920 are almost certainly OCR digit→digit
-    # errors (e.g. "2018" read as "1909"). A person born before 1920 would
-    # be 106+ years old — extremely rare on a current CNI.
-    # We can't auto-fix digit→digit errors, but we flag them for GLM fallback.
-    if parsed_data["date_naissance"]["value"] is not None:
-        try:
-            _dob_parts = parsed_data["date_naissance"]["value"].split("/")
-            if len(_dob_parts) == 3:
-                _dob_year = int(_dob_parts[2])
-                if _dob_year < 1920:
-                    logger.warning(
-                        f"Implausible DOB year {_dob_year} in "
-                        f"'{parsed_data['date_naissance']['value']}' — "
-                        f"likely OCR digit error, flagging for GLM fallback"
-                    )
-                    # Don't delete — keep it but mark for review
-                    if "DOB_SUSPECT" not in parsed_data["methode"]:
-                        parsed_data["methode"] += " + DOB_SUSPECT"
-        except (ValueError, IndexError):
-            pass
+    # NOTE: Post-processing (dedup lieu_naissance, re-scan, DOB plausibility)
+    # is done centrally in _extract_from_array() after the template/legacy merge,
+    # so it is NOT repeated here to avoid wasted work and inconsistent results.
 
     # Return ALL 12 CNI fields, even those with value=None.
     # Downstream consumers (API, frontend) need the full schema to know
@@ -853,9 +1135,123 @@ class OCRService:
                 center_y = sum(p[1] for p in coords) / 4
                 blocks.append({"text": text.strip(), "cx": center_x, "cy": center_y, "conf": float(conf)})
 
-        # Step 5: Extract structured fields using spatial logic
+        # Step 5: Extract structured fields — TEMPLATE FIRST, then fallback
         _t_extract_start = time.perf_counter()
-        spatial_data = _extract_fields_from_blocks(blocks)
+
+        # Detect side for template selection
+        _is_verso = any(
+            kw in b.get("text", "").upper()
+            for b in blocks
+            for kw in ["PERE", "FATHER", "MERE", "MOTHER", "AUTORITE", "AUTHORITY",
+                       "DELIVRANCE", "UNIQUE", "IDENTIFIER", "ADRESSE", "POSTE"]
+        )
+        _side = "verso" if _is_verso else "recto"
+        _img_h, _img_w = enhanced.shape[:2]
+
+        # PRIMARY: Template-based extraction (position + format validators)
+        template_data = _extract_by_template(blocks, _img_h, _img_w, _side)
+
+        # FALLBACK: Legacy spatial extraction for fields the template missed
+        legacy_data = _extract_fields_from_blocks(blocks)
+
+        # Merge: template values take priority, legacy fills gaps
+        spatial_data = template_data
+        for field in CNI_FIELDS:
+            if spatial_data[field]["value"] is None and legacy_data[field]["value"] is not None:
+                spatial_data[field] = legacy_data[field]
+                if "FALLBACK" not in spatial_data.get("methode", ""):
+                    spatial_data["methode"] += " + FALLBACK_ANCRAGE"
+
+        # Merge methode metadata
+        if "MRZ" in legacy_data.get("methode", "") and "MRZ" not in spatial_data.get("methode", ""):
+            spatial_data["methode"] += " + MRZ"
+        if "DOB_SUSPECT" in legacy_data.get("methode", "") and "DOB_SUSPECT" not in spatial_data.get("methode", ""):
+            spatial_data["methode"] += " + DOB_SUSPECT"
+
+        # --- Post-processing on merged result ---
+
+        # 1. Deduplicate lieu_naissance vs nom/prenom
+        if spatial_data["lieu_naissance"]["value"] is not None:
+            _lieu_upper = spatial_data["lieu_naissance"]["value"].upper()
+            for _field in ["nom", "prenom"]:
+                if spatial_data[_field]["value"] is not None:
+                    if _lieu_upper == spatial_data[_field]["value"].upper():
+                        logger.debug(f"lieu_naissance '{_lieu_upper}' matches {_field} — clearing")
+                        spatial_data["lieu_naissance"] = {"value": None, "conf": 0.0}
+                        break
+
+        # 2. Re-scan for lieu_naissance if dedup cleared it
+        #    Use spatial proximity: pick the block closest to date_naissance
+        #    that looks like a place name and doesn't match nom/prenom.
+        if spatial_data["lieu_naissance"]["value"] is None:
+            _nom_upper = (spatial_data["nom"]["value"].upper()
+                          if spatial_data["nom"]["value"] else "")
+            _prenom_upper = (spatial_data["prenom"]["value"].upper()
+                             if spatial_data["prenom"]["value"] else "")
+            _dob_cy = None
+            if spatial_data["date_naissance"]["value"] is not None:
+                _dob_val = (spatial_data["date_naissance"]["value"]
+                            .replace("/", ".").replace(",", ".").replace(":", "."))
+                _dob_year = spatial_data["date_naissance"]["value"][-4:]
+                for b in blocks:
+                    b_text_norm = (b.get("text", "")
+                                   .replace(",", ".").replace("-", ".").replace(":", "."))
+                    if _dob_val in b_text_norm or _dob_year in b_text_norm:
+                        _dob_cy = b.get("cy", 0)
+                        break
+            # Re-scan: use the lieu_naissance zone from the template to find candidates
+            _zone_key = "lieu_naissance"
+            _zones = CNI_RECTO_ZONES if _side == "recto" else CNI_VERSO_ZONES
+            _lieu_zone = [(cy1, cy2, cx1, cx2) for f, cy1, cy2, cx1, cx2, _ in _zones if f == _zone_key]
+            _place_candidates = []
+            if _lieu_zone:
+                _cy1, _cy2, _cx1, _cx2 = _lieu_zone[0]
+                _cy_lo = _cy1 * _img_h
+                _cy_hi = _cy2 * _img_h
+                _cx_lo = _cx1 * _img_w
+                _cx_hi = _cx2 * _img_w
+                for b in blocks:
+                    b_text = b.get("text", "").strip()
+                    if not _is_place_text(b_text):
+                        continue
+                    b_cy = b.get("cy", 0)
+                    b_cx = b.get("cx", 0)
+                    if not (_cy_lo <= b_cy <= _cy_hi and _cx_lo <= b_cx <= _cx_hi):
+                        continue
+                    b_upper = b_text.upper()
+                    if b_upper == _nom_upper or b_upper == _prenom_upper:
+                        continue
+                    _place_candidates.append(b)
+            if _place_candidates:
+                if _dob_cy is not None:
+                    _place_candidates.sort(key=lambda b: abs(b.get("cy", 0) - _dob_cy))
+                else:
+                    _place_candidates.sort(key=lambda b: b.get("cy", 0))
+                best = _place_candidates[0]
+                spatial_data["lieu_naissance"] = {
+                    "value": best["text"].strip(),
+                    "conf": float(best.get("conf", 0.0)),
+                }
+                if "RESCAN_LIEU" not in spatial_data.get("methode", ""):
+                    spatial_data["methode"] += " + RESCAN_LIEU"
+
+        # 3. DOB plausibility check (runs on the final merged result)
+        if spatial_data["date_naissance"]["value"] is not None:
+            try:
+                _dob_parts = spatial_data["date_naissance"]["value"].split("/")
+                if len(_dob_parts) == 3:
+                    _dob_year = int(_dob_parts[2])
+                    if _dob_year < 1920:
+                        logger.warning(
+                            f"Implausible DOB year {_dob_year} in "
+                            f"'{spatial_data['date_naissance']['value']}' — "
+                            f"likely OCR digit error, flagging for GLM fallback"
+                        )
+                        if "DOB_SUSPECT" not in spatial_data.get("methode", ""):
+                            spatial_data["methode"] += " + DOB_SUSPECT"
+            except (ValueError, IndexError):
+                pass
+
         _t_extract = time.perf_counter()
         logger.debug(f"Field extraction timing: {(_t_extract-_t_extract_start)*1000:.0f}ms")
 

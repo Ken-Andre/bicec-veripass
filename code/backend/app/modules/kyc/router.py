@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.security import get_current_user, make_session_handle
+from app.core.security import get_current_user, make_session_handle, verify_session_handle
 from app.core.logging import logger
 from app.db.session import get_db
 from app.modules.auth.models import User
@@ -449,6 +449,46 @@ async def capture_bill(
     )
 
 
+async def _resolve_document_by_handle(
+    doc_id: str, user: User, db: AsyncSession
+) -> Document | None:
+    """Resolve a document ID that may be a raw UUID or an HMAC handle.
+
+    API responses return HMAC handles (via make_session_handle), so clients
+    will naturally pass those handles back. This function tries the raw UUID
+    first; if that fails or doesn't match, it iterates through the user's
+    documents and checks via verify_session_handle.
+    """
+    # Try raw UUID first (most efficient), scoped to the current user
+    try:
+        raw_uuid = uuid.UUID(doc_id)
+        result = await db.execute(
+            select(Document)
+            .options(selectinload(Document.ocr_fields))
+            .join(KYCSession, Document.session_id == KYCSession.id)
+            .where(Document.id == raw_uuid, KYCSession.user_id == user.id)
+        )
+        doc = result.scalar_one_or_none()
+        if doc:
+            return doc
+    except ValueError:
+        pass
+
+    # Fall back to HMAC handle lookup through user's session documents
+    result = await db.execute(
+        select(KYCSession)
+        .options(selectinload(KYCSession.documents).selectinload(Document.ocr_fields))
+        .where(KYCSession.user_id == user.id)
+    )
+    sessions = result.scalars().all()
+    for session in sessions:
+        for doc in session.documents:
+            if verify_session_handle(doc_id, str(doc.id)):
+                return doc
+
+    return None
+
+
 @router.get("/document/{doc_id}/ocr")
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_document_ocr(
@@ -457,13 +497,11 @@ async def get_document_ocr(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get OCR results for a document."""
-    result = await db.execute(
-        select(Document)
-        .options(selectinload(Document.ocr_fields))
-        .where(Document.id == uuid.UUID(doc_id))
-    )
-    doc = result.scalar_one_or_none()
+    """Get OCR results for a document.
+
+    Accepts both raw UUIDs and HMAC handles (as returned by other endpoints).
+    """
+    doc = await _resolve_document_by_handle(doc_id, current_user, db)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 

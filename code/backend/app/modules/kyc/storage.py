@@ -25,8 +25,6 @@ import aiofiles
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-import json
-import urllib.request
 from fastapi import UploadFile, HTTPException, status
 
 from app.core.config import settings
