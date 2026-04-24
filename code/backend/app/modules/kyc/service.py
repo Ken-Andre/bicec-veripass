@@ -131,7 +131,7 @@ def get_shared_paddle_ocr() -> Any | None:
         "lang": _paddle_lang(),
         "use_doc_orientation_classify": False,
         "use_doc_unwarping": False,
-        "use_textline_orientation": False,
+        "use_textline_orientation": True,
         "enable_mkldnn": False,
     }
     if det_model_dir:
@@ -147,6 +147,24 @@ def get_shared_paddle_ocr() -> Any | None:
     except Exception as exc:
         logger.warning(f"PaddleOCR unavailable: {exc}", exc_info=True)
         return None
+
+    # Warmup: run a tiny dummy predict() call so the first real request
+    # doesn't suffer from non-deterministic initialization artifacts.
+    # PaddleOCR v3's first inference can produce garbage output (e.g.
+    # nom=DSCHANG instead of KANA) because internal tensors are not yet
+    # fully materialized. A warmup call forces full model initialization.
+    # Controlled by PADDLE_WARMUP_ON_START env var (default: true).
+    _should_warmup = os.environ.get("PADDLE_WARMUP_ON_START", "true").lower() in ("true", "1", "yes")
+    if _should_warmup:
+        try:
+            import numpy as np
+            _dummy = np.zeros((100, 300, 3), dtype=np.uint8)
+            _shared_paddle_ocr.predict(_dummy)
+            logger.info("PaddleOCR warmup predict() completed")
+        except Exception as exc:
+            logger.debug(f"PaddleOCR warmup predict() failed (non-critical): {exc}")
+    else:
+        logger.info("PaddleOCR warmup skipped (PADDLE_WARMUP_ON_START=false)")
 
     return _shared_paddle_ocr
 

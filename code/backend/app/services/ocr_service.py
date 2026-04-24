@@ -232,6 +232,63 @@ CAMEROON_CITIES = [
     "NGAMBE", "TIBATI", "NGAOUNDERE", "MEIGANGA",
 ]
 
+# ---------------------------------------------------------------------------
+# Date sanitization (ported from notebook ocr_utils.py)
+# ---------------------------------------------------------------------------
+def _sanitize_date(val: str) -> str:
+    """Fix common OCR date errors: '07.02,18E9' -> '07/02/1989', etc.
+
+    Handles common OCR garbling patterns in date strings:
+    - Letter→digit confusion (E→8, O→0, l→1, etc.) in year part
+    - 2-digit year expansion ('89' → '1989')
+    - Zero month/day correction
+    """
+    if not val or not isinstance(val, str):
+        return val
+    # Normalize separators
+    d = val.replace("/", ".").replace("-", ".").replace(",", ".").strip()
+    parts = d.split(".")
+    if len(parts) != 3:
+        return val  # not a recognizable date format
+    day, month, year = parts
+    # Fix letter→digit OCR errors in the year portion
+    # Common confusions on Cameroonian CNI: E↔8, O↔0, l↔1, I↔1, S↔5, Z↔2, B↔8, G↔9
+    _digit_map = {
+        "E": "8", "O": "0", "l": "1", "I": "1",
+        "S": "5", "Z": "2", "B": "8", "G": "9", "A": "4",
+    }
+    _had_letter_sub = False
+    _year_chars = []
+    for c in year:
+        if c in _digit_map:
+            _year_chars.append(_digit_map[c])
+            _had_letter_sub = True
+        else:
+            _year_chars.append(c)
+    year = "".join(_year_chars)
+    # Heuristic: 4-digit year starting with 1[0-8] is likely a garbled 19XX
+    # (the '9' in '19' often gets misread by OCR as another digit, e.g. E→8)
+    # Example: '18E9' → after digit_map → '1889' → '1989'
+    # IMPORTANT: Only apply this when letter substitutions occurred in the
+    # year — without that evidence, changing 1809→1909 would hide an
+    # implausible DOB from the plausibility check.
+    if (_had_letter_sub
+        and len(year) == 4
+        and year[0] == "1"
+        and year[1].isdigit()
+        and int(year[1]) <= 8):
+        year = "19" + year[2:]
+    # Expand 2-digit year: '89' -> '1989', '23' -> '2023'
+    if len(year) == 2 and year.isdigit():
+        year = ("19" + year) if int(year) > 30 else ("20" + year)
+    # Fix zero month/day
+    if month == "00":
+        month = "01"
+    if day == "00":
+        day = "01"
+    return f"{day}/{month}/{year}"
+
+
 CAMEROON_PROFESSIONS = {
     "MENAGERE", "COMMERCANT", "ETUDIANT", "ELEVE", "INGENIEUR",
     "ENSEIGNANT", "FONCTIONNAIRE", "CHAUFFEUR", "AGRICULTEUR",
@@ -304,19 +361,17 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                 parsed_data["numero_cni"] = {"value": match_9.group(1), "conf": conf}
 
         # --- Dates (collect ALL regardless of side) ---
-        match_date = re.search(r"\b(\d{2}[./-]\d{2}[./-]\d{2,4})\b", text)
+        # Accept comma as separator too (PaddleOCR v3 sometimes reads
+        # "07.02.2018" as "07.02,2018" or "07/02,2018").
+        match_date = re.search(r"\b(\d{2}[./,\-]\d{2}[./,\-]\d{2,4})\b", text)
         if match_date:
-            raw_date = match_date.group(1).replace(".", "/").replace("-", "/")
+            raw_date = match_date.group(1).replace(".", "/").replace("-", "/").replace(",", "/")
             parts = raw_date.split("/")
             if len(parts) == 3:
-                d, m, y = parts
-                if m == "00":
-                    m = "01"
-                if d == "00":
-                    d = "01"
-                clean_date = f"{d}/{m}/{y}"
-                if len(clean_date) == 8:  # 2-digit year -> expand
-                    clean_date = clean_date[:6] + ("19" if int(clean_date[6:]) > 30 else "20") + clean_date[6:]
+                clean_date = f"{parts[0]}/{parts[1]}/{parts[2]}"
+                # Apply date sanitization (fix OCR garbling like 18E9→1989,
+                # zero month/day, 2-digit year expansion, etc.)
+                clean_date = _sanitize_date(clean_date)
                 all_dates.append((clean_date, conf))
 
         # --- Verso-specific fields (adresse, poste) ---
@@ -353,9 +408,18 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                         parsed_data["poste_identification"] = {"value": meilleur["text"].replace(" ", ""), "conf": meilleur.get("conf", conf)}
 
         # --- Identity fields (extract on BOTH sides) ---
-        # Sexe (F / M isolated)
+        # Sexe (F / M isolated or embedded in noisy OCR text)
+        # PaddleOCR v3 sometimes merges small characters with adjacent text,
+        # e.g. "KEEESF" instead of isolated "F".
         if text_upper in ["F", "M"] and parsed_data["sexe"]["value"] is None:
             parsed_data["sexe"] = {"value": text_upper, "conf": conf}
+        elif parsed_data["sexe"]["value"] is None and len(text) <= 8 and conf > 0.5:
+            # Look for F/M at end of short noisy blocks (e.g. "KEEESF")
+            # Use \s*$ instead of \b$ because \b fails when preceded by
+            # another word character (S before F).
+            _sex_match = re.search(r"([FM])\s*$", text_upper)
+            if _sex_match:
+                parsed_data["sexe"] = {"value": _sex_match.group(1), "conf": conf * 0.85}
 
         # Taille (e.g. 1.54, 1,75)
         match_taille = re.search(r"\b(1[.,]\d{2})\b", text)
@@ -367,6 +431,9 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
             parsed_data["profession"] = {"value": text, "conf": conf}
 
         # Lieu de naissance (Cameroonian city names)
+        # NOTE: Déduplication with nom is done in POST-PROCESSING below,
+        # because the NOM spatial anchor may not have been assigned yet
+        # when we encounter a city-name block earlier in the loop.
         _city_matches = [c for c in CAMEROON_CITIES if c in text_upper]
         if _city_matches and parsed_data["lieu_naissance"]["value"] is None:
             # Verify it's not inside an MRZ line
@@ -503,8 +570,140 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                 if "HEURISTIQUE" not in parsed_data["methode"]:
                     parsed_data["methode"] += " + HEURISTIQUE"
 
-    # Remove None values for downstream compatibility
-    return {k: v for k, v in parsed_data.items() if not (isinstance(v, dict) and v.get("value") is None)}
+    # --- Post-processing: deduplicate lieu_naissance vs nom AND prenom ---
+    # This MUST run AFTER all fields are assigned (including spatial anchors)
+    # because the inline check can't know the final nom/prenom values yet.
+    # A city name that exactly matches the holder's surname OR given name
+    # is almost certainly a false positive from the same text block.
+    if parsed_data["lieu_naissance"]["value"] is not None:
+        _lieu_upper = parsed_data["lieu_naissance"]["value"].upper()
+        # Exact match only — substring is too aggressive ("BONOU" in "BONOUA")
+        for _field in ["nom", "prenom"]:
+            if parsed_data[_field]["value"] is not None:
+                if _lieu_upper == parsed_data[_field]["value"].upper():
+                    logger.debug(
+                        f"lieu_naissance '{_lieu_upper}' matches {_field} "
+                        f"'{parsed_data[_field]['value']}' — clearing false positive"
+                    )
+                    parsed_data["lieu_naissance"] = {"value": None, "conf": 0.0}
+                    break
+
+    # --- Re-scan for lieu_naissance after dedup ---
+    # If dedup cleared a false positive (e.g. "Kana" matched both nom and city),
+    # we need to try other city blocks that were skipped because lieu_naissance
+    # was already filled. Example: "DSCHANG" exists as block 7 but was never
+    # assigned because "KANA" (block 3) was found first.
+    if parsed_data["lieu_naissance"]["value"] is None:
+        _nom_upper = (parsed_data["nom"]["value"].upper()
+                      if parsed_data["nom"]["value"] else "")
+        _prenom_upper = (parsed_data["prenom"]["value"].upper()
+                         if parsed_data["prenom"]["value"] else "")
+        # Collect city-name candidates from all blocks, then pick the one
+        # closest to the date_naissance block (on a CNI recto, lieu_naissance
+        # is always just below date_naissance). Fallback: sort by cy.
+        _city_candidates = []
+        _dob_cy = None
+        if parsed_data["date_naissance"]["value"] is not None:
+            # Find the block whose text contains the detected DOB.
+            # The sanitized date uses '/' but the raw OCR block may use
+            # '.', ',', or '-' as separators.
+            _dob_val = (parsed_data["date_naissance"]["value"]
+                        .replace("/", ".").replace(",", "."))
+            _dob_year = parsed_data["date_naissance"]["value"][-4:]
+            for b in blocks:
+                # Normalize block text the same way as _dob_val so commas,
+                # dashes etc. don't break the match.
+                b_text_norm = (b.get("text", "")
+                               .replace(",", ".").replace("-", "."))
+                if _dob_val in b_text_norm or _dob_year in b_text_norm:
+                    _dob_cy = b.get("cy", 0)
+                    break
+        for b in blocks:
+            b_text_upper = b["text"].strip().upper()
+            if "<" in b_text_upper:
+                continue  # skip MRZ lines
+            _city_matches = [c for c in CAMEROON_CITIES if c in b_text_upper]
+            if _city_matches:
+                _city_name = _city_matches[0]
+                # Skip if it matches nom or prenom (same false-positive risk)
+                if _city_name == _nom_upper or _city_name == _prenom_upper:
+                    continue
+                _city_candidates.append({"name": _city_name, "conf": float(b.get("conf", 0.0)), "cy": b.get("cy", 0)})
+        if _city_candidates:
+            # Sort by proximity to date_naissance block, or by cy if no DOB found
+            if _dob_cy is not None:
+                _city_candidates.sort(key=lambda c: abs(c["cy"] - _dob_cy))
+            else:
+                _city_candidates.sort(key=lambda c: c["cy"])
+            best = _city_candidates[0]
+            parsed_data["lieu_naissance"] = {
+                "value": best["name"].title(),
+                "conf": best["conf"],
+            }
+            if "RESCAN_VILLE" not in parsed_data["methode"]:
+                parsed_data["methode"] += " + RESCAN_VILLE"
+
+    # --- DOB plausibility check ---
+    # CNI dates of birth before 1920 are almost certainly OCR digit→digit
+    # errors (e.g. "2018" read as "1909"). A person born before 1920 would
+    # be 106+ years old — extremely rare on a current CNI.
+    # We can't auto-fix digit→digit errors, but we flag them for GLM fallback.
+    if parsed_data["date_naissance"]["value"] is not None:
+        try:
+            _dob_parts = parsed_data["date_naissance"]["value"].split("/")
+            if len(_dob_parts) == 3:
+                _dob_year = int(_dob_parts[2])
+                if _dob_year < 1920:
+                    logger.warning(
+                        f"Implausible DOB year {_dob_year} in "
+                        f"'{parsed_data['date_naissance']['value']}' — "
+                        f"likely OCR digit error, flagging for GLM fallback"
+                    )
+                    # Don't delete — keep it but mark for review
+                    if "DOB_SUSPECT" not in parsed_data["methode"]:
+                        parsed_data["methode"] += " + DOB_SUSPECT"
+        except (ValueError, IndexError):
+            pass
+
+    # Return ALL 12 CNI fields, even those with value=None.
+    # Downstream consumers (API, frontend) need the full schema to know
+    # which fields are expected, even when not extracted.
+    return parsed_data
+
+
+# ---------------------------------------------------------------------------
+# Image preprocessing for better OCR detection
+# ---------------------------------------------------------------------------
+def _enhance_for_ocr(img: np.ndarray) -> np.ndarray:
+    """Apply selective contrast enhancement for very dark images only.
+
+    CLAHE (even conservative clipLimit=1.0) was found to DEGRADE OCR
+    results on normal CNI photos by distorting thin text strokes
+    (e.g. "KANA" → "NATA", "EDITH" → "KANA"). It is only applied when
+    the image is genuinely underexposed (mean brightness < 100).
+
+    Args:
+        img: BGR numpy array (aligned card image).
+
+    Returns:
+        Enhanced BGR numpy array, or original if already well-exposed.
+    """
+    # Measure average brightness — only enhance very dark images
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    mean_brightness = float(np.mean(gray))
+
+    # Well-exposed document (mean > 100 out of 255): skip enhancement
+    if mean_brightness > 100:
+        return img
+
+    # Dark image: apply very conservative CLAHE
+    logger.info(f"Low-contrast image detected (brightness={mean_brightness:.0f}), applying CLAHE")
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    l_channel, a_channel, b_channel = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=1.0, tileGridSize=(8, 8))
+    l_enhanced = clahe.apply(l_channel)
+    lab_enhanced = cv2.merge([l_enhanced, a_channel, b_channel])
+    return cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
 
 
 class OCRService:
@@ -516,7 +715,6 @@ class OCRService:
 
     def extract_from_bytes(self, image_bytes: bytes) -> dict[str, Any]:
         """Extract text from image bytes using PaddleOCR with alignment."""
-        import time
         start_time = time.perf_counter()
 
         # Convert bytes to numpy array (BGR for OpenCV)
@@ -529,14 +727,13 @@ class OCRService:
 
     def extract_from_path(self, image_path: Path) -> dict[str, Any]:
         """Extract text from image file using PaddleOCR with alignment."""
-        import time
         start_time = time.perf_counter()
 
         img_arr = cv2.imread(str(image_path))
         if img_arr is None:
             logger.error(f"Failed to read image: {image_path}")
             return {
-                "fields": {},
+                "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
                 "blocks": [],
                 "engine": "paddleocr_error",
                 "needs_glm_fallback": True,
@@ -549,19 +746,26 @@ class OCRService:
         return result
 
     def _extract_from_array(self, img_arr: np.ndarray) -> dict[str, Any]:
-        """Run full OCR pipeline: align -> OCR -> extract fields."""
+        """Run full OCR pipeline: align -> enhance -> OCR -> extract fields."""
+        _t0 = time.perf_counter()
+
         # Step 1: Align the card image
         aligned = align_card_image(img_arr)
         if aligned is None:
             aligned = img_arr
             logger.debug("Card alignment failed, using original image")
+        _t_align = time.perf_counter()
 
-        # Step 2: Run PaddleOCR
+        # Step 2: Enhance contrast for better text detection
+        enhanced = _enhance_for_ocr(aligned)
+        _t_enhance = time.perf_counter()
+
+        # Step 3: Run PaddleOCR
         ocr = get_shared_paddle_ocr()
         if ocr is None:
             logger.warning("PaddleOCR not available, returning empty results")
             return {
-                "fields": {},
+                "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
                 "blocks": [],
                 "engine": "paddleocr_unavailable",
                 "needs_glm_fallback": True,
@@ -570,25 +774,31 @@ class OCRService:
 
         try:
             # Ensure image is valid and has expected dimensions
-            if aligned is None or aligned.size == 0:
+            if enhanced is None or enhanced.size == 0:
                 logger.error("Empty image passed to OCR")
                 return {
-                    "fields": {},
+                    "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
                     "blocks": [],
                     "engine": "paddleocr_error",
                     "needs_glm_fallback": True,
                     "avg_confidence": 0.0,
                 }
-            
+
             # PaddleOCR v3: use predict() instead of deprecated ocr().
             # The cls parameter was removed in v3 — textline orientation is
             # controlled via use_textline_orientation at init time.
-            results = ocr.predict(aligned)
+            results = ocr.predict(enhanced)
+            _t_ocr = time.perf_counter()
+            logger.info(
+                f"OCR pipeline timing: align={(_t_align-_t0)*1000:.0f}ms, "
+                f"enhance={(_t_enhance-_t_align)*1000:.0f}ms, "
+                f"predict={(_t_ocr-_t_enhance)*1000:.0f}ms"
+            )
 
         except Exception as exc:
             logger.error(f"OCR total failure: {exc}", exc_info=True)
             return {
-                "fields": {},
+                "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
                 "blocks": [],
                 "engine": "paddleocr_error",
                 "needs_glm_fallback": True,
@@ -598,14 +808,14 @@ class OCRService:
         if not results or not results[0].get("rec_texts"):
             logger.warning("No text detected in image")
             return {
-                "fields": {},
+                "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
                 "blocks": [],
                 "engine": "paddleocr",
                 "needs_glm_fallback": True,
                 "avg_confidence": 0.0,
             }
 
-        # Step 3: Build blocks from OCR results
+        # Step 4: Build blocks from OCR results
         blocks = []
         first_page = results[0]
 
@@ -643,30 +853,53 @@ class OCRService:
                 center_y = sum(p[1] for p in coords) / 4
                 blocks.append({"text": text.strip(), "cx": center_x, "cy": center_y, "conf": float(conf)})
 
-        # Step 4: Extract structured fields using spatial logic
+        # Step 5: Extract structured fields using spatial logic
+        _t_extract_start = time.perf_counter()
         spatial_data = _extract_fields_from_blocks(blocks)
+        _t_extract = time.perf_counter()
+        logger.debug(f"Field extraction timing: {(_t_extract-_t_extract_start)*1000:.0f}ms")
 
         # Extract MRZ data if present (for verso)
         mrz_data = extract_mrz(blocks)
         if mrz_data:
             spatial_data["mrz"] = mrz_data
 
-        # Build the flat fields dict expected by downstream consumers
+        # Build the flat fields dict — always include ALL 12 CNI fields,
+        # even those with value=None, so the frontend knows the full schema.
         fields: dict[str, dict[str, Any]] = {}
         for field_name in CNI_FIELDS:
-            if field_name in spatial_data:
+            if field_name in spatial_data and isinstance(spatial_data[field_name], dict):
                 fields[field_name] = spatial_data[field_name]
+            else:
+                fields[field_name] = {"value": None, "conf": 0.0}
 
-        # Calculate average confidence
-        confidences = [f.get("conf", 0) for f in fields.values()]
-        avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+        # Calculate average confidence — only over fields that have a value
+        # (None fields should NOT drag down the average)
+        filled_confidences = [
+            f.get("conf", 0.0) for f in fields.values()
+            if f.get("value") is not None
+        ]
+        avg_confidence = (
+            sum(filled_confidences) / len(filled_confidences)
+            if filled_confidences
+            else 0.0
+        )
 
-        # Determine if fallback is needed
-        needs_fallback = avg_confidence < self.confidence_threshold
+        filled_count = len(filled_confidences)  # same as sum(1 for f in fields.values() if f.get("value") is not None)
 
+        # Determine if fallback is needed — consider confidence, fill rate,
+        # AND data quality flags (e.g. implausible DOB year from OCR errors).
+        fill_rate = filled_count / len(CNI_FIELDS)
+        _has_dob_suspect = "DOB_SUSPECT" in spatial_data.get("methode", "")
+        needs_fallback = (
+            avg_confidence < self.confidence_threshold
+            or fill_rate < 0.5  # fewer than 6 of 12 fields filled → fallback
+            or _has_dob_suspect  # implausible DOB year → needs review
+        )
         logger.info(
-            f"OCR extracted {len(fields)} fields, avg_confidence={avg_confidence:.2f}, "
-            f"needs_glm_fallback={needs_fallback}, side={spatial_data.get('detected_side', 'unknown')}, "
+            f"OCR extracted {filled_count}/{len(CNI_FIELDS)} fields, "
+            f"avg_confidence={avg_confidence:.2f}, needs_glm_fallback={needs_fallback}, "
+            f"side={spatial_data.get('detected_side', 'unknown')}, "
             f"method={spatial_data.get('methode', 'unknown')}"
         )
 

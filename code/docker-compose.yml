@@ -14,6 +14,7 @@ volumes:
   db_storage:         # /data/db       — PostgreSQL data files
   db_backups:         # /backups/db    — PostgreSQL backups (non-pruned par docker prune)
   redis_data:
+  models_paddlex_storage: # /home/vpuser/.paddlex — Cache for PaddleX models
   nginx_certs:
 
 services:
@@ -141,20 +142,32 @@ services:
       - SMTP_SSL=${SMTP_SSL:-false}
       - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
       - OCR_CONFIDENCE_THRESHOLD=0.90
-      - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
+      - PADDLE_WARMUP_ON_START=true  # Warmup au démarrage du worker, pas à la 1ère requête
+      - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+      - PADDLE_CACHE_DIR=/tmp/paddle-cache
+      - OCR_MODELS_ROOT=${OCR_MODELS_ROOT:-/opt/models-offline}
+      - PADDLE_OFFLINE=true
+      - PADDLE_DET_MODEL_DIR=${PADDLE_DET_MODEL_DIR:-/opt/models-offline/paddlex/official_models/PP-OCRv5_server_det}
+      - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/opt/models-offline/paddlex/official_models/latin_PP-OCRv5_mobile_rec}
       - FACE_MATCH_MIN_SCORE=${FACE_MATCH_MIN_SCORE:-0.8}
       - ANTI_SPOOFING_MIN_SCORE=${ANTI_SPOOFING_MIN_SCORE:-0.7}
       - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
       - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
-      - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/data/models/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
-      - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/data/models/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
+      - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/opt/models-offline/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
+      - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/opt/models-offline/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
       - GLM_OCR_QUEUE=${GLM_OCR_QUEUE:-glm_ocr_jobs}
       - GLM_OCR_TIMEOUT_SECONDS=${GLM_OCR_TIMEOUT_SECONDS:-90}
       - SENTRY_DSN=${SENTRY_DSN_BACKEND}
+      - PADDLEX_HOME=/home/vpuser/.paddlex
     volumes:
       - documents_storage:/data/documents
       - models_storage:/data/models
+      - models_paddlex_storage:/home/vpuser/.paddlex
+      - ${OFFLINE_MODELS_DIR:-./infra/models-offline}:/opt/models-offline:ro
+      - ../paddleocr_test/images:/tmp/test-images:ro  # CNI test images for /test/extract endpoint
     depends_on:
+      storage_init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -162,7 +175,7 @@ services:
     networks:
       - veripass-net
     restart: unless-stopped
-    mem_limit: 2.5g     # PaddleOCR lazy (2GB) + FastAPI workers (512MB)
+    mem_limit: 4g       # PaddleOCR (3GB) + FastAPI workers (512MB)
     ports:
       - "8001:8000"     # Debug direct access (sans nginx) - CHANGED from 8000 to avoid conflicts
     healthcheck:
@@ -178,6 +191,58 @@ services:
         max-file: "5"
     # GLM-OCR via worker Celery séparé
 
+  # ── STORAGE INIT (init-container, fixes volume ownership) ───────────────
+  storage_init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_storage_init
+    entrypoint: []
+    command:
+      [
+        "sh",
+        "-lc",
+        "mkdir -p /data/documents /data/models /home/vpuser/.paddlex && chown -R vpuser:vpgroup /data/documents /data/models /home/vpuser/.paddlex || true",
+      ]
+    user: root
+    volumes:
+      - documents_storage:/data/documents
+      - models_storage:/data/models
+      - models_paddlex_storage:/home/vpuser/.paddlex
+    networks:
+      - veripass-net
+    restart: "no"
+
+  # ── MODEL INIT (init-container, runs once) ──────────────────────────────
+  model_init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_model_init
+    profiles: ["online-init"]
+    entrypoint: []
+    command: ["python", "scripts/download_models.py"]
+    environment:
+      - MODELS_PATH=/data/models
+      - PADDLE_CACHE_DIR=/tmp/paddle-cache
+      - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+      - PADDLE_DET_MODEL_DIR=${PADDLE_DET_MODEL_DIR:-/data/models/paddle/PP-OCRv5_server_det}
+      - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/data/models/paddle/PP-OCRv5_server_rec}
+      - PADDLE_CLS_MODEL_DIR=${PADDLE_CLS_MODEL_DIR:-/data/models/paddle/ch_ppocr_mobile_v2.0_cls_infer}
+      - PADDLEX_HOME=/home/vpuser/.paddlex
+    volumes:
+      - models_storage:/data/models
+      - models_paddlex_storage:/home/vpuser/.paddlex
+    networks:
+      - veripass-net
+    restart: "no"  # Runs once; docker compose manages retries via depends_on
+    mem_limit: 4g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   #  CELERY WORKERS 
   celery_ocr:
     build:
@@ -185,25 +250,35 @@ services:
       dockerfile: Dockerfile
     container_name: vp_celery_ocr
     entrypoint: []
-    command: ["/app/.venv/bin/celery", "-A", "app.celery", "worker", "-Q", "glm_ocr_jobs", "--concurrency=1", "-n", "ocr_worker@%h", "--loglevel=info"]
+    command: ["python", "-m", "celery", "-A", "app.celery", "worker", "-Q", "glm_ocr_jobs", "--concurrency=1", "-n", "ocr_worker@%h", "--loglevel=info"]
     environment:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_PATH=/data/documents
       - MODELS_PATH=/data/models
+      - PADDLE_CACHE_DIR=/tmp/paddle-cache
+      - OCR_MODELS_ROOT=${OCR_MODELS_ROOT:-/opt/models-offline}
+      - PADDLE_OFFLINE=true
+      - PADDLE_DET_MODEL_DIR=${PADDLE_DET_MODEL_DIR:-/opt/models-offline/paddlex/official_models/PP-OCRv5_server_det}
+      - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/opt/models-offline/paddlex/official_models/latin_PP-OCRv5_mobile_rec}
       - GLM_LAZY_LOAD=true      # GLM-OCR chargé à la 1ère tâche de la queue
       - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
       - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
-      - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/data/models/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
-      - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/data/models/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
+      - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/opt/models-offline/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
+      - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/opt/models-offline/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
       - GLM_OCR_QUEUE=${GLM_OCR_QUEUE:-glm_ocr_jobs}
       - GLM_OCR_TIMEOUT_SECONDS=${GLM_OCR_TIMEOUT_SECONDS:-90}
       - SKIP_MIGRATIONS=1
       - SENTRY_DSN=${SENTRY_DSN_BACKEND}
+      - PADDLEX_HOME=/home/vpuser/.paddlex
     volumes:
       - documents_storage:/data/documents
       - models_storage:/data/models
+      - models_paddlex_storage:/home/vpuser/.paddlex
+      - ${OFFLINE_MODELS_DIR:-./infra/models-offline}:/opt/models-offline:ro
     depends_on:
+      storage_init:
+        condition: service_completed_successfully
       api:
         condition: service_healthy  # Ne démarre qu'après API prête
     networks:
@@ -229,7 +304,7 @@ services:
       dockerfile: Dockerfile
     container_name: vp_celery_notif
     entrypoint: []
-    command: ["/app/.venv/bin/celery", "-A", "app.celery", "worker", "-Q", "celery,notifications,provisioning_batch,sanctions_sync", "--concurrency=2", "-n", "notif_worker@%h", "--loglevel=info"]
+    command: ["python", "-m", "celery", "-A", "app.celery", "worker", "-Q", "celery,notifications,provisioning_batch,sanctions_sync", "--concurrency=2", "-n", "notif_worker@%h", "--loglevel=info"]
     environment:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
@@ -274,7 +349,7 @@ services:
       dockerfile: Dockerfile
     container_name: vp_celery_beat
     entrypoint: []
-    command: ["/app/.venv/bin/celery", "-A", "app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
+    command: ["python", "-m", "celery", "-A", "app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
     environment:
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
@@ -297,7 +372,7 @@ services:
     mem_limit: 128m
     healthcheck:
       # redis-cli absent dans l'image Python — utiliser Python + redis pour pinger le broker
-      test: ["CMD-SHELL", "/app/.venv/bin/python3 -c \"import redis; r=redis.from_url('redis://redis:6379/0'); r.ping()\" || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import redis; r=redis.from_url('redis://redis:6379/0'); r.ping()\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

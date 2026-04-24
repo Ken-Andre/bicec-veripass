@@ -190,13 +190,18 @@ async def test_ocr_extract():
 
     This is for testing OCR without uploading a file.
     """
-    import os
-
-    test_image_path = Path("/tmp/test_cni_valid.png")
-    if not test_image_path.exists():
+    # Look for test images in the mounted volume first, then fallback
+    _test_dirs = [Path("/tmp/test-images"), Path("/tmp")]
+    test_image_path = None
+    for _dir in _test_dirs:
+        _candidate = _dir / "cni_recto.png"
+        if _candidate.exists():
+            test_image_path = _candidate
+            break
+    if test_image_path is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Test image not found on server",
+            detail="Test image not found on server. Mount paddleocr_test/images to /tmp/test-images",
         )
 
     ocr_result = await asyncio.to_thread(ocr_service.extract_from_path, test_image_path)

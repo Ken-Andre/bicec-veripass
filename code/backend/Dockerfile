@@ -54,7 +54,7 @@ RUN groupadd vpgroup && useradd -m vpuser -G vpgroup
 WORKDIR /app
 
 # Copy the virtualenv from the builder
-COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder --chown=vpuser:vpgroup /app/.venv /app/.venv
 
 # Copy application code and set ownership
 COPY --chown=vpuser:vpgroup . .
