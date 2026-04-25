@@ -14,10 +14,13 @@ import CniRectoGuideScreen from './views/kyc/CniRectoGuideScreen';
 import CniVersoGuideScreen from './views/kyc/CniVersoGuideScreen';
 import OcrReviewScreen from './views/kyc/OcrReviewScreen';
 import LivenessScreen from './views/kyc/LivenessScreen';
+import BillCaptureScreen from './views/kyc/BillCaptureScreen';
 import AddressScreen from './views/kyc/AddressScreen';
 import NiuScreen from './views/kyc/NiuScreen';
 import ConsentScreen from './views/kyc/ConsentScreen';
+import SignatureScreen from './views/kyc/SignatureScreen';
 import ReviewScreen from './views/kyc/ReviewScreen';
+import SubmitSuccessScreen from './views/kyc/SubmitSuccessScreen';
 import DeleteAccountScreen from './views/settings/DeleteAccountScreen';
 import { KycResumeBanner } from './components/KycResumeBanner';
 import { OfflineBanner } from './components/OfflineBanner';
@@ -36,6 +39,10 @@ function CniRectoCapture() {
 
 function CniVersoCapture() {
   return <CniCaptureScreen side="verso" nextRoute="/kyc/ocr-review" />;
+}
+
+function BillEneoCapture() {
+  return <BillCaptureScreen billType="ENEO" />;
 }
 
 function App() {
@@ -59,6 +66,7 @@ function App() {
                 <Route path="/auth/forgot-pin" element={<ForgotPinScreen />} />
                 <Route path="/dashboard" element={<LockGuard><DashboardPage /></LockGuard>} />
                 <Route path="/settings/delete-account" element={<LockGuard><DeleteAccountScreen /></LockGuard>} />
+                {/* === Marie Journey: KYC Flow === */}
                 <Route path="/kyc/intro" element={<LockGuard><KycIntroScreen /></LockGuard>} />
                 <Route path="/kyc/cni-intro" element={<LockGuard><CniIntroScreen /></LockGuard>} />
                 <Route path="/kyc/cni-recto-guide" element={<LockGuard><CniRectoGuideScreen /></LockGuard>} />
@@ -67,12 +75,17 @@ function App() {
                 <Route path="/kyc/cni-verso-capture" element={<LockGuard><CniVersoCapture /></LockGuard>} />
                 <Route path="/kyc/cni-recto" element={<LockGuard><CniRectoGuideScreen /></LockGuard>} />
                 <Route path="/kyc/cni-verso" element={<LockGuard><CniVersoGuideScreen /></LockGuard>} />
+                {/* OCR Review → Liveness */}
                 <Route path="/kyc/ocr-review" element={<LockGuard><OcrReviewScreen /></LockGuard>} />
                 <Route path="/kyc/liveness" element={<LockGuard><LivenessScreen /></LockGuard>} />
+                {/* Bill capture → Address → NIU → Consent → Signature → Review → Submit */}
+                <Route path="/kyc/bill-capture" element={<LockGuard><BillEneoCapture /></LockGuard>} />
                 <Route path="/kyc/address" element={<LockGuard><AddressScreen /></LockGuard>} />
                 <Route path="/kyc/niu" element={<LockGuard><NiuScreen /></LockGuard>} />
                 <Route path="/kyc/consent" element={<LockGuard><ConsentScreen /></LockGuard>} />
+                <Route path="/kyc/signature" element={<LockGuard><SignatureScreen /></LockGuard>} />
                 <Route path="/kyc/review" element={<LockGuard><ReviewScreen /></LockGuard>} />
+                <Route path="/kyc/submit-success" element={<LockGuard><SubmitSuccessScreen /></LockGuard>} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </KycProvider>

@@ -75,6 +75,12 @@ export default defineConfig(async ({ mode }) => {
   return {
     base: '/mobile/',
     plugins,
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: ['./src/test/setup.ts'],
+      include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    },
     build: {
       sourcemap: mode === 'production',
     },

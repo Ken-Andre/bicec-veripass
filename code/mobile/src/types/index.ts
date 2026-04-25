@@ -102,13 +102,23 @@ export type KycStepType =
   | 'cni_verso'
   | 'ocr_review'
   | 'liveness'
-  | 'address'
   | 'utility_bill'
+  | 'address'
   | 'niu'
   | 'consent'
+  | 'signature'
   | 'submission';
 
-export type AccessLevel = 'RESTRICTED_ACCESS' | 'LIMITED_ACCESS' | 'FULL_ACCESS';
+// ADR-001: Access tiers match backend LifecycleState → AccessTier mapping
+export type AccessTier =
+  | 'GUEST'              // DRAFT, REJECTED, ABANDONED — no KYC access
+  | 'RESTRICTED'         // SUBMITTED, PROCESSING, PENDING_AGENT_REVIEW, PENDING_INFO — dashboard vitrine only
+  | 'LIMITED_ACCESS'     // APPROVED, ACCOUNT_CREATED without NIU — services restreints
+  | 'FULL_ACCESS'        // ACCOUNT_CREATED with valid NIU — all services
+  | 'DISABLED';          // FRAUD_SUSPECT — access blocked
+
+/** @deprecated Use AccessTier instead for ADR-001 compliance */
+export type AccessLevel = AccessTier;
 
 export interface KycSession {
   session_id: string;
