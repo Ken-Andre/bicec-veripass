@@ -8,6 +8,7 @@ from app.modules.analytics.router import router as analytics_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.audit.router import router as audit_router
 from app.api.v1.ocr import router as ocr_router
+from app.api.v1.sentry_proxy import router as sentry_proxy_router
 
 api_router = APIRouter()
 
@@ -22,3 +23,4 @@ api_router.include_router(
 )
 api_router.include_router(audit_router, prefix="/audit", tags=["audit"])
 api_router.include_router(ocr_router, tags=["ocr"])
+api_router.include_router(sentry_proxy_router, tags=["sentry"])
