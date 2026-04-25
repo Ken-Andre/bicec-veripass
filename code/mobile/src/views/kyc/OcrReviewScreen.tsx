@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
@@ -14,12 +14,11 @@ type OcrField = {
   editable: boolean;
 };
 
-type SessionDocument = {
-  id: string;
-  doc_type: string;
-  ocr_engine?: string | null;
-  file_path?: string;
-};
+type FetchState = 'loading' | 'error' | 'success';
+
+// Exponential backoff: 2s, 4s, 8s
+const RETRY_DELAYS = [2000, 4000, 8000];
+const MAX_RETRIES = 3;
 
 export default function OcrReviewScreen() {
   const { t } = useLanguage();
@@ -33,108 +32,174 @@ export default function OcrReviewScreen() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.90);
   const [userEditThreshold, setUserEditThreshold] = useState(0.95);
+  const [fetchState, setFetchState] = useState<FetchState>('loading');
+  const [retryCount, setRetryCount] = useState(0);
+
+  const mountedRef = useRef(true);
 
   const getFieldLabel = (fieldName: string) => {
     const translated = t(`ocr.field.${fieldName}`);
     if (translated !== `ocr.field.${fieldName}`) return translated;
-    return fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return fieldName.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  const fetchThresholds = async () => {
+    try {
+      const res = await apiClient.get<any>('/ocr/config/thresholds');
+      if (mountedRef.current && res) {
+        setThreshold(res.confidence_threshold ?? 0.90);
+        setUserEditThreshold(res.user_edit_threshold ?? 0.95);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch OCR thresholds:', err);
+    }
+  };
+
+  const fetchOcrWithRetry = async (attempt: number): Promise<void> => {
+    if (!mountedRef.current) return;
+
+    try {
+      setLoading(true);
+      setStatusMessage(
+        t('ocr.loading.text') || 'Analyse de votre document...'
+      );
+      setFetchState('loading');
+
+      // Fetch current session — the response already includes documents
+      // with their nested ocr_fields, so no second API call is needed.
+      const sessionRes = await apiClient.get<any>('/kyc/session/current', {
+        timeout: 15000,
+      });
+      if (!mountedRef.current) return;
+
+      const sessionData = sessionRes.data ?? sessionRes;
+      const documents = (sessionData.documents || []) as any[];
+
+      // Collect OCR fields from ALL CNI documents (recto + verso)
+      const allOcrFields: any[] = [];
+      for (const doc of documents) {
+        if (doc.doc_type === 'CNI_RECTO' || doc.doc_type === 'CNI_VERSO') {
+          const docFields = doc.ocr_fields || [];
+          for (const f of docFields) {
+            // Deduplicate: prefer fields already seen (first occurrence wins)
+            if (!allOcrFields.some((existing) => existing.field_name === f.field_name)) {
+              allOcrFields.push(f);
+            }
+          }
+        }
+      }
+
+      if (allOcrFields.length === 0) {
+        setStatusMessage(null);
+        setFields([]);
+        setFetchState('success');
+        setLoading(false);
+        return;
+      }
+
+      // Map API OCR field records to UI fields
+      const extractedFields: OcrField[] = allOcrFields.map((f) => ({
+        field_name: f.field_name,
+        value: f.extracted_value || f.corrected_value || '',
+        confidence: f.confidence_score ?? 0,
+        editable:
+          f.human_corrected ? true : (f.confidence_score ?? 0) < userEditThreshold,
+      }));
+
+      setStatusMessage(null);
+      setFields(extractedFields);
+      setFetchState('success');
+
+      // Store in KycContext
+      setOcrFields(extractedFields);
+    } catch (err: any) {
+      if (!mountedRef.current) return;
+
+      const isTimeout = err.name === 'AbortError' || err.code === 'ECONNABORTED';
+      const isServerError =
+        err.message?.includes('503') ||
+        err.message?.includes('504') ||
+        err.message?.includes('500') ||
+        err.message?.includes('Service Unavailable') ||
+        err.message?.includes('Gateway Time-out') ||
+        err.message?.includes('Internal Server Error');
+      const isSessionExpired =
+        err.message?.includes('Session expirée') ||
+        err.message?.includes('401');
+
+      if (isSessionExpired) {
+        setFetchState('error');
+        setStatusMessage(
+          t('ocr.error.session_expired') ||
+          'Votre session a expiré. Veuillez vous reconnecter.'
+        );
+        return;
+      }
+
+      if (attempt < MAX_RETRIES && (isTimeout || isServerError)) {
+        const delay = RETRY_DELAYS[attempt] ?? 8000;
+        setRetryCount(attempt + 1);
+        setStatusMessage(
+          `${t('ocr.loading.retry') || 'Nouvelle tentative'} (${attempt + 1}/${MAX_RETRIES})...`
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        return fetchOcrWithRetry(attempt + 1);
+      }
+
+      // All retries exhausted or non-retryable error
+      console.warn('OCR fetch failed, using manual entry:', err);
+      setStatusMessage(
+        isServerError
+          ? (t('ocr.error.server_error') || 'Le serveur est temporairement saturé ou inaccessible.')
+          : (t('ocr.manual_entry') || 'Saisissez vos informations manuellement')
+      );
+      setFetchState('error');
+
+      // Only pre-fill empty fields if we truly give up
+      const fallbackFields: OcrField[] = [
+        'nom',
+        'prenom',
+        'date_naissance',
+        'lieu_naissance',
+        'sexe',
+        'taille',
+        'profession',
+        'numero_cni',
+        'date_delivrance',
+        'date_expiration',
+        'adresse',
+        'poste_identification',
+      ].map((name) => ({
+        field_name: name,
+        value: '',
+        confidence: 0,
+        editable: true,
+      }));
+
+      setFields(fallbackFields);
+
+      captureKycException(err, 'ocr_failure', {
+        sessionId,
+        step: 'ocr_review',
+        operation: 'ocr_fetch',
+        extra: { retryCount: attempt, error: err.message },
+      });
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
   };
 
   useEffect(() => {
     setCurrentStep('ocr_review');
-    let mounted = true;
-
-    const fetchThresholds = async () => {
-      try {
-        const res = await apiClient.get<any>('/ocr/config/thresholds');
-        if (mounted && res.data) {
-          setThreshold(res.data.confidence_threshold ?? 0.90);
-          setUserEditThreshold(res.data.user_edit_threshold ?? 0.95);
-        }
-      } catch (err) {
-        console.warn('Failed to fetch OCR thresholds:', err);
-      }
-    };
-
-    const fetchOcr = async () => {
-      try {
-        setStatusMessage(t('ocr.loading.text') || 'Analyse de votre document...');
-
-        // Get current session to find CNI document
-        const sessionRes = await apiClient.get<any>('/kyc/session/current');
-        if (!mounted) return;
-
-        const documents = (sessionRes.data?.documents || []) as SessionDocument[];
-        const cniDoc = documents.find(d => d.doc_type === 'CNI_RECTO' || d.doc_type === 'CNI_VERSO');
-
-        if (!cniDoc) {
-          setStatusMessage(null);
-          setFields([]);
-          return;
-        }
-
-        // Call OCR extraction API for this document
-        try {
-          const ocrRes = await apiClient.post<any, any>(`/ocr/extract?document_id=${cniDoc.id}`, null);
-
-          if (!mounted) return;
-
-          const ocrData = ocrRes.data;
-
-          // Map API response to UI fields
-          const extractedFields: OcrField[] = Object.entries(ocrData.fields || {}).map(
-            ([fieldName, fieldData]: [string, any]) => ({
-              field_name: fieldName,
-              value: fieldData.value || '',
-              confidence: fieldData.conf ?? 0,
-              editable: ocrData.can_user_edit ?? (fieldData.conf < userEditThreshold),
-            })
-          );
-
-          setStatusMessage(null);
-          setFields(extractedFields);
-
-          // Store in KycContext
-          setOcrFields(extractedFields);
-
-        } catch (ocrErr) {
-          // If OCR extraction fails, show empty fields for manual entry
-          console.warn('OCR extraction failed, using manual entry:', ocrErr);
-          setStatusMessage(t('ocr.manual_entry') || 'Saisissez vos informations manuellement');
-
-          const fallbackFields: OcrField[] = [
-            'nom', 'prenom', 'date_naissance', 'lieu_naissance', 'sexe',
-            'taille', 'profession', 'numero_cni', 'date_delivrance',
-            'date_expiration', 'adresse', 'poste_identification'
-          ].map(name => ({
-            field_name: name,
-            value: '',
-            confidence: 0,
-            editable: true,
-          }));
-
-          setFields(fallbackFields);
-        }
-
-      } catch (err) {
-        if (!mounted) return;
-        console.error('OCR Fetch failed:', err);
-        captureKycException(err, 'ocr_failure', {
-          sessionId,
-          step: 'ocr_review',
-          operation: 'ocr_fetch',
-        });
-        setStatusMessage(null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
+    mountedRef.current = true;
 
     fetchThresholds();
-    fetchOcr();
+    fetchOcrWithRetry(0);
 
-    return () => { mounted = false; };
-  }, [setCurrentStep, sessionId, t, setOcrFields, userEditThreshold]);
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [setCurrentStep, t, sessionId]);
 
   const getConfidenceLevel = (score: number) => {
     if (score >= threshold) return 'high';
@@ -145,14 +210,33 @@ export default function OcrReviewScreen() {
   const getConfidenceUI = (score: number, editable: boolean) => {
     // Show warning if user can edit (confidence below threshold)
     if (editable) {
-      return { color: 'text-orange-600', bg: 'bg-orange-100', icon: <AlertCircle className="w-3 h-3" /> };
+      return {
+        color: 'text-orange-600',
+        bg: 'bg-orange-100',
+        icon: <AlertCircle className="w-3 h-3" />,
+      };
     }
 
     const level = getConfidenceLevel(score);
     switch (level) {
-      case 'high': return { color: 'text-green-600', bg: 'bg-green-100', icon: <ShieldCheck className="w-3 h-3" /> };
-      case 'medium': return { color: 'text-orange-600', bg: 'bg-orange-100', icon: <AlertCircle className="w-3 h-3" /> };
-      default: return { color: 'text-red-600', bg: 'bg-red-100', icon: <AlertCircle className="w-3 h-3" /> };
+      case 'high':
+        return {
+          color: 'text-green-600',
+          bg: 'bg-green-100',
+          icon: <ShieldCheck className="w-3 h-3" />,
+        };
+      case 'medium':
+        return {
+          color: 'text-orange-600',
+          bg: 'bg-orange-100',
+          icon: <AlertCircle className="w-3 h-3" />,
+        };
+      default:
+        return {
+          color: 'text-red-600',
+          bg: 'bg-red-100',
+          icon: <AlertCircle className="w-3 h-3" />,
+        };
     }
   };
 
@@ -160,7 +244,7 @@ export default function OcrReviewScreen() {
     try {
       const corrections: Record<string, string> = {};
 
-      const updatedFields = fields.map(f => {
+      const updatedFields = fields.map((f) => {
         const newValue = editedValues[f.field_name];
         if (newValue !== undefined && newValue !== f.value) {
           corrections[f.field_name] = newValue;
@@ -170,7 +254,8 @@ export default function OcrReviewScreen() {
       });
 
       if (Object.keys(corrections).length > 0) {
-        await apiClient.post('/kyc/ocr/confirm', { fields: corrections });
+        // API expects OCRConfirmSubmitRequest with corrected_fields key
+        await apiClient.post('/kyc/ocr/confirm', { corrected_fields: corrections });
       }
 
       setOcrFields(updatedFields);
@@ -185,6 +270,7 @@ export default function OcrReviewScreen() {
         operation: 'ocr_confirm_submit',
         extra: { corrected_fields_count: Object.keys(editedValues).length },
       });
+      // Still proceed — worst case user manually entered data
       completeStep('ocr_review');
       navigate('/kyc/liveness');
     }
@@ -195,7 +281,14 @@ export default function OcrReviewScreen() {
       <ScreenLayout title={t('ocr.review.title')} showBack>
         <div className="flex-1 flex flex-col justify-center items-center py-20">
           <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground animate-pulse">{statusMessage || t('ocr.loading.text') || 'Analyse de votre document...'}</p>
+          <p className="text-muted-foreground animate-pulse">
+            {statusMessage || t('ocr.loading.text') || 'Analyse de votre document...'}
+          </p>
+          {retryCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Tentative {retryCount}/{MAX_RETRIES}
+            </p>
+          )}
         </div>
       </ScreenLayout>
     );
@@ -204,7 +297,35 @@ export default function OcrReviewScreen() {
   return (
     <ScreenLayout title={t('ocr.review.title')} showBack>
       <div className="flex flex-col gap-6 py-4">
-        {statusMessage && (
+        {fetchState === 'error' && statusMessage && (
+          <div className="bg-red-50 p-4 rounded-2xl border border-red-200">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-red-700 font-bold">{statusMessage}</p>
+                <div className="flex gap-4 mt-3">
+                  <button
+                    onClick={() => {
+                      setLoading(true);
+                      fetchOcrWithRetry(0);
+                    }}
+                    className="text-xs font-bold bg-white px-3 py-1.5 rounded-lg border border-red-200 text-red-700 shadow-sm active:scale-95 transition-all"
+                  >
+                    🚀 {t('common.retry') || 'Réessayer'}
+                  </button>
+                  <button
+                    onClick={() => setStatusMessage(null)}
+                    className="text-xs font-bold text-red-600 underline underline-offset-2"
+                  >
+                    {t('ocr.error.skip_to_manual') || 'Saisie manuelle'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {fetchState === 'success' && statusMessage && (
           <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
             <p className="text-sm text-orange-700 font-medium">{statusMessage}</p>
           </div>
@@ -212,7 +333,8 @@ export default function OcrReviewScreen() {
 
         <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
           <p className="text-sm text-primary font-medium">
-            {t('ocr.processing.subtitle') || 'Vérifiez les informations extraites de votre CNI'}
+            {t('ocr.processing.subtitle') ||
+              'Vérifiez les informations extraites de votre CNI'}
           </p>
         </div>
 
@@ -220,7 +342,9 @@ export default function OcrReviewScreen() {
           {fields.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p>Aucune donnée OCR disponible.</p>
-              <p className="text-sm mt-2">Veuillez saisir vos informations manuellement.</p>
+              <p className="text-sm mt-2">
+                Veuillez saisir vos informations manuellement.
+              </p>
             </div>
           ) : (
             fields.map((field) => {
@@ -234,32 +358,57 @@ export default function OcrReviewScreen() {
                     <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                       {getFieldLabel(field.field_name)}
                     </label>
-                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${ui.bg} ${ui.color}`}>
+                    <div
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${ui.bg} ${ui.color}`}
+                    >
                       {ui.icon}
-                      {field.confidence > 0 ? `${Math.round(field.confidence * 100)}%` : 'N/A'}
+                      {field.confidence > 0
+                        ? `${Math.round(field.confidence * 100)}%`
+                        : 'N/A'}
                     </div>
                   </div>
 
-                  <div className={`relative flex items-center p-3 rounded-xl border-2 transition-all duration-200 ${isEditing ? 'border-primary ring-4 ring-primary/10 bg-background' : 'border-muted/20 bg-muted/30 group-hover:border-muted/40'}`}>
+                  <div
+                    className={`relative flex items-center p-3 rounded-xl border-2 transition-all duration-200 ${isEditing
+                      ? 'border-primary ring-4 ring-primary/10 bg-background'
+                      : 'border-muted/20 bg-muted/30 group-hover:border-muted/40'
+                      }`}
+                  >
                     {isEditing || field.editable ? (
                       <input
                         type="text"
                         value={currentValue}
-                        onChange={(e) => setEditedValues(prev => ({ ...prev, [field.field_name]: e.target.value }))}
+                        onChange={(e) =>
+                          setEditedValues((prev) => ({
+                            ...prev,
+                            [field.field_name]: e.target.value,
+                          }))
+                        }
                         className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
                         autoFocus
                         onBlur={() => setEditing(null)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') setEditing(null); }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') setEditing(null);
+                        }}
                       />
                     ) : (
                       <div
                         className="flex-1 flex items-center justify-between cursor-pointer"
-                        onClick={() => field.editable && setEditing(field.field_name)}
+                        onClick={() =>
+                          field.editable && setEditing(field.field_name)
+                        }
                       >
-                        <span className={`text-sm font-semibold ${!currentValue ? 'text-red-400 italic' : 'text-foreground'}`}>
+                        <span
+                          className={`text-sm font-semibold ${!currentValue
+                            ? 'text-red-400 italic'
+                            : 'text-foreground'
+                            }`}
+                        >
                           {currentValue || 'À compléter'}
                         </span>
-                        {field.editable && <Edit2 className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />}
+                        {field.editable && (
+                          <Edit2 className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                        )}
                       </div>
                     )}
                   </div>
@@ -277,7 +426,8 @@ export default function OcrReviewScreen() {
             {t('common.continue')}
           </button>
           <p className="text-[11px] text-center text-muted-foreground mt-4 px-6">
-            En continuant, vous confirmez que les informations ci-dessus correspondent exactement à votre pièce d'identité officielle.
+            En continuant, vous confirmez que les informations ci-dessus
+            correspondent exactement à votre pièce d'identité officielle.
           </p>
         </div>
       </div>

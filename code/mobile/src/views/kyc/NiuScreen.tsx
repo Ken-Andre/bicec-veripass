@@ -1,27 +1,41 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useKyc } from '../../contexts/KycContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { FileText, SkipForward, AlertTriangle } from 'lucide-react';
+import { fetchWithCorrelation } from '../../services/apiClient';
+import { enqueueOfflineNiu } from '../../services/kycSyncService';
 
 export default function NiuScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { completeStep, sessionId, setSessionId } = useKyc();
   const [mode, setMode] = useState<'choose' | 'manual' | 'upload'>('choose');
   const [niuValue, setNiuValue] = useState('');
 
   const handleSubmit = async (niuType: string) => {
-    try {
-      const token = localStorage.getItem('access_token');
-      await fetch('/api/v1/kyc/niu/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ niu_type: niuType, niu_value: niuType === 'DECLARATIVE' ? niuValue : undefined }),
-      });
-      navigate('/kyc/consent');
-    } catch {
-      navigate('/kyc/consent');
+    const sid = sessionId || `offline-${Date.now()}`;
+    if (!sessionId) setSessionId(sid);
+
+    const online = typeof navigator !== 'undefined' && navigator.onLine;
+    if (online) {
+      try {
+        await fetchWithCorrelation('/api/v1/kyc/niu/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ niu_type: niuType, niu_value: niuType === 'DECLARATIVE' ? niuValue : undefined }),
+        });
+      } catch {
+        // Online failed — enqueue for later sync
+        await enqueueOfflineNiu({ sessionId: sid, niuType, niuValue: niuType === 'DECLARATIVE' ? niuValue : null });
+      }
+    } else {
+      // Offline — enqueue for sync on reconnect
+      await enqueueOfflineNiu({ sessionId: sid, niuType, niuValue: niuType === 'DECLARATIVE' ? niuValue : null });
     }
+    completeStep('niu');
+    navigate('/kyc/consent');
   };
 
   return (

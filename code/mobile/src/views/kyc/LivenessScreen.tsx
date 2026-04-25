@@ -7,7 +7,8 @@ import { CheckCircle, XCircle, Loader2, Camera } from 'lucide-react';
 import { initFaceLandmarker, detectForVideo, isFacePresent, computeSmileScore, computeEAR, computeYawAngle } from '../../services/mediapipeService';
 import type { LivenessResult } from '../../types';
 import { enqueueOfflineLivenessCapture, runKycSyncNow, safeSubmitLiveness } from '../../services/kycSyncService';
-import { captureKycException } from '../../services/sentry';
+import { fetchWithCorrelation } from '../../services/apiClient';
+import { captureKycException, captureKycMessage } from '../../services/sentry';
 
 type ChallengeType = 'smile' | 'blink' | 'turn_left' | 'turn_right';
 
@@ -23,7 +24,8 @@ export default function LivenessScreen() {
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'challenge' | 'success' | 'fail' | 'locked'>('loading');
   const [currentChallenge, setCurrentChallenge] = useState(0);
-  const [holdCount, setHoldCount] = useState(0);
+  const holdCountRef = useRef(0);
+  const [holdCount, setHoldCount] = useState(0); // Mirror of holdCountRef for re-renders
   const [message, setMessage] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
@@ -33,6 +35,100 @@ export default function LivenessScreen() {
   const animFrameRef = useRef<number>(0);
   const lastFaceTimeRef = useRef<number>(0);
   const capturedLandmarksRef = useRef<Array<Record<string, unknown>>>([]);
+  const selfieCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const selfieDataUrlRef = useRef<string | null>(null);
+  const challengeCompleteRef = useRef(false);
+
+  const toHex = (buffer: ArrayBuffer): string =>
+    Array.from(new Uint8Array(buffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+  const computeSha256 = useCallback(async (blob: Blob): Promise<string | null> => {
+    try {
+      if (!globalThis.crypto?.subtle) return null;
+      const bytes = await blob.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return toHex(digest);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /** Capture a selfie frame from the video stream (front-facing, neutral face). */
+  const captureSelfieFrame = useCallback(() => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = selfieCanvasRef.current || document.createElement('canvas');
+    selfieCanvasRef.current = canvas;
+    // Use video native resolution (front camera is typically 640×480)
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d')!;
+    // Mirror horizontally to match the selfie preview the user sees
+    ctx.save();
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    selfieDataUrlRef.current = canvas.toDataURL('image/jpeg', 0.85);
+  }, []);
+
+  /** Upload selfie as a SELFIE document to the backend so face matching works. */
+  const uploadSelfie = useCallback(async (): Promise<boolean> => {
+    const dataUrl = selfieDataUrlRef.current;
+    if (!dataUrl) {
+      captureKycMessage('No selfie frame captured, skipping selfie upload', 'upload_failure', {
+        sessionId,
+        step: 'liveness',
+        operation: 'selfie_upload_no_frame',
+      });
+      return false;
+    }
+
+    // Convert data URL to Blob
+    const [meta, content] = dataUrl.split(',');
+    const mimeMatch = /data:(.*?);base64/.exec(meta || '');
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const binary = atob(content || '');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: mimeType });
+    const clientSha = await computeSha256(blob);
+
+    // Inline session-id resolution (avoid referencing ensureSessionId before its definition)
+    const stableSessionId = sessionId ?? `offline-${Date.now()}`;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, 'selfie.jpg');
+      formData.append('doc_type', 'SELFIE');
+      if (clientSha) {
+        formData.append('client_sha256', clientSha);
+      }
+      const res = await fetchWithCorrelation('/api/v1/kyc/document/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null);
+        throw new Error(`selfie_upload_failed_${res.status}: ${JSON.stringify(detail)}`);
+      }
+      return true;
+    } catch (err) {
+      // Queue for offline retry — store selfie in liveness offline payload
+      captureKycException(err, 'upload_failure', {
+        sessionId: stableSessionId,
+        step: 'liveness',
+        operation: 'selfie_upload',
+        extra: { queued_offline: true },
+      });
+      // Fall through — liveness submit will include selfie in offline queue
+      return false;
+    }
+  }, [computeSha256, sessionId]);
 
   const getChallengeInstruction = (type: ChallengeType) => {
     switch (type) {
@@ -79,10 +175,13 @@ export default function LivenessScreen() {
       streamRef.current = stream;
       setStatus('challenge');
       setCurrentChallenge(0);
+      holdCountRef.current = 0;
       setHoldCount(0);
+      challengeCompleteRef.current = false;
       setMessage('');
       lastFaceTimeRef.current = Date.now();
       capturedLandmarksRef.current = [];
+      selfieDataUrlRef.current = null;
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err));
       console.error('Camera access error:', error);
@@ -96,8 +195,13 @@ export default function LivenessScreen() {
     }
   }, [t, sessionId]);
 
-  const submitLiveness = useCallback(async (landmarks: Array<Record<string, unknown>>, challengeType: ChallengeType): Promise<LivenessResult> => {
-    return await safeSubmitLiveness({ landmarks_json: landmarks, challenge_type: challengeType });
+  const submitLiveness = useCallback(async (
+    landmarks: Array<Record<string, unknown>>,
+    challengeType: ChallengeType,
+  ): Promise<LivenessResult> => {
+    return await safeSubmitLiveness(
+      { landmarks_json: landmarks, challenge_type: challengeType },
+    );
   }, []);
 
   const videoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
@@ -148,23 +252,27 @@ export default function LivenessScreen() {
           const type = CHALLENGES[currentChallenge];
 
           if (checkChallenge(type, landmarks)) {
-            setHoldCount(prev => {
-              const next = prev + 1;
-              if (next >= HOLD_FRAMES) {
-                if (currentChallenge < CHALLENGES.length - 1) {
-                  setCurrentChallenge(c => c + 1);
-                  return 0;
-                }
+            holdCountRef.current += 1;
+            setHoldCount(holdCountRef.current);
+            if (holdCountRef.current >= HOLD_FRAMES) {
+              if (currentChallenge < CHALLENGES.length - 1) {
+                holdCountRef.current = 0;
+                setHoldCount(0);
+                setCurrentChallenge(c => c + 1);
+              } else if (!challengeCompleteRef.current) {
+                // All challenges done — capture selfie and stop camera (once)
+                challengeCompleteRef.current = true;
+                captureSelfieFrame();
                 setStatus('success');
                 stopCamera();
-                return next;
               }
-              return next;
-            });
+            }
           } else {
-            setHoldCount(prev => Math.max(0, prev - 1));
+            holdCountRef.current = Math.max(0, holdCountRef.current - 1);
+            setHoldCount(holdCountRef.current);
           }
         } else {
+          holdCountRef.current = 0;
           setHoldCount(0);
           if (lastFaceTimeRef.current !== 0 && Date.now() - lastFaceTimeRef.current > NO_FACE_TIMEOUT_MS) {
             setMessage(t('liveness.face.not_detected') !== 'liveness.face.not_detected' ? t('liveness.face.not_detected') : 'Visage non detecte. Placez-vous dans le cercle.');
@@ -202,6 +310,10 @@ export default function LivenessScreen() {
       return;
     }
 
+    // Upload selfie BEFORE liveness submit so the backend has the SELFIE
+    // document available for face matching in compute_face_match_score_for_session.
+    const selfieOk = await uploadSelfie();
+
     try {
       const finalChallenge = CHALLENGES[Math.min(currentChallenge, CHALLENGES.length - 1)];
       const result = await submitLiveness(payload, finalChallenge);
@@ -225,6 +337,7 @@ export default function LivenessScreen() {
           sessionId: ensureSessionId(),
           challengeType: CHALLENGES[Math.min(currentChallenge, CHALLENGES.length - 1)],
           landmarks: payload,
+          selfieDataUrl: selfieOk ? undefined : (selfieDataUrlRef.current ?? undefined), // Only include selfie in offline queue if online upload failed
         });
         completeStep('liveness');
         resetLivenessAttempts();
@@ -262,12 +375,10 @@ export default function LivenessScreen() {
 
   const handleRestartSession = async () => {
     try {
-      const token = localStorage.getItem('vp_token');
       localStorage.removeItem('vp_kyc_cache');
       sessionStorage.removeItem('vp_kyc_cache');
-      await fetch('/api/v1/kyc/session/start', {
+      await fetchWithCorrelation('/api/v1/kyc/session/start', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
     } catch {
       // Best effort reset.
@@ -318,6 +429,7 @@ export default function LivenessScreen() {
                 muted
                 className="w-full h-full object-cover scale-x-[-1]"
               />
+              <canvas ref={(node) => { selfieCanvasRef.current = node; }} className="hidden" />
               <div className="absolute inset-0 shadow-[inset_0_0_60px_rgba(0,0,0,0.4)] pointer-events-none rounded-[140px]"></div>
 
               {!faceDetected && (

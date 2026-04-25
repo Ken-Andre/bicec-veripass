@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useKyc } from '../../contexts/KycContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
+import { fetchWithCorrelation } from '../../services/apiClient';
+import { enqueueOfflineConsent } from '../../services/kycSyncService';
 import { CheckSquare, Square, FileText } from 'lucide-react';
 
 const Checkbox = ({ checked, onClick }: { checked: boolean; onClick: () => void }) => (
@@ -13,6 +16,7 @@ const Checkbox = ({ checked, onClick }: { checked: boolean; onClick: () => void 
 export default function ConsentScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { completeStep, sessionId, setSessionId } = useKyc();
   const [consents, setConsents] = useState({ cgu: false, privacy: false, data: false });
 
   const allAccepted = consents.cgu && consents.privacy && consents.data;
@@ -23,22 +27,42 @@ export default function ConsentScreen() {
 
   const handleSubmit = async () => {
     if (!allAccepted) return;
-    try {
-      const token = localStorage.getItem('access_token');
-      await fetch('/api/v1/kyc/consent/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          cgu_accepted: true,
-          privacy_accepted: true,
-          data_processing_accepted: true,
-        }),
+    const sid = sessionId || `offline-${Date.now()}`;
+    if (!sessionId) setSessionId(sid);
+
+    const online = typeof navigator !== 'undefined' && navigator.onLine;
+    if (online) {
+      try {
+        await fetchWithCorrelation('/api/v1/kyc/consent/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cgu_accepted: true,
+            privacy_accepted: true,
+            data_processing_accepted: true,
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to submit consent:', error);
+        // Online failed — enqueue for later sync
+        await enqueueOfflineConsent({
+          sessionId: sid,
+          cguAccepted: true,
+          privacyAccepted: true,
+          dataProcessingAccepted: true,
+        });
+      }
+    } else {
+      // Offline — enqueue for sync on reconnect
+      await enqueueOfflineConsent({
+        sessionId: sid,
+        cguAccepted: true,
+        privacyAccepted: true,
+        dataProcessingAccepted: true,
       });
-      navigate('/kyc/review');
-    } catch (error) {
-      console.error('Failed to submit consent:', error);
-      navigate('/kyc/review');
     }
+    completeStep('consent');
+    navigate('/kyc/signature');
   };
 
   return (

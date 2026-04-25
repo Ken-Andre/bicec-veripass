@@ -4,6 +4,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { FileText, Camera, CheckCircle, Shield } from 'lucide-react';
 import { useKyc } from '../../contexts/KycContext';
+import { fetchWithCorrelation } from '../../services/apiClient';
 
 export default function KycIntroScreen() {
   const { t } = useLanguage();
@@ -15,10 +16,8 @@ export default function KycIntroScreen() {
     if (starting) return;
     setStarting(true);
     try {
-      const token = localStorage.getItem('vp_token');
-      const res = await fetch('/api/v1/kyc/session/start', {
+      const res = await fetchWithCorrelation('/api/v1/kyc/session/start', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (res.ok) {
         const data = (await res.json()) as { session_id?: string };

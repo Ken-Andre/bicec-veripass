@@ -5,6 +5,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { computeLaplacianVariance } from '../../services/mediapipeService';
 import { Camera, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import { enqueueOfflineCniCapture, runKycSyncNow } from '../../services/kycSyncService';
+import { fetchWithCorrelation } from '../../services/apiClient';
 import { captureKycException, captureKycMessage } from '../../services/sentry';
 
 type QualityStatus = 'checking' | 'good' | 'blurry' | 'dark' | 'glare';
@@ -62,7 +63,6 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
   const uploadDocument = useCallback(async (blob: Blob, dataUrl: string) => {
     const clientSha = await computeSha256(blob);
     try {
-      const token = localStorage.getItem('vp_token');
       const formData = new FormData();
       formData.append('file', blob, `cni_${side}.jpg`);
       formData.append('side', side.toUpperCase());
@@ -73,9 +73,8 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
         formData.append('client_sha256', clientSha);
       }
 
-      const res = await fetch('/api/v1/kyc/capture/cni', {
+      const res = await fetchWithCorrelation('/api/v1/kyc/capture/cni', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
 
