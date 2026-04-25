@@ -15,27 +15,31 @@ from fastapi import (
     Form,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.security import get_current_user, make_session_handle, verify_session_handle
+from app.core.security import get_current_user, get_current_agent, make_session_handle, verify_session_handle, require_agent_role
 from app.core.logging import logger
 from app.db.session import get_db
-from app.modules.auth.models import User
+from app.modules.auth.models import User, Agent, AgentRole
 from app.modules.kyc.models import (
     KYCSession,
     Document,
     OCRField,
     BiometricResult,
     ConsentRecord,
+    ValidationDecision,
+    AmlAlert,
+    Notification,
 )
 from app.modules.kyc.service import (
     process_document_ocr_pipeline,
     compute_anti_spoofing_score_from_landmarks,
     compute_face_match_score_for_session,
 )
+from app.modules.audit.models import AuditLog
 from app.modules.kyc.schemas import (
     KYCSessionResponse,
     KYCSubmitResponse,
@@ -55,7 +59,11 @@ from app.modules.kyc.schemas import (
     GeoRegionResponse,
     GeoCityResponse,
     GeoQuartierResponse,
+    LifecycleState,
+    AccessTier,
+    LIFECYCLE_TO_ACCESS_TIER,
 )
+from app.modules.kyc import geo_data
 
 router = APIRouter()
 SHA256_HEX_RE = re.compile(r"^[a-fA-F0-9]{64}$")
@@ -230,7 +238,22 @@ async def get_current_session(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get the current active KYC session for the user."""
+    """Get the current active KYC session for the user.
+
+    Returns the most recent session across all lifecycle states,
+    so the PWA can display the appropriate UI based on status/access_level.
+    """
+    # States where the session is still active (not abandoned/archived)
+    active_statuses = [
+        LifecycleState.DRAFT,
+        LifecycleState.PENDING_INFO,
+        LifecycleState.LOCKED_LIVENESS,
+        LifecycleState.PENDING_KYC,  # legacy alias
+        LifecycleState.PENDING_AGENT_REVIEW,
+        LifecycleState.APPROVED,
+        LifecycleState.REJECTED,
+        LifecycleState.FRAUD_SUSPECT,
+    ]
     result = await db.execute(
         select(KYCSession)
         .options(
@@ -240,9 +263,7 @@ async def get_current_session(
         )
         .where(
             KYCSession.user_id == current_user.id,
-            KYCSession.status.in_(
-                ["DRAFT", "PENDING_INFO", "LOCKED_LIVENESS", "PENDING_KYC"]
-            ),
+            KYCSession.status.in_(active_statuses),
         )
         .order_by(KYCSession.started_at.desc())
     )
@@ -344,12 +365,14 @@ async def start_kyc_session(
             "message": "Existing session found",
         }
 
-    # Create new session
+    # Create new session — ADR-001: DRAFT → RESTRICTED access
+    # Note: ADR-001 specifies GUEST for DRAFT, but existing sessions use RESTRICTED.
+    # Keeping RESTRICTED for backward compat until migration is ready.
     session = KYCSession(
         id=uuid.uuid4(),
         user_id=current_user.id,
-        status="DRAFT",
-        access_level="RESTRICTED",
+        status=LifecycleState.DRAFT,
+        access_level=AccessTier.RESTRICTED,
         started_at=datetime.now(timezone.utc),
     )
     db.add(session)
@@ -676,10 +699,12 @@ async def submit_liveness(
         session_id=session.id,
         db=db,
     )
-    resolved_face_match_score = face_match_score if face_match_score is not None else confidence
-    if (
+    # face_match_score is None when no SELFIE document exists yet.
+    # In that case, we do NOT substitute the liveness confidence —
+    # a None score is honest and signals that face matching was not performed.
+    if face_match_score is not None and (
         anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
-        or resolved_face_match_score < settings.FACE_MATCH_MIN_SCORE
+        or face_match_score < settings.FACE_MATCH_MIN_SCORE
     ):
         session.priority_flag = True
 
@@ -692,14 +717,14 @@ async def submit_liveness(
             id=uuid.uuid4(),
             session_id=session.id,
             liveness_score=confidence,
-            face_match_score=resolved_face_match_score,
+            face_match_score=face_match_score,
             anti_spoofing_score=anti_spoofing_score,
             processed_at=datetime.now(timezone.utc),
         )
         db.add(biometric)
     else:
         biometric.liveness_score = confidence
-        biometric.face_match_score = resolved_face_match_score
+        biometric.face_match_score = face_match_score
         biometric.anti_spoofing_score = anti_spoofing_score
         biometric.processed_at = datetime.now(timezone.utc)
     session.liveness_strike_count = 0
@@ -711,7 +736,7 @@ async def submit_liveness(
         confidence=confidence,
         attempts_remaining=3 - session.liveness_strike_count,
         strikes_remaining=3 - session.liveness_strike_count,
-        face_match_score=resolved_face_match_score,
+        face_match_score=face_match_score,
         anti_spoofing_score=anti_spoofing_score,
         is_locked=False,
         cooldown_seconds=None,
@@ -913,6 +938,18 @@ async def _compute_kyc_readiness(
     doc_types = {d.doc_type for d in docs}
 
     required = {"CNI_RECTO", "CNI_VERSO", "SELFIE"}
+
+    # Single BiometricResult query — used for SELFIE satisfaction and readiness gating
+    result = await db.execute(
+        select(BiometricResult).where(BiometricResult.session_id == session.id)
+    )
+    biometric = result.scalar_one_or_none()
+    has_biometric_result = biometric is not None
+
+    # Liveness capture already provides a face image; if biometric result exists,
+    # it satisfies the SELFIE requirement (no separate selfie upload needed).
+    if has_biometric_result:
+        doc_types = doc_types | {"SELFIE"}
     missing = sorted(required - doc_types)
     blocking_reasons: list[str] = []
     warnings: list[str] = []
@@ -941,26 +978,22 @@ async def _compute_kyc_readiness(
     if not has_ocr_review:
         blocking_reasons.append("OCR review not completed. Please confirm identity fields first.")
 
-    result = await db.execute(
-        select(BiometricResult).where(BiometricResult.session_id == session.id)
-    )
-    biometric = result.scalar_one_or_none()
-    has_biometric_result = biometric is not None
     if not has_biometric_result:
         blocking_reasons.append("Liveness step not completed")
 
     confidence_score_global: float | None = None
     if biometric and ocr_scores:
         liveness_score = float(biometric.liveness_score or 0.0)
-        face_match_score = float(biometric.face_match_score or 0.0)
+        raw_face_match = biometric.face_match_score
+        face_match_score = float(raw_face_match) if raw_face_match is not None else None
         anti_spoofing_score = float(biometric.anti_spoofing_score or 0.0)
         ocr_avg_score = float(mean(ocr_scores))
-        confidence_score_global = float(
-            mean(
-                [ocr_avg_score, liveness_score, face_match_score, anti_spoofing_score]
-            )
-        )
-        if face_match_score < settings.FACE_MATCH_MIN_SCORE:
+        # Build score list for global average — exclude None components
+        score_components: list[float] = [ocr_avg_score, liveness_score, anti_spoofing_score]
+        if face_match_score is not None:
+            score_components.append(face_match_score)
+        confidence_score_global = float(mean(score_components))
+        if face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE:
             warnings.append("Face match below threshold: priority manual review will be applied.")
         if anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE:
             warnings.append("Anti-spoofing below threshold: priority manual review will be applied.")
@@ -1017,21 +1050,40 @@ async def submit_kyc(
     biometric = result.scalar_one_or_none()
     if not biometric:
         raise HTTPException(status_code=400, detail="Liveness step not completed")
-    face_match_score = float(biometric.face_match_score or 0.0)
+    raw_face_match = biometric.face_match_score
+    face_match_score = float(raw_face_match) if raw_face_match is not None else None
     anti_spoofing_score = float(biometric.anti_spoofing_score or 0.0)
 
     # Flag for stronger manual review, but keep submission path available.
-    low_face_match = face_match_score < settings.FACE_MATCH_MIN_SCORE
+    # Only check face_match if it was actually computed (not None).
+    low_face_match = face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE
     low_anti_spoofing = anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
     if low_face_match or low_anti_spoofing:
         session.priority_flag = True
 
     session.confidence_score_global = readiness.confidence_score_global
 
-    # Submit
-    session.status = "PENDING_KYC"
+    # Submit — transition per ADR-001: DRAFT → PENDING_AGENT_REVIEW
+    new_status = LifecycleState.PENDING_AGENT_REVIEW
+    new_access_level = LIFECYCLE_TO_ACCESS_TIER.get(new_status, AccessTier.RESTRICTED)
+
+    session.status = new_status
+    session.access_level = new_access_level
     session.submitted_at = datetime.now(timezone.utc)
     session.last_step_completed = "submission"
+    await db.commit()
+
+    # Audit log
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="KYC_SUBMIT",
+        table_name="kyc_sessions",
+        record_id=str(session.id),
+        new_data={"status": new_status, "access_level": new_access_level},
+        performed_by=current_user.id,
+        performed_at=datetime.now(timezone.utc),
+    )
+    db.add(audit)
     await db.commit()
 
     logger.info(f"KYC submitted for user {current_user.id}, session {session.id}")
@@ -1043,9 +1095,184 @@ async def submit_kyc(
         )
     return KYCSubmitResponse(
         session_id=make_session_handle(str(session.id)),
-        status="PENDING_KYC",
+        status=new_status,
         message=message,
+        access_level=new_access_level,
     )
+
+
+# === Mobile Review Status ===
+
+
+@router.get("/review-status")
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def get_review_status(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Poll review status for the user's submitted KYC session.
+
+    Returns the current lifecycle state, access tier, and any unread
+    notifications about agent decisions. The PWA uses this to:
+    - Show "Dashboard Vitrine" while PENDING_AGENT_REVIEW (RESTRICTED)
+    - Unlock services when APPROVED (LIMITED_ACCESS)
+    - Show rejection reason when REJECTED (GUEST)
+    - Block all access when FRAUD_SUSPECT (DISABLED)
+    - Allow re-submission when PENDING_INFO (RESTRICTED)
+    """
+    # Find the most recent submitted session (not DRAFT, not ABANDONED)
+    reviewable_statuses = [
+        LifecycleState.PENDING_AGENT_REVIEW,
+        LifecycleState.PENDING_KYC,
+        LifecycleState.APPROVED,
+        LifecycleState.REJECTED,
+        LifecycleState.FRAUD_SUSPECT,
+        LifecycleState.PENDING_INFO,
+    ]
+    result = await db.execute(
+        select(KYCSession)
+        .where(
+            KYCSession.user_id == current_user.id,
+            KYCSession.status.in_(reviewable_statuses),
+        )
+        .order_by(KYCSession.submitted_at.desc())
+    )
+    session = result.scalars().first()
+
+    if not session:
+        return {"status": "NO_SUBMISSION", "access_level": AccessTier.GUEST}
+
+    # Fetch unread notifications for this user about KYC decisions
+    result = await db.execute(
+        select(Notification)
+        .where(
+            Notification.user_id == current_user.id,
+            Notification.type.like("KYC_%"),
+            Notification.is_read == False,  # noqa: E712
+        )
+        .order_by(Notification.sent_at.desc())
+    )
+    unread_notifications = result.scalars().all()
+
+    # Build response with decision details if available
+    decision_info = None
+    if session.status in {LifecycleState.APPROVED, LifecycleState.REJECTED, LifecycleState.FRAUD_SUSPECT}:
+        result = await db.execute(
+            select(ValidationDecision)
+            .where(ValidationDecision.session_id == session.id)
+            .order_by(ValidationDecision.decided_at.desc())
+        )
+        latest_decision = result.scalars().first()
+        if latest_decision:
+            decision_info = {
+                "decision": latest_decision.decision,
+                "reason": latest_decision.reason,
+                "decided_at": latest_decision.decided_at.isoformat(),
+            }
+
+    # NOTE: Do NOT mark notifications as read on GET — that's a write side effect.
+    # The PWA should call POST /notifications/{id}/read instead.
+
+    return {
+        "status": session.status,
+        "access_level": session.access_level,
+        "submitted_at": session.submitted_at.isoformat() if session.submitted_at else None,
+        "completed_at": session.completed_at.isoformat() if session.completed_at else None,
+        "decision": decision_info,
+        "unread_notifications": [
+            {
+                "id": str(n.id),
+                "type": n.type,
+                "message": n.message,
+                "sent_at": n.sent_at.isoformat() if n.sent_at else None,
+            }
+            for n in unread_notifications
+        ],
+    }
+
+
+@router.post("/notifications/read")
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def mark_notifications_read(
+    request: Request,
+    mark_all: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark notifications as read.
+
+    With mark_all=true: marks all unread KYC notifications for the current user.
+    Without mark_all: use POST /notifications/{id}/read for a single notification.
+    """
+    if not mark_all:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide mark_all=true to mark all notifications, "
+            "or use POST /notifications/{id}/read for a single notification.",
+        )
+
+    # Bulk UPDATE — single SQL statement instead of Python loop
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(Notification)
+        .where(
+            Notification.user_id == current_user.id,
+            Notification.type.like("KYC_%"),
+            Notification.is_read == False,  # noqa: E712
+        )
+        .values(is_read=True, read_at=now)
+    )
+    count = result.rowcount  # number of rows updated
+    if count > 0:
+        await db.commit()
+
+    return {"status": "success", "marked_read": count}
+
+
+@router.post("/notifications/{notification_id}/read")
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def mark_notification_read(
+    request: Request,
+    notification_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a single notification as read.
+
+    Called by the PWA after the user has seen the notification
+    (received via GET /review-status unread_notifications).
+    """
+    # Validate and parse the notification ID
+    try:
+        raw_uuid = uuid.UUID(notification_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid notification ID format.",
+        )
+
+    # Scope to current user — users can only mark their own notifications
+    result = await db.execute(
+        select(Notification).where(
+            Notification.id == raw_uuid,
+            Notification.user_id == current_user.id,
+        )
+    )
+    notification = result.scalar_one_or_none()
+
+    if not notification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found.",
+        )
+
+    if not notification.is_read:
+        notification.is_read = True
+        notification.read_at = datetime.now(timezone.utc)
+        await db.commit()
+
+    return {"status": "success", "notification_id": str(notification.id), "is_read": True}
 
 
 # === Geo Data Endpoints ===
@@ -1055,174 +1282,18 @@ async def submit_kyc(
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_regions(request: Request):
     """Get Cameroon regions."""
-    # In production, fetch from DB. For now, return static data.
-    return [
-        {"code": "CE", "name": "Centre"},
-        {"code": "LT", "name": "Littoral"},
-        {"code": "OU", "name": "Ouest"},
-        {"code": "SU", "name": "Sud"},
-        {"code": "NO", "name": "Nord"},
-        {"code": "EN", "name": "Extrême-Nord"},
-        {"code": "AD", "name": "Adamaoua"},
-        {"code": "ES", "name": "Est"},
-        {"code": "NW", "name": "Nord-Ouest"},
-        {"code": "SW", "name": "Sud-Ouest"},
-    ]
+    return geo_data.get_regions()
 
 
 @router.get("/geo/cities/{region_code}", response_model=list[GeoCityResponse])
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_cities(request: Request, region_code: str):
     """Get cities for a region."""
-    cities_by_region = {
-        "CE": [
-            {"code": "YDE", "name": "Yaoundé", "region_code": "CE"},
-            {"code": "MBA", "name": "Mbalmayo", "region_code": "CE"},
-            {"code": "OBA", "name": "Obala", "region_code": "CE"},
-        ],
-        "LT": [
-            {"code": "DLA", "name": "Douala", "region_code": "LT"},
-            {"code": "EDA", "name": "Edéa", "region_code": "LT"},
-            {"code": "NKG", "name": "Nkongsamba", "region_code": "LT"},
-        ],
-        "OU": [
-            {"code": "BFM", "name": "Bafoussam", "region_code": "OU"},
-            {"code": "DSG", "name": "Dschang", "region_code": "OU"},
-            {"code": "MDA", "name": "Mbouda", "region_code": "OU"},
-        ],
-        "NW": [{"code": "BDA", "name": "Bamenda", "region_code": "NW"}],
-        "SW": [{"code": "BUE", "name": "Buéa", "region_code": "SW"}],
-        "NO": [{"code": "GRA", "name": "Garoua", "region_code": "NO"}],
-        "EN": [{"code": "MRA", "name": "Maroua", "region_code": "EN"}],
-        "AD": [{"code": "NGD", "name": "Ngaoundéré", "region_code": "AD"}],
-        "ES": [{"code": "BTA", "name": "Bertoua", "region_code": "ES"}],
-        "SU": [{"code": "EBW", "name": "Ebolowa", "region_code": "SU"}],
-    }
-    return cities_by_region.get(region_code, [])
+    return geo_data.get_cities(region_code)
 
 
 @router.get("/geo/quartiers/{city_code}", response_model=list[GeoQuartierResponse])
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_quartiers(request: Request, city_code: str):
     """Get quartiers for a city."""
-    quartiers_by_city = {
-        "YDE": [
-            {
-                "code": "BAS",
-                "name": "Bastos",
-                "city_code": "YDE",
-                "commune_name": "Yaoundé 1er",
-            },
-            {
-                "code": "NLG",
-                "name": "Nlongkak",
-                "city_code": "YDE",
-                "commune_name": "Yaoundé 1er",
-            },
-            {
-                "code": "MEL",
-                "name": "Melen",
-                "city_code": "YDE",
-                "commune_name": "Yaoundé 6e",
-            },
-            {
-                "code": "BYA",
-                "name": "Biyem-Assi",
-                "city_code": "YDE",
-                "commune_name": "Yaoundé 6e",
-            },
-            {
-                "code": "MDS",
-                "name": "Mendong",
-                "city_code": "YDE",
-                "commune_name": "Yaoundé 6e",
-            },
-            {
-                "code": "ESS",
-                "name": "Essos",
-                "city_code": "YDE",
-                "commune_name": "Yaoundé 5e",
-            },
-            {
-                "code": "ODA",
-                "name": "Odza",
-                "city_code": "YDE",
-                "commune_name": "Yaoundé 4e",
-            },
-        ],
-        "DLA": [
-            {
-                "code": "AKW",
-                "name": "Akwa",
-                "city_code": "DLA",
-                "commune_name": "Douala 1er",
-            },
-            {
-                "code": "DEI",
-                "name": "Deido",
-                "city_code": "DLA",
-                "commune_name": "Douala 1er",
-            },
-            {
-                "code": "BPR",
-                "name": "Bonapriso",
-                "city_code": "DLA",
-                "commune_name": "Douala 1er",
-            },
-            {
-                "code": "BMS",
-                "name": "Bonamoussadi",
-                "city_code": "DLA",
-                "commune_name": "Douala 5e",
-            },
-            {
-                "code": "MKP",
-                "name": "Makepe",
-                "city_code": "DLA",
-                "commune_name": "Douala 5e",
-            },
-        ],
-        "BFM": [
-            {
-                "code": "TGI",
-                "name": "Tamdja",
-                "city_code": "BFM",
-                "commune_name": "Bafoussam 1er",
-            },
-            {
-                "code": "KAM",
-                "name": "Kamkop",
-                "city_code": "BFM",
-                "commune_name": "Bafoussam 2e",
-            },
-        ],
-        "BDA": [
-            {
-                "code": "MNK",
-                "name": "Mankon",
-                "city_code": "BDA",
-                "commune_name": "Bamenda 1er",
-            },
-            {
-                "code": "UPT",
-                "name": "Up Station",
-                "city_code": "BDA",
-                "commune_name": "Bamenda 1er",
-            },
-        ],
-        "BUE": [
-            {
-                "code": "MOL",
-                "name": "Molyko",
-                "city_code": "BUE",
-                "commune_name": "Buéa",
-            },
-            {
-                "code": "GCE",
-                "name": "Great Soppo",
-                "city_code": "BUE",
-                "commune_name": "Buéa",
-            },
-        ],
-    }
-    return quartiers_by_city.get(city_code, [])
+    return geo_data.get_quartiers(city_code)

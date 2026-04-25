@@ -534,23 +534,44 @@ def _byte_histogram_similarity(path_a: Path, path_b: Path) -> float:
 def _deepface_verify_if_available(cni_path: Path, selfie_path: Path) -> float | None:
     try:
         from deepface import DeepFace  # type: ignore
-    except Exception:
-        return None
-
-    try:
-        result = DeepFace.verify(
-            img1_path=str(cni_path),
-            img2_path=str(selfie_path),
-            model_name="Facenet512",
-            detector_backend="retinaface",
-            enforce_detection=False,
-        )
     except Exception as exc:
-        logger.warning("DeepFace verification failed: %s", exc)
+        logger.warning("DeepFace import failed: %s", exc)
         return None
 
-    distance = float(result.get("distance", 1.0))
-    return _clamp_01(1.0 - distance)
+    detector = settings.DEEPFACE_DETECTOR_BACKEND
+    fallback_detector = "opencv"  # Lightweight fallback if primary detector fails
+
+    # Try primary detector backend, then fallback
+    for backend in [detector, fallback_detector]:
+        if backend == detector and backend == fallback_detector:
+            # Avoid trying the same backend twice
+            continue
+        try:
+            result = DeepFace.verify(
+                img1_path=str(cni_path),
+                img2_path=str(selfie_path),
+                model_name="Facenet512",
+                detector_backend=backend,
+                enforce_detection=False,
+            )
+            distance = float(result.get("distance", 1.0))
+            score = _clamp_01(1.0 - distance)
+            logger.info(
+                "DeepFace verify OK (detector=%s, distance=%.4f, score=%.4f)",
+                backend, distance, score,
+            )
+            return score
+        except Exception as exc:
+            logger.warning(
+                "DeepFace verification failed with detector=%s: %s",
+                backend, exc,
+            )
+            if backend == detector:
+                logger.info("Retrying with fallback detector: %s", fallback_detector)
+                continue
+            return None
+
+    return None
 
 
 async def compute_face_match_score_for_session(

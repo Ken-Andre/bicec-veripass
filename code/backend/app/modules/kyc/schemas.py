@@ -3,6 +3,52 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from datetime import datetime
+from uuid import UUID
+
+
+# === ADR-001 Lifecycle States & Access Tiers ===
+
+class LifecycleState:
+    """KYC session lifecycle states per ADR-001."""
+    DRAFT = "DRAFT"
+    SUBMITTED = "SUBMITTED"
+    PROCESSING = "PROCESSING"
+    PENDING_AGENT_REVIEW = "PENDING_AGENT_REVIEW"
+    APPROVED = "APPROVED"
+    ACCOUNT_CREATED = "ACCOUNT_CREATED"
+    REJECTED = "REJECTED"
+    FRAUD_SUSPECT = "FRAUD_SUSPECT"
+    PENDING_INFO = "PENDING_INFO"
+    LOCKED_LIVENESS = "LOCKED_LIVENESS"
+    ABANDONED = "ABANDONED"
+    # Legacy alias — existing code uses PENDING_KYC
+    PENDING_KYC = "PENDING_KYC"
+
+
+class AccessTier:
+    """User access tiers per ADR-001."""
+    GUEST = "GUEST"
+    RESTRICTED = "RESTRICTED"
+    LIMITED_ACCESS = "LIMITED_ACCESS"
+    FULL_ACCESS = "FULL_ACCESS"
+    DISABLED = "DISABLED"
+
+
+# Mapping lifecycle → access tier (ADR-001 Table 1)
+LIFECYCLE_TO_ACCESS_TIER = {
+    LifecycleState.DRAFT: AccessTier.GUEST,
+    LifecycleState.SUBMITTED: AccessTier.RESTRICTED,
+    LifecycleState.PROCESSING: AccessTier.RESTRICTED,
+    LifecycleState.PENDING_AGENT_REVIEW: AccessTier.RESTRICTED,
+    LifecycleState.PENDING_KYC: AccessTier.RESTRICTED,
+    LifecycleState.APPROVED: AccessTier.LIMITED_ACCESS,
+    LifecycleState.ACCOUNT_CREATED: AccessTier.LIMITED_ACCESS,
+    LifecycleState.REJECTED: AccessTier.GUEST,
+    LifecycleState.FRAUD_SUSPECT: AccessTier.DISABLED,
+    LifecycleState.PENDING_INFO: AccessTier.RESTRICTED,
+    LifecycleState.LOCKED_LIVENESS: AccessTier.RESTRICTED,
+    LifecycleState.ABANDONED: AccessTier.GUEST,
+}
 
 
 # === OCR Field ===
@@ -99,6 +145,7 @@ class KYCSubmitResponse(BaseModel):
     session_id: str
     status: str
     message: str
+    access_level: str = AccessTier.RESTRICTED
 
 
 class KYCReadinessResponse(BaseModel):
