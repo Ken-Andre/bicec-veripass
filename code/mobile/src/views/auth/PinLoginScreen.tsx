@@ -50,7 +50,16 @@ const PinLoginScreen = () => {
       });
 
       navigate('/dashboard');
-    } catch {
+    } catch (err: unknown) {
+      // Check if PIN was revoked (403) — redirect to OTP
+      // apiClient puts the backend `detail` string as Error.message
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('OTP')) {
+        setError('Session expirée. Redirection vers OTP...');
+        setTimeout(() => navigate('/auth/phone'), 1500);
+        return;
+      }
+
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       setShake(true);

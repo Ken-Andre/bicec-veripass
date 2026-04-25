@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import { apiClient } from '../services/apiClient';
+import { apiClient, setSessionExpiredHandler } from '../services/apiClient';
 
 interface User {
   id: string;
@@ -42,6 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLockedRef = useRef(isLocked);
   const timerRef = useRef<number | null>(null);
   const lastActivityRef = useRef(0);
+  const pollPauseUntilRef = useRef(0);
+  const consecutiveErrorsRef = useRef(0);
 
   useEffect(() => { isAuthenticatedRef.current = isAuthenticated; }, [isAuthenticated]);
   useEffect(() => { isLockedRef.current = isLocked; }, [isLocked]);
@@ -67,6 +69,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const unlock = useCallback(() => {
     setIsLocked(false);
   }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('vp_token');
+    localStorage.removeItem('vp_user');
+    setUser(null);
+    setIsAuthenticated(false);
+    setIsLocked(false);
+    clearTimer();
+  }, [clearTimer]);
+
+  // Register session expired handler with apiClient so 401 responses trigger logout
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      logout();
+      // If on lock screen, stay there; otherwise navigate to login
+      const onLock = window.location.pathname.includes('/auth/lock');
+      if (!onLock) {
+        window.location.href = '/mobile/auth/login';
+      }
+    });
+  }, [logout]);
 
   // Reset the inactivity timer on user activity
   const resetTimer = useCallback(() => {
@@ -105,11 +128,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetTimer();
 
     const intervalId = window.setInterval(() => {
-      if (isAuthenticatedRef.current && !isLockedRef.current) {
-        const elapsed = Date.now() - lastActivityRef.current;
-        if (elapsed >= INACTIVITY_TIMEOUT) {
-          lock();
-        }
+      if (!isAuthenticatedRef.current || isLockedRef.current) return;
+
+      // If server is under load, pause polling temporarily
+      if (Date.now() < pollPauseUntilRef.current) {
+        return;
+      }
+
+      const elapsed = Date.now() - lastActivityRef.current;
+      if (elapsed >= INACTIVITY_TIMEOUT) {
+        lock();
       }
     }, 5000);
 
@@ -150,16 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(true);
     setIsLocked(false);
     setUser(userData);
+    consecutiveErrorsRef.current = 0;
+    pollPauseUntilRef.current = 0;
   }, []);
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('vp_token');
-    localStorage.removeItem('vp_user');
-    setUser(null);
-    setIsAuthenticated(false);
-    setIsLocked(false);
-    clearTimer();
-  }, [clearTimer]);
 
   const setPinSetupCompleted = useCallback(() => {
     setUser(prev => {
