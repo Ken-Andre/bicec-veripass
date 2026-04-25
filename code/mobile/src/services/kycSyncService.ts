@@ -1,5 +1,5 @@
-import { apiClient } from './apiClient';
-import type { KycStepType, LivenessResult } from '../types';
+import { apiClient, fetchWithCorrelation } from './apiClient';
+import type { KycStepType, LivenessResult, AddressData } from '../types';
 import {
   decryptJsonPayload,
   enqueueKycSyncItem,
@@ -24,6 +24,39 @@ interface CniPayload {
 interface LivenessPayload {
   landmarks_json: Array<Record<string, unknown>>;
   challenge_type: 'smile' | 'blink' | 'turn_left' | 'turn_right';
+  selfie_data_url?: string;
+}
+
+interface AddressPayload {
+  region: string;
+  city: string;
+  commune: string;
+  quartier: string;
+  lieu_dit?: string;
+  gps_lat?: number;
+  gps_lng?: number;
+}
+
+interface BillPayload {
+  file_data_url: string;
+  bill_type: 'ENEO' | 'CAMWATER';
+  session_id?: string | null;
+  client_sha256?: string | null;
+}
+
+interface NiuPayload {
+  niu_type: string;
+  niu_value?: string | null;
+}
+
+interface ConsentPayload {
+  cgu_accepted: boolean;
+  privacy_accepted: boolean;
+  data_processing_accepted: boolean;
+}
+
+interface SignaturePayload {
+  signature_data: string;
 }
 
 interface QueueSummary {
@@ -46,11 +79,12 @@ const STEP_PRIORITY: Record<KycStepType, number> = {
   cni_verso: 20,
   ocr_review: 30,
   liveness: 40,
-  address: 50,
-  utility_bill: 60,
+  utility_bill: 50,
+  address: 60,
   niu: 70,
   consent: 80,
-  submission: 90,
+  signature: 90,
+  submission: 100,
 };
 
 class SyncError extends Error {
@@ -74,11 +108,6 @@ class SyncError extends Error {
   }
 }
 
-function buildAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('vp_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 function dataUrlToBlob(dataUrl: string): Blob {
   const [meta, content] = dataUrl.split(',');
   const mimeMatch = /data:(.*?);base64/.exec(meta || '');
@@ -97,9 +126,11 @@ function firstIncompleteStep(completedSteps: KycStepType[]): KycStepType {
     'cni_verso',
     'ocr_review',
     'liveness',
+    'utility_bill',
     'address',
     'niu',
     'consent',
+    'signature',
     'submission',
   ];
   return sequence.find((step) => !completedSteps.includes(step)) ?? 'submission';
@@ -119,7 +150,7 @@ function isNetworkLikeError(error: unknown): boolean {
 
 function classifyHttpSyncError(
   responseStatus: number,
-  operation: 'capture_cni' | 'capture_liveness',
+  operation: string,
   detail?: unknown,
 ): SyncError {
   const detailText =
@@ -166,9 +197,8 @@ function classifyHttpSyncError(
 
 async function ensureServerDraftSession(): Promise<void> {
   try {
-    await fetch('/api/v1/kyc/session/start', {
+    await fetchWithCorrelation('/api/v1/kyc/session/start', {
       method: 'POST',
-      headers: buildAuthHeaders(),
     });
   } catch {
     // Best effort; replay will fail gracefully and retry on network recovery.
@@ -199,9 +229,8 @@ async function uploadCni(item: KycSyncQueueItem): Promise<void> {
     formData.append('client_sha256', payload.client_sha256);
   }
 
-  const response = await fetch('/api/v1/kyc/capture/cni', {
+  const response = await fetchWithCorrelation('/api/v1/kyc/capture/cni', {
     method: 'POST',
-    headers: buildAuthHeaders(),
     body: formData,
   });
 
@@ -233,17 +262,133 @@ async function uploadCni(item: KycSyncQueueItem): Promise<void> {
 
 async function uploadLiveness(item: KycSyncQueueItem): Promise<void> {
   const payload = await decryptJsonPayload<LivenessPayload>(item.session_id, item.encrypted_payload);
-  const response = await fetch('/api/v1/kyc/capture/liveness', {
+
+  // Upload selfie document first (if present) so the backend has a SELFIE
+  // doc for face matching when the liveness result is processed.
+  if (payload.selfie_data_url) {
+    try {
+      const blob = dataUrlToBlob(payload.selfie_data_url);
+      const formData = new FormData();
+      formData.append('file', blob, 'selfie.jpg');
+      formData.append('doc_type', 'SELFIE');
+      const selfieRes = await fetchWithCorrelation('/api/v1/kyc/document/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!selfieRes.ok) {
+        captureKycMessage('Offline replay: selfie upload failed, liveness will proceed without face match', 'upload_failure', {
+          sessionId: item.session_id,
+          step: 'liveness',
+          operation: 'offline_replay_selfie_upload',
+          extra: { queue_item_id: item.id, status: selfieRes.status },
+        });
+        // Non-fatal: liveness submit can still succeed, just without face match
+      }
+    } catch (err) {
+      captureKycException(err, 'upload_failure', {
+        sessionId: item.session_id,
+        step: 'liveness',
+        operation: 'offline_replay_selfie_upload',
+        extra: { queue_item_id: item.id },
+      });
+      // Non-fatal: continue with liveness submit
+    }
+  }
+
+  // Submit liveness result (landmarks + challenge)
+  const { selfie_data_url, ...livenessBody } = payload;
+  const response = await fetchWithCorrelation('/api/v1/kyc/capture/liveness', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...buildAuthHeaders(),
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(livenessBody),
   });
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
     throw classifyHttpSyncError(response.status, 'capture_liveness', detail);
+  }
+  await removeKycSyncItem(item.id);
+}
+
+async function submitAddress(item: KycSyncQueueItem): Promise<void> {
+  const payload = await decryptJsonPayload<AddressPayload>(item.session_id, item.encrypted_payload);
+  const response = await fetchWithCorrelation('/api/v1/kyc/address/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw classifyHttpSyncError(response.status, 'submit_address', detail);
+  }
+  await removeKycSyncItem(item.id);
+}
+
+async function submitBill(item: KycSyncQueueItem): Promise<void> {
+  const payload = await decryptJsonPayload<BillPayload>(item.session_id, item.encrypted_payload);
+  const formData = new FormData();
+  formData.append('file', dataUrlToBlob(payload.file_data_url), `bill_${payload.bill_type.toLowerCase()}.jpg`);
+  formData.append('bill_type', payload.bill_type);
+  if (payload.session_id) {
+    formData.append('session_id', payload.session_id);
+  }
+  if (payload.client_sha256) {
+    formData.append('client_sha256', payload.client_sha256);
+  }
+  const response = await fetchWithCorrelation('/api/v1/kyc/capture/bill', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw classifyHttpSyncError(response.status, 'submit_bill', detail);
+  }
+  await removeKycSyncItem(item.id);
+}
+
+async function submitNiu(item: KycSyncQueueItem): Promise<void> {
+  const payload = await decryptJsonPayload<NiuPayload>(item.session_id, item.encrypted_payload);
+  const response = await fetchWithCorrelation('/api/v1/kyc/niu/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw classifyHttpSyncError(response.status, 'submit_niu', detail);
+  }
+  await removeKycSyncItem(item.id);
+}
+
+async function submitConsent(item: KycSyncQueueItem): Promise<void> {
+  const payload = await decryptJsonPayload<ConsentPayload>(item.session_id, item.encrypted_payload);
+  const response = await fetchWithCorrelation('/api/v1/kyc/consent/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      cgu_accepted: payload.cgu_accepted,
+      privacy_accepted: payload.privacy_accepted,
+      data_processing_accepted: payload.data_processing_accepted,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw classifyHttpSyncError(response.status, 'submit_consent', detail);
+  }
+  await removeKycSyncItem(item.id);
+}
+
+async function submitSignature(item: KycSyncQueueItem): Promise<void> {
+  const payload = await decryptJsonPayload<SignaturePayload>(item.session_id, item.encrypted_payload);
+  const response = await fetchWithCorrelation('/api/v1/kyc/signature/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ signature_data: payload.signature_data }),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw classifyHttpSyncError(response.status, 'submit_signature', detail);
   }
   await removeKycSyncItem(item.id);
 }
@@ -266,12 +411,34 @@ function hasPendingCniDependency(item: KycSyncQueueItem, queue: KycSyncQueueItem
 }
 
 async function processQueueItem(item: KycSyncQueueItem): Promise<void> {
-  if (item.op_type === 'capture_cni') {
-    await uploadCni(item);
-    return;
-  }
-  if (item.op_type === 'capture_liveness') {
-    await uploadLiveness(item);
+  switch (item.op_type) {
+    case 'capture_cni':
+      await uploadCni(item);
+      break;
+    case 'capture_liveness':
+      await uploadLiveness(item);
+      break;
+    case 'submit_address':
+      await submitAddress(item);
+      break;
+    case 'submit_bill':
+      await submitBill(item);
+      break;
+    case 'submit_niu':
+      await submitNiu(item);
+      break;
+    case 'submit_consent':
+      await submitConsent(item);
+      break;
+    case 'submit_signature':
+      await submitSignature(item);
+      break;
+    default:
+      captureKycMessage(`Unknown queue op_type: ${item.op_type}`, 'sync_error', {
+        sessionId: item.session_id,
+        step: item.step,
+        operation: 'process_queue_item',
+      });
   }
 }
 
@@ -300,10 +467,11 @@ export async function runKycSyncNow(): Promise<void> {
       try {
         await processQueueItem(item);
       } catch (error: unknown) {
+        const operationLabel = `offline_replay_${item.op_type}`;
         captureKycException(error, 'upload_failure', {
           sessionId: item.session_id,
           step: item.step,
-          operation: item.op_type === 'capture_cni' ? 'offline_replay_capture_cni' : 'offline_replay_capture_liveness',
+          operation: operationLabel,
           extra: { queue_item_id: item.id, retry_count: item.retry_count },
         });
         const syncErr = error instanceof SyncError ? error : null;
@@ -352,6 +520,7 @@ export async function enqueueOfflineLivenessCapture(input: {
   sessionId: string;
   challengeType: LivenessPayload['challenge_type'];
   landmarks: Array<Record<string, unknown>>;
+  selfieDataUrl?: string;
 }): Promise<void> {
   await enqueueKycSyncItem({
     op_type: 'capture_liveness',
@@ -360,8 +529,93 @@ export async function enqueueOfflineLivenessCapture(input: {
     payload: {
       challenge_type: input.challengeType,
       landmarks_json: input.landmarks,
+      ...(input.selfieDataUrl ? { selfie_data_url: input.selfieDataUrl } : {}),
     } satisfies LivenessPayload,
     meta: { challenge_type: input.challengeType },
+  });
+}
+
+export async function enqueueOfflineAddress(input: {
+  sessionId: string;
+  address: AddressData;
+}): Promise<void> {
+  await enqueueKycSyncItem({
+    op_type: 'submit_address',
+    session_id: input.sessionId,
+    step: 'address',
+    payload: input.address satisfies AddressPayload,
+    meta: { region: input.address.region, city: input.address.city },
+  });
+}
+
+export async function enqueueOfflineBill(input: {
+  sessionId: string;
+  billType: 'ENEO' | 'CAMWATER';
+  fileDataUrl: string;
+  clientSha256?: string | null;
+}): Promise<void> {
+  await enqueueKycSyncItem({
+    op_type: 'submit_bill',
+    session_id: input.sessionId,
+    step: 'utility_bill',
+    client_sha256: input.clientSha256 ?? null,
+    payload: {
+      file_data_url: input.fileDataUrl,
+      bill_type: input.billType,
+      session_id: input.sessionId,
+      client_sha256: input.clientSha256 ?? null,
+    } satisfies BillPayload,
+    meta: { bill_type: input.billType },
+  });
+}
+
+export async function enqueueOfflineNiu(input: {
+  sessionId: string;
+  niuType: string;
+  niuValue?: string | null;
+}): Promise<void> {
+  await enqueueKycSyncItem({
+    op_type: 'submit_niu',
+    session_id: input.sessionId,
+    step: 'niu',
+    payload: {
+      niu_type: input.niuType,
+      niu_value: input.niuValue ?? null,
+    } satisfies NiuPayload,
+    meta: { niu_type: input.niuType },
+  });
+}
+
+export async function enqueueOfflineConsent(input: {
+  sessionId: string;
+  cguAccepted: boolean;
+  privacyAccepted: boolean;
+  dataProcessingAccepted: boolean;
+}): Promise<void> {
+  await enqueueKycSyncItem({
+    op_type: 'submit_consent',
+    session_id: input.sessionId,
+    step: 'consent',
+    payload: {
+      cgu_accepted: input.cguAccepted,
+      privacy_accepted: input.privacyAccepted,
+      data_processing_accepted: input.dataProcessingAccepted,
+    } satisfies ConsentPayload,
+    meta: { cgu_accepted: String(input.cguAccepted) },
+  });
+}
+
+export async function enqueueOfflineSignature(input: {
+  sessionId: string;
+  signatureData: string;
+}): Promise<void> {
+  await enqueueKycSyncItem({
+    op_type: 'submit_signature',
+    session_id: input.sessionId,
+    step: 'signature',
+    payload: {
+      signature_data: input.signatureData,
+    } satisfies SignaturePayload,
   });
 }
 
@@ -399,6 +653,10 @@ export async function getResumeTargetPath(): Promise<string | null> {
       return '/kyc/niu';
     case 'consent':
       return '/kyc/consent';
+    case 'signature':
+      return '/kyc/signature';
+    case 'utility_bill':
+      return '/kyc/bill-capture';
     case 'submission':
     default:
       return null;

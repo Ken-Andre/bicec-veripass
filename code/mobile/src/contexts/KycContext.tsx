@@ -1,17 +1,39 @@
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
-import type { KycStepType, KycStatus, AccessLevel, OcrField, AddressData } from '../types';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
+import type { KycStepType, KycStatus, AccessTier, OcrField, AddressData } from '../types';
 import {
   clearPersistedKycState,
   loadPersistedKycState,
   persistKycState,
 } from '../services/kycOfflineStore';
 
+// ADR-001: Review status from backend /review-status endpoint
+export interface ReviewStatusNotification {
+  id: string;
+  type: string;
+  message: string;
+  sent_at: string | null;
+}
+
+export interface ReviewStatus {
+  status: KycStatus;
+  accessLevel: AccessTier;
+  submittedAt: string | null;
+  completedAt: string | null;
+  decision: {
+    decision: string;
+    agent_role: string;
+    reason: string | null;
+    decided_at: string;
+  } | null;
+  unreadNotifications: ReviewStatusNotification[];
+}
+
 interface KycState {
   sessionId: string | null;
   status: KycStatus;
   currentStep: KycStepType;
   completedSteps: KycStepType[];
-  accessLevel: AccessLevel;
+  accessLevel: AccessTier;
   cniRectoCapture: string | null;
   cniVersoCapture: string | null;
   ocrFields: OcrField[];
@@ -26,6 +48,8 @@ interface KycState {
   signatureData: string | null;
   selectedPlan: string | null;
   interests: string[];
+  // ADR-001: Review status from backend
+  reviewStatus: ReviewStatus | null;
 }
 
 interface KycContextType extends KycState {
@@ -44,8 +68,9 @@ interface KycContextType extends KycState {
   setSignature: (data: string) => void;
   setSelectedPlan: (plan: string) => void;
   setInterests: (interests: string[]) => void;
-  setAccessLevel: (level: AccessLevel) => void;
+  setAccessLevel: (level: AccessTier) => void;
   setStatus: (status: KycStatus) => void;
+  setReviewStatus: (status: ReviewStatus | null) => void;
   resetKyc: () => void;
 
   // Backward compatibility with old KycContext
@@ -64,7 +89,7 @@ const initialState: KycState = {
   status: 'IN_PROGRESS',
   currentStep: 'cni_recto',
   completedSteps: [],
-  accessLevel: 'RESTRICTED_ACCESS',
+  accessLevel: 'GUEST',
   cniRectoCapture: null,
   cniVersoCapture: null,
   ocrFields: [],
@@ -79,6 +104,7 @@ const initialState: KycState = {
   signatureData: null,
   selectedPlan: null,
   interests: [],
+  reviewStatus: null,
 };
 
 const KycContext = createContext<KycContextType>({} as KycContextType);
@@ -86,16 +112,6 @@ const KycContext = createContext<KycContextType>({} as KycContextType);
 export function KycProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<KycState>(initialState);
   const [hydrated, setHydrated] = useState(false);
-
-  // Compute derived fields using useMemo to avoid recomputation on every render
-  const step = useMemo(() => state.completedSteps.length, [state.completedSteps]);
-
-  // Memoized kycData object for backward compatibility
-  const kycData = useMemo(() => ({
-    idDocumentFront: undefined,
-    idDocumentBack: undefined,
-    livenessScore: undefined,
-  }), []);
 
   // Restore an existing KYC draft (if any) from IndexedDB on mount.
   useEffect(() => {
@@ -127,50 +143,136 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     });
   }, [state, hydrated]);
 
+  // Core setters wrapped in useCallback
+  const setSessionId = useCallback((sessionId: string) => 
+    setState(s => s.sessionId === sessionId ? s : ({ ...s, sessionId })), []);
+
+  const setCurrentStep = useCallback((currentStep: KycStepType) => 
+    setState(s => s.currentStep === currentStep ? s : ({ ...s, currentStep })), []);
+
+  const completeStep = useCallback((step: KycStepType) => 
+    setState(s => ({
+      ...s,
+      completedSteps: s.completedSteps.includes(step) ? s.completedSteps : [...s.completedSteps, step],
+    })), []);
+
+  const setCniCapture = useCallback((side: 'recto' | 'verso', data: string) => 
+    setState(s => ({
+      ...s,
+      [side === 'recto' ? 'cniRectoCapture' : 'cniVersoCapture']: data,
+    })), []);
+
+  const setOcrFields = useCallback((ocrFields: OcrField[]) => 
+    setState(s => ({ ...s, ocrFields })), []);
+
+  const incrementLivenessAttempt = useCallback(() => 
+    setState(s => ({ ...s, livenessAttempts: s.livenessAttempts + 1 })), []);
+
+  const resetLivenessAttempts = useCallback(() => 
+    setState(s => ({ ...s, livenessAttempts: 0 })), []);
+
+  const setAddress = useCallback((address: AddressData) => 
+    setState(s => ({ ...s, address })), []);
+
+  const setBillCapture = useCallback((billCapture: string) => 
+    setState(s => ({ ...s, billCapture })), []);
+
+  const setNiuCapture = useCallback((niuCapture: string | null) => 
+    setState(s => ({ ...s, niuCapture })), []);
+
+  const setNiuManual = useCallback((niuManual: string | null) => 
+    setState(s => ({ ...s, niuManual })), []);
+
+  const setConsent = useCallback((key: 'consentCgu' | 'consentPrivacy' | 'consentData', val: boolean) => 
+    setState(s => ({ ...s, [key]: val })), []);
+
+  const setSignature = useCallback((signatureData: string) => 
+    setState(s => ({ ...s, signatureData })), []);
+
+  const setSelectedPlan = useCallback((selectedPlan: string) => 
+    setState(s => ({ ...s, selectedPlan })), []);
+
+  const setInterests = useCallback((interests: string[]) => 
+    setState(s => ({ ...s, interests })), []);
+
+  const setAccessLevel = useCallback((accessLevel: AccessTier) => 
+    setState(s => ({ ...s, accessLevel })), []);
+
+  const setStatus = useCallback((status: KycStatus) => 
+    setState(s => ({ ...s, status })), []);
+
+  const setReviewStatus = useCallback((reviewStatus: ReviewStatus | null) => 
+    setState(s => ({ ...s, reviewStatus })), []);
+
+  const resetKyc = useCallback(() => {
+    setState(initialState);
+    void clearPersistedKycState().catch((err) => {
+      console.warn('Failed to clear persisted KYC state', err);
+    });
+  }, []);
+
+  // Compute derived fields using useMemo to avoid recomputation on every render
+  const step = useMemo(() => state.completedSteps.length, [state.completedSteps]);
+
+  // Memoized kycData object for backward compatibility
+  const kycData = useMemo(() => ({
+    idDocumentFront: undefined,
+    idDocumentBack: undefined,
+    livenessScore: undefined,
+  }), []);
+
+  // Memoize context value
+  const contextValue = useMemo(() => ({
+    ...state,
+    setSessionId,
+    setCurrentStep,
+    completeStep,
+    setCniCapture,
+    setOcrFields,
+    incrementLivenessAttempt,
+    resetLivenessAttempts,
+    setAddress,
+    setBillCapture,
+    setNiuCapture,
+    setNiuManual,
+    setConsent,
+    setSignature,
+    setSelectedPlan,
+    setInterests,
+    setAccessLevel,
+    setStatus,
+    resetKyc,
+    step,
+    setStep: () => { /* no-op */ },
+    kycData,
+    updateKycData: () => { /* no-op */ },
+  }), [
+    state,
+    setSessionId,
+    setCurrentStep,
+    completeStep,
+    setCniCapture,
+    setOcrFields,
+    incrementLivenessAttempt,
+    resetLivenessAttempts,
+    setAddress,
+    setBillCapture,
+    setNiuCapture,
+    setNiuManual,
+    setConsent,
+    setSignature,
+    setSelectedPlan,
+    setInterests,
+    setAccessLevel,
+    setStatus,
+    setReviewStatus,
+    resetKyc,
+    step,
+    kycData,
+  ]);
+
   return (
-    <KycContext.Provider value={{
-      ...state,
-
-      // Core setters
-      setSessionId: (sessionId) => setState(s => ({ ...s, sessionId })),
-      setCurrentStep: (currentStep) => setState(s => ({ ...s, currentStep })),
-      completeStep: (step) => setState(s => ({
-        ...s,
-        completedSteps: [...new Set([...s.completedSteps, step])],
-      })),
-      setCniCapture: (side, data) => setState(s => ({
-        ...s,
-        [side === 'recto' ? 'cniRectoCapture' : 'cniVersoCapture']: data,
-      })),
-      setOcrFields: (ocrFields) => setState(s => ({ ...s, ocrFields })),
-      incrementLivenessAttempt: () => setState(s => ({
-        ...s,
-        livenessAttempts: s.livenessAttempts + 1,
-      })),
-      resetLivenessAttempts: () => setState(s => ({ ...s, livenessAttempts: 0 })),
-      setAddress: (address) => setState(s => ({ ...s, address })),
-      setBillCapture: (billCapture) => setState(s => ({ ...s, billCapture })),
-      setNiuCapture: (niuCapture) => setState(s => ({ ...s, niuCapture })),
-      setNiuManual: (niuManual) => setState(s => ({ ...s, niuManual })),
-      setConsent: (key, val) => setState(s => ({ ...s, [key]: val })),
-      setSignature: (signatureData) => setState(s => ({ ...s, signatureData })),
-      setSelectedPlan: (selectedPlan) => setState(s => ({ ...s, selectedPlan })),
-      setInterests: (interests) => setState(s => ({ ...s, interests })),
-      setAccessLevel: (accessLevel) => setState(s => ({ ...s, accessLevel })),
-      setStatus: (status) => setState(s => ({ ...s, status })),
-      resetKyc: () => {
-        setState(initialState);
-        void clearPersistedKycState().catch((err) => {
-          console.warn('Failed to clear persisted KYC state', err);
-        });
-      },
-
-      // Backward compatibility - computed from state, not using 'this'
-      step,
-      setStep: () => { /* no-op, use setCurrentStep */ },
-      kycData,
-      updateKycData: () => { /* no-op, use individual setters */ },
-    }}>
+    <KycContext.Provider value={contextValue}>
       {children}
     </KycContext.Provider>
   );

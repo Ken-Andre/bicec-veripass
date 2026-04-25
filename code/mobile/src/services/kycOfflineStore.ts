@@ -1,4 +1,4 @@
-import type { AddressData, OcrField, KycStepType, KycStatus, AccessLevel } from '../types';
+import type { AddressData, OcrField, KycStepType, KycStatus, AccessTier } from '../types';
 
 const DB_NAME = 'vp_kyc_offline_db';
 const DB_VERSION = 1;
@@ -7,7 +7,14 @@ const KYC_STATE_KEY = 'kyc_state_v1';
 const KYC_QUEUE_KEY = 'kyc_queue_v1';
 const KYC_SESSION_KEYS_KEY = 'kyc_session_keys_v1';
 
-export type QueueOpType = 'capture_cni' | 'capture_liveness';
+export type QueueOpType =
+  | 'capture_cni'
+  | 'capture_liveness'
+  | 'submit_address'
+  | 'submit_bill'
+  | 'submit_niu'
+  | 'submit_consent'
+  | 'submit_signature';
 export type QueueStatus = 'pending' | 'synced' | 'needs_reupload' | 'failed';
 
 export interface PersistedKycState {
@@ -15,7 +22,7 @@ export interface PersistedKycState {
   status: KycStatus;
   currentStep: KycStepType;
   completedSteps: KycStepType[];
-  accessLevel: AccessLevel;
+  accessLevel: AccessTier;
   cniRectoCapture: string | null;
   cniVersoCapture: string | null;
   ocrFields: OcrField[];
@@ -225,7 +232,12 @@ export async function loadPersistedKycState(): Promise<PersistedKycState | null>
   if (!envelope || envelope.version !== 1 || !envelope.value) {
     return null;
   }
-  return envelope.value;
+  // Migrate legacy access level values (ADR-001 rename)
+  const state = envelope.value;
+  if (state.accessLevel === 'RESTRICTED_ACCESS') {
+    state.accessLevel = 'RESTRICTED';
+  }
+  return state;
 }
 
 export async function persistKycState(state: PersistedKycState): Promise<void> {
