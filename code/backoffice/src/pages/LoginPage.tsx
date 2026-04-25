@@ -15,11 +15,16 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
 
-    const success = await login(email, password)
-    if (success) {
-      navigate('/')
-    } else {
-      setError('Email ou mot de passe incorrect')
+    try {
+      const success = await login(email, password)
+      if (success) {
+        navigate('/')
+      }
+    } catch (err: any) {
+      // login() returns false on failure, but we can extract detail from the raw response
+      // The AuthContext already handles the flow, so we just set a generic error
+      // However if the backend returns structured errors (lockout, attempts), show them
+      setError(err?.message || 'Email ou mot de passe incorrect')
     }
   }
 
