@@ -1,5 +1,6 @@
 """Auth router: OTP, PIN, Agent login, Token refresh."""
 
+import uuid as _uuid
 from datetime import timedelta
 from typing import Optional
 from fastapi import APIRouter, Request, Depends, HTTPException, status
@@ -39,6 +40,7 @@ from app.modules.auth.schemas import (
     TokenResponse,
     RefreshTokenRequest,
     AgentLoginRequest,
+    AgentPasswordChangeRequest,
     UserResponse,
     AgentResponse,
     PinSetupRequest,
@@ -487,10 +489,16 @@ async def verify_pin(
     result = await db.execute(select(User).where(User.phone == body.phone))
     user = result.scalar_one_or_none()
 
-    if not user or not user.pin_hash:
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
+        )
+
+    if not user.pin_hash:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="PIN révoqué. Veuillez vous reconnecter via OTP.",
         )
 
     if not verify_password(body.pin, user.pin_hash):
@@ -507,7 +515,17 @@ async def verify_pin(
         )
     )
     kyc_session = kyc_result.scalar_one_or_none()
-    session_handle = make_session_handle(str(kyc_session.id)) if kyc_session else None
+
+    if not kyc_session:
+        # No active session (old one may be ABANDONED/SUBMITTED) — start fresh
+        kyc_session = KYCSession(
+            user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
+        )
+        db.add(kyc_session)
+        await db.commit()
+        await db.refresh(kyc_session)
+
+    session_handle = make_session_handle(str(kyc_session.id))
 
     # Create tokens
     access_token = create_access_token(
@@ -597,6 +615,45 @@ async def agent_login(
 
 
 # ============================================================
+# AGENT PASSWORD CHANGE (Story 1.4 — self-service)
+# ============================================================
+
+
+
+@router.post("/agent/password-change")
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def agent_password_change(
+    request: Request,
+    body: AgentPasswordChangeRequest,
+    current_agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db),
+):
+    """Agent self-service password change.
+
+    Requires current password verification. On success, all existing
+    refresh tokens remain valid (they are subject-based, not password-based),
+    but the agent should re-login for a clean token set.
+    """
+    if not verify_password(body.current_password, current_agent.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect.",
+        )
+
+    if body.current_password == body.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password.",
+        )
+
+    current_agent.password_hash = hash_password(body.new_password)
+    await db.commit()
+
+    logger.info(f"Agent password changed: {current_agent.email}")
+    return {"status": "success", "message": "Password updated successfully"}
+
+
+# ============================================================
 # TOKEN REFRESH ENDPOINT
 # ============================================================
 
@@ -638,8 +695,49 @@ async def refresh_token(
         f"user_agent={request.headers.get('user-agent', 'unknown')}"
     )
 
+    # Look up the subject to preserve role/user_type claims in the new access token
+    try:
+        parsed_uuid = _uuid.UUID(subject)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token subject",
+        )
+
+    # Try Agent first (back-office), then User (mobile)
+    additional_claims: dict | None = None
+    result = await db.execute(select(Agent).where(Agent.id == parsed_uuid))
+    agent = result.scalar_one_or_none()
+    if agent:
+        additional_claims = {"role": agent.role.value, "user_type": "agent"}
+    else:
+        result = await db.execute(select(User).where(User.id == parsed_uuid))
+        user = result.scalar_one_or_none()
+        if user:
+            # For mobile users, re-derive session handle if possible
+            kyc_result = await db.execute(
+                select(KYCSession).where(
+                    KYCSession.user_id == user.id,
+                    KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
+                )
+            )
+            kyc_session = kyc_result.scalar_one_or_none()
+            session_handle = make_session_handle(str(kyc_session.id)) if kyc_session else None
+            additional_claims = {
+                "role": user.role,
+                "user_type": "mobile",
+            }
+            if session_handle:
+                additional_claims["sid"] = session_handle
+        else:
+            # Subject not found — account deleted. Refuse token refresh.
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account no longer exists",
+            )
+
     # Issue new tokens
-    access_token = create_access_token(subject=subject)
+    access_token = create_access_token(subject=subject, additional_claims=additional_claims)
     new_refresh_token = create_refresh_token(subject=subject)
 
     return TokenResponse(
@@ -724,18 +822,51 @@ async def delete_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete user account and all associated data."""
-    await db.execute(
-        delete(ConsentRecord).where(
-            ConsentRecord.session_id.in_(
-                select(KYCSession.id).where(KYCSession.user_id == current_user.id)
-            )
-        )
+    """Delete user account and all associated data.
+
+    Cascades: OCRField → BiometricResult → ConsentRecord → Document → KYCSession → Notification → User.
+    Document files on disk are also removed.
+    """
+    from app.modules.kyc.models import Document, OCRField, BiometricResult
+    from app.modules.kyc.storage import document_storage
+
+    session_ids_q = select(KYCSession.id).where(KYCSession.user_id == current_user.id)
+
+    # 1. Fetch document file paths for disk cleanup
+    doc_paths_result = await db.execute(
+        select(Document.file_path).where(Document.session_id.in_(session_ids_q))
     )
+    for (file_path_str,) in doc_paths_result.all():
+        if file_path_str:
+            try:
+                file_path = document_storage.base_path / file_path_str
+                if file_path.exists():
+                    file_path.unlink()
+            except Exception:
+                pass  # Best-effort cleanup
+
+    # 2. Delete OCR fields (FK → Document)
+    doc_ids_q = select(Document.id).where(Document.session_id.in_(session_ids_q))
+    await db.execute(delete(OCRField).where(OCRField.document_id.in_(doc_ids_q)))
+
+    # 3. Delete biometric results (FK → KYCSession)
+    await db.execute(delete(BiometricResult).where(BiometricResult.session_id.in_(session_ids_q)))
+
+    # 4. Delete consent records (FK → KYCSession)
+    await db.execute(delete(ConsentRecord).where(ConsentRecord.session_id.in_(session_ids_q)))
+
+    # 5. Delete documents (FK → KYCSession)
+    await db.execute(delete(Document).where(Document.session_id.in_(session_ids_q)))
+
+    # 6. Delete KYC sessions
     await db.execute(delete(KYCSession).where(KYCSession.user_id == current_user.id))
+
+    # 7. Delete notifications
     await db.execute(
         delete(Notification).where(Notification.user_id == current_user.id)
     )
+
+    # 8. Delete user
     await db.delete(current_user)
     await db.commit()
     return {"message": "Account deleted successfully"}

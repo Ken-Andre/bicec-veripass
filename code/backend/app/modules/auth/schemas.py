@@ -128,3 +128,51 @@ class UserExistsCheckResponse(BaseModel):
     has_pin: bool = False
     has_email: bool = False
     phone: Optional[str] = None
+
+
+class AgentPasswordChangeRequest(BaseModel):
+    """Agent self-service password change."""
+
+    current_password: str = Field(..., min_length=8, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class AdminAgentCreateRequest(BaseModel):
+    """ADMIN_IT creates a new agent account."""
+
+    name: str = Field(..., min_length=1, max_length=100)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    role: str = Field(..., pattern=r"^(JEAN|THOMAS|SYLVIE|ADMIN_IT)$")
+    agency_id: Optional[str] = Field(None, max_length=64)
+
+
+class AdminAgentUpdateRequest(BaseModel):
+    """ADMIN_IT updates an agent account."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    email: Optional[EmailStr] = None
+    role: Optional[str] = Field(None, pattern=r"^(JEAN|THOMAS|SYLVIE|ADMIN_IT)$")
+    is_available: Optional[bool] = None
+    agency_id: Optional[str] = Field(None, max_length=64)
+
+
+class AdminAgentResetPasswordRequest(BaseModel):
+    """ADMIN_IT resets an agent's password."""
+
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class AdminAgentResponse(BaseModel):
+    """Agent info returned to ADMIN_IT."""
+
+    id: str = Field(..., max_length=64)
+    name: str = Field(..., max_length=100)
+    email: str = Field(..., max_length=128)
+    role: str = Field(..., max_length=20)
+    agency_id: Optional[str] = None
+    is_available: bool
+    active_dossier_count: int = Field(..., ge=0)
+    last_activity_at: Optional[str] = None
+
+    model_config = {"from_attributes": True}
