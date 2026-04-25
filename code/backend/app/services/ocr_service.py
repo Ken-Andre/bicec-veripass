@@ -275,12 +275,12 @@ def _parse_mrz_line2(line2: str) -> dict:
 STOP_WORDS = {
     "REPUBLIQUE", "REPUBLIC", "CAMEROON", "CAMEROUN", "NATIONAL", "IDENTITY",
     "CARD", "CARTE", "NATIONALE", "IDENTITE", "SIGNATURE", "SEXE", "NAME", "NOM",
-    "SURNAME", "GIVEN", "NAMES", "PROFESSION", "OCCUPATION", "TRAVAIL",
-    "REPUBLIQUEDUCAMEROUN", "REPUBLICOFCAMEROON", "CARTENATIONALEDIDENTITE",
+    "SURNAME", "GIVEN", "NAMES", "PROFESSION", "OCCUPATION", "MENAGERE", "TRAVAIL",
+    "INGENIEUR", "REPUBLIQUEDUCAMEROUN", "REPUBLICOFCAMEROON", "CARTENATIONALEDIDENTITE",
     "PERE/FATHER", "MERE/MOTHER", "S.P/S.M", "AUTORITE/AUTHORITY", "DATEDE", "DELIVRANCE",
     "POSTEDIDENTIFICATION", "DATEOFISSUE", "IDENTIFSCATIONPOSS", "DATEDEXPIRATION/",
     "DENTIFLANTUNIQUE", "DATEOEEXPIRY", "UNIOUEIDENDFIE", "DENTIFIANURIQUE",
-    "OHOUEIDENTIFIER", "PRÉNOMS", "PRENOMS", "PRÉNOM", "PRENOM",
+    "OHOUEIDENTIFIER", "FENO", "PRÉNOMS", "PRENOMS", "PRÉNOM", "PRENOM",
     "HEIGHT", "TAILLE", "ADRESSE", "ADDRESS", "DATE", "BIRTH", "NAISSANCE",
     "LIEU", "PLACE", "PLACEOFBIRTH", "LIEUDENAISSANCE", "NUMERO", "NUMBER",
     "IDENTIFIANT", "UNIQUE", "IDENTIFIER", "POSTE", "D'IDENTIFICATION",
@@ -393,13 +393,13 @@ def _is_stop_word(text: str) -> bool:
 
 CNI_RECTO_ZONES = [
     # Zone            cy_min  cy_max  cx_min  cx_max  validator
-    ("nom",            0.18,   0.30,   0.05,   0.60, "is_name"),
-    ("prenom",         0.30,   0.42,   0.05,   0.60, "is_name"),
-    ("date_naissance", 0.42,   0.56,   0.10,   0.60, "is_date"),
-    ("lieu_naissance", 0.53,   0.64,   0.05,   0.60, "is_place"),
-    ("sexe",           0.60,   0.72,   0.05,   0.40, "is_sex"),
-    ("taille",         0.60,   0.72,   0.35,   0.60, "is_height"),
-    ("profession",     0.68,   0.82,   0.05,   0.60, "is_profession"),
+    ("nom",            0.18,   0.32,   0.05,   0.65, "is_name"),
+    ("prenom",         0.30,   0.45,   0.05,   0.65, "is_name"),
+    ("date_naissance", 0.42,   0.58,   0.10,   0.65, "is_date"),
+    ("lieu_naissance", 0.53,   0.66,   0.05,   0.65, "is_place"),
+    ("sexe",           0.60,   0.75,   0.05,   0.45, "is_sex"),
+    ("taille",         0.60,   0.75,   0.35,   0.65, "is_height"),
+    ("profession",     0.68,   0.85,   0.05,   0.65, "is_profession"),
 ]
 
 CNI_VERSO_ZONES = [
@@ -556,9 +556,21 @@ def _extract_sex_value(text: str) -> str | None:
 
 def _extract_height_value(text: str) -> str | None:
     """Extract height (1.XX) from text."""
-    m = re.search(r"\b(1[.,]\d{2})\b", text)
-    if m:
-        return m.group(1).replace(",", ".")
+    # Remove units and common noise
+    t = text.lower().replace(" ", "").replace("m", "").replace("s", "").replace("e", "")
+    # Keep only digits and decimal if present
+    nums = "".join([c for c in t if c.isdigit() or c == "."])
+    if not nums:
+        return None
+    try:
+        # Handle formats like "1.75" or "175"
+        val = float(nums)
+        if 1.4 <= val <= 2.2: # matches 1.75m
+            return f"{val:.2f}m"
+        if 140 <= val <= 220: # matches 175cm
+            return f"{val/100:.2f}m"
+    except ValueError:
+        pass
     return None
 
 
@@ -890,16 +902,65 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                 parsed_dates.sort(key=lambda x: x[0])
 
                 if is_verso:
-                    # Verso: DOB (earliest or new CNI), delivrance, expiration
-                    if parsed_data["date_naissance"]["value"] is None and len(parsed_dates) >= 3:
-                        parsed_data["date_naissance"] = {"value": parsed_dates[0][1], "conf": parsed_dates[0][2]}
+                    # On verso, dates are typically:
+                    #   - date_naissance (if present on new CNI)
+                    #   - date_delivrance
+                    #   - date_expiration
+                    # Use MRZ to identify date_naissance and date_expiration if available
+                    mrz_dob = mrz_fields.get("date_naissance", {}).get("value")
+                    mrz_exp = mrz_fields.get("date_expiration", {}).get("value")
+
+                    # Match MRZ dates to detected dates to classify them
+                    _dob_match = None
+                    _exp_match = None
+                    if mrz_dob:
+                        mrz_dob_sortable = mrz_dob[6:10] + mrz_dob[3:5] + mrz_dob[0:2]
+                        for _s, _d, _c in parsed_dates:
+                            if _s == mrz_dob_sortable:
+                                _dob_match = (_d, _c)
+                                break
+                    if mrz_exp:
+                        mrz_exp_sortable = mrz_exp[6:10] + mrz_exp[3:5] + mrz_exp[0:2]
+                        for _s, _d, _c in parsed_dates:
+                            if _s == mrz_exp_sortable:
+                                _exp_match = (_d, _c)
+                                break
+
+                    # Assign date_naissance from MRZ-matched date or earliest date
+                    if parsed_data["date_naissance"]["value"] is None:
+                        if _dob_match:
+                            parsed_data["date_naissance"] = {"value": _dob_match[0], "conf": _dob_match[1]}
+                        elif len(parsed_dates) >= 3:
+                            # 3+ dates on verso: earliest is likely DOB (new CNI)
+                            parsed_data["date_naissance"] = {"value": parsed_dates[0][1], "conf": parsed_dates[0][2]}
+
+                    # Assign date_delivrance: middle date (after excluding DOB match)
                     if parsed_data["date_delivrance"]["value"] is None:
-                        if len(parsed_dates) >= 3:
-                            parsed_data["date_delivrance"] = {"value": parsed_dates[1][1], "conf": parsed_dates[1][2]}
-                        elif len(parsed_dates) == 2:
-                            parsed_data["date_delivrance"] = {"value": parsed_dates[0][1], "conf": parsed_dates[0][2]}
+                        _dob_idx = None
+                        if _dob_match:
+                            _dob_sortable = _dob_match[0][6:10] + _dob_match[0][3:5] + _dob_match[0][0:2] if len(_dob_match[0]) == 10 else ""
+                            for _idx, (_s, _d, _c) in enumerate(parsed_dates):
+                                if _d == _dob_match[0] and _s == _dob_sortable:
+                                    _dob_idx = _idx
+                                    break
+                        _remaining = [
+                            (_s, _d, _c)
+                            for _idx, (_s, _d, _c) in enumerate(parsed_dates)
+                            if _idx != _dob_idx
+                        ]
+                        if len(_remaining) >= 2:
+                            parsed_data["date_delivrance"] = {"value": _remaining[0][1], "conf": _remaining[0][2]}
+                        elif len(_remaining) == 1:
+                            # Only one non-DOB date: assume delivrance if no expiry match
+                            if not _exp_match:
+                                parsed_data["date_delivrance"] = {"value": _remaining[0][1], "conf": _remaining[0][2]}
+
+                    # Assign date_expiration: latest date or MRZ-matched
                     if parsed_data["date_expiration"]["value"] is None:
-                        parsed_data["date_expiration"] = {"value": parsed_dates[-1][1], "conf": parsed_dates[-1][2]}
+                        if _exp_match:
+                            parsed_data["date_expiration"] = {"value": _exp_match[0], "conf": _exp_match[1]}
+                        else:
+                            parsed_data["date_expiration"] = {"value": parsed_dates[-1][1], "conf": parsed_dates[-1][2]}
                 else:
                     # Recto: earliest = DOB, latest = Expiry
                     if parsed_data["date_naissance"]["value"] is None:
@@ -1139,17 +1200,32 @@ class OCRService:
         _t_extract_start = time.perf_counter()
 
         # Detect side for template selection
-        _is_verso = any(
-            kw in b.get("text", "").upper()
-            for b in blocks
-            for kw in ["PERE", "FATHER", "MERE", "MOTHER", "AUTORITE", "AUTHORITY",
-                       "DELIVRANCE", "UNIQUE", "IDENTIFIER", "ADRESSE", "POSTE"]
-        )
-        _side = "verso" if _is_verso else "recto"
+        # Side detection logic
+        recto_keywords = {"REPUBLIQUE", "IDENTITY", "CARD", "CARTE", "NATIONALE", "RECTO"}
+        verso_keywords = {"AUTORITE", "AUTHORITY", "MRZ", "VERSO", "EMPREINTE", "FINGERPRINT"}
+        
+        # Check for MRZ separately as it's a strong indicator of Verso
+        has_mrz = any("<<" in b.get("text", "") for b in blocks)
+        
+        recto_score = 0
+        verso_score = 10 if has_mrz else 0
+        
+        texts = [b.get("text", "").upper() for b in blocks]
+        for text in texts:
+            for skip in recto_keywords:
+                if skip in text:
+                    recto_score += 1
+            for skip in verso_keywords:
+                if skip in text:
+                    verso_score += 1
+                    
+        detected_side = "recto" if recto_score >= verso_score else "verso"
+        logger.info(f"Side detection: recto={recto_score}, verso={verso_score} -> {detected_side}")
+        
         _img_h, _img_w = enhanced.shape[:2]
 
         # PRIMARY: Template-based extraction (position + format validators)
-        template_data = _extract_by_template(blocks, _img_h, _img_w, _side)
+        template_data = _extract_by_template(blocks, _img_h, _img_w, detected_side)
 
         # FALLBACK: Legacy spatial extraction for fields the template missed
         legacy_data = _extract_fields_from_blocks(blocks)
