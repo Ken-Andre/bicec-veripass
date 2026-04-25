@@ -72,6 +72,11 @@ class User(Base):
     liveness_lockout_count_24h = Column(Integer, default=0)
     last_lockout_reset_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Soft delete support - retained for GDPR compliance (10 years)
+    # Authentication is BLOCKED for deleted users, but data is preserved
+    is_deleted = Column(Boolean, default=False, index=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

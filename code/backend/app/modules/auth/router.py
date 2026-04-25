@@ -91,6 +91,12 @@ async def send_otp(
     if phone:
         result = await db.execute(select(User).where(User.phone == phone))
         user = result.scalar_one_or_none()
+        # Block OTP for deleted accounts
+        if user and user.is_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="Ce compte a été supprimé. Veuillez créer un nouveau compte.",
+            )
         if not user and mode == "login":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -108,6 +114,12 @@ async def send_otp(
     elif email:
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
+        # Block OTP for deleted accounts
+        if user and user.is_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="Ce compte a été supprimé. Veuillez créer un nouveau compte.",
+            )
         if not user and mode == "login":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -243,6 +255,14 @@ async def verify_otp_endpoint(
     else:
         result = await db.execute(select(User).where(User.email == identifier))
     user = result.scalar_one_or_none()
+
+    # Block OTP verify for deleted accounts
+    if user and user.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Ce compte a été supprimé. Veuillez créer un nouveau compte.",
+        )
+
     if not user:
         user = User(phone=identifier, role="CLIENT")
         db.add(user)
@@ -488,6 +508,13 @@ async def verify_pin(
     """Verify PIN for returning mobile user."""
     result = await db.execute(select(User).where(User.phone == body.phone))
     user = result.scalar_one_or_none()
+
+    # Block login for deleted accounts
+    if user and user.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Ce compte a été supprimé. Veuillez créer un nouveau compte.",
+        )
 
     if not user:
         raise HTTPException(
@@ -770,7 +797,8 @@ async def check_user_exists(
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
-    if not user:
+    # Don't reveal deleted accounts in existence check
+    if not user or user.is_deleted:
         return UserExistsCheckResponse(exists=False, has_pin=False, has_email=False)
 
     return UserExistsCheckResponse(
@@ -822,51 +850,27 @@ async def delete_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete user account and all associated data.
+    """Soft-delete user account.
 
-    Cascades: OCRField → BiometricResult → ConsentRecord → Document → KYCSession → Notification → User.
-    Document files on disk are also removed.
+    Authentication is BLOCKED for deleted users (OTP, PIN, token refresh).
+    All KYC data and documents are RETAINED for compliance (10 years per COBAC regulations).
+    Only the user record is marked as deleted — data is preserved for audit trail.
     """
-    from app.modules.kyc.models import Document, OCRField, BiometricResult
-    from app.modules.kyc.storage import document_storage
+    from datetime import datetime, timezone
 
-    session_ids_q = select(KYCSession.id).where(KYCSession.user_id == current_user.id)
+    # Soft delete: mark user as deleted, retain all data for compliance
+    current_user.is_deleted = True
+    current_user.deleted_at = datetime.now(timezone.utc)
+    # Clear authentication credentials to prevent any login attempt
+    current_user.pin_hash = None
+    # Clear phone/email to prevent OTP being sent to old credentials
+    # NOTE: In production, you might want to retain these for audit purposes
+    # but clearing them prevents re-registration with the same phone/email
+    # current_user.phone = None  # Uncomment if you want to free up the phone number
+    # current_user.email = None  # Uncomment if you want to free up the email
 
-    # 1. Fetch document file paths for disk cleanup
-    doc_paths_result = await db.execute(
-        select(Document.file_path).where(Document.session_id.in_(session_ids_q))
-    )
-    for (file_path_str,) in doc_paths_result.all():
-        if file_path_str:
-            try:
-                file_path = document_storage.base_path / file_path_str
-                if file_path.exists():
-                    file_path.unlink()
-            except Exception:
-                pass  # Best-effort cleanup
-
-    # 2. Delete OCR fields (FK → Document)
-    doc_ids_q = select(Document.id).where(Document.session_id.in_(session_ids_q))
-    await db.execute(delete(OCRField).where(OCRField.document_id.in_(doc_ids_q)))
-
-    # 3. Delete biometric results (FK → KYCSession)
-    await db.execute(delete(BiometricResult).where(BiometricResult.session_id.in_(session_ids_q)))
-
-    # 4. Delete consent records (FK → KYCSession)
-    await db.execute(delete(ConsentRecord).where(ConsentRecord.session_id.in_(session_ids_q)))
-
-    # 5. Delete documents (FK → KYCSession)
-    await db.execute(delete(Document).where(Document.session_id.in_(session_ids_q)))
-
-    # 6. Delete KYC sessions
-    await db.execute(delete(KYCSession).where(KYCSession.user_id == current_user.id))
-
-    # 7. Delete notifications
-    await db.execute(
-        delete(Notification).where(Notification.user_id == current_user.id)
-    )
-
-    # 8. Delete user
-    await db.delete(current_user)
     await db.commit()
+
+    logger.info(f"User {current_user.id} soft-deleted. Data retained for compliance (10 years).")
+
     return {"message": "Account deleted successfully"}

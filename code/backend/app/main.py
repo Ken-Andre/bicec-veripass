@@ -13,8 +13,8 @@ from app.api.v1.router import api_router
 from app.routers.demo import router as demo_router
 from app.core.config import settings
 
-# Sentry Init
-if settings.SENTRY_DSN:
+# Sentry Init (skip if SKIP_SENTRY=1, needed for tests with Python 3.14)
+if settings.SENTRY_DSN and not os.getenv("SKIP_SENTRY"):
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         send_default_pii=True,
