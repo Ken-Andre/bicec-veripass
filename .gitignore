@@ -162,6 +162,11 @@ QWEN.md
 *.lnk
 
 # ========================
+# Python Version Files
+# ========================
+code/backend/.python-version
+
+# ========================
 # Backend Debug Scripts
 # ========================
 code/backend/debug_*.py
