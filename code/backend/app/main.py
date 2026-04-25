@@ -56,14 +56,35 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Seed data failed (non-fatal): {e}")
 
     if settings.PADDLE_WARMUP_ON_START:
+        # Step 1: Load PaddleOCR model — this is REQUIRED for the app to function.
+        ocr = get_shared_paddle_ocr()
+        if ocr is None:
+            raise RuntimeError("PaddleOCR is unavailable — cannot start without OCR engine")
+
+        # Step 2: Run predict() warmup on a synthetic text image — non-fatal.
+        # This triggers internal JIT compilation and memory allocation in BOTH
+        # the detection and recognition sub-models. Without this, the first
+        # real OCR request returns garbage results (e.g. nom=DSCHANG instead
+        # of KANA). A pure noise/black image short-circuits detection, leaving
+        # recognition unwarmed — we need actual text.
         try:
-            ocr = get_shared_paddle_ocr()
-            if ocr is None:
-                raise RuntimeError("PaddleOCR is unavailable after warmup")
-            logger.info("PaddleOCR warmup on startup complete")
+            from app.services.ocr_service import generate_warmup_image
+            _warmup_img = generate_warmup_image()
+            _warmup_start = time.perf_counter()
+            _ = ocr.predict(_warmup_img)
+            _warmup_ms = (time.perf_counter() - _warmup_start) * 1000
+            logger.info(
+                f"PaddleOCR warmup on startup complete "
+                f"(model load + predict={_warmup_ms:.0f}ms)"
+            )
         except Exception as e:
-            logger.error(f"PaddleOCR warmup failed: {e}")
-            raise
+            # Don't crash the entire app if warmup predict() fails —
+            # the model IS loaded and functional, just not warmed up.
+            # The first real request may return garbage, but the app still serves.
+            logger.error(
+                f"PaddleOCR predict warmup failed (non-fatal): {e}. "
+                "First OCR request may return garbage."
+            )
 
     yield
     # Shutdown

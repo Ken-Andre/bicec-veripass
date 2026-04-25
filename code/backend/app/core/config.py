@@ -74,7 +74,8 @@ class Settings(BaseSettings):
     PADDLE_REC_MODEL_DIR: str = ""
     PADDLE_CLS_MODEL_DIR: str = ""
     PADDLE_CACHE_DIR: str = "/tmp/paddle-cache"
-    PADDLE_WARMUP_ON_START: bool = False
+    PADDLE_WARMUP_ON_START: bool = True  # Warmup predict() on startup to avoid first-call garbage
+    OCR_IMAGE_WIDTH: int = 600  # Image width for OCR pipeline (600=2x faster than 800, same field quality)
     GLM_OCR_QUEUE: str = "glm_ocr_jobs"
     GLM_OCR_ENABLED: bool = True
     GLM_OCR_CLI_PATH: str = ""
@@ -84,6 +85,7 @@ class Settings(BaseSettings):
     OCR_GLM_FALLBACK_MIN_FIELDS: int = 2
     FACE_MATCH_MIN_SCORE: float = 0.8
     ANTI_SPOOFING_MIN_SCORE: float = 0.7
+    DEEPFACE_DETECTOR_BACKEND: str = "retinaface"  # retinaface (best) or opencv (lightweight fallback)
 
     # Orange SMS API
     ORANGE_CLIENT_ID: str = ""

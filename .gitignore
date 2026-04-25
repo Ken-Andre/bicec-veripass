@@ -117,9 +117,9 @@ paddleocr_test/notebooks/__marimo__/
 *.gguf
 paddleocr_test/*.zip
 paddleocr_test/*.gguf
-paddleocr_test/_*.py
-paddleocr_test/_*.txt
-paddleocr_test/_*.json
+paddleocr_test/**/_*.py
+paddleocr_test/**/_*.txt
+paddleocr_test/**/_*.json
 paddleocr_test/*.png
 paddleocr_test/nul
 paddleocr_test/result_*.png_annotated.png
@@ -149,6 +149,42 @@ COMMIT_PLAN*.md
 *_PLAN.md
 *_FIX.md
 all_changes.txt
+
+# ========================
+# AI Tool Files
+# ========================
+GEMINI.md
+QWEN.md
+
+# ========================
+# Windows Shortcuts
+# ========================
+*.lnk
+
+# ========================
+# Backend Debug Scripts
+# ========================
+code/backend/debug_*.py
+
+# ========================
+# Models Offline
+# ========================
+code/infra/models-offline/
+
+# ========================
+# Cursor Reports
+# ========================
+cursor_*.md
+
+# ========================
+# Backoffice Test Results
+# ========================
+code/backoffice/test-results/
+
+# ========================
+# Mobile Generated Tests
+# ========================
+code/mobile/src/views/kyc/__tests__/
 
 # ========================
 # Build & Lint outputs
