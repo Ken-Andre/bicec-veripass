@@ -7,6 +7,8 @@ from app.core.security import get_current_agent, require_agent_role
 from app.db.session import get_db
 from app.modules.auth.models import AgentRole
 
+from app.modules.analytics import service as analytics_service
+
 router = APIRouter()
 
 
@@ -26,5 +28,5 @@ async def get_dashboard(
 
     Access: SYLVIE, ADMIN_IT
     """
-    # TODO: Implement analytics dashboard
-    return {"status": "dashboard_data"}
+    stats = await analytics_service.get_dashboard_stats(db)
+    return stats
