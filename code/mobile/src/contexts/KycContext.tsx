@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
-import type { KycStepType, KycStatus, AccessTier, OcrField, AddressData } from '../types';
+import type {
+  KycStepType,
+  KycStatus,
+  AccessTier,
+  OcrField,
+  AddressData,
+  BasicProfileData,
+  DocumentChoiceData,
+} from '../types';
 import {
   clearPersistedKycState,
   loadPersistedKycState,
@@ -48,6 +56,9 @@ interface KycState {
   signatureData: string | null;
   selectedPlan: string | null;
   interests: string[];
+  basicProfile: BasicProfileData | null;
+  documentChoice: DocumentChoiceData | null;
+  biometricConsentAccepted: boolean;
   // ADR-001: Review status from backend
   reviewStatus: ReviewStatus | null;
 }
@@ -68,6 +79,9 @@ interface KycContextType extends KycState {
   setSignature: (data: string) => void;
   setSelectedPlan: (plan: string) => void;
   setInterests: (interests: string[]) => void;
+  setBasicProfile: (profile: BasicProfileData) => void;
+  setDocumentChoice: (choice: DocumentChoiceData) => void;
+  setBiometricConsentAccepted: (accepted: boolean) => void;
   setAccessLevel: (level: AccessTier) => void;
   setStatus: (status: KycStatus) => void;
   setReviewStatus: (status: ReviewStatus | null) => void;
@@ -86,7 +100,7 @@ interface KycContextType extends KycState {
 
 const initialState: KycState = {
   sessionId: null,
-  status: 'IN_PROGRESS',
+  status: 'DRAFT',
   currentStep: 'cni_recto',
   completedSteps: [],
   accessLevel: 'GUEST',
@@ -104,6 +118,9 @@ const initialState: KycState = {
   signatureData: null,
   selectedPlan: null,
   interests: [],
+  basicProfile: null,
+  documentChoice: null,
+  biometricConsentAccepted: false,
   reviewStatus: null,
 };
 
@@ -120,7 +137,13 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
       try {
         const persisted = await loadPersistedKycState();
         if (active && persisted) {
-          setState(persisted);
+          setState({
+            ...initialState,
+            ...persisted,
+            basicProfile: persisted.basicProfile ?? null,
+            documentChoice: persisted.documentChoice ?? null,
+            biometricConsentAccepted: persisted.biometricConsentAccepted ?? false,
+          });
         }
       } catch (err) {
         console.warn('Failed to restore KYC draft from IndexedDB', err);
@@ -142,6 +165,40 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
       console.warn('Failed to persist KYC draft to IndexedDB', err);
     });
   }, [state, hydrated]);
+
+  // ADR-001: Poll review status if PENDING or SUBMITTED
+  useEffect(() => {
+    if (state.status !== 'PENDING' && state.status !== 'SUBMITTED') return;
+    if (!state.sessionId) return;
+
+    let active = true;
+    const poll = async () => {
+      try {
+        const { apiClient } = await import('../services/apiClient');
+        const response = await apiClient.get<ReviewStatus>(`/kyc/session/${state.sessionId}/review-status`);
+        
+        if (active) {
+          setState(s => ({
+            ...s,
+            status: response.status,
+            accessLevel: response.accessLevel,
+            reviewStatus: response
+          }));
+        }
+      } catch (err) {
+        console.warn('Polling review status failed', err);
+      }
+    };
+
+    // Initial poll
+    void poll();
+
+    const interval = setInterval(poll, 10000); // 10 seconds
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [state.status, state.sessionId]);
 
   // Core setters wrapped in useCallback
   const setSessionId = useCallback((sessionId: string) => 
@@ -195,6 +252,15 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
   const setInterests = useCallback((interests: string[]) => 
     setState(s => ({ ...s, interests })), []);
 
+  const setBasicProfile = useCallback((basicProfile: BasicProfileData) =>
+    setState(s => ({ ...s, basicProfile })), []);
+
+  const setDocumentChoice = useCallback((documentChoice: DocumentChoiceData) =>
+    setState(s => ({ ...s, documentChoice })), []);
+
+  const setBiometricConsentAccepted = useCallback((biometricConsentAccepted: boolean) =>
+    setState(s => ({ ...s, biometricConsentAccepted })), []);
+
   const setAccessLevel = useCallback((accessLevel: AccessTier) => 
     setState(s => ({ ...s, accessLevel })), []);
 
@@ -239,8 +305,12 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     setSignature,
     setSelectedPlan,
     setInterests,
+    setBasicProfile,
+    setDocumentChoice,
+    setBiometricConsentAccepted,
     setAccessLevel,
     setStatus,
+    setReviewStatus,
     resetKyc,
     step,
     setStep: () => { /* no-op */ },
@@ -263,6 +333,9 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     setSignature,
     setSelectedPlan,
     setInterests,
+    setBasicProfile,
+    setDocumentChoice,
+    setBiometricConsentAccepted,
     setAccessLevel,
     setStatus,
     setReviewStatus,

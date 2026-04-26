@@ -9,10 +9,18 @@ import { fetchWithCorrelation } from '../../services/apiClient';
 export default function KycIntroScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { setSessionId } = useKyc();
+  const { setSessionId, basicProfile, documentChoice } = useKyc();
   const [starting, setStarting] = useState(false);
 
   const ensureKycSession = async () => {
+    if (!basicProfile) {
+      navigate('/kyc/basic-profile');
+      return;
+    }
+    if (!documentChoice) {
+      navigate('/kyc/document-choice');
+      return;
+    }
     if (starting) return;
     setStarting(true);
     try {
@@ -29,7 +37,7 @@ export default function KycIntroScreen() {
       setSessionId(`offline-${Date.now()}`);
     } finally {
       setStarting(false);
-      navigate('/kyc/cni-intro');
+      navigate('/kyc/document-choice');
     }
   };
 

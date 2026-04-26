@@ -8,11 +8,14 @@ import { DashboardPage } from './views/dashboard';
 import { NotFoundPage } from './views/NotFoundPage';
 import { PinSetupScreen, PinLoginScreen, PhoneEntryScreen, OtpVerifyScreen, EmailEntryScreen, EmailOtpVerifyScreen, LockScreen, ForgotPinScreen } from './views/auth';
 import KycIntroScreen from './views/kyc/KycIntroScreen';
+import BasicProfileScreen from './views/kyc/BasicProfileScreen';
+import DocumentChoiceScreen from './views/kyc/DocumentChoiceScreen';
 import CniIntroScreen from './views/kyc/CniIntroScreen';
 import CniCaptureScreen from './views/kyc/CniCaptureScreen';
 import CniRectoGuideScreen from './views/kyc/CniRectoGuideScreen';
 import CniVersoGuideScreen from './views/kyc/CniVersoGuideScreen';
 import OcrReviewScreen from './views/kyc/OcrReviewScreen';
+import BiometricConsentScreen from './views/kyc/BiometricConsentScreen';
 import LivenessScreen from './views/kyc/LivenessScreen';
 import BillCaptureScreen from './views/kyc/BillCaptureScreen';
 import AddressScreen from './views/kyc/AddressScreen';
@@ -66,6 +69,8 @@ function App() {
                 <Route path="/auth/forgot-pin" element={<ForgotPinScreen />} />
                 <Route path="/dashboard" element={<LockGuard><DashboardPage /></LockGuard>} />
                 <Route path="/settings/delete-account" element={<LockGuard><DeleteAccountScreen /></LockGuard>} />
+                <Route path="/kyc/basic-profile" element={<LockGuard><BasicProfileScreen /></LockGuard>} />
+                <Route path="/kyc/document-choice" element={<LockGuard><DocumentChoiceScreen /></LockGuard>} />
                 {/* === Marie Journey: KYC Flow === */}
                 <Route path="/kyc/intro" element={<LockGuard><KycIntroScreen /></LockGuard>} />
                 <Route path="/kyc/cni-intro" element={<LockGuard><CniIntroScreen /></LockGuard>} />
@@ -77,6 +82,7 @@ function App() {
                 <Route path="/kyc/cni-verso" element={<LockGuard><CniVersoGuideScreen /></LockGuard>} />
                 {/* OCR Review → Liveness */}
                 <Route path="/kyc/ocr-review" element={<LockGuard><OcrReviewScreen /></LockGuard>} />
+                <Route path="/kyc/biometric-consent" element={<LockGuard><BiometricConsentScreen /></LockGuard>} />
                 <Route path="/kyc/liveness" element={<LockGuard><LivenessScreen /></LockGuard>} />
                 {/* Bill capture → Address → NIU → Consent → Signature → Review → Submit */}
                 <Route path="/kyc/bill-capture" element={<LockGuard><BillEneoCapture /></LockGuard>} />

@@ -61,14 +61,24 @@ const TIER_CONFIG: Record<AccessTier, { label: string; color: string; bgColor: s
 
 // Status labels for KYC review states
 const STATUS_LABELS: Record<string, { label: string; description: string }> = {
-  PENDING_AGENT_REVIEW: { label: 'En cours de vérification', description: 'Notre équipe examine votre dossier.' },
-  PENDING_KYC: { label: 'En cours de vérification', description: 'Notre équipe examine votre dossier.' },
-  APPROVED: { label: 'Dossier approuvé', description: 'Votre identité a été validée.' },
-  ACCOUNT_CREATED: { label: 'Compte créé', description: 'Votre compte bancaire est prêt.' },
-  REJECTED: { label: 'Dossier refusé', description: 'Vous pouvez recommencer la procédure.' },
-  FRAUD_SUSPECT: { label: 'Vérification approfondie', description: 'Notre équipe vous contactera.' },
-  PENDING_INFO: { label: 'Informations requises', description: 'Des informations supplémentaires sont nécessaires.' },
-  INFO_REQUESTED: { label: 'Informations requises', description: 'Des informations supplémentaires sont nécessaires.' },
+  DRAFT: { label: 'Dossier en preparation', description: 'Completez les etapes pour soumettre votre KYC.' },
+  PENDING_KYC: { label: 'Verification agent en cours', description: 'Votre dossier est en attente de traitement par Jean.' },
+  PENDING_INFO: { label: 'Informations complementaires requises', description: 'Ajoutez les pieces demandees pour continuer.' },
+  COMPLIANCE_REVIEW: { label: 'Revue conformite AML/CFT', description: 'Votre dossier est en controle compliance.' },
+  READY_FOR_OPS: { label: 'Pret pour ouverture de compte', description: 'Le dossier est valide et transmis aux operations.' },
+  PROVISIONING: { label: 'Provisioning bancaire en cours', description: 'Creation du compte en cours dans le SI bancaire.' },
+  OPS_ERROR: { label: 'Erreur operationnelle', description: 'Une erreur technique est survenue. Nouvelle tentative en cours.' },
+  OPS_CORRECTION: { label: 'Correction operationnelle requise', description: 'Des corrections sont necessaires avant activation.' },
+  VALIDATED_PENDING_AGENCY: { label: 'Valide en attente agence', description: 'Le dossier est valide, finalisation agence en attente.' },
+  ACTIVATED_LIMITED: { label: 'Compte active (acces limite)', description: 'Compte actif avec restrictions en attendant NIU valide.' },
+  ACTIVATED_PRE_FULL: { label: 'Compte pre-active', description: 'Derniere validation agence requise pour acces complet.' },
+  ACTIVATED_FULL: { label: 'Compte active complet', description: 'Votre compte est pleinement actif.' },
+  EXPIRY_WARNING: { label: 'Document bientot expire', description: 'Renouvelez vos documents pour maintenir vos acces.' },
+  PENDING_RESUBMIT: { label: 'Resoumission requise', description: 'Soumettez les nouveaux documents demandes.' },
+  MONITORED: { label: 'Compte sous surveillance', description: 'Votre compte reste actif avec surveillance renforcee.' },
+  REJECTED: { label: 'Dossier rejete', description: 'Votre dossier a ete rejete. Vous pouvez recommencer la procedure.' },
+  DISABLED: { label: 'Compte bloque', description: 'Acces suspendu. Contactez le support BICEC.' },
+  ABANDONED: { label: 'Session abandonnee', description: 'Votre session a expire. Reprenez le parcours KYC.' },
 };
 
 const REVIEW_POLL_INTERVAL_MS = 30_000; // 30s
@@ -86,7 +96,7 @@ export function DashboardPage() {
   const markAllNotificationsRead = useCallback(async () => {
     if (!reviewStatus?.unreadNotifications?.length) return;
     try {
-      await apiClient.post('/kyc/notifications/read?mark_all=true');
+      await apiClient.post('/kyc/notifications/read?mark_all=true', {});
     } catch {
       // Best effort — will be retried on next poll if still unread
     }
@@ -101,7 +111,7 @@ export function DashboardPage() {
     try {
       const res = await apiClient.get<any>('/kyc/review-status');
       const data: ReviewStatus = {
-        status: (res.status as KycStatus) ?? 'IN_PROGRESS',
+        status: (res.status as KycStatus) ?? 'DRAFT',
         accessLevel: (res.access_level as AccessTier) ?? 'GUEST',
         submittedAt: res.submitted_at ?? null,
         completedAt: res.completed_at ?? null,
@@ -147,9 +157,19 @@ export function DashboardPage() {
   const latestNotification = reviewStatus?.unreadNotifications?.[0];
   const decision = reviewStatus?.decision;
   const isKycDone = accessLevel === 'FULL_ACCESS' || accessLevel === 'LIMITED_ACCESS';
-  const isRejected = accessLevel === 'GUEST' && reviewStatus?.status === 'REJECTED';
+  const isRejected = reviewStatus?.status === 'REJECTED';
   const isFraudSuspect = accessLevel === 'DISABLED';
-  const isPendingReview = accessLevel === 'RESTRICTED' && reviewStatus?.status !== 'IN_PROGRESS';
+  const pendingStatuses = new Set([
+    'PENDING_KYC',
+    'PENDING_INFO',
+    'COMPLIANCE_REVIEW',
+    'READY_FOR_OPS',
+    'PROVISIONING',
+    'OPS_ERROR',
+    'OPS_CORRECTION',
+    'VALIDATED_PENDING_AGENCY',
+  ]);
+  const isPendingReview = reviewStatus?.status ? pendingStatuses.has(reviewStatus.status) : accessLevel === 'RESTRICTED';
 
   return (
     <ScreenLayout showNav title="Tableau de bord">
@@ -421,3 +441,4 @@ export function DashboardPage() {
     </ScreenLayout>
   );
 }
+

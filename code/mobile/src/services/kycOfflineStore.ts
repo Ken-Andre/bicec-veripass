@@ -1,4 +1,12 @@
-import type { AddressData, OcrField, KycStepType, KycStatus, AccessTier } from '../types';
+import type {
+  AddressData,
+  OcrField,
+  KycStepType,
+  KycStatus,
+  AccessTier,
+  BasicProfileData,
+  DocumentChoiceData,
+} from '../types';
 
 const DB_NAME = 'vp_kyc_offline_db';
 const DB_VERSION = 1;
@@ -37,6 +45,9 @@ export interface PersistedKycState {
   signatureData: string | null;
   selectedPlan: string | null;
   interests: string[];
+  basicProfile: BasicProfileData | null;
+  documentChoice: DocumentChoiceData | null;
+  biometricConsentAccepted: boolean;
 }
 
 export interface EncryptedPayload {
@@ -234,7 +245,7 @@ export async function loadPersistedKycState(): Promise<PersistedKycState | null>
   }
   // Migrate legacy access level values (ADR-001 rename)
   const state = envelope.value;
-  if (state.accessLevel === 'RESTRICTED_ACCESS') {
+  if ((state.accessLevel as string) === 'RESTRICTED_ACCESS') {
     state.accessLevel = 'RESTRICTED';
   }
   return state;

@@ -25,9 +25,13 @@ export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
   const navigate = useNavigate();
 
   return (
-    <div className={cn('min-h-screen bg-background flex flex-col', className)}>
+    <div className={cn('min-h-screen bg-background flex flex-col relative overflow-hidden', className)}>
+      <div className="pointer-events-none absolute inset-0 opacity-60">
+        <div className="absolute -top-28 -right-20 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
+      </div>
       {(title || showBack) && (
-        <header className="sticky top-0 z-30 glass-strong safe-top">
+        <header className="sticky top-0 z-30 glass-strong safe-top border-b border-white/40">
           <div className="flex items-center gap-3 h-16 px-4">
             {showBack && (
               <button
@@ -46,7 +50,7 @@ export const ScreenLayout: React.FC<ScreenLayoutProps> = ({
       )}
       <main
         className={cn(
-          'flex-1 flex flex-col px-6 py-8 safe-bottom',
+          'flex-1 flex flex-col px-6 py-8 safe-bottom relative z-10',
           center && 'items-center justify-center text-center',
           showNav && 'pb-24'
         )}

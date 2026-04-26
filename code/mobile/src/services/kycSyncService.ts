@@ -59,7 +59,7 @@ interface SignaturePayload {
   signature_data: string;
 }
 
-interface QueueSummary {
+export interface QueueSummary {
   pendingCount: number;
   needsReuploadCount: number;
   failedCount: number;
@@ -625,7 +625,11 @@ export async function getKycSyncSummary(): Promise<QueueSummary> {
   const needsReuploadCount = queue.filter((item) => item.status === 'needs_reupload').length;
   const failedCount = queue.filter((item) => item.status === 'failed').length;
   const state = await loadPersistedKycState();
-  const hasResumeData = Boolean(state && firstIncompleteStep(state.completedSteps || []) !== 'submission');
+  const hasResumeData = Boolean(
+    state &&
+      (state.sessionId !== null || (state.completedSteps && state.completedSteps.length > 0)) &&
+      firstIncompleteStep(state.completedSteps || []) !== 'submission'
+  );
   return { pendingCount, needsReuploadCount, failedCount, hasResumeData };
 }
 
@@ -637,6 +641,7 @@ export async function getResumeTargetPath(): Promise<string | null> {
 
   const state = await loadPersistedKycState();
   if (!state) return null;
+  if (state.sessionId === null && (!state.completedSteps || state.completedSteps.length === 0)) return null;
 
   switch (firstIncompleteStep(state.completedSteps || [])) {
     case 'cni_recto':

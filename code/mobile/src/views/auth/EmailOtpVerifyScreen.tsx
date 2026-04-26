@@ -71,7 +71,7 @@ const EmailOtpVerifyScreen = () => {
 
       // Email verified, proceed to PIN setup
       if (!user?.has_pin) {
-        navigate('/auth/pin-setup');
+        navigate('/auth/pin-setup', { state: { onboarding: true } });
       } else {
         navigate('/dashboard');
       }
@@ -97,7 +97,7 @@ const EmailOtpVerifyScreen = () => {
 
   const handleSkip = () => {
     if (!user?.has_pin) {
-      navigate('/auth/pin-setup');
+      navigate('/auth/pin-setup', { state: { onboarding: true } });
     } else {
       navigate('/dashboard');
     }

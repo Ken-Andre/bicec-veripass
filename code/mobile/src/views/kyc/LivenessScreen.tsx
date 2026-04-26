@@ -20,7 +20,15 @@ const MAX_LANDMARK_FRAMES = 48;
 export default function LivenessScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { resetLivenessAttempts, incrementLivenessAttempt, livenessAttempts, completeStep, sessionId, setSessionId } = useKyc();
+  const {
+    resetLivenessAttempts,
+    incrementLivenessAttempt,
+    livenessAttempts,
+    completeStep,
+    sessionId,
+    setSessionId,
+    biometricConsentAccepted,
+  } = useKyc();
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'challenge' | 'success' | 'fail' | 'locked'>('loading');
   const [currentChallenge, setCurrentChallenge] = useState(0);
@@ -290,9 +298,13 @@ export default function LivenessScreen() {
   }, [status, currentChallenge, checkChallenge, stopCamera, t]);
 
   useEffect(() => {
+    if (!biometricConsentAccepted) {
+      navigate('/kyc/biometric-consent', { replace: true });
+      return;
+    }
     startCamera();
     return () => stopCamera();
-  }, [startCamera, stopCamera]);
+  }, [biometricConsentAccepted, navigate, startCamera, stopCamera]);
 
   useEffect(() => {
     if (status !== 'locked' || cooldownSeconds <= 0) return;

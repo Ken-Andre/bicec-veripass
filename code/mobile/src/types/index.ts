@@ -30,6 +30,23 @@ export interface KycStepInfo {
 
 // === KYC STATUS (merged from both sources) ===
 export type KycStatus =
+  | 'DRAFT'
+  | 'PENDING_KYC'
+  | 'PENDING_INFO'
+  | 'COMPLIANCE_REVIEW'
+  | 'READY_FOR_OPS'
+  | 'PROVISIONING'
+  | 'OPS_ERROR'
+  | 'OPS_CORRECTION'
+  | 'VALIDATED_PENDING_AGENCY'
+  | 'ACTIVATED_LIMITED'
+  | 'ACTIVATED_PRE_FULL'
+  | 'ACTIVATED_FULL'
+  | 'EXPIRY_WARNING'
+  | 'PENDING_RESUBMIT'
+  | 'MONITORED'
+  | 'DISABLED'
+  | 'ABANDONED'
   | 'PENDING'
   | 'IN_PROGRESS'
   | 'COMPLETED'
@@ -193,6 +210,18 @@ export interface AddressData {
   lieu_dit?: string;
   gps_lat?: number;
   gps_lng?: number;
+}
+
+export interface BasicProfileData {
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  nationality: string;
+}
+
+export interface DocumentChoiceData {
+  documentType: 'CNI' | 'PASSPORT' | 'DRIVER_LICENSE';
+  nationality: string;
 }
 
 export interface KycSubmitResponse {

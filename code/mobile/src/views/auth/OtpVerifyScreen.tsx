@@ -81,8 +81,10 @@ const OtpVerifyScreen = () => {
 
       // Login flow: after phone OTP verify, go directly to PIN login
       if (mode === 'login') {
+        localStorage.removeItem('vp_onboarding_flow');
         navigate('/auth/pin-login', { replace: true });
       } else {
+        localStorage.setItem('vp_onboarding_flow', '1');
         // Signup flow: go to email entry
         navigate('/auth/email', { state: { mode } });
       }

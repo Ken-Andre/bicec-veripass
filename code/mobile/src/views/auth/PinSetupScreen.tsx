@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { apiClient } from '../../services/apiClient';
@@ -8,12 +8,15 @@ import { Delete, Lock } from 'lucide-react';
 
 const PinSetupScreen = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { setPinSetupCompleted } = useAuth();
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const onboardingFlow = Boolean((location.state as { onboarding?: boolean } | null)?.onboarding) ||
+    localStorage.getItem('vp_onboarding_flow') === '1';
 
   const currentPin = step === 'create' ? pin : confirmPin;
   const setCurrentPin = step === 'create' ? setPin : setConfirmPin;
@@ -43,7 +46,11 @@ const PinSetupScreen = () => {
     try {
       await apiClient.post<void, { pin: string }>('/auth/pin/setup', { pin });
       setPinSetupCompleted();
-      navigate('/dashboard');
+      if (onboardingFlow) {
+        navigate('/kyc/basic-profile');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError('Erreur lors de la configuration du PIN');
       console.error(err);

@@ -82,7 +82,7 @@ const EmailEntryScreen = () => {
           </button>
 
           <button
-            onClick={() => navigate('/auth/pin-setup')}
+            onClick={() => navigate('/auth/pin-setup', { state: { onboarding: true } })}
             className="w-full text-slate-400 font-bold h-12 uppercase tracking-widest text-xs active:text-primary transition-colors"
           >
             Passer cette étape

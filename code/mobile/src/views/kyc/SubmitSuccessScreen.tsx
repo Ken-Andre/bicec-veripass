@@ -11,12 +11,14 @@ export default function SubmitSuccessScreen() {
   const { resetKyc } = useKyc();
 
   useEffect(() => {
-    // Clear KYC state after successful submission
+    // Clear KYC state after successful submission and auto-redirect to dashboard
+    // This allows the user to see their pending/restrained status on the homepage.
     const timer = setTimeout(() => {
       resetKyc();
-    }, 500);
+      navigate('/dashboard', { replace: true });
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [resetKyc]);
+  }, [resetKyc, navigate]);
 
   return (
     <ScreenLayout title={t('submit.success.title') || 'Dossier soumis'}>
@@ -27,7 +29,7 @@ export default function SubmitSuccessScreen() {
 
         <div className="text-center">
           <h2 className="text-2xl font-bold text-slate-800">
-            {t('submit.success.heading') || 'Félicitations Marie !'}
+            {t('submit.success.heading') || 'Dossier soumis avec succes'}
           </h2>
           <p className="text-muted-foreground mt-2 max-w-xs mx-auto">
             {t('submit.success.message') || 'Votre dossier KYC a été soumis avec succès. Notre équipe va maintenant l\'examiner.'}
@@ -39,23 +41,23 @@ export default function SubmitSuccessScreen() {
             <Clock className="w-5 h-5 text-primary" />
             <div>
               <p className="text-sm font-medium">{t('submit.success.timeline.review') || 'Revue en agence'}</p>
-              <p className="text-xs text-muted-foreground">24-48 heures ouvrées</p>
+              <p className="text-xs text-muted-foreground">PENDING_KYC puis READY_FOR_OPS</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
             <FileCheck className="w-5 h-5 text-primary" />
             <div>
-              <p className="text-sm font-medium">{t('submit.success.timeline.validation') || 'Validation finale'}</p>
-              <p className="text-xs text-muted-foreground">Notification par SMS/email</p>
+              <p className="text-sm font-medium">{t('submit.success.timeline.validation') || 'Validation & provisioning'}</p>
+              <p className="text-xs text-muted-foreground">{'PROVISIONING -> VALIDATED_PENDING_AGENCY'}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
             <Building2 className="w-5 h-5 text-primary" />
             <div>
-              <p className="text-sm font-medium">{t('submit.success.timeline.activation') || 'Activation du compte'}</p>
-              <p className="text-xs text-muted-foreground">Accès complet ou limité selon validation</p>
+              <p className="text-sm font-medium">{t('submit.success.timeline.activation') || 'Activation des acces'}</p>
+              <p className="text-xs text-muted-foreground">ACTIVATED_LIMITED ou ACTIVATED_PRE_FULL/FULL selon NIU</p>
             </div>
           </div>
         </div>
@@ -84,3 +86,4 @@ export default function SubmitSuccessScreen() {
     </ScreenLayout>
   );
 }
+

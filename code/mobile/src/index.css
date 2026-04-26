@@ -19,7 +19,7 @@
 
 @layer base {
   :root {
-    --background: 210 33% 99%;
+    --background: 210 45% 98%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -28,7 +28,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 215 100% 23%;
+    --primary: 215 100% 14%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96.1%;
@@ -37,7 +37,7 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 45 90% 50%;
+    --accent: 194 100% 44%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -45,7 +45,7 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 215 100% 23%;
+    --ring: 194 100% 44%;
 
     --radius: 1rem;
 
@@ -96,6 +96,9 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    background-image:
+      radial-gradient(circle at 100% 0%, rgba(0, 29, 69, 0.08), transparent 40%),
+      radial-gradient(circle at 0% 100%, rgba(0, 163, 224, 0.08), transparent 35%);
   }
 }
 
@@ -125,13 +128,13 @@
   }
 
   .gradient-primary {
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(215 100% 15%));
+    background: linear-gradient(135deg, #001d45 0%, #003062 55%, #00a3e0 100%);
   }
 
   .bicec-button {
     @apply relative flex items-center justify-center gap-2 rounded-2xl font-bold text-white transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none overflow-hidden border-0;
-    background: linear-gradient(135deg, #00A3E0 0%, #001D45 100%);
-    box-shadow: 0 10px 25px -5px rgba(0, 29, 69, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    background: linear-gradient(135deg, #00a3e0 0%, #00579b 46%, #001d45 100%);
+    box-shadow: 0 12px 28px -10px rgba(0, 29, 69, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
   }
 
   .bicec-button::after {
@@ -144,6 +147,6 @@
   }
 
   .premium-input {
-    @apply w-full bg-white border-2 border-slate-100 rounded-2xl px-5 h-14 text-lg focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none;
+    @apply w-full bg-white border-2 border-slate-200 rounded-2xl px-5 h-14 text-lg focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none shadow-sm;
   }
 }

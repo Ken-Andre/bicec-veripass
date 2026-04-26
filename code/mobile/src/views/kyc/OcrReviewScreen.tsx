@@ -261,7 +261,7 @@ export default function OcrReviewScreen() {
       setOcrFields(updatedFields);
 
       completeStep('ocr_review');
-      navigate('/kyc/liveness');
+      navigate('/kyc/biometric-consent');
     } catch (err) {
       console.error('Submission failed:', err);
       captureKycException(err, 'ocr_failure', {
@@ -272,7 +272,7 @@ export default function OcrReviewScreen() {
       });
       // Still proceed — worst case user manually entered data
       completeStep('ocr_review');
-      navigate('/kyc/liveness');
+      navigate('/kyc/biometric-consent');
     }
   };
 
