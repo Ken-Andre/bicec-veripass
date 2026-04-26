@@ -1,9 +1,3 @@
-/**
- * Service API pour la gestion des dossiers KYC
- * Source: veripass-gatekeeper prototype (src/services/dossier-service.ts)
- * WARNING: Remplacer les mocks par les vrais appels API backend
- */
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 export async function fetchQueue() {
@@ -54,5 +48,15 @@ export async function requestInfo(sessionId: string, agentId: string, message: s
     body: JSON.stringify({ sessionId, agentId, message, fields }),
   });
   if (!res.ok) throw new Error(`Failed to request info for dossier ${sessionId}`);
+  return res.json();
+}
+
+export async function fetchDashboardStats(token: string) {
+  const res = await fetch(`${API_BASE}/analytics/dashboard`, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (!res.ok) throw new Error('Failed to fetch dashboard stats');
   return res.json();
 }
