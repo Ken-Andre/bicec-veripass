@@ -77,24 +77,24 @@ const GEO_QUARTIERS = [
 ];
 
 function mockGeoAndApiResponses(apiSuccess = true) {
-  mockFetch.mockImplementation((url: string, _options?: any) => {
+  mockFetch.mockImplementation(((url: string, _options?: any) => {
     if (url === '/api/v1/kyc/geo/regions') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(GEO_REGIONS) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(GEO_REGIONS) } as unknown as Response);
     }
     if (url.startsWith('/api/v1/kyc/geo/cities/')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(GEO_CITIES) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(GEO_CITIES) } as unknown as Response);
     }
     if (url.startsWith('/api/v1/kyc/geo/quartiers/')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(GEO_QUARTIERS) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(GEO_QUARTIERS) } as unknown as Response);
     }
     if (url === '/api/v1/kyc/address/submit') {
       if (apiSuccess) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ status: 'success' }) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ status: 'success' }) } as unknown as Response);
       }
       return Promise.reject(new Error('Network error'));
     }
-    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-  });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as unknown as Response);
+  }) as typeof fetchWithCorrelation);
 }
 
 function renderAddressScreen() {

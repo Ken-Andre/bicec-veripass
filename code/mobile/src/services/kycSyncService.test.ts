@@ -122,6 +122,7 @@ function makeQueueItem(overrides: Partial<{
   encrypted_payload: any;
   client_sha256: string | null;
   meta: Record<string, any>;
+  created_at: string;
 }> = {}): any {
   return {
     id: overrides.id ?? `kycq-test-${Date.now()}`,
@@ -140,17 +141,17 @@ function makeQueueItem(overrides: Partial<{
   };
 }
 
-function makeResponse(ok: boolean, status: number, body: any = {}) {
+function makeResponse(ok: boolean, status: number, body: any = {}): Response {
   return {
     ok,
     status,
     json: vi.fn().mockResolvedValue(body),
-  };
+  } as unknown as Response;
 }
 
 /** Find fetchWithCorrelation calls that targeted the given URL. */
-function findFetchCallsByUrl(url: string): [string, any][] {
-  return vi.mocked(fetchWithCorrelation).mock.calls.filter(c => c[0] === url);
+function findFetchCallsByUrl(url: string): [url: string, init?: any][] {
+  return (vi.mocked(fetchWithCorrelation).mock.calls as [string, any?][]).filter(c => c[0] === url);
 }
 
 /** Get all fetchWithCorrelation call URLs in order. */
@@ -181,7 +182,7 @@ beforeEach(() => {
   vi.clearAllMocks(); // clears call history, preserves factory implementations
   // Reset functions that accumulate mockResolvedValueOnce / mockImplementation per test
   vi.mocked(loadKycSyncQueue).mockReset().mockResolvedValue([]);
-  vi.mocked(fetchWithCorrelation).mockReset().mockResolvedValue({ ok: true, json: async () => ({}) });
+  vi.mocked(fetchWithCorrelation).mockReset().mockResolvedValue({ ok: true, json: async () => ({}) } as unknown as Response);
 });
 
 // =========================================================================
@@ -203,7 +204,7 @@ describe('enqueueOfflineAddress', () => {
     });
 
     expect(enqueueKycSyncItem).toHaveBeenCalledOnce();
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.op_type).toBe('submit_address');
     expect(call.step).toBe('address');
     expect(call.session_id).toBe('sess-1');
@@ -229,7 +230,7 @@ describe('enqueueOfflineBill', () => {
     });
 
     expect(enqueueKycSyncItem).toHaveBeenCalledOnce();
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.op_type).toBe('submit_bill');
     expect(call.step).toBe('utility_bill');
     expect(call.payload.file_data_url).toBe(dataUrl);
@@ -247,7 +248,7 @@ describe('enqueueOfflineBill', () => {
       fileDataUrl: 'data:image/jpeg;base64,/9j/',
     });
 
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.client_sha256).toBeNull();
     expect(call.payload.client_sha256).toBeNull();
     expect(call.meta.bill_type).toBe('CAMWATER');
@@ -262,7 +263,7 @@ describe('enqueueOfflineNiu', () => {
       niuValue: 'M123456789A',
     });
 
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.op_type).toBe('submit_niu');
     expect(call.step).toBe('niu');
     expect(call.payload.niu_type).toBe('DECLARATIVE');
@@ -277,7 +278,7 @@ describe('enqueueOfflineNiu', () => {
       niuValue: null,
     });
 
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.payload.niu_value).toBeNull();
   });
 });
@@ -291,7 +292,7 @@ describe('enqueueOfflineConsent', () => {
       dataProcessingAccepted: true,
     });
 
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.op_type).toBe('submit_consent');
     expect(call.step).toBe('consent');
     expect(call.payload.cgu_accepted).toBe(true);
@@ -308,7 +309,7 @@ describe('enqueueOfflineConsent', () => {
       dataProcessingAccepted: false,
     });
 
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.payload.cgu_accepted).toBe(false);
   });
 });
@@ -321,7 +322,7 @@ describe('enqueueOfflineSignature', () => {
       signatureData: signatureDataUrl,
     });
 
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.op_type).toBe('submit_signature');
     expect(call.step).toBe('signature');
     expect(call.payload.signature_data).toBe(signatureDataUrl);
@@ -364,7 +365,7 @@ describe('replay: submit_address', () => {
     });
 
     mockQueueForSync([item], [item], []);
-    vi.mocked(fetchWithCorrelation).mockResolvedValue(makeResponse(false, 409, { detail: 'Conflict' }));
+    vi.mocked(fetchWithCorrelation).mockResolvedValue(makeResponse(false, 409, { detail: 'Conflict' }) as unknown as Response);
 
     await runKycSyncNow();
 
@@ -383,7 +384,7 @@ describe('replay: submit_address', () => {
     });
 
     mockQueueForSync([item], [item], []);
-    vi.mocked(fetchWithCorrelation).mockResolvedValue(makeResponse(false, 401));
+    vi.mocked(fetchWithCorrelation).mockResolvedValue(makeResponse(false, 401) as unknown as Response);
 
     await runKycSyncNow();
 
@@ -401,7 +402,7 @@ describe('replay: submit_address', () => {
     });
 
     mockQueueForSync([item], [item], []);
-    vi.mocked(fetchWithCorrelation).mockResolvedValue(makeResponse(false, 500));
+    vi.mocked(fetchWithCorrelation).mockResolvedValue(makeResponse(false, 500) as unknown as Response);
 
     await runKycSyncNow();
 
@@ -449,7 +450,7 @@ describe('replay: submit_bill', () => {
     });
 
     mockQueueForSync([item], [item], []);
-    vi.mocked(fetchWithCorrelation).mockResolvedValue(makeResponse(false, 404));
+    vi.mocked(fetchWithCorrelation).mockResolvedValue(makeResponse(false, 404) as unknown as Response);
 
     await runKycSyncNow();
 
@@ -616,10 +617,10 @@ describe('runKycSyncNow queue processing', () => {
     mockQueueForSync(allItems, allItems, allItems, allItems);
 
     // Make CNI upload fail so it stays pending in the queue
-    vi.mocked(fetchWithCorrelation).mockImplementation((url: string) => {
+    vi.mocked(fetchWithCorrelation).mockImplementation(((url: string) => {
       if (url === '/api/v1/kyc/capture/cni') return Promise.resolve(makeResponse(false, 500));
       return Promise.resolve(makeResponse(true, 200));
-    });
+    }) as typeof fetchWithCorrelation);
 
     await runKycSyncNow();
 
@@ -639,10 +640,10 @@ describe('runKycSyncNow queue processing', () => {
 
     mockQueueForSync([item], [item], []);
     // session/start succeeds, NIU submit throws network error
-    vi.mocked(fetchWithCorrelation).mockImplementation((url: string) => {
+    vi.mocked(fetchWithCorrelation).mockImplementation(((url: string) => {
       if (url === '/api/v1/kyc/niu/submit') return Promise.reject(new TypeError('Failed to fetch'));
       return Promise.resolve(makeResponse(true, 200));
-    });
+    }) as typeof fetchWithCorrelation);
 
     await runKycSyncNow();
 
@@ -678,12 +679,12 @@ describe('runKycSyncNow queue processing', () => {
 
     // Make address/submit hang; session/start resolves immediately
     let resolveAddressFetch!: () => void;
-    vi.mocked(fetchWithCorrelation).mockImplementation((url: string) => {
+    vi.mocked(fetchWithCorrelation).mockImplementation(((url: string) => {
       if (url === '/api/v1/kyc/address/submit') {
-        return new Promise(r => { resolveAddressFetch = () => r(makeResponse(true, 200)); });
+        return new Promise<Response>(r => { resolveAddressFetch = () => r(makeResponse(true, 200)); });
       }
       return Promise.resolve(makeResponse(true, 200));
-    });
+    }) as typeof fetchWithCorrelation);
 
     // Start first sync (will hang at address/submit)
     const first = runKycSyncNow();
@@ -778,7 +779,7 @@ describe('getKycSyncSummary', () => {
       status: 'DRAFT',
       currentStep: 'liveness',
       completedSteps: ['cni_recto'],
-      accessLevel: 'NONE',
+      accessLevel: 'RESTRICTED',
       cniRectoCapture: null,
       cniVersoCapture: null,
       ocrFields: [],
@@ -793,6 +794,9 @@ describe('getKycSyncSummary', () => {
       signatureData: null,
       selectedPlan: null,
       interests: [],
+      basicProfile: null,
+      documentChoice: null,
+      biometricConsentAccepted: false,
     });
 
     const summary = await getKycSyncSummary();
@@ -907,7 +911,7 @@ describe('getResumeTargetPath', () => {
       status: 'DRAFT',
       currentStep: 'liveness',
       completedSteps: ['cni_recto', 'cni_verso', 'ocr_review'],
-      accessLevel: 'NONE',
+      accessLevel: 'RESTRICTED',
       cniRectoCapture: null,
       cniVersoCapture: null,
       ocrFields: [],
@@ -922,6 +926,9 @@ describe('getResumeTargetPath', () => {
       signatureData: null,
       selectedPlan: null,
       interests: [],
+      basicProfile: null,
+      documentChoice: null,
+      biometricConsentAccepted: false,
     });
 
     const path = await getResumeTargetPath();
@@ -949,7 +956,7 @@ describe('enqueueOfflineCniCapture (regression)', () => {
       clientSha256: 'sha256abc',
     });
 
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.op_type).toBe('capture_cni');
     expect(call.step).toBe('cni_recto');
     expect(call.client_sha256).toBe('sha256abc');
@@ -966,7 +973,7 @@ describe('enqueueOfflineLivenessCapture (regression)', () => {
       landmarks: [{ x: 0.5, y: 0.5 }],
     });
 
-    const call = enqueueKycSyncItem.mock.calls[0][0];
+    const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.op_type).toBe('capture_liveness');
     expect(call.step).toBe('liveness');
     expect(call.payload.challenge_type).toBe('smile');

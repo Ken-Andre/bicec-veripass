@@ -35,8 +35,8 @@ let _mockSyncNow: ReturnType<typeof createSyncMock>;
 let _mockGetSummary: ReturnType<typeof createSummaryMock>;
 
 vi.mock('../services/kycSyncService', () => ({
-  runKycSyncNow: (...args: unknown[]) => _mockSyncNow(...args),
-  getKycSyncSummary: (...args: unknown[]) => _mockGetSummary(...args),
+  runKycSyncNow: () => _mockSyncNow(),
+  getKycSyncSummary: () => _mockGetSummary(),
 }));
 
 // Import after mocks

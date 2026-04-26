@@ -71,7 +71,7 @@ const mockUseKyc = vi.mocked(useKyc);
 const mockGetUserMedia = vi.fn();
 
 function mockApiSuccess() {
-  mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ status: 'success' }) });
+  mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ status: 'success' }) } as unknown as Response);
 }
 
 function mockApiFailure() {

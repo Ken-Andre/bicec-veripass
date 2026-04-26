@@ -5,7 +5,7 @@
  * Crypto.subtle is natively available in Node 18+ jsdom, so we get real
  * AES-GCM encryption/decryption round-trips.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import {
   encryptJsonPayload,
@@ -30,7 +30,7 @@ function makeKycState(overrides: Partial<PersistedKycState> = {}): PersistedKycS
     status: 'DRAFT',
     currentStep: 'address',
     completedSteps: ['cni_recto', 'cni_verso', 'ocr_review', 'liveness'],
-    accessLevel: 'NONE',
+    accessLevel: 'RESTRICTED',
     cniRectoCapture: null,
     cniVersoCapture: null,
     ocrFields: [],
@@ -45,6 +45,9 @@ function makeKycState(overrides: Partial<PersistedKycState> = {}): PersistedKycS
     signatureData: null,
     selectedPlan: null,
     interests: [],
+    basicProfile: null,
+    documentChoice: null,
+    biometricConsentAccepted: false,
     ...overrides,
   };
 }
