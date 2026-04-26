@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RotateCcw, Wifi } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { getKycSyncSummary, getResumeTargetPath, runKycSyncNow } from '../services/kycSyncService';
 
 export function KycResumeBanner() {

@@ -60,8 +60,13 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     }
   }, []);
 
+  const UPLOAD_TIMEOUT_MS = 20_000;
+
   const uploadDocument = useCallback(async (blob: Blob, dataUrl: string) => {
     const clientSha = await computeSha256(blob);
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), UPLOAD_TIMEOUT_MS);
+
     try {
       const formData = new FormData();
       formData.append('file', blob, `cni_${side}.jpg`);
@@ -76,7 +81,10 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
       const res = await fetchWithCorrelation('/api/v1/kyc/capture/cni', {
         method: 'POST',
         body: formData,
+        signal: abortController.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         throw new Error(`capture_cni_failed_${res.status}`);
@@ -84,12 +92,14 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
 
       await runKycSyncNow();
     } catch (err) {
+      clearTimeout(timeoutId);
+      const isTimeout = err instanceof Error && (err.name === 'AbortError' || err.message.includes('abort'));
       const stableSessionId = ensureSessionId();
       captureKycException(err, 'upload_failure', {
         sessionId: stableSessionId,
         step: side === 'recto' ? 'cni_recto' : 'cni_verso',
         operation: 'capture_cni_direct_upload',
-        extra: { side: side.toUpperCase(), queued_offline: true },
+        extra: { side: side.toUpperCase(), queued_offline: true, timed_out: isTimeout },
       });
       await enqueueOfflineCniCapture({
         sessionId: stableSessionId,
@@ -98,7 +108,11 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
         fileDataUrl: dataUrl,
         clientSha256: clientSha,
       });
-      console.warn('Upload error, queued offline replay:', err);
+      if (isTimeout) {
+        console.warn('CNI upload timed out after 20s — saved offline for later sync.');
+      } else {
+        console.warn('Upload error, queued offline replay:', err);
+      }
     }
   }, [side, sessionId, computeSha256, ensureSessionId]);
 
@@ -131,6 +145,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     }
 
     completeStep(side === 'recto' ? 'cni_recto' : 'cni_verso');
+    setCapturing(false);
     stopCamera();
     navigate(nextRoute);
   }, [side, nextRoute, setCniCapture, completeStep, stopCamera, navigate, uploadDocument]);
@@ -338,7 +353,10 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           )}
 
           {capturing && (
-            <div className="text-white">Capturing...</div>
+            <div className="flex items-center gap-2 text-white text-sm font-medium animate-pulse">
+              <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              Traitement en cours…
+            </div>
           )}
         </div>
 

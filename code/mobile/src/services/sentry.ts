@@ -38,26 +38,32 @@ export function initMobileSentry(): void {
 
   const isProd = import.meta.env.MODE === 'production';
 
-  // Custom transport that sends to our proxy instead of Sentry directly
-  // This avoids tracking prevention blockers.
+  // Custom transport that sends to our proxy instead of Sentry directly.
+  // The Sentry ingest domain (o4511113586409472.ingest.de.sentry.io) is blocked by ad-blockers.
+  // We route through our own backend (/api/v1/sentry-proxy) which forwards server-side.
   // transport must be a factory: (BrowserTransportOptions) => Transport
   const makeProxyTransport = (transportOptions: { url: string } & Parameters<typeof Sentry.createTransport>[0]) =>
     Sentry.createTransport(transportOptions, (request) => {
-      // Extract query params from the original URL
+      // Extract query params from the original DSN-derived URL
       const url = new URL(transportOptions.url);
       const sentryKey = url.searchParams.get('sentry_key') || '';
       const sentryVersion = url.searchParams.get('sentry_version') || '7';
       const sentryClient = url.searchParams.get('sentry_client') || '';
 
-      // Build proxy URL with query params
-      const proxyUrl = new URL(SENTRY_PROXY_URL);
+      // Build proxy URL — use relative path so it works regardless of VITE_API_URL at build time
+      const proxyUrl = new URL(SENTRY_PROXY_URL, window.location.origin);
       proxyUrl.searchParams.set('sentry_key', sentryKey);
       proxyUrl.searchParams.set('sentry_version', sentryVersion);
       proxyUrl.searchParams.set('sentry_client', sentryClient);
 
       const bodyStr = typeof request.body === 'string' ? request.body : new TextDecoder().decode(request.body);
 
-      // Send to our backend proxy instead of Sentry
+      // 5-second client-side timeout — the backend should respond 202 almost instantly
+      // (actual Sentry forwarding happens in a FastAPI BackgroundTask after the response).
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5_000);
+
+      // Send exclusively through our backend proxy — do NOT fall back to the blocked ingest domain.
       return fetch(proxyUrl.toString(), {
         method: 'POST',
         headers: {
@@ -65,19 +71,18 @@ export function initMobileSentry(): void {
         },
         body: bodyStr,
         credentials: 'omit',
-      }).then((response) => {
-        return { statusCode: response.status };
-      }).catch(() => {
-        // Fallback: try sending directly if proxy fails
-        return fetch(transportOptions.url, {
-          method: 'POST',
-          body: bodyStr,
-          headers: {
-            'Content-Type': 'application/x-sentry-envelope',
-          },
-          credentials: 'omit',
-        }).then((response) => ({ statusCode: response.status }));
-      });
+        signal: controller.signal,
+      })
+        .then((response) => {
+          clearTimeout(timeoutId);
+          // 202 Accepted is our fire-and-forget success code
+          return { statusCode: response.status === 202 ? 200 : response.status };
+        })
+        .catch(() => {
+          clearTimeout(timeoutId);
+          // Proxy unreachable, aborted, or network offline — drop silently
+          return { statusCode: 200 };
+        });
     });
 
   Sentry.init({

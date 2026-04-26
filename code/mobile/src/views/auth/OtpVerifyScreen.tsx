@@ -29,12 +29,8 @@ const OtpVerifyScreen = () => {
   const isEmail = identifier?.includes('@');
 
   useEffect(() => {
-    if (!identifier) {
-      navigate('/auth/phone');
-      return;
-    }
     inputRefs.current[0]?.focus();
-  }, [identifier, navigate]);
+  }, []);
 
   const handleChange = (index: number, value: string) => {
     if (!/^\d?$/.test(value)) return;
@@ -56,7 +52,6 @@ const OtpVerifyScreen = () => {
     const newCode = [...code];
     paste.split('').forEach((c, i) => { newCode[i] = c; });
     setCode(newCode);
-
     const lastFilledIndex = Math.min(paste.length - 1, 5) + (paste.length < 6 ? 1 : 0);
     inputRefs.current[Math.min(lastFilledIndex, 5)]?.focus();
   };
@@ -105,9 +100,34 @@ const OtpVerifyScreen = () => {
       const payload = isEmail ? { email: identifier } : { phone: identifier };
       await apiClient.post('/auth/otp/send', payload);
     } catch (err) {
-      console.error("Resend error", err);
+      console.error('Resend error', err);
     }
   };
+
+  // Guard: if identifier was lost (page reload, back navigation), show friendly error
+  if (!identifier) {
+    return (
+      <ScreenLayout showBack title="Sécurité">
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center px-4">
+          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center">
+            <MessageSquareCheck className="w-8 h-8 text-red-500" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-slate-800">Session expirée</h2>
+            <p className="text-slate-500 text-sm">
+              Votre session OTP a expiré ou la page a été rechargée. Veuillez recommencer.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/auth/phone')}
+            className="bicec-button w-full h-14"
+          >
+            Retour à l'accueil
+          </button>
+        </div>
+      </ScreenLayout>
+    );
+  }
 
   return (
     <ScreenLayout showBack title="Sécurité">
@@ -155,7 +175,7 @@ const OtpVerifyScreen = () => {
               disabled={resendTimer > 0}
               className="text-sm font-bold text-primary active:opacity-70 disabled:text-slate-400 transition-colors uppercase tracking-widest"
             >
-              {resendTimer > 0 ? `Renvoyer (${resendTimer}s)` : "Renvoyer le code"}
+              {resendTimer > 0 ? `Renvoyer (${resendTimer}s)` : 'Renvoyer le code'}
             </button>
           </div>
         </div>
