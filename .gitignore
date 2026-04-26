@@ -224,3 +224,5 @@ docs/integration-analysis-*.md
 code/test_cni.png
 code/test_otp.py
 test_mailpit_otp.py
+.gemini/
+gha-creds-*.json
