@@ -1,62 +1,64 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+import { apiGet, apiPost, type ApiError } from './api-client'
 
-export async function fetchQueue() {
-  const res = await fetch(`${API_BASE}/backoffice/queue`);
-  if (!res.ok) throw new Error('Failed to fetch queue');
-  return res.json();
+export interface QueueItem {
+  id: string
+  status: string
+  access_level: string
+  priority_flag: boolean
+  client_name: string | null
+  client_phone: string | null
+  assigned_agent_name: string | null
+  overall_confidence: number | null
+  agency_code: string | null
+  submitted_at: string | null
+}
+
+export interface PageResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export async function fetchQueue(): Promise<QueueItem[]> {
+  const res = await apiGet<PageResponse<QueueItem>>('/backoffice/queue')
+  return res.items
 }
 
 export async function fetchDossier(id: string) {
-  const res = await fetch(`${API_BASE}/backoffice/dossier/${id}`);
-  if (!res.ok) throw new Error(`Failed to fetch dossier ${id}`);
-  return res.json();
+  return apiGet(`/backoffice/dossier/${id}`)
 }
 
 export async function fetchAuditLog(sessionId?: string) {
-  const url = sessionId
-    ? `${API_BASE}/backoffice/audit-log?session_id=${sessionId}`
-    : `${API_BASE}/backoffice/audit-log`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to fetch audit log');
-  return res.json();
+  const path = sessionId
+    ? `/backoffice/audit-logs?session_id=${sessionId}`
+    : '/backoffice/audit-logs'
+  const res = await apiGet<PageResponse<unknown>>(path)
+  return res.items
 }
 
-export async function claimDossier(sessionId: string, agentId: string) {
-  const res = await fetch(`${API_BASE}/backoffice/dossier/${sessionId}/claim`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ agentId }),
-  });
-  if (!res.ok) throw new Error(`Failed to claim dossier ${sessionId}`);
-  return res.json();
+export async function reviewDossier(sessionId: string, decision: string, reason: string) {
+  return apiPost(`/backoffice/dossier/${sessionId}/review`, { decision, reason })
 }
 
-export async function unclaimDossier(sessionId: string, agentId: string) {
-  const res = await fetch(`${API_BASE}/backoffice/dossier/${sessionId}/unclaim`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ agentId }),
-  });
-  if (!res.ok) throw new Error(`Failed to unclaim dossier ${sessionId}`);
-  return res.json();
+export async function assignDossier(sessionId: string, agentId: string) {
+  return apiPost(`/backoffice/dossier/${sessionId}/assign`, { agent_id: agentId })
 }
 
-export async function requestInfo(sessionId: string, agentId: string, message: string, fields: string[]) {
-  const res = await fetch(`${API_BASE}/backoffice/dossier/${sessionId}/request-info`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessionId, agentId, message, fields }),
-  });
-  if (!res.ok) throw new Error(`Failed to request info for dossier ${sessionId}`);
-  return res.json();
+export async function autoAssignDossier(sessionId: string) {
+  return apiPost(`/backoffice/dossier/${sessionId}/auto-assign`)
 }
 
-export async function fetchDashboardStats(token: string) {
-  const res = await fetch(`${API_BASE}/analytics/dashboard`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-  if (!res.ok) throw new Error('Failed to fetch dashboard stats');
-  return res.json();
+export async function requestInfo(sessionId: string, message: string, _fields: string[]) {
+  return apiPost(`/backoffice/dossier/${sessionId}/review`, {
+    decision: 'INFO_REQUESTED',
+    reason: message,
+  })
 }
+
+export async function fetchDashboardStats() {
+  return apiGet('/analytics/dashboard')
+}
+
+export { ApiError }

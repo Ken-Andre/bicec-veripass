@@ -45,6 +45,7 @@ class KYCSession(Base):
     submitted_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    client_name = Column(String(200), nullable=True)
     last_step_completed = Column(String(100), nullable=True)
     submission_ip = Column(INET, nullable=True)
 

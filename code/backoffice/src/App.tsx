@@ -6,10 +6,12 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import MainLayout from './components/layout/MainLayout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
-import ValidationDesk from './pages/validation/ValidationDesk'
-import CompliancePage from './pages/compliance/CompliancePage'
+import ValidationQueuePage from './pages/validation/ValidationQueuePage'
+import EvidenceViewerPage from './pages/validation/EvidenceViewerPage'
+import ComplianceDashboard from './pages/compliance/ComplianceDashboard'
+import AmlAlertDetailPage from './pages/compliance/AmlAlertDetailPage'
+import ConflictResolverPage from './pages/compliance/ConflictResolverPage'
 import AdminPage from '@/pages/admin/AdminPage'
-import AnalyticsPage from '@/pages/analytics/AnalyticsPage'
 import CommandCenterPage from '@/pages/command-center/CommandCenterPage'
 import UnauthorizedPage from '@/pages/UnauthorizedPage'
 import NotFoundPage from '@/pages/NotFoundPage'
@@ -22,7 +24,7 @@ function App() {
       <ToastContainer />
       <Routes>
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-        
+
         <Route
           path="/"
           element={
@@ -31,57 +33,72 @@ function App() {
             </ProtectedRoute>
           }
         >
-        <Route index element={<DashboardPage />} />
-        
-        <Route
-          path="validation"
-          element={
-            <ProtectedRoute allowedRoles={['JEAN']}>
-              <ValidationDesk />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="compliance"
-          element={
-            <ProtectedRoute allowedRoles={['THOMAS']}>
-              <CompliancePage />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="command-center"
-          element={
-            <ProtectedRoute allowedRoles={['SYLVIE']}>
-              <CommandCenterPage />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="analytics"
-          element={
-            <ProtectedRoute allowedRoles={['SYLVIE', 'THOMAS']}>
-              <AnalyticsPage />
-            </ProtectedRoute>
-          }
-        />
-        
-        <Route
-          path="admin"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN_IT']}>
-              <AdminPage />
-            </ProtectedRoute>
-          }
-        />
-      </Route>
+          <Route index element={<DashboardPage />} />
 
-      <Route path="/unauthorized" element={<UnauthorizedPage />} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+          <Route
+            path="validation"
+            element={
+              <ProtectedRoute allowedRoles={['JEAN']}>
+                <ValidationQueuePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="validation/dossier/:id"
+            element={
+              <ProtectedRoute allowedRoles={['JEAN']}>
+                <EvidenceViewerPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="compliance"
+            element={
+              <ProtectedRoute allowedRoles={['THOMAS']}>
+                <ComplianceDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="compliance/alert/:id"
+            element={
+              <ProtectedRoute allowedRoles={['THOMAS']}>
+                <AmlAlertDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="compliance/duplicates"
+            element={
+              <ProtectedRoute allowedRoles={['THOMAS']}>
+                <ConflictResolverPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="command-center"
+            element={
+              <ProtectedRoute allowedRoles={['SYLVIE']}>
+                <CommandCenterPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="admin"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN_IT']}>
+                <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
     </ToastProvider>
   )
 }

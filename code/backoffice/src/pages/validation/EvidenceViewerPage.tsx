@@ -1,93 +1,264 @@
-/**
- * EvidenceViewerPage — Inspection dossier complète pour Jean
- * Source: veripass-gatekeeper prototype
- * Mapping vers BICEC VeriPass — Split-screen: documents gauche / OCR + actions droite
- */
 import { useParams, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDossier, useAuditLog } from '@/hooks/useQueryHooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
+import { Badge } from '@/components/ui/Badge';
 import { ImageViewer } from '@/components/shared/ImageViewer';
-import { StatusChip } from '@/components/shared/StatusChip';
-import { ConfidenceBar } from '@/components/shared/ConfidenceBar';
-import { FlagBadge } from '@/components/shared/FlagBadge';
 import { DossierTimeline } from '@/components/shared/DossierTimeline';
 import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
-import { ArrowLeft, Check, X, MessageSquare, Loader2 } from 'lucide-react';
-import type { DossierFlag } from '@/types';
+import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck } from 'lucide-react';
+import { reviewDossier, assignDossier, autoAssignDossier } from '@/services/dossier-service';
+import { apiGet, apiPost } from '@/services/api-client';
 
-// Mock dossier data until API is ready
-const mockDossier = {
-  id: 'demo-session-id',
-  status: 'PENDING_REVIEW',
-  accessLevel: 'RESTRICTED',
-  overallConfidence: 0.82,
-  clientIdentity: {
-    lastName: 'NGUEMO',
-    firstName: 'Marie Claire',
-    dateOfBirth: '15/03/1992',
-    placeOfBirth: 'Douala',
-    phone: '+237 6XX XXX XXX',
-    email: 'marie@example.cm',
-  },
-  flags: ['LOW_OCR'],
-  documents: [
-    { id: 'doc1', docType: 'CNI_RECTO', url: '/placeholder-cni.jpg', ocrFields: [
-      { fieldName: 'Nom', extractedValue: 'NGUEMO', confidence: 0.96, correctedValue: '', needsReview: false },
-      { fieldName: 'Prénom', extractedValue: 'Marie Claire', confidence: 0.92, correctedValue: '', needsReview: false },
-      { fieldName: 'Date Naissance', extractedValue: '15/03/1992', confidence: 0.72, correctedValue: '', needsReview: true },
-      { fieldName: 'Lieu Naissance', extractedValue: 'Douala', confidence: 0.88, correctedValue: '', needsReview: false },
-    ]},
-  ],
-  biometrics: { faceMatchScore: 0.91, livenessScore: 0.95, antiSpoofingScore: 0.98 },
-};
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const TOKEN_KEY = 'veripass_access_token';
+
+function getToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
+}
+
+function useAuthenticatedImage(sessionId: string | undefined, docId: string | undefined): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  const urlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!sessionId || !docId) return;
+    let cancelled = false;
+    const token = getToken();
+    if (!token) return;
+
+    fetch(`${API_BASE}/backoffice/dossier/${sessionId}/documents/${docId}/file`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load');
+        return res.blob();
+      })
+      .then((blob) => {
+        if (!cancelled) {
+          const objectUrl = URL.createObjectURL(blob);
+          setUrl(objectUrl);
+          urlRef.current = objectUrl;
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+    };
+  }, [sessionId, docId]);
+
+  return url;
+}
+
+function SupportThreadPanel({ sessionId }: { sessionId: string }) {
+  const [threads, setThreads] = useState<any[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const loadThreads = useCallback(async () => {
+    try {
+      const data = await apiGet(`/backoffice/support/threads?session_id=${sessionId}`);
+      setThreads(data);
+      if (data.length > 0 && !activeThreadId) {
+        setActiveThreadId(data[0].id);
+      }
+    } catch {}
+  }, [sessionId, activeThreadId]);
+
+  const loadMessages = useCallback(async (threadId: string) => {
+    try {
+      const data = await apiGet(`/backoffice/support/threads/${threadId}/messages`);
+      setMessages(data);
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadThreads() }, [loadThreads]);
+
+  useEffect(() => {
+    if (activeThreadId) loadMessages(activeThreadId);
+  }, [activeThreadId, loadMessages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const createThread = async () => {
+    try {
+      const thread = await apiPost('/backoffice/support/threads', { session_id: sessionId });
+      setThreads([thread, ...threads]);
+      setActiveThreadId(thread.id);
+    } catch {}
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !activeThreadId) return;
+    setSending(true);
+    try {
+      const msg = await apiPost(`/backoffice/support/threads/${activeThreadId}/messages`, { content: newMessage });
+      setMessages([...messages, msg]);
+      setNewMessage('');
+    } catch {}
+    setSending(false);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-sm">Support Client</CardTitle>
+        {threads.length === 0 && (
+          <Button variant="outline" size="sm" onClick={createThread}>
+            <MessageSquare className="h-3 w-3 mr-1" /> Nouveau thread
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {threads.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">
+            Aucun échange avec le client. Créez un thread pour envoyer un message.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {messages.map((msg: any) => (
+              <div
+                key={msg.id}
+                className={`p-2 rounded-lg text-sm ${
+                  msg.sender_type === 'JEAN' ? 'bg-primary/10 ml-4' : 'bg-muted mr-4'
+                }`}
+              >
+                <p className="text-xs text-muted-foreground mb-1">
+                  {msg.sender_type === 'JEAN' ? 'Vous' : 'Client'} · {new Date(msg.sent_at).toLocaleTimeString('fr-FR')}
+                </p>
+                <p>{msg.content}</p>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+
+            <div className="flex gap-2 pt-2 border-t">
+              <input
+                className="flex-1 rounded-md border px-3 py-1.5 text-sm"
+                placeholder="Écrire un message..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              />
+              <Button size="sm" onClick={sendMessage} disabled={sending || !newMessage.trim()}>
+                <Send className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function EvidenceViewerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: dossier, isLoading } = useDossier(id || '');
   const { data: auditEntries } = useAuditLog(id);
-  const [activeDoc, setActiveDoc] = useState(0);
-  const [editingField, setEditingField] = useState<string | null>(null);
+  const [activeDocIndex, setActiveDocIndex] = useState(0);
   const [showRequestInfo, setShowRequestInfo] = useState(false);
   const [showReject, setShowReject] = useState(false);
-  const [reason, setReason] = useState('');
+  const [showApprove, setShowApprove] = useState(false);
+  const [actionReason, setActionReason] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
 
-  const data = dossier || mockDossier;
-  const currentDoc = data.documents?.[activeDoc] || { ocrFields: [] };
+  const documents = dossier?.documents || [];
+  const currentDoc = documents[activeDocIndex];
+  const imageUrl = useAuthenticatedImage(id, currentDoc?.id);
 
-  const handleInfoRequest = async (message: string, fields: string[]) => {
-    // TODO: Call POST /api/v1/backoffice/dossiers/{id}/request-info
-    console.log('Request info:', message, fields);
+  const handleSelfAssign = async () => {
+    if (!id) return;
+    setAssignLoading(true);
+    setAssignError(null);
+    try {
+      const storedUser = localStorage.getItem('veripass_user');
+      const agentId = storedUser ? JSON.parse(storedUser).id : null;
+      if (!agentId) throw new Error('ID agent introuvable');
+      await assignDossier(id, agentId);
+      queryClient.invalidateQueries({ queryKey: ['dossier', id] });
+    } catch (err: any) {
+      setAssignError(err?.detail || "Impossible d'assigner le dossier");
+    }
+    setAssignLoading(false);
+  };
+
+  const handleAutoAssign = async () => {
+    if (!id) return;
+    setAssignLoading(true);
+    setAssignError(null);
+    try {
+      await autoAssignDossier(id);
+      queryClient.invalidateQueries({ queryKey: ['dossier', id] });
+    } catch (err: any) {
+      setAssignError(err?.detail || "Impossible d'assigner automatiquement");
+    }
+    setAssignLoading(false);
+  };
+
+  const handleReview = async (decision: string) => {
+    if (!id || !actionReason.trim()) return;
+    setActionLoading(true);
+    try {
+      await reviewDossier(id, decision, actionReason.trim());
+      queryClient.invalidateQueries({ queryKey: ['dossier', id] });
+      queryClient.invalidateQueries({ queryKey: ['queue'] });
+      if (decision === 'APPROVED' || decision === 'REJECTED') {
+        navigate('/validation');
+      }
+      setShowApprove(false);
+      setShowReject(false);
+      setActionReason('');
+    } catch {}
+    setActionLoading(false);
+  };
+
+  const handleInfoRequest = async (message: string, _fields: string[]) => {
+    if (!id) return;
+    try {
+      await reviewDossier(id, 'INFO_REQUESTED', message);
+      queryClient.invalidateQueries({ queryKey: ['dossier', id] });
+      queryClient.invalidateQueries({ queryKey: ['queue'] });
+    } catch {}
     setShowRequestInfo(false);
-  };
-
-  const handleApprove = async () => {
-    // TODO: Call POST /api/v1/backoffice/dossiers/{id}/approve
-    console.log('Approved');
-    navigate('/validation');
-  };
-
-  const handleReject = async () => {
-    if (!reason.trim()) return;
-    // TODO: Call POST /api/v1/backoffice/dossiers/{id}/reject
-    console.log('Rejected:', reason);
-    setShowReject(false);
-    navigate('/validation');
   };
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
 
+  if (!dossier) {
+    return (
+      <Card className="border-destructive">
+        <CardContent className="p-8 text-center">
+          <p className="text-destructive font-medium">Dossier introuvable</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate('/validation')}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Retour
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const needsAssign = !dossier.assigned_agent_id;
+  const isReviewable = dossier.status === 'PENDING_AGENT_REVIEW' || dossier.status === 'PENDING_KYC' || dossier.status === 'FRAUD_SUSPECT';
+
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => navigate('/validation')}>
@@ -95,145 +266,218 @@ export default function EvidenceViewerPage() {
           </Button>
           <div>
             <h1 className="text-lg font-bold">
-              {data.clientIdentity?.firstName || '—'} {data.clientIdentity?.lastName || '—'}
+              {dossier.client_name || dossier.user_phone || 'Dossier'}
             </h1>
             <p className="text-sm text-muted-foreground">
-              NIU: {data.clientIdentity?.niu || '—'} • Dossier: {data.id?.slice(0, 8)}...
+              {dossier.agency_code ? `Agence: ${dossier.agency_code}` : ''} · {dossier.session_id?.slice(0, 8)}...
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StatusChip status={data.status} />
-          {data.flags?.map((flag: DossierFlag) => <FlagBadge key={flag} flag={flag} />)}
+          <Badge variant={dossier.status === 'PENDING_AGENT_REVIEW' ? 'warning' : 'default'}>
+            {dossier.status}
+          </Badge>
         </div>
       </div>
 
-      {/* Split Screen */}
+      {assignError && (
+        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{assignError}</div>
+      )}
+
+      {needsAssign && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="flex items-center justify-between p-4">
+            <p className="text-sm font-medium text-yellow-800">Dossier non assigné</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={handleAutoAssign} disabled={assignLoading}>
+                {assignLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserCheck className="h-4 w-4 mr-1" />}
+                Assigner auto
+              </Button>
+              <Button size="sm" onClick={handleSelfAssign} disabled={assignLoading}>
+                {assignLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserCheck className="h-4 w-4 mr-1" />}
+                Prendre en charge
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Left - Documents */}
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <Tabs value={`${activeDoc}`} onValueChange={(v: string) => setActiveDoc(Number(v))}>
-                <TabsList>
-                  {data.documents?.map((doc: { docType: string }, i: number) => (
-                    <TabsTrigger key={i} value={`${i}`}>{doc.docType}</TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+              {documents.length > 0 && (
+                <Tabs value={`${activeDocIndex}`} onValueChange={(v) => setActiveDocIndex(Number(v))}>
+                  <TabsList>
+                    {documents.map((doc: any, i: number) => (
+                      <TabsTrigger key={doc.id} value={`${i}`}>{doc.doc_type}</TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
             </CardHeader>
             <CardContent>
               <ImageViewer
-                src={currentDoc.url || '/placeholder.jpg'}
-                alt={currentDoc.docType || 'Document'}
+                src={imageUrl || '/placeholder.jpg'}
+                alt={currentDoc?.doc_type || 'Document'}
                 className="min-h-[300px]"
               />
             </CardContent>
           </Card>
 
-          {/* Biometrics */}
-          {data.biometrics && (
+          {dossier.biometric_result && (
             <Card>
               <CardHeader><CardTitle>Biométrie</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Face Match</span>
-                  <ConfidenceBar score={data.biometrics.faceMatchScore} size="sm" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Liveness</span>
-                  <ConfidenceBar score={data.biometrics.livenessScore} size="sm" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Anti-Spoofing</span>
-                  <ConfidenceBar score={data.biometrics.antiSpoofingScore} size="sm" />
-                </div>
+                {[
+                  { label: 'Face Match', score: dossier.biometric_result.face_match_score },
+                  { label: 'Liveness', score: dossier.biometric_result.liveness_score },
+                  { label: 'Anti-Spoofing', score: dossier.biometric_result.anti_spoofing_score },
+                ].map((item: any) => (
+                  <div key={item.label} className="flex items-center justify-between">
+                    <span className="text-sm">{item.label}</span>
+                    <span className={`text-sm font-mono ${item.score != null && item.score >= 0.8 ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {item.score != null ? `${(item.score * 100).toFixed(0)}%` : 'N/A'}
+                    </span>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}
 
-          {/* Audit Timeline */}
           <Card>
             <CardHeader><CardTitle>Historique</CardTitle></CardHeader>
             <CardContent>
-              <DossierTimeline entries={auditEntries || []} />
+              <DossierTimeline entries={(auditEntries || []) as any} />
             </CardContent>
           </Card>
+
+          <SupportThreadPanel sessionId={id || ''} />
         </div>
 
-        {/* Right - OCR Fields + Actions */}
         <div className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>Champs OCR extraits</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Champs extraits (OCR)</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              {currentDoc.ocrFields?.map((field: { fieldName: string; extractedValue: string; confidence: number; correctedValue?: string; needsReview?: boolean }, i: number) => (
+              {currentDoc?.ocr_fields?.map((field: any, i: number) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded-lg border">
-                  <ConfidenceBar score={field.confidence} size="sm" className="w-[60px] flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">{field.fieldName}</p>
-                    {editingField === `${activeDoc}-${i}` ? (
-                      <Input
-                        size={1}
-                        defaultValue={field.extractedValue}
-                        onBlur={() => {
-                          // TODO: Save correction
-                          setEditingField(null);
-                        }}
-                        className="h-6 text-sm"
-                        autoFocus
-                      />
-                    ) : (
-                      <p className="text-sm font-medium truncate">{field.extractedValue}</p>
-                    )}
+                  <div className="flex-shrink-0 w-12 text-center">
+                    <span className={`text-xs font-mono ${
+                      field.confidence_score >= 0.9 ? 'text-green-600' :
+                      field.confidence_score >= 0.7 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {(field.confidence_score * 100).toFixed(0)}%
+                    </span>
                   </div>
-                  {field.needsReview && (
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setEditingField(`${activeDoc}-${i}`)}>✏️</Button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">{field.field_name}</p>
+                    <p className="text-sm font-medium truncate">
+                      {field.human_corrected ? field.corrected_value : field.extracted_value}
+                    </p>
+                  </div>
+                  {field.human_corrected && (
+                    <span className="text-xs text-blue-600 italic">Corrigé</span>
                   )}
                 </div>
               ))}
+              {(!currentDoc?.ocr_fields || currentDoc.ocr_fields.length === 0) && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Aucun champ OCR disponible
+                </p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Actions */}
-          <Card>
-            <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
-            <CardContent className="flex gap-3">
-              <Button className="flex-1" onClick={handleApprove}>
-                <Check className="h-4 w-4 mr-2" /> Approuver
-              </Button>
-              <Button variant="destructive" className="flex-1" onClick={() => setShowReject(true)}>
-                <X className="h-4 w-4 mr-2" /> Rejeter
-              </Button>
-              <Button variant="outline" onClick={() => setShowRequestInfo(true)}>
-                <MessageSquare className="h-4 w-4" />
-              </Button>
-            </CardContent>
-          </Card>
+          {dossier.aml_alerts && dossier.aml_alerts.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Alertes AML</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {dossier.aml_alerts.map((alert: any) => (
+                  <div key={alert.id} className="flex items-center justify-between p-2 rounded-lg border border-red-200 bg-red-50">
+                    <div>
+                      <p className="text-sm font-medium">{alert.alert_type}</p>
+                      <p className="text-xs text-muted-foreground">{alert.status}</p>
+                    </div>
+                    <span className="text-sm font-mono text-red-600">
+                      {(alert.match_score * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {isReviewable && (
+            <Card>
+              <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                {dossier.status !== 'FRAUD_SUSPECT' && (
+                  <Button className="w-full" onClick={() => setShowApprove(true)}>
+                    <Check className="h-4 w-4 mr-2" /> Approuver
+                  </Button>
+                )}
+                <Button variant="destructive" className="w-full" onClick={() => setShowReject(true)}>
+                  <X className="h-4 w-4 mr-2" /> Rejeter
+                </Button>
+                {dossier.status !== 'FRAUD_SUSPECT' && (
+                  <Button variant="outline" className="w-full" onClick={() => setShowRequestInfo(true)}>
+                    <MessageSquare className="h-4 w-4 mr-2" /> Demander des informations
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
-      {/* Request Info Modal */}
+      <Dialog open={showApprove} onOpenChange={setShowApprove}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approuver le dossier</DialogTitle>
+            <DialogDescription>Justification obligatoire (traçabilité COBAC).</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={actionReason}
+            onChange={(e) => setActionReason(e.target.value)}
+            placeholder="Ex: Identité vérifiée, documents conformes..."
+            className="min-h-[80px]"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowApprove(false); setActionReason('') }}>Annuler</Button>
+            <Button onClick={() => handleReview('APPROVED')} disabled={actionLoading || !actionReason.trim()}>
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Confirmer l'approbation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showReject} onOpenChange={setShowReject}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dossier.status === 'FRAUD_SUSPECT' ? 'Classer sans suite (investigation)' : 'Rejeter le dossier'}</DialogTitle>
+            <DialogDescription>Motif obligatoire pour le rejet.</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={actionReason}
+            onChange={(e) => setActionReason(e.target.value)}
+            placeholder="Ex: Document flou, identité non vérifiable..."
+            className="min-h-[100px]"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowReject(false); setActionReason('') }}>Annuler</Button>
+            <Button variant="destructive" onClick={() => handleReview('REJECTED')} disabled={actionLoading || !actionReason.trim()}>
+              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Confirmer le rejet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <RequestInfoModal
         open={showRequestInfo}
         onOpenChange={setShowRequestInfo}
         onSubmit={handleInfoRequest}
-        fieldNames={currentDoc.ocrFields?.filter((f: { needsReview: boolean }) => f.needsReview)?.map((f: { fieldName: string }) => f.fieldName)}
+        fieldNames={currentDoc?.ocr_fields?.filter((f: any) => f.confidence_score < 0.7)?.map((f: any) => f.field_name) || []}
       />
-
-      {/* Reject Dialog */}
-      <Dialog open={showReject} onOpenChange={setShowReject}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rejeter le dossier</DialogTitle>
-            <DialogDescription>Motif obligatoire pour le rejet.</DialogDescription>
-          </DialogHeader>
-          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex: Document flou, impossibilité de vérifier l'identité..." className="min-h-[100px]" />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReject(false)}>Annuler</Button>
-            <Button variant="destructive" onClick={handleReject} disabled={!reason.trim()}>Confirmer le rejet</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

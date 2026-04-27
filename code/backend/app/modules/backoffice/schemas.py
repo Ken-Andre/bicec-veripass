@@ -16,11 +16,11 @@ class KYCQueueItemSchema(BaseModel):
     started_at: Optional[datetime] = None
     submitted_at: Optional[datetime] = None
 
-    # User info for queue display
-    user_phone: Optional[str] = None
-
-    # Current assignee
+    client_name: Optional[str] = None
+    client_phone: Optional[str] = None
     assigned_agent_name: Optional[str] = None
+    overall_confidence: Optional[float] = None
+    agency_code: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -40,13 +40,7 @@ class AuditLogSchema(BaseModel):
 
 
 class ReviewDecisionRequest(BaseModel):
-    """Agent submits a review decision on a KYC dossier.
-
-    Per ADR-001, only specific roles can make certain decisions:
-    - JEAN: APPROVED, REJECTED, INFO_REQUESTED
-    - THOMAS: FRAUD_SUSPECT (AML/Sanctions), INFO_REQUESTED
-    - SYLVIE: APPROVED (escalation override)
-    """
+    """Agent submits a review decision on a KYC dossier."""
 
     decision: str = Field(
         ...,
@@ -140,12 +134,7 @@ class DossierAmlAlertBrief(BaseModel):
 
 
 class DossierDetailSchema(BaseModel):
-    """Full dossier detail for agent side-by-side review (J08).
-
-    Provides all data an agent needs to make an informed decision:
-    documents with OCR, biometric scores, consent, AML alerts,
-    and previous review history.
-    """
+    """Full dossier detail for agent side-by-side review (J08)."""
 
     session_id: UUID
     status: str
@@ -158,28 +147,61 @@ class DossierDetailSchema(BaseModel):
     last_step_completed: Optional[str] = None
     niu_type: Optional[str] = None
 
-    # User info
     user_phone: Optional[str] = None
+    client_name: Optional[str] = None
+    agency_code: Optional[str] = None
 
-    # Documents
     documents: list[DossierDocumentBrief] = []
 
-    # Biometric
     biometric_result: Optional[DossierBiometricBrief] = None
 
-    # Consent
     has_consent: bool = False
     consent_method: Optional[str] = None
     signed_at: Optional[datetime] = None
 
-    # Review history
     decisions: list[DossierDecisionBrief] = []
 
-    # AML alerts
     aml_alerts: list[DossierAmlAlertBrief] = []
 
-    # Assignment
     assigned_agent_id: Optional[UUID] = None
     assigned_agent_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class SupportThreadSchema(BaseModel):
+    id: UUID
+    session_id: UUID
+    status: str
+    created_at: datetime
+    message_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class SupportMessageSchema(BaseModel):
+    id: UUID
+    thread_id: UUID
+    sender_type: str
+    sender_id: UUID
+    content: str
+    sent_at: datetime
+    read_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class SupportMessageCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+
+
+class SupportThreadCreate(BaseModel):
+    session_id: UUID
+
+
+class AutoAssignResponse(BaseModel):
+    session_id: UUID
+    agent_id: UUID
+    agent_name: str
+    assigned_at: datetime
+    assignment_method: str = "auto"

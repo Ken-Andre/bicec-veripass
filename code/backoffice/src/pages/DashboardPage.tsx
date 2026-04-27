@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 import { FileCheck, AlertTriangle, Clock, CheckCircle, Loader2 } from 'lucide-react'
 import { fetchDashboardStats } from '../services/dossier-service'
-import { authService } from '../services/authService'
 
 interface DashboardData {
   summary: {
@@ -40,12 +39,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const token = await authService.getAccessToken()
-        if (!token) {
-          setError('Non authentifié')
-          return
-        }
-        const stats = await fetchDashboardStats(token)
+        const stats = await fetchDashboardStats()
         setData(stats)
       } catch (err) {
         console.error('Failed to load dashboard stats:', err)

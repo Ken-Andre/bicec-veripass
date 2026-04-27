@@ -37,7 +37,7 @@ export default function SystemLogsPage() {
 
   const filtered = useMemo(() => {
     if (!entries) return [];
-    return entries.filter((e: { agentName: string; actionType: string; sessionId: string; rationale: string }) => {
+    return entries.filter((e: any) => {
       const matchSearch = !search || e.agentName.toLowerCase().includes(search.toLowerCase()) || e.rationale.toLowerCase().includes(search.toLowerCase());
       const matchAction = actionType === 'ALL' || e.actionType === actionType;
       return matchSearch && matchAction;
