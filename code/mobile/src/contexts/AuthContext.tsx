@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { apiClient, setSessionExpiredHandler } from '../services/apiClient';
+import { isPasskeySupported, registerPasskey, authenticatePasskey, removePasskey } from '../services/passkeyService';
 
 interface User {
   id: string;
@@ -15,12 +16,16 @@ interface AuthContextType {
   phone: string | null;
   loading: boolean;
   isLocked: boolean;
+  biometricEnabled: boolean;
+  isPasskeySupported: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
   lock: () => void;
   unlock: () => void;
   setPhone: (phone: string) => void;
   setPinSetupCompleted: () => void;
+  setBiometric: (enabled: boolean) => Promise<boolean>;
+  authenticateWithPasskey: () => Promise<boolean>;
   resetAccount: () => void;
   deleteAccount: () => Promise<void>;
 }
@@ -36,6 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [phone, setPhone] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(() => 
+    localStorage.getItem('vp_biometric') === 'true'
+  );
 
   // Use refs to avoid stale closures in the inactivity timer
   const isAuthenticatedRef = useRef(isAuthenticated);
@@ -158,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser) as User;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUser(parsedUser);
         if (token) {
           setIsAuthenticated(true);
@@ -169,7 +178,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = useCallback((token: string, userData: User) => {
@@ -194,11 +202,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetAccount = useCallback(() => {
     localStorage.removeItem('vp_token');
     localStorage.removeItem('vp_user');
+    removePasskey();
     setIsAuthenticated(false);
     setUser(null);
     setIsLocked(false);
+    setBiometricEnabled(false);
     clearTimer();
   }, [clearTimer]);
+
+  const handleSetBiometric = useCallback(async (enabled: boolean): Promise<boolean> => {
+    if (enabled) {
+      if (!isPasskeySupported()) return false;
+      const userId = user?.id || 'anonymous';
+      const success = await registerPasskey(userId);
+      if (success) {
+        setBiometricEnabled(true);
+      }
+      return success;
+    } else {
+      removePasskey();
+      setBiometricEnabled(false);
+      return true;
+    }
+  }, [user]);
+
+  const authenticateWithPasskey = useCallback(async (): Promise<boolean> => {
+    if (!biometricEnabled) return false;
+    return authenticatePasskey();
+  }, [biometricEnabled]);
 
   const deleteAccount = async () => {
     try {
@@ -221,12 +252,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone,
       loading,
       isLocked,
+      biometricEnabled,
+      isPasskeySupported: isPasskeySupported(),
       login,
       logout,
       lock,
       unlock,
       setPhone,
       setPinSetupCompleted,
+      setBiometric: handleSetBiometric,
+      authenticateWithPasskey,
       resetAccount,
       deleteAccount,
     }}>

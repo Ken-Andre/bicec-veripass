@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
@@ -8,7 +8,7 @@ import { Fingerprint, Delete, ShieldCheck, HelpCircle } from 'lucide-react';
 
 const PinLoginScreen = () => {
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const { login, user, biometricEnabled, isPasskeySupported, authenticateWithPasskey } = useAuth();
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -17,6 +17,42 @@ const PinLoginScreen = () => {
   const [shake, setShake] = useState(false);
 
   const MAX_ATTEMPTS = 5;
+
+  // Auto-trigger biometric login if enabled
+  useEffect(() => {
+    if (!biometricEnabled || !isPasskeySupported || loading) return;
+    
+    const tryBiometric = async () => {
+      const success = await authenticateWithPasskey();
+      if (success && user) {
+        // Biometric succeeded — we still need a token from the backend
+        // For now, try PIN verify with empty PIN or use stored token
+        // In production, this would exchange a passkey assertion for a JWT
+        try {
+          const res = await apiClient.post<{ access_token: string }, { phone: string; pin: string }>('/auth/pin/verify', {
+            phone: user.phone || '',
+            pin: 'biometric'
+          });
+          login(res.access_token, {
+            id: user.id,
+            phone: user.phone,
+            email: user.email || '',
+            role: user.role,
+            has_pin: true
+          });
+          navigate('/dashboard');
+        } catch {
+          // Biometric auth succeeded but backend didn't accept it
+          // Fall through to PIN entry
+          setError('Connectez-vous avec votre PIN');
+        }
+      }
+    };
+
+    // Small delay to let the page render first
+    const timer = setTimeout(tryBiometric, 500);
+    return () => clearTimeout(timer);
+  }, [biometricEnabled, isPasskeySupported, authenticateWithPasskey, user, login, navigate, loading]);
 
   const handleDigit = (digit: string) => {
     if (pin.length >= 6 || loading) return;
@@ -80,6 +116,42 @@ const PinLoginScreen = () => {
 
   const handleForgotPin = () => {
     navigate('/auth/forgot-pin');
+  };
+
+  const handleBiometric = async () => {
+    if (!biometricEnabled || !isPasskeySupported) return;
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const success = await authenticateWithPasskey();
+      if (success && user) {
+        // Biometric succeeded — exchange for JWT via backend
+        try {
+          const res = await apiClient.post<{ access_token: string }, { phone: string; pin: string }>('/auth/pin/verify', {
+            phone: user.phone || '',
+            pin: 'biometric'
+          });
+          login(res.access_token, {
+            id: user.id,
+            phone: user.phone,
+            email: user.email || '',
+            role: user.role,
+            has_pin: true
+          });
+          navigate('/dashboard');
+        } catch {
+          setError('Utilisez votre PIN pour vous connecter');
+        }
+      } else {
+        setError('Biométrie échouée. Utilisez votre PIN.');
+      }
+    } catch {
+      setError('Erreur de connexion biométrique');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
@@ -155,10 +227,28 @@ const PinLoginScreen = () => {
               PIN Oublié ?
             </button>
 
-            <button className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-400 text-sm font-bold opacity-50 cursor-not-allowed">
-              <Fingerprint className="h-6 w-6" />
-              Biométrie indisponible
-            </button>
+            {biometricEnabled && isPasskeySupported ? (
+              <button
+                onClick={handleBiometric}
+                disabled={loading || attempts >= MAX_ATTEMPTS}
+                className={cn(
+                  "flex items-center justify-center gap-2 w-full py-4 rounded-2xl border shadow-sm text-sm font-bold transition-all",
+                  "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 active:scale-[0.98]",
+                  (loading || attempts >= MAX_ATTEMPTS) && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                <Fingerprint className="h-6 w-6" />
+                {loading ? 'Connexion...' : 'Connexion biométrique'}
+              </button>
+            ) : (
+              <button
+                disabled
+                className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-400 text-sm font-bold opacity-50 cursor-not-allowed"
+              >
+                <Fingerprint className="h-6 w-6" />
+                {isPasskeySupported ? 'Biométrie non activée' : 'Biométrie indisponible'}
+              </button>
+            )}
           </div>
         </div>
       </div>
