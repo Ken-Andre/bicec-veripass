@@ -111,5 +111,127 @@ export const translations: Record<string, Record<Language, string>> = {
     'stepper.consent': { fr: 'Consent.', en: 'Consent' },
     'stepper.signature': { fr: 'Signature', en: 'Signature' },
     'stepper.review': { fr: 'Revue', en: 'Review' },
+
+    // Navigation
+    'nav.home': { fr: 'Accueil', en: 'Home' },
+    'nav.cards': { fr: 'Cartes', en: 'Cards' },
+    'nav.transfers': { fr: 'Virements', en: 'Transfers' },
+    'nav.more': { fr: 'Plus', en: 'More' },
+
+    // Dashboard
+    'dashboard.balance': { fr: 'Solde', en: 'Balance' },
+    'dashboard.restricted.banner': { fr: 'Complétez votre KYC pour débloquer les services', en: 'Complete your KYC to unlock services' },
+    'dashboard.limited.banner': { fr: 'Ajoutez votre NIU pour l\'accès complet', en: 'Add your NIU for full access' },
+    'dashboard.ecosystem.title': { fr: 'Écosystème BICEC', en: 'BICEC Ecosystem' },
+    'dashboard.ecosystem.hint': { fr: 'Connectez vos applications BICEC', en: 'Connect your BICEC apps' },
+
+    // Cards
+    'cards.frozen': { fr: 'Carte gelée', en: 'Card frozen' },
+    'cards.frozenDesc': { fr: 'La carte est temporairement bloquée', en: 'Card is temporarily blocked' },
+    'cards.freeze': { fr: 'Geler', en: 'Freeze' },
+    'cards.freezeDesc': { fr: 'Bloquer temporairement la carte', en: 'Temporarily block card' },
+    'cards.show': { fr: 'Détails', en: 'Details' },
+    'cards.hide': { fr: 'Masquer', en: 'Hide' },
+    'cards.copy': { fr: 'Copier', en: 'Copy' },
+    'cards.findAtm': { fr: 'Trouver un DAB', en: 'Find an ATM' },
+    'cards.findAtmDesc': { fr: 'Localiser les distributeurs à proximité', en: 'Locate nearby ATMs' },
+
+    // Transfers
+    'transfer.send.title': { fr: 'Envoyer', en: 'Send' },
+    'transfer.send.desc': { fr: 'Virement bancaire ou mobile', en: 'Bank or mobile transfer' },
+    'transfer.send.chooseType': { fr: 'Choisissez le type de transfert', en: 'Choose transfer type' },
+    'transfer.send.bicec': { fr: 'Virement BICEC', en: 'BICEC Transfer' },
+    'transfer.send.bicecDesc': { fr: 'Vers un compte BICEC', en: 'To a BICEC account' },
+    'transfer.send.mobile': { fr: 'Mobile Money', en: 'Mobile Money' },
+    'transfer.send.mobileDesc': { fr: 'MTN MoMo, Orange Money', en: 'MTN MoMo, Orange Money' },
+    'transfer.send.phoneNumber': { fr: 'Numéro de téléphone', en: 'Phone number' },
+    'transfer.send.amount': { fr: 'Montant', en: 'Amount' },
+    'transfer.send.motif': { fr: 'Motif', en: 'Reason' },
+    'transfer.send.motifPlaceholder': { fr: 'Ex: Paiement loyer', en: 'Ex: Rent payment' },
+    'transfer.send.summary': { fr: 'Récapitulatif', en: 'Summary' },
+    'transfer.send.to': { fr: 'Destinataire', en: 'Recipient' },
+    'transfer.send.fees': { fr: 'Frais', en: 'Fees' },
+    'transfer.send.enterPin': { fr: 'Entrez votre PIN pour confirmer', en: 'Enter your PIN to confirm' },
+    'transfer.success.title': { fr: 'Transfert réussi !', en: 'Transfer successful!' },
+    'transfer.success.back': { fr: 'Retour au tableau de bord', en: 'Back to dashboard' },
+    'transfer.recurring': { fr: 'Virements récurrents', en: 'Recurring transfers' },
+    'transfer.recurringDesc': { fr: 'Planifiez des virements automatiques', en: 'Schedule automatic transfers' },
+    'transfer.iso.iban': { fr: 'IBAN', en: 'IBAN' },
+    'transfer.iso.name': { fr: 'Nom du bénéficiaire', en: 'Beneficiary name' },
+    'transfer.iso.bic': { fr: 'BIC / SWIFT', en: 'BIC / SWIFT' },
+    'transfer.iso.invalidIban': { fr: 'IBAN invalide', en: 'Invalid IBAN' },
+    'transfer.iso.scheme': { fr: 'Schéma', en: 'Scheme' },
+    'transfer.iso.endToEnd': { fr: 'End-to-End ID', en: 'End-to-End ID' },
+    'transfer.iso.msgId': { fr: 'Message ID', en: 'Message ID' },
+    'transfer.iso.download': { fr: 'Télécharger le reçu ISO 20022', en: 'Download ISO 20022 receipt' },
+
+    // Receive
+    'receive.title': { fr: 'Recevoir', en: 'Receive' },
+    'receive.desc': { fr: 'Vos coordonnées bancaires', en: 'Your bank details' },
+    'receive.holder': { fr: 'Titulaire', en: 'Holder' },
+    'receive.bankCode': { fr: 'Code banque', en: 'Bank code' },
+    'receive.branchCode': { fr: 'Code agence', en: 'Branch code' },
+    'receive.accountNumber': { fr: 'Numéro de compte', en: 'Account number' },
+    'receive.key': { fr: 'Clé RIB', en: 'RIB Key' },
+    'receive.scanQr': { fr: 'Scannez pour recevoir', en: 'Scan to receive' },
+    'receive.copyIban': { fr: 'Copier l\'IBAN', en: 'Copy IBAN' },
+
+    // Transactions
+    'transactions.title': { fr: 'Transactions', en: 'Transactions' },
+    'transactions.filter.all': { fr: 'Tout', en: 'All' },
+    'transactions.filter.in': { fr: 'Entrées', en: 'Income' },
+    'transactions.filter.out': { fr: 'Sorties', en: 'Expenses' },
+
+    // Savings
+    'savings.title': { fr: 'Épargne', en: 'Savings' },
+    'savings.total': { fr: 'Total épargné', en: 'Total saved' },
+    'savings.pockets': { fr: 'Mes poches', en: 'My pockets' },
+    'savings.create': { fr: 'Créer', en: 'Create' },
+    'savings.newPocket': { fr: 'Nouvelle poche', en: 'New pocket' },
+    'savings.pocketName': { fr: 'Nom de la poche', en: 'Pocket name' },
+    'savings.goal': { fr: 'Objectif', en: 'Goal' },
+    'savings.initialAmount': { fr: 'Montant initial', en: 'Initial amount' },
+    'savings.createBtn': { fr: 'Créer la poche', en: 'Create pocket' },
+    'savings.tip': { fr: 'Conseil : mettez de côté régulièrement même de petites sommes.', en: 'Tip: set aside regularly even small amounts.' },
+
+    // Settings
+    'settings.title': { fr: 'Paramètres', en: 'Settings' },
+    'settings.language': { fr: 'Langue', en: 'Language' },
+    'settings.preferences': { fr: 'Préférences', en: 'Preferences' },
+    'settings.biometric': { fr: 'Biométrie', en: 'Biometrics' },
+    'settings.notifications': { fr: 'Notifications push', en: 'Push notifications' },
+    'settings.darkMode': { fr: 'Mode sombre', en: 'Dark mode' },
+    'settings.security': { fr: 'Sécurité', en: 'Security' },
+    'settings.changePin': { fr: 'Changer le PIN', en: 'Change PIN' },
+    'settings.privacy': { fr: 'Confidentialité', en: 'Privacy' },
+    'settings.dev.title': { fr: 'Développement', en: 'Development' },
+    'settings.dev.fullAccess': { fr: 'Forcer Full Access', en: 'Force Full Access' },
+
+    // Notifications
+    'notifications.title': { fr: 'Notifications', en: 'Notifications' },
+
+    // Help
+    'help.title': { fr: 'Aide', en: 'Help' },
+    'help.faq': { fr: 'Questions fréquentes', en: 'FAQ' },
+    'help.chat': { fr: 'Chat support', en: 'Chat support' },
+    'help.call': { fr: 'Appeler', en: 'Call' },
+    'help.language': { fr: 'fr', en: 'fr' },
+
+    // Support
+    'support.title': { fr: 'Support', en: 'Support' },
+    'support.placeholder': { fr: 'Tapez votre message...', en: 'Type your message...' },
+
+    // More
+    'more.title': { fr: 'Plus', en: 'More' },
+    'more.services': { fr: 'Services', en: 'Services' },
+    'more.settings': { fr: 'Compte', en: 'Account' },
+    'more.logout': { fr: 'Se déconnecter', en: 'Log out' },
+    'more.confirmLogout': { fr: 'Se déconnecter ?', en: 'Log out?' },
+    'more.confirm': { fr: 'Confirmer', en: 'Confirm' },
+
+    // Common
+    'common.continue': { fr: 'Continuer', en: 'Continue' },
+    'common.confirm': { fr: 'Confirmer', en: 'Confirm' },
+    'common.cancel': { fr: 'Annuler', en: 'Cancel' },
 };
 
