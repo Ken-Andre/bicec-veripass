@@ -79,5 +79,37 @@ export const translations: Record<string, Record<Language, string>> = {
     'liveness.intro.title': { fr: 'Vérification de vie', en: 'Liveness Check' },
     'liveness.intro.subtitle': { fr: 'Veuillez suivre les instructions à l\'écran', en: 'Please follow on- screen instructions' },
     'liveness.challenge.smile': { fr: 'Souriez :)', en: 'Smile :)' },
+
+    // KYC Hydration Gate
+    'kyc.hydration.title': { fr: 'Restauration de votre progression', en: 'Restoring your progress' },
+    'kyc.hydration.subtitle': { fr: 'Veuillez patienter...', en: 'Please wait...' },
+
+    // CNI Quality
+    'cni.resolution': { fr: 'Résolution insuffisante', en: 'Resolution too low' },
+    'cni.sharpness': { fr: 'Image floue', en: 'Image is blurry' },
+    'cni.brightness': { fr: 'Luminosité incorrecte', en: 'Brightness out of range' },
+    'cni.glare': { fr: 'Reflets détectés', en: 'Glare detected' },
+    'cni.aspect_ratio': { fr: 'Cadrage incorrect', en: 'Wrong framing' },
+
+    // Celebration
+    'celebration.title': { fr: 'Félicitations !', en: 'Congratulations!' },
+    'celebration.message': { fr: 'Votre dossier a été soumis avec succès.', en: 'Your application has been submitted successfully.' },
+
+    // Biometric Login
+    'auth.biometric.login': { fr: 'Connexion biométrique', en: 'Biometric login' },
+    'auth.biometric.try': { fr: 'Essayer la biométrie', en: 'Try biometric login' },
+    'auth.biometric.unsupported': { fr: 'Non disponible sur cet appareil', en: 'Not available on this device' },
+    'auth.biometric.failed': { fr: 'Biométrie échouée, utilisez le PIN', en: 'Biometric failed, use PIN' },
+
+    // Progress Stepper
+    'stepper.cni': { fr: 'CNI', en: 'ID Card' },
+    'stepper.ocr': { fr: 'OCR', en: 'OCR' },
+    'stepper.liveness': { fr: 'Visage', en: 'Face' },
+    'stepper.address': { fr: 'Adresse', en: 'Address' },
+    'stepper.bill': { fr: 'Facture', en: 'Bill' },
+    'stepper.niu': { fr: 'NIU', en: 'NIU' },
+    'stepper.consent': { fr: 'Consent.', en: 'Consent' },
+    'stepper.signature': { fr: 'Signature', en: 'Signature' },
+    'stepper.review': { fr: 'Revue', en: 'Review' },
 };
 

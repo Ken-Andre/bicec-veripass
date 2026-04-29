@@ -64,6 +64,7 @@ interface KycState {
 }
 
 interface KycContextType extends KycState {
+  hydrated: boolean;
   setSessionId: (id: string) => void;
   setCurrentStep: (step: KycStepType) => void;
   completeStep: (step: KycStepType) => void;
@@ -290,6 +291,7 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
   // Memoize context value
   const contextValue = useMemo(() => ({
     ...state,
+    hydrated,
     setSessionId,
     setCurrentStep,
     completeStep,
@@ -318,6 +320,7 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     updateKycData: () => { /* no-op */ },
   }), [
     state,
+    hydrated,
     setSessionId,
     setCurrentStep,
     completeStep,
