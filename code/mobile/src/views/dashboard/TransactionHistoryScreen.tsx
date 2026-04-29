@@ -1,0 +1,89 @@
+import { useState } from 'react';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { ScreenLayout } from '../../components/ScreenLayout';
+import { BottomNav } from '../../components/BottomNav';
+import { mockTransactions } from '../../services/mockData';
+import { ArrowUpRight, ArrowDownLeft, Smartphone, Zap, ShoppingCart, Briefcase } from 'lucide-react';
+import { cn } from '../../lib/utils';
+import type { TransactionCategory } from '../../types';
+
+const categoryIcons: Record<TransactionCategory, typeof ArrowUpRight> = {
+  transfer_out: ArrowUpRight,
+  transfer_in: ArrowDownLeft,
+  mobile_recharge: Smartphone,
+  bill_payment: Zap,
+  purchase: ShoppingCart,
+  salary: Briefcase,
+};
+
+const categoryColors: Record<TransactionCategory, string> = {
+  transfer_out: 'bg-amber-100 text-amber-600',
+  transfer_in: 'bg-emerald-100 text-emerald-600',
+  mobile_recharge: 'bg-blue-100 text-blue-600',
+  bill_payment: 'bg-red-100 text-red-600',
+  purchase: 'bg-purple-100 text-purple-600',
+  salary: 'bg-emerald-100 text-emerald-600',
+};
+
+type Filter = 'all' | 'in' | 'out';
+
+export function TransactionHistoryScreen() {
+  const { t } = useLanguage();
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const filtered = mockTransactions.filter((tx) => {
+    if (filter === 'in') return tx.amount > 0;
+    if (filter === 'out') return tx.amount < 0;
+    return true;
+  });
+
+  const fmt = (n: number) => Math.abs(n).toLocaleString('fr-FR');
+  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      <ScreenLayout showBack title={t('transactions.title')}>
+        <div className="space-y-4 pt-2">
+          <div className="flex gap-2">
+            {(['all', 'in', 'out'] as Filter[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={cn(
+                  'px-4 py-2 rounded-full text-xs font-medium transition-all',
+                  filter === f ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500',
+                )}
+              >
+                {t(`transactions.filter.${f}`)}
+              </button>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            {filtered.map((tx) => {
+              const Icon = categoryIcons[tx.category] || ArrowUpRight;
+              const colorClass = categoryColors[tx.category] || 'bg-slate-100 text-slate-500';
+              return (
+                <div key={tx.id} className="bg-white border border-slate-100 rounded-2xl p-4 active:scale-[0.98] transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center shrink-0', colorClass)}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">{tx.label}</p>
+                      <p className="text-xs text-slate-400">{tx.counterparty} • {formatDate(tx.date)}</p>
+                    </div>
+                    <span className={cn('text-sm font-bold whitespace-nowrap', tx.amount > 0 ? 'text-emerald-500' : 'text-slate-800')}>
+                      {tx.amount > 0 ? '+' : '-'}{fmt(tx.amount)} F
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </ScreenLayout>
+      <BottomNav />
+    </div>
+  );
+}
