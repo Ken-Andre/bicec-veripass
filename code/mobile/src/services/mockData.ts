@@ -2,7 +2,7 @@ import type {
   OtpSendResponse, OtpVerifyResponse, PinSetupResponse, PinVerifyResponse,
   KycSession, CaptureResult, OcrResult, LivenessResult, LivenessChallenge,
   KycSubmitResponse, Notification, SupportThread, SupportMessage, BankPlan,
-  GeoRegion, GeoCity, GeoQuartier, Transaction
+  GeoRegion, GeoCity, GeoQuartier, Transaction, BankCard, SavingsPocket
 } from '../types';
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -591,4 +591,15 @@ export const mockTransactions: Transaction[] = [
   { id: 'tx13', type: 'credit', label: 'Prime de fin d\'année', amount: 100000, date: new Date(now - 12 * day).toISOString(), category: 'salary', counterparty: 'SABC' },
   { id: 'tx14', type: 'debit', label: 'Pharmacie du Centre', amount: -4500, date: new Date(now - 13 * day).toISOString(), category: 'purchase', counterparty: 'Pharmacie Centre' },
   { id: 'tx15', type: 'debit', label: 'Abonnement Canal+', amount: -10000, date: new Date(now - 14 * day).toISOString(), category: 'bill_payment', counterparty: 'Canal+ Cameroun' },
+];
+
+export const mockCards: BankCard[] = [
+  { id: 'c1', name: 'Carte Virtuelle', last4: '4521', fullNumber: '4532 8901 2345 4521', type: 'virtual', brand: 'visa', expiry: '12/27', cvv: '456', status: 'active', frozen: false },
+  { id: 'c2', name: 'Carte Visa', last4: '8903', fullNumber: '4716 2300 5678 8903', type: 'physical', brand: 'visa', expiry: '09/28', cvv: '789', status: 'active', frozen: false },
+];
+
+export const mockSavingsPockets: SavingsPocket[] = [
+  { id: 'p1', name: 'Épargne voyage', amount: 50000, goal: 200000, color: 'bg-amber-500', icon: '✈️' },
+  { id: 'p2', name: 'Fonds d\'urgence', amount: 75000, goal: 500000, color: 'bg-emerald-500', icon: '🛟' },
+  { id: 'p3', name: 'Études', amount: 120000, goal: 300000, color: 'bg-blue-500', icon: '📚' },
 ];

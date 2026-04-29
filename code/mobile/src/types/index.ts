@@ -314,6 +314,14 @@ export type TransactionCategory =
   | 'purchase'
   | 'salary';
 
+export type IsoScheme = 'SEPA' | 'XAF-RTGS' | 'MOBILE';
+
+export interface IsoTransactionMeta {
+  endToEndId: string;
+  msgId: string;
+  scheme: IsoScheme;
+}
+
 export interface Transaction {
   id: string;
   type: 'credit' | 'debit';
@@ -322,4 +330,65 @@ export interface Transaction {
   date: string;
   category: TransactionCategory;
   counterparty: string;
+  iso?: IsoTransactionMeta;
+}
+
+// === BANKING TYPES ===
+
+export interface BankCard {
+  id: string;
+  name: string;
+  last4: string;
+  fullNumber: string;
+  type: 'virtual' | 'physical';
+  brand: 'visa' | 'mastercard';
+  expiry: string;
+  cvv: string;
+  status: 'active' | 'frozen' | 'blocked';
+  frozen: boolean;
+}
+
+export interface CreditTransferInput {
+  debtorName: string;
+  debtorIban: string;
+  debtorBic?: string;
+  creditorName: string;
+  creditorIban: string;
+  creditorBic?: string;
+  amount: number;
+  currency: string;
+  remittance?: string;
+  scheme?: IsoScheme;
+}
+
+export interface BuiltCreditTransfer {
+  msgId: string;
+  endToEndId: string;
+  instrId: string;
+  createdAt: string;
+  xml: string;
+  scheme: IsoScheme;
+}
+
+export interface SavingsPocket {
+  id: string;
+  name: string;
+  amount: number;
+  goal: number;
+  color: string;
+  icon: string;
+}
+
+export interface Transfer {
+  id: string;
+  type: 'bicec' | 'mobile';
+  amount: number;
+  currency: string;
+  creditorName: string;
+  creditorIban?: string;
+  creditorPhone?: string;
+  motif?: string;
+  status: 'pending' | 'completed' | 'failed';
+  iso?: IsoTransactionMeta;
+  createdAt: string;
 }
