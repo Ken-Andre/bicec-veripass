@@ -39,15 +39,17 @@ const GLARE_AVG = 200;
 const ASPECT_MIN = 1.45;
 const ASPECT_MAX = 1.75; // ID-1 ≈ 1.586
 
-export function evaluateCni(m: CniMetrics): CniCheckResult {
+export function evaluateCni(m: CniMetrics, skipAspectRatio = false): CniCheckResult {
   const failures: CniCheckCode[] = [];
 
   if (m.width * m.height < MIN_PIXELS) failures.push('resolution');
   if (m.sharpness < MIN_SHARPNESS) failures.push('sharpness');
   if (m.avgBrightness < MIN_BRIGHTNESS || m.avgBrightness > MAX_BRIGHTNESS) failures.push('brightness');
   if (m.maxBrightness > GLARE_MAX && m.avgBrightness > GLARE_AVG) failures.push('glare');
-  const ar = m.height > 0 ? m.width / m.height : 0;
-  if (ar < ASPECT_MIN || ar > ASPECT_MAX) failures.push('aspect_ratio');
+  if (!skipAspectRatio) {
+    const ar = m.height > 0 ? m.width / m.height : 0;
+    if (ar < ASPECT_MIN || ar > ASPECT_MAX) failures.push('aspect_ratio');
+  }
 
   // Authenticity: weighted score from each criterion, all-or-nothing per axis.
   const passed = 5 - failures.length;

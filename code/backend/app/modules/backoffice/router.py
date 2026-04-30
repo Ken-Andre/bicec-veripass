@@ -730,7 +730,7 @@ async def list_audit_logs(
     page: PageParams = Depends(),
     session_id: str | None = None,
     _agent: Agent = Depends(
-        require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT)
+        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT)
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -871,9 +871,15 @@ async def send_support_message(
     )
     db.add(message)
 
+    # Look up the session's user_id for the notification
+    session_result = await db.execute(
+        select(KYCSession.user_id).where(KYCSession.id == thread.session_id)
+    )
+    session_user_id = session_result.scalar_one_or_none()
+
     notification = Notification(
         id=uuid.uuid4(),
-        user_id=None,
+        user_id=session_user_id,
         type="SUPPORT_MESSAGE",
         message=f"Nouveau message de l'agent : {body.content[:100]}",
         payload={

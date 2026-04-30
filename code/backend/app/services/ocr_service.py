@@ -1288,6 +1288,7 @@ class OCRService:
         """
         _t0 = time.perf_counter()
         is_bill = doc_type.startswith("BILL_")
+        _target_fields = BILL_FIELDS.get(doc_type, CNI_FIELDS) if is_bill else CNI_FIELDS
 
         # Step 1: Align card image (only for CNI, not bills)
         if is_bill:
@@ -1306,7 +1307,7 @@ class OCRService:
         if ocr is None:
             logger.warning("PaddleOCR not available, returning empty results")
             return {
-                "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
+                "fields": {f: {"value": None, "conf": 0.0} for f in _target_fields},
                 "blocks": [],
                 "engine": "paddleocr_unavailable",
                 "needs_glm_fallback": True,
@@ -1318,7 +1319,7 @@ class OCRService:
             if enhanced is None or enhanced.size == 0:
                 logger.error("Empty image passed to OCR")
                 return {
-                    "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
+                    "fields": {f: {"value": None, "conf": 0.0} for f in _target_fields},
                     "blocks": [],
                     "engine": "paddleocr_error",
                     "needs_glm_fallback": True,
@@ -1340,7 +1341,7 @@ class OCRService:
         except Exception as exc:
             logger.error(f"OCR total failure: {exc}", exc_info=True)
             return {
-                "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
+                "fields": {f: {"value": None, "conf": 0.0} for f in _target_fields},
                 "blocks": [],
                 "engine": "paddleocr_error",
                 "needs_glm_fallback": True,
@@ -1350,7 +1351,7 @@ class OCRService:
         if not results or not results[0].get("rec_texts"):
             logger.warning("No text detected in image")
             return {
-                "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
+                "fields": {f: {"value": None, "conf": 0.0} for f in _target_fields},
                 "blocks": [],
                 "engine": "paddleocr",
                 "needs_glm_fallback": True,

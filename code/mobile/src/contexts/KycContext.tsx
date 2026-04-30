@@ -271,11 +271,11 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
   const setReviewStatus = useCallback((reviewStatus: ReviewStatus | null) => 
     setState(s => ({ ...s, reviewStatus })), []);
 
-  const resetKyc = useCallback(() => {
-    setState(initialState);
-    void clearPersistedKycState().catch((err) => {
+  const resetKyc = useCallback(async () => {
+    await clearPersistedKycState().catch((err) => {
       console.warn('Failed to clear persisted KYC state', err);
     });
+    setState(initialState);
   }, []);
 
   // Compute derived fields using useMemo to avoid recomputation on every render

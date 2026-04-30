@@ -247,14 +247,14 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           return;
         }
 
-        // Additional CNI-specific quality gate
+        // Additional CNI-specific quality gate (skip aspect_ratio on live feed)
         const cniResult = evaluateCni({
           width: vw,
           height: vh,
           sharpness: variance,
           avgBrightness: avgBrightness,
           maxBrightness: maxBrightness,
-        });
+        }, true);
 
         if (!cniResult.ok) {
           setQuality('cni_fail');
