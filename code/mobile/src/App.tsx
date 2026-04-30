@@ -30,6 +30,8 @@ import OcrReviewScreen from './views/kyc/OcrReviewScreen';
 import BiometricConsentScreen from './views/kyc/BiometricConsentScreen';
 import LivenessScreen from './views/kyc/LivenessScreen';
 import BillCaptureScreen from './views/kyc/BillCaptureScreen';
+import BillTypeSelectScreen from './views/kyc/BillTypeSelectScreen';
+import BillUploadScreen from './views/kyc/BillUploadScreen';
 import AddressScreen from './views/kyc/AddressScreen';
 import NiuScreen from './views/kyc/NiuScreen';
 import ConsentScreen from './views/kyc/ConsentScreen';
@@ -54,10 +56,6 @@ function CniRectoCapture() {
 
 function CniVersoCapture() {
   return <CniCaptureScreen side="verso" nextRoute="/kyc/ocr-review" />;
-}
-
-function BillEneoCapture() {
-  return <BillCaptureScreen billType="ENEO" />;
 }
 
 function App() {
@@ -107,8 +105,10 @@ function App() {
                 <Route path="/kyc/ocr-review" element={<LockGuard><KycHydrationGate><OcrReviewScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/biometric-consent" element={<LockGuard><KycHydrationGate><BiometricConsentScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/liveness" element={<LockGuard><KycHydrationGate><LivenessScreen /></KycHydrationGate></LockGuard>} />
-                {/* Bill capture → Address → NIU → Consent → Signature → Review → Submit */}
-                <Route path="/kyc/bill-capture" element={<LockGuard><KycHydrationGate><BillEneoCapture /></KycHydrationGate></LockGuard>} />
+                {/* Bill type select → Capture or Upload → Address → NIU → ... */}
+                <Route path="/kyc/bill-select" element={<LockGuard><KycHydrationGate><BillTypeSelectScreen /></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/bill-capture" element={<LockGuard><KycHydrationGate><BillCaptureScreen /></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/bill-upload" element={<LockGuard><KycHydrationGate><BillUploadScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/address" element={<LockGuard><KycHydrationGate><AddressScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/niu" element={<LockGuard><KycHydrationGate><NiuScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/consent" element={<LockGuard><KycHydrationGate><ConsentScreen /></KycHydrationGate></LockGuard>} />

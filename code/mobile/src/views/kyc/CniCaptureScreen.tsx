@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useKyc } from '../../contexts/KycContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { computeLaplacianVariance } from '../../services/mediapipeService';
+import { evaluateCni } from '../../services/cniValidator';
 import { Camera, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import { enqueueOfflineCniCapture, runKycSyncNow } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
 import { captureKycException, captureKycMessage } from '../../services/sentry';
 
-type QualityStatus = 'checking' | 'good' | 'blurry' | 'dark' | 'glare';
+type QualityStatus = 'checking' | 'good' | 'blurry' | 'dark' | 'glare' | 'cni_fail';
 
 interface CniCaptureScreenProps {
   side: 'recto' | 'verso';
@@ -246,6 +247,20 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           return;
         }
 
+        // Additional CNI-specific quality gate
+        const cniResult = evaluateCni({
+          width: vw,
+          height: vh,
+          sharpness: variance,
+          avgBrightness: avgBrightness,
+          maxBrightness: maxBrightness,
+        });
+
+        if (!cniResult.ok) {
+          setQuality('cni_fail');
+          return;
+        }
+
         setQuality('good');
       } catch {
         setQuality('good');
@@ -266,6 +281,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
       case 'blurry': return t('capture.quality.blurry');
       case 'dark': return t('capture.quality.dark');
       case 'glare': return t('capture.quality.glare');
+      case 'cni_fail': return t('capture.quality.cni_fail') || 'Qualité insuffisante';
       default: return t('capture.quality.analyzing');
     }
   };
@@ -276,6 +292,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
       case 'blurry': return 'bg-orange-500 text-white';
       case 'dark': return 'bg-blue-500 text-white';
       case 'glare': return 'bg-yellow-500 text-black';
+      case 'cni_fail': return 'bg-red-500 text-white';
       default: return 'bg-gray-500 text-white';
     }
   };
@@ -286,6 +303,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
       case 'blurry': return 'border-orange-500';
       case 'dark': return 'border-blue-500';
       case 'glare': return 'border-yellow-500';
+      case 'cni_fail': return 'border-red-500';
       default: return 'border-white/50';
     }
   };

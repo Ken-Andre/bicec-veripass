@@ -93,6 +93,18 @@ class User(Base):
     notifications = relationship(
         "Notification", back_populates="user", cascade="all, delete-orphan"
     )
+    bank_cards = relationship(
+        "BankCard", back_populates="user", cascade="all, delete-orphan"
+    )
+    transfers = relationship(
+        "Transfer", back_populates="user", cascade="all, delete-orphan"
+    )
+    transactions = relationship(
+        "Transaction", back_populates="user", cascade="all, delete-orphan"
+    )
+    savings_pockets = relationship(
+        "SavingsPocket", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Agent(Base):

@@ -20,3 +20,4 @@ from app.modules.kyc.models import (  # noqa
 from app.modules.admin.models import Agency, ProvisioningBatch, ProvisioningBatchItem  # noqa
 from app.modules.audit.models import AuditLog  # noqa
 from app.modules.aml.models import BatchJob  # noqa
+from app.modules.banking.models import BankCard, Transfer, Transaction, SavingsPocket  # noqa

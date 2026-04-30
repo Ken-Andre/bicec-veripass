@@ -3,9 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
-import { Edit2, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { ConfidenceBadge } from '../../components/ConfidenceBadge';
+import { ProgressStepper } from '../../components/ProgressStepper';
+import { Edit2, AlertCircle, Loader2 } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import { captureKycException } from '../../services/sentry';
+
+const KYC_STEPS = [
+  { label: 'CNI' },
+  { label: 'OCR' },
+  { label: 'Visage' },
+  { label: 'Adresse' },
+  { label: 'Facture' },
+  { label: 'NIU' },
+  { label: 'Consent.' },
+  { label: 'Signature' },
+  { label: 'Revue' },
+];
 
 type OcrField = {
   field_name: string;
@@ -30,7 +44,6 @@ export default function OcrReviewScreen() {
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [threshold, setThreshold] = useState(0.90);
   const [userEditThreshold, setUserEditThreshold] = useState(0.95);
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [retryCount, setRetryCount] = useState(0);
@@ -47,7 +60,6 @@ export default function OcrReviewScreen() {
     try {
       const res = await apiClient.get<any>('/ocr/config/thresholds');
       if (mountedRef.current && res) {
-        setThreshold(res.confidence_threshold ?? 0.90);
         setUserEditThreshold(res.user_edit_threshold ?? 0.95);
       }
     } catch (err) {
@@ -201,45 +213,6 @@ export default function OcrReviewScreen() {
     };
   }, [setCurrentStep, t, sessionId]);
 
-  const getConfidenceLevel = (score: number) => {
-    if (score >= threshold) return 'high';
-    if (score >= 0.5) return 'medium';
-    return 'low';
-  };
-
-  const getConfidenceUI = (score: number, editable: boolean) => {
-    // Show warning if user can edit (confidence below threshold)
-    if (editable) {
-      return {
-        color: 'text-orange-600',
-        bg: 'bg-orange-100',
-        icon: <AlertCircle className="w-3 h-3" />,
-      };
-    }
-
-    const level = getConfidenceLevel(score);
-    switch (level) {
-      case 'high':
-        return {
-          color: 'text-green-600',
-          bg: 'bg-green-100',
-          icon: <ShieldCheck className="w-3 h-3" />,
-        };
-      case 'medium':
-        return {
-          color: 'text-orange-600',
-          bg: 'bg-orange-100',
-          icon: <AlertCircle className="w-3 h-3" />,
-        };
-      default:
-        return {
-          color: 'text-red-600',
-          bg: 'bg-red-100',
-          icon: <AlertCircle className="w-3 h-3" />,
-        };
-    }
-  };
-
   const handleSubmit = async () => {
     try {
       const corrections: Record<string, string> = {};
@@ -296,7 +269,8 @@ export default function OcrReviewScreen() {
 
   return (
     <ScreenLayout title={t('ocr.review.title')} showBack>
-      <div className="flex flex-col gap-6 py-4">
+      <ProgressStepper steps={KYC_STEPS} currentStep={1} className="mb-4" />
+      <div className="flex flex-col gap-6 py-2">
         {fetchState === 'error' && statusMessage && (
           <div className="bg-red-50 p-4 rounded-2xl border border-red-200">
             <div className="flex items-start gap-3">
@@ -348,7 +322,6 @@ export default function OcrReviewScreen() {
             </div>
           ) : (
             fields.map((field) => {
-              const ui = getConfidenceUI(field.confidence, field.editable);
               const currentValue = editedValues[field.field_name] ?? field.value;
               const isEditing = editing === field.field_name;
 
@@ -358,14 +331,7 @@ export default function OcrReviewScreen() {
                     <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                       {getFieldLabel(field.field_name)}
                     </label>
-                    <div
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${ui.bg} ${ui.color}`}
-                    >
-                      {ui.icon}
-                      {field.confidence > 0
-                        ? `${Math.round(field.confidence * 100)}%`
-                        : 'N/A'}
-                    </div>
+                    <ConfidenceBadge confidence={field.confidence} />
                   </div>
 
                   <div

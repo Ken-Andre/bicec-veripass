@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { BottomNav } from '../../components/BottomNav';
+import { apiClient } from '../../services/apiClient';
 import { mockTransactions } from '../../services/mockData';
 import { ArrowUpRight, ArrowDownLeft, Smartphone, Zap, ShoppingCart, Briefcase } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import type { TransactionCategory } from '../../types';
+import type { TransactionCategory, Transaction } from '../../types';
 
 const categoryIcons: Record<TransactionCategory, typeof ArrowUpRight> = {
   transfer_out: ArrowUpRight,
@@ -30,8 +31,16 @@ type Filter = 'all' | 'in' | 'out';
 export function TransactionHistoryScreen() {
   const { t } = useLanguage();
   const [filter, setFilter] = useState<Filter>('all');
+  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
 
-  const filtered = mockTransactions.filter((tx) => {
+  useEffect(() => {
+    const cat = filter === 'all' ? '' : filter;
+    apiClient.get<{ transactions: Transaction[] }>(`/banking/transactions${cat ? `?category=${cat}` : ''}`)
+      .then(data => { if (data?.transactions?.length) setTransactions(data.transactions); })
+      .catch(() => {});
+  }, [filter]);
+
+  const filtered = transactions.filter((tx) => {
     if (filter === 'in') return tx.amount > 0;
     if (filter === 'out') return tx.amount < 0;
     return true;

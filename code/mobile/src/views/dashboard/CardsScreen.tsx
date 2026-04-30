@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { BottomNav } from '../../components/BottomNav';
+import { apiClient } from '../../services/apiClient';
 import { mockCards } from '../../services/mockData';
 import type { BankCard } from '../../types';
 import { CreditCard, Wifi, Lock, Eye, EyeOff, Copy, CheckCircle, Snowflake, MapPin } from 'lucide-react';
@@ -13,8 +14,24 @@ export function CardsScreen() {
   const [showDetails, setShowDetails] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState(false);
 
-  const toggleFreeze = (id: string) => {
-    setCards(cards.map(c => c.id === id ? { ...c, frozen: !c.frozen, status: c.frozen ? 'active' : 'frozen' } : c));
+  useEffect(() => {
+    apiClient.get<BankCard[]>('/banking/cards')
+      .then(data => { if (data && data.length > 0) setCards(data); })
+      .catch(() => {}); // keep mock data
+  }, []);
+
+  const toggleFreeze = async (id: string) => {
+    const card = cards.find(c => c.id === id);
+    if (!card) return;
+    const newFrozen = !card.frozen;
+    // Optimistic update
+    setCards(cards.map(c => c.id === id ? { ...c, frozen: newFrozen, status: newFrozen ? 'frozen' : 'active' } : c));
+    try {
+      await apiClient.post(`/banking/cards/${id}/freeze`, { frozen: newFrozen });
+    } catch {
+      // Revert on failure
+      setCards(cards.map(c => c.id === id ? { ...c, frozen: !newFrozen, status: !newFrozen ? 'frozen' : 'active' } : c));
+    }
   };
 
   const handleCopy = (text: string) => {

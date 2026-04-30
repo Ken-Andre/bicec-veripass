@@ -1,14 +1,16 @@
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
+import { CelebrationOverlay } from '../../components/CelebrationOverlay';
 import { CheckCircle, Clock, FileCheck, Building2, ArrowRight } from 'lucide-react';
 import { useKyc } from '../../contexts/KycContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function SubmitSuccessScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { resetKyc } = useKyc();
+  const [showCelebration, setShowCelebration] = useState(true);
 
   useEffect(() => {
     // Clear KYC state after successful submission and auto-redirect to dashboard
@@ -21,7 +23,15 @@ export default function SubmitSuccessScreen() {
   }, [resetKyc, navigate]);
 
   return (
-    <ScreenLayout title={t('submit.success.title') || 'Dossier soumis'}>
+    <>
+      <CelebrationOverlay
+        show={showCelebration}
+        title={t('celebration.title')}
+        message={t('celebration.message')}
+        onComplete={() => setShowCelebration(false)}
+        autoHide={4000}
+      />
+      <ScreenLayout title={t('submit.success.title') || 'Dossier soumis'}>
       <div className="flex flex-col items-center gap-6 py-8">
         <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center border-4 border-green-100">
           <CheckCircle className="w-14 h-14 text-green-500" />
@@ -83,7 +93,8 @@ export default function SubmitSuccessScreen() {
           Un récapitulatif de votre dossier vous a été envoyé par email. Vous pouvez consulter l\'état de votre dossier à tout moment depuis votre tableau de bord.
         </p>
       </div>
-    </ScreenLayout>
+      </ScreenLayout>
+    </>
   );
 }
 

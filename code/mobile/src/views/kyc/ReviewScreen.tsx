@@ -3,9 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
+import { ProgressStepper } from '../../components/ProgressStepper';
 import { CheckCircle, FileText, User, MapPin, Shield, Loader2, PenLine, Receipt, AlertCircle } from 'lucide-react';
 import { getSubmissionBlockerStatus, runKycSyncNow } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
+
+const KYC_STEPS = [
+  { label: 'CNI' },
+  { label: 'OCR' },
+  { label: 'Visage' },
+  { label: 'Adresse' },
+  { label: 'Facture' },
+  { label: 'NIU' },
+  { label: 'Consent.' },
+  { label: 'Signature' },
+  { label: 'Revue' },
+];
 
 interface SessionData {
   status: string;
@@ -138,7 +151,8 @@ export default function ReviewScreen() {
 
   return (
     <ScreenLayout title={t('review.title')} showBack>
-      <div className="flex flex-col gap-4 py-4">
+      <ProgressStepper steps={KYC_STEPS} currentStep={8} className="mb-4" />
+      <div className="flex flex-col gap-4 py-2">
         <h2 className="text-lg font-bold">{t('review.title')}</h2>
         <p className="text-sm text-muted-foreground">Vérifiez votre dossier avant soumission</p>
 

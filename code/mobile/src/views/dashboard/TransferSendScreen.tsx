@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
+import { apiClient } from '../../services/apiClient';
 import { buildPacs008, downloadIsoXml, isValidIban, isValidBic } from '../../services/iso20022';
 import type { BuiltCreditTransfer } from '../../types';
 import { Building2, Smartphone, CheckCircle, ArrowRight, Download } from 'lucide-react';
@@ -40,6 +41,36 @@ export function TransferSendScreen() {
   const handleConfirm = async () => {
     if (pin.length !== 6) return;
     setLoading(true);
+
+    // Try backend API first
+    try {
+      const res = await apiClient.post<{ transfer: { id: string }; iso_preview: BuiltCreditTransfer }, {
+        transfer_type: TransferType;
+        amount: number;
+        currency: string;
+        creditor_name: string;
+        creditor_iban?: string;
+        creditor_bic?: string;
+        creditor_phone?: string;
+        motif?: string;
+      }>('/banking/transfers/send', {
+        transfer_type: transferType!,
+        amount: parseInt(amount || '0', 10),
+        currency: 'XAF',
+        creditor_name: creditorName || recipient,
+        creditor_iban: transferType === 'bicec' ? recipient.replace(/\s/g, '') : undefined,
+        creditor_bic: creditorBic || undefined,
+        creditor_phone: transferType === 'mobile' ? recipient : undefined,
+        motif: motif || undefined,
+      });
+      setIso(res.iso_preview);
+      setLoading(false);
+      setStep('success');
+      return;
+    } catch {
+      // Fallback to client-side ISO generation
+    }
+
     await new Promise(r => setTimeout(r, 1500));
 
     const built = buildPacs008({

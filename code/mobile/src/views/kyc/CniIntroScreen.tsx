@@ -1,7 +1,20 @@
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
+import { ProgressStepper } from '../../components/ProgressStepper';
 import { Shield, Lock } from 'lucide-react';
+
+const KYC_STEPS = [
+  { label: 'CNI' },
+  { label: 'OCR' },
+  { label: 'Visage' },
+  { label: 'Adresse' },
+  { label: 'Facture' },
+  { label: 'NIU' },
+  { label: 'Consent.' },
+  { label: 'Signature' },
+  { label: 'Revue' },
+];
 
 export default function CniIntroScreen() {
   const { t } = useLanguage();
@@ -9,7 +22,8 @@ export default function CniIntroScreen() {
 
   return (
     <ScreenLayout title={t('cni.intro.title')} showBack>
-      <div className="flex flex-col items-center gap-6 py-8">
+      <ProgressStepper steps={KYC_STEPS} currentStep={0} className="mb-6" />
+      <div className="flex flex-col items-center gap-6 py-4">
         <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
           <Shield className="w-10 h-10 text-primary" />
         </div>

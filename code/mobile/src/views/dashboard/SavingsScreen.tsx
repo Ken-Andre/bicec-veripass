@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { BottomNav } from '../../components/BottomNav';
+import { apiClient } from '../../services/apiClient';
 import { mockSavingsPockets } from '../../services/mockData';
 import type { SavingsPocket } from '../../types';
 import { Plus, PiggyBank, Target, TrendingUp } from 'lucide-react';
@@ -15,20 +16,38 @@ export function SavingsScreen() {
   const [newGoal, setNewGoal] = useState('');
   const [newInitial, setNewInitial] = useState('');
 
+  useEffect(() => {
+    apiClient.get<{ pockets: SavingsPocket[] }>('/banking/savings/pockets')
+      .then(data => { if (data?.pockets?.length) setPockets(data.pockets); })
+      .catch(() => {});
+  }, []);
+
   const totalSaved = pockets.reduce((s, p) => s + p.amount, 0);
   const fmt = (n: number) => n.toLocaleString('fr-FR');
 
-  const handleCreatePocket = () => {
+  const handleCreatePocket = async () => {
     if (!newName || !newGoal) return;
-    const pocket: SavingsPocket = {
-      id: Date.now().toString(),
-      name: newName,
-      amount: parseInt(newInitial) || 0,
-      goal: parseInt(newGoal),
-      color: ['bg-amber-500', 'bg-emerald-500', 'bg-blue-500', 'bg-purple-500'][pockets.length % 4],
-      icon: '💰',
-    };
-    setPockets([...pockets, pocket]);
+    try {
+      const created = await apiClient.post<SavingsPocket, { name: string; goal: number; initial_amount: number; color?: string; icon?: string }>('/banking/savings/pockets', {
+        name: newName,
+        goal: parseInt(newGoal),
+        initial_amount: parseInt(newInitial) || 0,
+        color: ['bg-amber-500', 'bg-emerald-500', 'bg-blue-500', 'bg-purple-500'][pockets.length % 4],
+        icon: '💰',
+      });
+      setPockets([...pockets, created]);
+    } catch {
+      // Fallback to local creation
+      const pocket: SavingsPocket = {
+        id: Date.now().toString(),
+        name: newName,
+        amount: parseInt(newInitial) || 0,
+        goal: parseInt(newGoal),
+        color: ['bg-amber-500', 'bg-emerald-500', 'bg-blue-500', 'bg-purple-500'][pockets.length % 4],
+        icon: '💰',
+      };
+      setPockets([...pockets, pocket]);
+    }
     setNewName(''); setNewGoal(''); setNewInitial('');
     setShowDialog(false);
   };
