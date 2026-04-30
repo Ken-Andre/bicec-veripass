@@ -77,6 +77,8 @@ class DocumentResponse(BaseModel):
     doc_type: str
     file_path: str
     sha256_hash: str
+    ocr_status: str = "PENDING"
+    ocr_error: Optional[str] = None
     ocr_engine: Optional[str] = None
     confidence_per_field: Optional[dict] = None
     capture_quality_metrics: Optional[dict] = None

@@ -20,6 +20,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -919,3 +920,101 @@ async def mark_message_read(
     message.read_at = datetime.now(timezone.utc)
     await db.commit()
     return {"status": "read", "message_id": str(message_id)}
+
+
+# --- OCR Correction ---
+
+
+class OcrCorrectRequest(BaseModel):
+    document_id: str
+    field_name: str
+    corrected_value: str
+
+
+@router.post("/dossier/{session_id}/ocr-correct", status_code=200)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def correct_ocr_field(
+    request: Request,
+    session_id: str,
+    body: OcrCorrectRequest,
+    current_agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE)
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Allow an agent to correct an OCR field value."""
+    try:
+        session_uuid = uuid.UUID(session_id)
+        doc_uuid = uuid.UUID(body.document_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID format")
+
+    # Verify session exists
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == session_uuid)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Verify document belongs to session
+    doc_result = await db.execute(
+        select(Document).where(
+            Document.id == doc_uuid,
+            Document.session_id == session_uuid,
+        )
+    )
+    document = doc_result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found in this session")
+
+    # Find the OCR field
+    field_result = await db.execute(
+        select(OCRField).where(
+            OCRField.document_id == doc_uuid,
+            OCRField.field_name == body.field_name,
+        )
+    )
+    field = field_result.scalar_one_or_none()
+    if not field:
+        raise HTTPException(status_code=404, detail=f"OCR field '{body.field_name}' not found")
+
+    # Update the field
+    now = datetime.now(timezone.utc)
+    field.corrected_value = body.corrected_value
+    field.human_corrected = True
+    field.corrected_by_agent_id = current_agent.id
+    field.corrected_at = now
+
+    # Create audit log
+    from app.modules.audit.models import AuditLog
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="OCR_CORRECTION",
+        table_name="ocr_fields",
+        record_id=str(field.id),
+        old_data={"extracted_value": field.extracted_value},
+        new_data={
+            "corrected_value": body.corrected_value,
+            "field_name": body.field_name,
+            "document_id": str(doc_uuid),
+        },
+        performed_by=current_agent.id,
+        performed_at=now,
+    )
+    db.add(audit)
+
+    await db.commit()
+
+    logger.info(
+        f"Agent {current_agent.id} corrected OCR field '{body.field_name}' "
+        f"for document {doc_uuid} in session {session_id}"
+    )
+
+    return {
+        "status": "corrected",
+        "field_name": body.field_name,
+        "corrected_value": body.corrected_value,
+        "corrected_by": str(current_agent.id),
+        "corrected_at": now.isoformat(),
+    }

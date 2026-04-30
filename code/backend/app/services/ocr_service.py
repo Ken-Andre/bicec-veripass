@@ -422,6 +422,49 @@ CNI_VERSO_ZONES = [
 
 
 # ---------------------------------------------------------------------------
+# Positional template zones for BILL field extraction (ENEO / CAMWATER)
+# ---------------------------------------------------------------------------
+# Bills are A4 landscape documents — NOT card-shaped.
+# Positions calibrated on ENEO Facture d'Electricite (standard layout).
+# Zone format: (field_name, cy_min, cy_max, cx_min, cx_max, validator_key)
+
+BILL_ENEO_ZONES = [
+    # Zone                    cy_min  cy_max  cx_min  cx_max  validator
+    ("contrat_number",         0.18,   0.32,   0.02,   0.35, "is_contract_number"),
+    ("compteur_number",        0.18,   0.32,   0.35,   0.65, "is_meter_number"),
+    ("date_releve",            0.22,   0.30,   0.35,   0.65, "is_bill_date"),
+    ("date_facturation",       0.26,   0.34,   0.35,   0.65, "is_bill_date"),
+    ("date_limite_paiement",   0.15,   0.35,   0.70,   0.98, "is_bill_date"),
+    ("agence",                 0.32,   0.42,   0.02,   0.35, "is_bill_agence"),
+    ("ville",                  0.38,   0.48,   0.02,   0.35, "is_bill_place"),
+    ("total_ttc",              0.85,   0.98,   0.30,   0.70, "is_bill_amount"),
+    ("kwh_consommes",          0.42,   0.55,   0.40,   0.60, "is_bill_amount"),
+    ("categorie",              0.08,   0.18,   0.70,   0.98, "is_bill_category"),
+]
+
+BILL_CAMWATER_ZONES = [
+    # Zone                    cy_min  cy_max  cx_min  cx_max  validator
+    ("contrat_number",         0.18,   0.32,   0.02,   0.35, "is_contract_number"),
+    ("compteur_number",        0.18,   0.32,   0.35,   0.65, "is_meter_number"),
+    ("date_facturation",       0.26,   0.34,   0.35,   0.65, "is_bill_date"),
+    ("date_limite_paiement",   0.15,   0.35,   0.70,   0.98, "is_bill_date"),
+    ("total_ttc",              0.85,   0.98,   0.30,   0.70, "is_bill_amount"),
+    ("consommation_m3",        0.42,   0.55,   0.40,   0.60, "is_bill_amount"),
+]
+
+BILL_FIELDS = {
+    "BILL_ENEO": [
+        "contrat_number", "compteur_number", "date_releve", "date_facturation",
+        "date_limite_paiement", "agence", "ville", "total_ttc", "kwh_consommes", "categorie",
+    ],
+    "BILL_CAMWATER": [
+        "contrat_number", "compteur_number", "date_facturation",
+        "date_limite_paiement", "total_ttc", "consommation_m3",
+    ],
+}
+
+
+# ---------------------------------------------------------------------------
 # Content validators — check FORMAT, not specific values
 # ---------------------------------------------------------------------------
 def _is_date_text(text: str) -> bool:
@@ -514,6 +557,57 @@ def _is_poste_text(text: str) -> bool:
     return bool(re.match(r'^[A-Z]{1,4}[0-9]{2,4}$', t)) or (len(t) <= 6 and len(re.sub(r'\D', '', t)) >= 2 and len(re.sub(r'[^A-Z]', '', t)) >= 1)
 
 
+# ---------------------------------------------------------------------------
+# Bill-specific validators (ENEO / CAMWATER)
+# ---------------------------------------------------------------------------
+def _is_contract_number_text(text: str) -> bool:
+    """Validate a utility contract number (8-12 digits)."""
+    cleaned = re.sub(r"\D", "", text)
+    return 8 <= len(cleaned) <= 12
+
+
+def _is_meter_number_text(text: str) -> bool:
+    """Validate a meter/compteur number (10-11 digits)."""
+    cleaned = re.sub(r"\D", "", text)
+    return 10 <= len(cleaned) <= 11
+
+
+def _is_bill_amount_text(text: str) -> bool:
+    """Validate a bill amount (number with optional separators)."""
+    cleaned = text.replace(" ", "").replace(".", "").replace(",", ".")
+    try:
+        amount = float(cleaned)
+        return 0 < amount < 10_000_000
+    except (ValueError, TypeError):
+        return False
+
+
+def _is_bill_date_text(text: str) -> bool:
+    """Validate a bill date (DD/MM/YYYY or DD-MM-YYYY)."""
+    patterns = [
+        r"\b\d{2}/\d{2}/\d{4}\b",
+        r"\b\d{2}-\d{2}-\d{4}\b",
+        r"\b\d{2}\.\d{2}\.\d{4}\b",
+    ]
+    return any(re.search(p, text) for p in patterns)
+
+
+def _is_bill_agence_text(text: str) -> bool:
+    """Validate an agency name (alphabetic, 3+ chars)."""
+    return _is_alphabetic_text(text, min_len=3)
+
+
+def _is_bill_place_text(text: str) -> bool:
+    """Validate a city/ville name (alphabetic)."""
+    return _is_alphabetic_text(text, min_len=2)
+
+
+def _is_bill_category_text(text: str) -> bool:
+    """Validate a bill category (e.g. LV - DOMESTIC)."""
+    t = text.strip().upper()
+    return len(t) >= 3 and any(kw in t for kw in ["DOMESTIC", "COMMERCIAL", "INDUSTRIEL", "LV", "MV", "HV"])
+
+
 _VALIDATORS = {
     "is_name": _is_name_text,
     "is_date": _is_date_text,
@@ -524,6 +618,13 @@ _VALIDATORS = {
     "is_profession": _is_profession_text,
     "is_address": _is_address_text,
     "is_poste": _is_poste_text,
+    "is_contract_number": _is_contract_number_text,
+    "is_meter_number": _is_meter_number_text,
+    "is_bill_amount": _is_bill_amount_text,
+    "is_bill_date": _is_bill_date_text,
+    "is_bill_agence": _is_bill_agence_text,
+    "is_bill_place": _is_bill_place_text,
+    "is_bill_category": _is_bill_category_text,
 }
 
 
@@ -686,6 +787,89 @@ def _extract_by_template(
         parsed[field_name] = {"value": value, "conf": best_conf}
 
     return parsed
+
+
+def _extract_bill_by_template(
+    blocks: list[dict[str, Any]],
+    img_height: int,
+    img_width: int,
+    doc_type: str,
+) -> dict[str, Any]:
+    """Extract bill fields using positional template zones.
+
+    Works like _extract_by_template but for ENEO/CAMWATER bills.
+    Bills are A4 landscape — no card alignment applied.
+
+    Args:
+        blocks: OCR blocks with 'text', 'cx', 'cy', 'conf' keys.
+        img_height: Height of the image in pixels.
+        img_width: Width of the image in pixels.
+        doc_type: "BILL_ENEO" or "BILL_CAMWATER".
+
+    Returns:
+        Parsed field dict with per-field value and confidence.
+    """
+    bill_fields = BILL_FIELDS.get(doc_type, [])
+    parsed = {field: {"value": None, "conf": 0.0} for field in bill_fields}
+    parsed["methode"] = "BILL_TEMPLATE_POSITIONNEL"
+    parsed["detected_doc_type"] = doc_type
+
+    zones = BILL_ENEO_ZONES if doc_type == "BILL_ENEO" else BILL_CAMWATER_ZONES
+
+    for field_name, cy_min, cy_max, cx_min, cx_max, validator_key in zones:
+        validator = _VALIDATORS.get(validator_key)
+        if validator is None:
+            continue
+
+        cy_lo = cy_min * img_height
+        cy_hi = cy_max * img_height
+        cx_lo = cx_min * img_width
+        cx_hi = cx_max * img_width
+
+        candidates = []
+        for b in blocks:
+            b_cy = b.get("cy", 0)
+            b_cx = b.get("cx", 0)
+            if not (cy_lo <= b_cy <= cy_hi and cx_lo <= b_cx <= cx_hi):
+                continue
+            b_text = b.get("text", "")
+            if not validator(b_text):
+                continue
+            zone_cx = (cx_lo + cx_hi) / 2
+            zone_cy = (cy_lo + cy_hi) / 2
+            dist = ((b_cx - zone_cx) ** 2 + (b_cy - zone_cy) ** 2) ** 0.5
+            candidates.append((b, dist))
+
+        if not candidates:
+            continue
+
+        candidates.sort(key=lambda x: x[1])
+        best_block = candidates[0][0]
+        best_text = best_block["text"].strip()
+        best_conf = float(best_block.get("conf", 0.0))
+
+        value: str | None = best_text
+        if field_name in ("date_releve", "date_facturation", "date_limite_paiement"):
+            value = _extract_date_value(best_text)
+            if value is None:
+                continue
+        elif field_name in ("total_ttc", "kwh_consommes", "consommation_m3"):
+            value = _extract_bill_amount_value(best_text)
+            if value is None:
+                continue
+
+        parsed[field_name] = {"value": value, "conf": best_conf}
+
+    return parsed
+
+
+def _extract_bill_amount_value(text: str) -> str | None:
+    """Extract a numeric amount from bill text."""
+    cleaned = text.replace(" ", "").replace(",", ".")
+    nums = re.findall(r"\d+(?:\.\d+)?", cleaned)
+    if nums:
+        return nums[0]
+    return None
 
 
 def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1056,7 +1240,7 @@ class OCRService:
         self.confidence_threshold = settings.OCR_CONFIDENCE_THRESHOLD
         self.user_edit_threshold = settings.OCR_USER_EDIT_THRESHOLD
 
-    def extract_from_bytes(self, image_bytes: bytes) -> dict[str, Any]:
+    def extract_from_bytes(self, image_bytes: bytes, doc_type: str = "CNI_RECTO") -> dict[str, Any]:
         """Extract text from image bytes using PaddleOCR with alignment."""
         start_time = time.perf_counter()
 
@@ -1064,19 +1248,27 @@ class OCRService:
         pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         img_arr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
-        result = self._extract_from_array(img_arr)
+        result = self._extract_from_array(img_arr, doc_type=doc_type)
         result["process_time_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
         return result
 
-    def extract_from_path(self, image_path: Path) -> dict[str, Any]:
-        """Extract text from image file using PaddleOCR with alignment."""
+    def extract_from_path(self, image_path: Path, doc_type: str = "CNI_RECTO") -> dict[str, Any]:
+        """Extract text from image file using PaddleOCR with alignment.
+
+        Args:
+            image_path: Path to the image file.
+            doc_type: Document type — determines extraction strategy.
+                      CNI_RECTO/CNI_VERSO → card alignment + CNI templates.
+                      BILL_ENEO/BILL_CAMWATER → no alignment + bill templates.
+        """
         start_time = time.perf_counter()
 
         img_arr = cv2.imread(str(image_path))
         if img_arr is None:
             logger.error(f"Failed to read image: {image_path}")
+            empty_fields = BILL_FIELDS.get(doc_type, CNI_FIELDS) if doc_type.startswith("BILL_") else CNI_FIELDS
             return {
-                "fields": {f: {"value": None, "conf": 0.0} for f in CNI_FIELDS},
+                "fields": {f: {"value": None, "conf": 0.0} for f in empty_fields},
                 "blocks": [],
                 "engine": "paddleocr_error",
                 "needs_glm_fallback": True,
@@ -1084,23 +1276,29 @@ class OCRService:
                 "process_time_ms": 0.0,
             }
 
-        result = self._extract_from_array(img_arr)
+        result = self._extract_from_array(img_arr, doc_type=doc_type)
         result["process_time_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
         return result
 
-    def _extract_from_array(self, img_arr: np.ndarray) -> dict[str, Any]:
-        """Run full OCR pipeline: align -> enhance -> OCR -> extract fields."""
+    def _extract_from_array(self, img_arr: np.ndarray, doc_type: str = "CNI_RECTO") -> dict[str, Any]:
+        """Run full OCR pipeline: enhance -> OCR -> extract fields.
+
+        For CNI documents: align card, use CNI templates.
+        For bills: skip alignment, use bill templates.
+        """
         _t0 = time.perf_counter()
+        is_bill = doc_type.startswith("BILL_")
 
-        # Step 1: Align the card image
-        aligned = align_card_image(img_arr)
-        if aligned is None:
-            aligned = img_arr
-            logger.debug("Card alignment failed, using original image")
-        _t_align = time.perf_counter()
-
-        # Step 2: Enhance contrast for better text detection
-        enhanced = _enhance_for_ocr(aligned)
+        # Step 1: Align card image (only for CNI, not bills)
+        if is_bill:
+            enhanced = _enhance_for_ocr(img_arr)
+            _t_align = _t0  # no alignment for bills
+        else:
+            aligned = align_card_image(img_arr)
+            if aligned is None:
+                aligned = img_arr
+                logger.debug("Card alignment failed, using original image")
+            enhanced = _enhance_for_ocr(aligned)
         _t_enhance = time.perf_counter()
 
         # Step 3: Run PaddleOCR
@@ -1136,6 +1334,7 @@ class OCRService:
                 f"OCR pipeline timing: align={(_t_align-_t0)*1000:.0f}ms, "
                 f"enhance={(_t_enhance-_t_align)*1000:.0f}ms, "
                 f"predict={(_t_ocr-_t_enhance)*1000:.0f}ms"
+                f"{'[bill]' if is_bill else ''}"
             )
 
         except Exception as exc:
@@ -1199,120 +1398,127 @@ class OCRService:
         # Step 5: Extract structured fields — TEMPLATE FIRST, then fallback
         _t_extract_start = time.perf_counter()
 
-        # Detect side for template selection
-        # Side detection logic
-        recto_keywords = {"REPUBLIQUE", "IDENTITY", "CARD", "CARTE", "NATIONALE", "RECTO"}
-        verso_keywords = {"AUTORITE", "AUTHORITY", "MRZ", "VERSO", "EMPREINTE", "FINGERPRINT"}
-        
-        # Check for MRZ separately as it's a strong indicator of Verso
-        has_mrz = any("<<" in b.get("text", "") for b in blocks)
-        
-        recto_score = 0
-        verso_score = 10 if has_mrz else 0
-        
-        texts = [b.get("text", "").upper() for b in blocks]
-        for text in texts:
-            for skip in recto_keywords:
-                if skip in text:
-                    recto_score += 1
-            for skip in verso_keywords:
-                if skip in text:
-                    verso_score += 1
-                    
-        detected_side = "recto" if recto_score >= verso_score else "verso"
-        logger.info(f"Side detection: recto={recto_score}, verso={verso_score} -> {detected_side}")
-        
         _img_h, _img_w = enhanced.shape[:2]
 
-        # PRIMARY: Template-based extraction (position + format validators)
-        template_data = _extract_by_template(blocks, _img_h, _img_w, detected_side)
+        if is_bill:
+            # BILL extraction: use bill-specific templates (no side detection needed)
+            spatial_data = _extract_bill_by_template(blocks, _img_h, _img_w, doc_type)
+            bill_field_names = BILL_FIELDS.get(doc_type, [])
+        else:
+            # CNI extraction: detect side, use CNI templates + legacy fallback
+            recto_keywords = {"REPUBLIQUE", "IDENTITY", "CARD", "CARTE", "NATIONALE", "RECTO"}
+            verso_keywords = {"AUTORITE", "AUTHORITY", "MRZ", "VERSO", "EMPREINTE", "FINGERPRINT"}
+            
+            has_mrz = any("<<" in b.get("text", "") for b in blocks)
+            
+            recto_score = 0
+            verso_score = 10 if has_mrz else 0
+            
+            texts = [b.get("text", "").upper() for b in blocks]
+            for text in texts:
+                for skip in recto_keywords:
+                    if skip in text:
+                        recto_score += 1
+                for skip in verso_keywords:
+                    if skip in text:
+                        verso_score += 1
+                        
+            detected_side = "recto" if recto_score >= verso_score else "verso"
+            logger.info(f"Side detection: recto={recto_score}, verso={verso_score} -> {detected_side}")
 
-        # FALLBACK: Legacy spatial extraction for fields the template missed
-        legacy_data = _extract_fields_from_blocks(blocks)
+            # PRIMARY: Template-based extraction (position + format validators)
+            template_data = _extract_by_template(blocks, _img_h, _img_w, detected_side)
 
-        # Merge: template values take priority, legacy fills gaps
-        spatial_data = template_data
-        for field in CNI_FIELDS:
-            if spatial_data[field]["value"] is None and legacy_data[field]["value"] is not None:
-                spatial_data[field] = legacy_data[field]
-                if "FALLBACK" not in spatial_data.get("methode", ""):
-                    spatial_data["methode"] += " + FALLBACK_ANCRAGE"
+            # FALLBACK: Legacy spatial extraction for fields the template missed
+            legacy_data = _extract_fields_from_blocks(blocks)
 
-        # Merge methode metadata
-        if "MRZ" in legacy_data.get("methode", "") and "MRZ" not in spatial_data.get("methode", ""):
-            spatial_data["methode"] += " + MRZ"
-        if "DOB_SUSPECT" in legacy_data.get("methode", "") and "DOB_SUSPECT" not in spatial_data.get("methode", ""):
-            spatial_data["methode"] += " + DOB_SUSPECT"
+            # Merge: template values take priority, legacy fills gaps
+            spatial_data = template_data
+            for field in CNI_FIELDS:
+                if spatial_data[field]["value"] is None and legacy_data[field]["value"] is not None:
+                    spatial_data[field] = legacy_data[field]
+                    if "FALLBACK" not in spatial_data.get("methode", ""):
+                        spatial_data["methode"] += " + FALLBACK_ANCRAGE"
+
+        # Merge methode metadata (CNI only)
+        if not is_bill:
+            if "MRZ" in legacy_data.get("methode", "") and "MRZ" not in spatial_data.get("methode", ""):
+                spatial_data["methode"] += " + MRZ"
+            if "DOB_SUSPECT" in legacy_data.get("methode", "") and "DOB_SUSPECT" not in spatial_data.get("methode", ""):
+                spatial_data["methode"] += " + DOB_SUSPECT"
 
         # --- Post-processing on merged result ---
 
-        # 1. Deduplicate lieu_naissance vs nom/prenom
-        if spatial_data["lieu_naissance"]["value"] is not None:
-            _lieu_upper = spatial_data["lieu_naissance"]["value"].upper()
-            for _field in ["nom", "prenom"]:
-                if spatial_data[_field]["value"] is not None:
-                    if _lieu_upper == spatial_data[_field]["value"].upper():
-                        logger.debug(f"lieu_naissance '{_lieu_upper}' matches {_field} — clearing")
-                        spatial_data["lieu_naissance"] = {"value": None, "conf": 0.0}
-                        break
+        if not is_bill:
+            # CNI-specific post-processing: lieu_naissance dedup, DOB plausibility
+            # (skipped for bills — they have different field semantics)
 
-        # 2. Re-scan for lieu_naissance if dedup cleared it
-        #    Use spatial proximity: pick the block closest to date_naissance
-        #    that looks like a place name and doesn't match nom/prenom.
-        if spatial_data["lieu_naissance"]["value"] is None:
-            _nom_upper = (spatial_data["nom"]["value"].upper()
-                          if spatial_data["nom"]["value"] else "")
-            _prenom_upper = (spatial_data["prenom"]["value"].upper()
-                             if spatial_data["prenom"]["value"] else "")
-            _dob_cy = None
-            if spatial_data["date_naissance"]["value"] is not None:
-                _dob_val = (spatial_data["date_naissance"]["value"]
-                            .replace("/", ".").replace(",", ".").replace(":", "."))
-                _dob_year = spatial_data["date_naissance"]["value"][-4:]
-                for b in blocks:
-                    b_text_norm = (b.get("text", "")
-                                   .replace(",", ".").replace("-", ".").replace(":", "."))
-                    if _dob_val in b_text_norm or _dob_year in b_text_norm:
-                        _dob_cy = b.get("cy", 0)
-                        break
-            # Re-scan: use the lieu_naissance zone from the template to find candidates
-            _zone_key = "lieu_naissance"
-            _zones = CNI_RECTO_ZONES if _side == "recto" else CNI_VERSO_ZONES
-            _lieu_zone = [(cy1, cy2, cx1, cx2) for f, cy1, cy2, cx1, cx2, _ in _zones if f == _zone_key]
-            _place_candidates = []
-            if _lieu_zone:
-                _cy1, _cy2, _cx1, _cx2 = _lieu_zone[0]
-                _cy_lo = _cy1 * _img_h
-                _cy_hi = _cy2 * _img_h
-                _cx_lo = _cx1 * _img_w
-                _cx_hi = _cx2 * _img_w
-                for b in blocks:
-                    b_text = b.get("text", "").strip()
-                    if not _is_place_text(b_text):
-                        continue
-                    b_cy = b.get("cy", 0)
-                    b_cx = b.get("cx", 0)
-                    if not (_cy_lo <= b_cy <= _cy_hi and _cx_lo <= b_cx <= _cx_hi):
-                        continue
-                    b_upper = b_text.upper()
-                    if b_upper == _nom_upper or b_upper == _prenom_upper:
-                        continue
-                    _place_candidates.append(b)
-            if _place_candidates:
-                if _dob_cy is not None:
-                    _place_candidates.sort(key=lambda b: abs(b.get("cy", 0) - _dob_cy))
-                else:
-                    _place_candidates.sort(key=lambda b: b.get("cy", 0))
-                best = _place_candidates[0]
-                spatial_data["lieu_naissance"] = {
-                    "value": best["text"].strip(),
-                    "conf": float(best.get("conf", 0.0)),
-                }
-                if "RESCAN_LIEU" not in spatial_data.get("methode", ""):
-                    spatial_data["methode"] += " + RESCAN_LIEU"
+            # 1. Deduplicate lieu_naissance vs nom/prenom
+            if spatial_data.get("lieu_naissance", {}).get("value") is not None:
+                _lieu_upper = spatial_data["lieu_naissance"]["value"].upper()
+                for _field in ["nom", "prenom"]:
+                    if spatial_data.get(_field, {}).get("value") is not None:
+                        if _lieu_upper == spatial_data[_field]["value"].upper():
+                            logger.debug(f"lieu_naissance '{_lieu_upper}' matches {_field} — clearing")
+                            spatial_data["lieu_naissance"] = {"value": None, "conf": 0.0}
+                            break
 
-        # 3. DOB plausibility check (runs on the final merged result)
-        if spatial_data["date_naissance"]["value"] is not None:
+            # 2. Re-scan for lieu_naissance if dedup cleared it
+            #    Use spatial proximity: pick the block closest to date_naissance
+            #    that looks like a place name and doesn't match nom/prenom.
+            if spatial_data.get("lieu_naissance", {}).get("value") is None and "lieu_naissance" in spatial_data:
+                _nom_upper = (spatial_data["nom"]["value"].upper()
+                              if spatial_data.get("nom", {}).get("value") else "")
+                _prenom_upper = (spatial_data["prenom"]["value"].upper()
+                                 if spatial_data.get("prenom", {}).get("value") else "")
+                _dob_cy = None
+                if spatial_data.get("date_naissance", {}).get("value") is not None:
+                    _dob_val = (spatial_data["date_naissance"]["value"]
+                                .replace("/", ".").replace(",", ".").replace(":", "."))
+                    _dob_year = spatial_data["date_naissance"]["value"][-4:]
+                    for b in blocks:
+                        b_text_norm = (b.get("text", "")
+                                       .replace(",", ".").replace("-", ".").replace(":", "."))
+                        if _dob_val in b_text_norm or _dob_year in b_text_norm:
+                            _dob_cy = b.get("cy", 0)
+                            break
+                _zone_key = "lieu_naissance"
+                _zones = CNI_RECTO_ZONES if detected_side == "recto" else CNI_VERSO_ZONES
+                _lieu_zone = [(cy1, cy2, cx1, cx2) for f, cy1, cy2, cx1, cx2, _ in _zones if f == _zone_key]
+                _place_candidates = []
+                if _lieu_zone:
+                    _cy1, _cy2, _cx1, _cx2 = _lieu_zone[0]
+                    _cy_lo = _cy1 * _img_h
+                    _cy_hi = _cy2 * _img_h
+                    _cx_lo = _cx1 * _img_w
+                    _cx_hi = _cx2 * _img_w
+                    for b in blocks:
+                        b_text = b.get("text", "").strip()
+                        if not _is_place_text(b_text):
+                            continue
+                        b_cy = b.get("cy", 0)
+                        b_cx = b.get("cx", 0)
+                        if not (_cy_lo <= b_cy <= _cy_hi and _cx_lo <= b_cx <= _cx_hi):
+                            continue
+                        b_upper = b_text.upper()
+                        if b_upper == _nom_upper or b_upper == _prenom_upper:
+                            continue
+                        _place_candidates.append(b)
+                if _place_candidates:
+                    if _dob_cy is not None:
+                        _place_candidates.sort(key=lambda b: abs(b.get("cy", 0) - _dob_cy))
+                    else:
+                        _place_candidates.sort(key=lambda b: b.get("cy", 0))
+                    best = _place_candidates[0]
+                    spatial_data["lieu_naissance"] = {
+                        "value": best["text"].strip(),
+                        "conf": float(best.get("conf", 0.0)),
+                    }
+                    if "RESCAN_LIEU" not in spatial_data.get("methode", ""):
+                        spatial_data["methode"] += " + RESCAN_LIEU"
+
+        # 3. DOB plausibility check (CNI only)
+        if not is_bill and spatial_data.get("date_naissance", {}).get("value") is not None:
             try:
                 _dob_parts = spatial_data["date_naissance"]["value"].split("/")
                 if len(_dob_parts) == 3:
@@ -1331,22 +1537,22 @@ class OCRService:
         _t_extract = time.perf_counter()
         logger.debug(f"Field extraction timing: {(_t_extract-_t_extract_start)*1000:.0f}ms")
 
-        # Extract MRZ data if present (for verso)
-        mrz_data = extract_mrz(blocks)
-        if mrz_data:
-            spatial_data["mrz"] = mrz_data
+        # Extract MRZ data if present (CNI verso only)
+        if not is_bill:
+            mrz_data = extract_mrz(blocks)
+            if mrz_data:
+                spatial_data["mrz"] = mrz_data
 
-        # Build the flat fields dict — always include ALL 12 CNI fields,
-        # even those with value=None, so the frontend knows the full schema.
+        # Build the flat fields dict
+        target_fields = bill_field_names if is_bill else CNI_FIELDS
         fields: dict[str, dict[str, Any]] = {}
-        for field_name in CNI_FIELDS:
+        for field_name in target_fields:
             if field_name in spatial_data and isinstance(spatial_data[field_name], dict):
                 fields[field_name] = spatial_data[field_name]
             else:
                 fields[field_name] = {"value": None, "conf": 0.0}
 
         # Calculate average confidence — only over fields that have a value
-        # (None fields should NOT drag down the average)
         filled_confidences = [
             f.get("conf", 0.0) for f in fields.values()
             if f.get("value") is not None
@@ -1357,21 +1563,20 @@ class OCRService:
             else 0.0
         )
 
-        filled_count = len(filled_confidences)  # same as sum(1 for f in fields.values() if f.get("value") is not None)
+        filled_count = len(filled_confidences)
 
-        # Determine if fallback is needed — consider confidence, fill rate,
-        # AND data quality flags (e.g. implausible DOB year from OCR errors).
-        fill_rate = filled_count / len(CNI_FIELDS)
+        # Determine if fallback is needed
+        fill_rate = filled_count / max(len(target_fields), 1)
         _has_dob_suspect = "DOB_SUSPECT" in spatial_data.get("methode", "")
         needs_fallback = (
             avg_confidence < self.confidence_threshold
-            or fill_rate < 0.5  # fewer than 6 of 12 fields filled → fallback
-            or _has_dob_suspect  # implausible DOB year → needs review
+            or fill_rate < 0.5
+            or (not is_bill and _has_dob_suspect)
         )
         logger.info(
-            f"OCR extracted {filled_count}/{len(CNI_FIELDS)} fields, "
+            f"OCR extracted {filled_count}/{len(target_fields)} fields, "
             f"avg_confidence={avg_confidence:.2f}, needs_glm_fallback={needs_fallback}, "
-            f"side={spatial_data.get('detected_side', 'unknown')}, "
+            f"doc_type={doc_type}, "
             f"method={spatial_data.get('methode', 'unknown')}"
         )
 

@@ -31,6 +31,8 @@ SEX_REGEX = re.compile(r"\b([MF])\b")
 DEFAULT_REQUIRED_FIELDS: dict[str, list[str]] = {
     "CNI_RECTO": ["nom", "prenoms", "date_naissance", "numero_cni"],
     "CNI_VERSO": ["date_expiration"],
+    "BILL_ENEO": ["contrat_number", "date_facturation", "total_ttc"],
+    "BILL_CAMWATER": ["contrat_number", "date_facturation", "total_ttc"],
 }
 OCR_ENABLED_DOC_TYPES = {"CNI_RECTO", "CNI_VERSO", "BILL_ENEO", "BILL_CAMWATER", "NIU"}
 _shared_paddle_ocr: Any | None = None
@@ -215,7 +217,7 @@ def _extract_fields_from_lines(lines: list[tuple[str, float]]) -> tuple[dict[str
     return fields, confidences
 
 
-def _run_paddle_ocr(image_path: Path) -> OCRExtractionResult:
+def _run_paddle_ocr(image_path: Path, doc_type: str = "CNI_RECTO") -> OCRExtractionResult:
     """Run PaddleOCR and extract fields using the improved spatial extraction.
     
     Delegates to app.services.ocr_service to reuse the improved field extraction
@@ -228,7 +230,7 @@ def _run_paddle_ocr(image_path: Path) -> OCRExtractionResult:
     from app.services.ocr_service import ocr_service
 
     try:
-        result = ocr_service.extract_from_path(image_path)
+        result = ocr_service.extract_from_path(image_path, doc_type=doc_type)
     except Exception as exc:
         logger.error("PaddleOCR extraction failed on %s: %s", image_path, exc, exc_info=True)
         return OCRExtractionResult(
@@ -415,7 +417,7 @@ async def process_document_ocr_pipeline(
         }
 
     image_path = _resolve_document_path(document)
-    paddle_result = await asyncio.to_thread(_run_paddle_ocr, image_path)
+    paddle_result = await asyncio.to_thread(_run_paddle_ocr, image_path, document.doc_type)
 
     await _upsert_ocr_fields(db, document, paddle_result.fields, paddle_result.confidences)
     document.ocr_engine = paddle_result.engine

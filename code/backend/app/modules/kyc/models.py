@@ -104,6 +104,10 @@ class Document(Base):
     file_path = Column(Text, nullable=False)
     sha256_hash = Column(String(64), nullable=False)
 
+    ocr_status = Column(
+        String(20), nullable=False, default="PENDING"
+    )  # PENDING, SUCCESS, PARTIAL, FAILED, MANUAL
+    ocr_error = Column(Text, nullable=True)
     ocr_engine = Column(String(50), nullable=True)  # PADDLE, GLM, PADDLE_THEN_GLM
     ocr_raw_json = Column(JSONB, nullable=True)
     confidence_per_field = Column(JSONB, nullable=True)

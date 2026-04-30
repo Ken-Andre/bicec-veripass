@@ -194,20 +194,42 @@ async def _store_document_and_create_record(
     try:
         await process_document_ocr_pipeline(document_id=doc.id, db=db)
         await db.refresh(doc, attribute_names=["ocr_fields"])
+        if doc.ocr_fields:
+            doc.ocr_status = "SUCCESS"
+        else:
+            doc.ocr_status = "PARTIAL"
+            logger.warning(
+                "OCR pipeline returned no fields for document %s (doc_type=%s)",
+                doc.id,
+                doc_type,
+            )
     except Exception as exc:
-        logger.warning(
+        logger.error(
             "OCR pipeline failed for document %s (doc_type=%s): %s",
             doc.id,
             doc_type,
             exc,
+            exc_info=True,
         )
+        doc.ocr_status = "FAILED"
+        doc.ocr_error = str(exc)[:500]
 
-    logger.info(f"Document {doc_type} uploaded for session {session.id}")
+    await db.commit()
+    await db.refresh(doc, attribute_names=["ocr_fields"])
+
+    logger.info(
+        "Document %s uploaded for session %s — ocr_status=%s",
+        doc_type,
+        session.id,
+        doc.ocr_status,
+    )
     return DocumentResponse(
         id=make_session_handle(str(doc.id)),
         doc_type=doc.doc_type,
         file_path=doc.file_path,
         sha256_hash=doc.sha256_hash,
+        ocr_status=doc.ocr_status,
+        ocr_error=doc.ocr_error,
         ocr_engine=doc.ocr_engine,
         confidence_per_field=doc.confidence_per_field,
         captured_at=doc.captured_at,

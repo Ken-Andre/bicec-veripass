@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ImageViewer } from '@/components/shared/ImageViewer';
 import { DossierTimeline } from '@/components/shared/DossierTimeline';
 import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
-import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck } from 'lucide-react';
+import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck, Pencil, Save } from 'lucide-react';
 import { reviewDossier, assignDossier, autoAssignDossier } from '@/services/dossier-service';
 import { apiGet, apiPost } from '@/services/api-client';
 
@@ -176,6 +176,9 @@ export default function EvidenceViewerPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [ocrEditMode, setOcrEditMode] = useState(false);
+  const [ocrEditedFields, setOcrEditedFields] = useState<Record<string, string>>({});
+  const [ocrSaving, setOcrSaving] = useState(false);
 
   const documents = dossier?.documents || [];
   const currentDoc = documents[activeDocIndex];
@@ -235,6 +238,33 @@ export default function EvidenceViewerPage() {
       queryClient.invalidateQueries({ queryKey: ['queue'] });
     } catch {}
     setShowRequestInfo(false);
+  };
+
+  const handleOcrSave = async () => {
+    if (!id || !currentDoc) return;
+    setOcrSaving(true);
+    try {
+      for (const [fieldName, correctedValue] of Object.entries(ocrEditedFields)) {
+        await apiPost(`/backoffice/dossier/${id}/ocr-correct`, {
+          document_id: currentDoc.id,
+          field_name: fieldName,
+          corrected_value: correctedValue,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['dossier', id] });
+      setOcrEditMode(false);
+      setOcrEditedFields({});
+    } catch {}
+    setOcrSaving(false);
+  };
+
+  const startOcrEdit = () => {
+    const initial: Record<string, string> = {};
+    currentDoc?.ocr_fields?.forEach((f: any) => {
+      initial[f.field_name] = f.human_corrected ? f.corrected_value : f.extracted_value;
+    });
+    setOcrEditedFields(initial);
+    setOcrEditMode(true);
   };
 
   if (isLoading) {
@@ -357,7 +387,28 @@ export default function EvidenceViewerPage() {
 
         <div className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>Champs extraits (OCR)</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Champs extraits (OCR)</CardTitle>
+              {currentDoc?.ocr_fields && currentDoc.ocr_fields.length > 0 && (
+                <div className="flex gap-2">
+                  {ocrEditMode ? (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => { setOcrEditMode(false); setOcrEditedFields({}); }}>
+                        <X className="h-3 w-3 mr-1" /> Annuler
+                      </Button>
+                      <Button size="sm" onClick={handleOcrSave} disabled={ocrSaving}>
+                        {ocrSaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+                        Enregistrer
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={startOcrEdit}>
+                      <Pencil className="h-3 w-3 mr-1" /> Modifier
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardHeader>
             <CardContent className="space-y-2">
               {currentDoc?.ocr_fields?.map((field: any, i: number) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded-lg border">
@@ -371,13 +422,30 @@ export default function EvidenceViewerPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-muted-foreground">{field.field_name}</p>
-                    <p className="text-sm font-medium truncate">
-                      {field.human_corrected ? field.corrected_value : field.extracted_value}
-                    </p>
+                    {ocrEditMode ? (
+                      <input
+                        type="text"
+                        value={ocrEditedFields[field.field_name] || ''}
+                        onChange={(e) => setOcrEditedFields({ ...ocrEditedFields, [field.field_name]: e.target.value })}
+                        className="w-full text-sm font-medium border rounded px-2 py-1"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium truncate">
+                        {field.human_corrected ? field.corrected_value : field.extracted_value}
+                      </p>
+                    )}
                   </div>
-                  {field.human_corrected && (
-                    <span className="text-xs text-blue-600 italic">Corrigé</span>
-                  )}
+                  <div className="flex gap-1">
+                    {field.human_corrected && (
+                      <span className="text-xs text-blue-600 italic">Corrigé</span>
+                    )}
+                    {field.corrected_by_agent_id && (
+                      <span className="text-xs text-purple-600 italic">Agent</span>
+                    )}
+                    {!field.human_corrected && !field.corrected_by_agent_id && field.confidence_score < 0.7 && (
+                      <span className="text-xs text-orange-500">Faible</span>
+                    )}
+                  </div>
                 </div>
               ))}
               {(!currentDoc?.ocr_fields || currentDoc.ocr_fields.length === 0) && (
