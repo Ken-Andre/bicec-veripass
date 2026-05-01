@@ -50,6 +50,7 @@ class Settings(BaseSettings):
         "application/pdf",
     ]
     MAX_DOCUMENT_SIZE_MB: int = 10  # 10MB max per document
+    # TODO: consider reducing to 2MB once client-side compression is validated
 
     # Backup
     # ENABLE_BACKUPS: set to True only when backup infrastructure is configured.
