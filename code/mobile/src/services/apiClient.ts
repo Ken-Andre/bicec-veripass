@@ -106,9 +106,10 @@ export const createApiClient = (baseUrl: string) => {
       data: D,
       options?: RequestOptions
     ): Promise<T> => {
-      // Extended default timeout for OCR endpoints
+      // Extended default timeout for OCR and liveness endpoints
       const isOcr = path.includes('/ocr/');
-      const defaultTimeout = isOcr ? 90000 : 15000;
+      const isLiveness = path.includes('/liveness');
+      const defaultTimeout = isOcr ? 90000 : isLiveness ? 60000 : 15000;
 
       const response = await fetchWithTimeout(
         `${baseUrl}${path}`,

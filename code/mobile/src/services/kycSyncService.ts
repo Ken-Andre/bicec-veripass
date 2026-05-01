@@ -661,7 +661,7 @@ export async function getResumeTargetPath(): Promise<string | null> {
     case 'signature':
       return '/kyc/signature';
     case 'utility_bill':
-      return '/kyc/bill-capture';
+      return '/kyc/bill-select';
     case 'submission':
     default:
       return null;
