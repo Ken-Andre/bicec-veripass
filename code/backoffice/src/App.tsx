@@ -3,6 +3,7 @@ import { useAuth } from './contexts/AuthContext'
 import { ToastProvider } from './contexts/ToastContext'
 import ToastContainer from './components/ui/ToastContainer'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { RoleRedirect } from './components/auth/RoleRedirect'
 import MainLayout from './components/layout/MainLayout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
@@ -33,7 +34,7 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<DashboardPage />} />
+          <Route index element={<RoleRedirect />} />
 
           <Route
             path="validation"

@@ -193,16 +193,6 @@ async def _store_document_and_create_record(
 
     try:
         await process_document_ocr_pipeline(document_id=doc.id, db=db)
-        await db.refresh(doc, attribute_names=["ocr_fields"])
-        if doc.ocr_fields:
-            doc.ocr_status = "SUCCESS"
-        else:
-            doc.ocr_status = "PARTIAL"
-            logger.warning(
-                "OCR pipeline returned no fields for document %s (doc_type=%s)",
-                doc.id,
-                doc_type,
-            )
     except Exception as exc:
         logger.error(
             "OCR pipeline failed for document %s (doc_type=%s): %s",
@@ -213,8 +203,8 @@ async def _store_document_and_create_record(
         )
         doc.ocr_status = "FAILED"
         doc.ocr_error = str(exc)[:500]
+        await db.commit()
 
-    await db.commit()
     await db.refresh(doc, attribute_names=["ocr_fields"])
 
     logger.info(

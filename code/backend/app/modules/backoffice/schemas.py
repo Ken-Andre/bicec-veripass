@@ -37,7 +37,6 @@ class AuditLogSchema(BaseModel):
     newState: Optional[str] = None
     rationale: str = ""
     sessionId: Optional[str] = Field(None, alias="record_id")
-    metadata: Optional[dict] = None
 
     model_config = {"from_attributes": True, "populate_by_name": True}
 

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 import { FileCheck, AlertTriangle, Clock, CheckCircle, Loader2 } from 'lucide-react'
@@ -33,16 +32,9 @@ const iconMap: Record<string, any> = {
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  // Redirect JEAN/THOMAS to their respective pages (dashboard is for SYLVIE/ADMIN_IT)
-  useEffect(() => {
-    if (user?.role === 'JEAN') navigate('/validation', { replace: true })
-    else if (user?.role === 'THOMAS') navigate('/compliance', { replace: true })
-  }, [user, navigate])
 
   useEffect(() => {
     async function loadStats() {

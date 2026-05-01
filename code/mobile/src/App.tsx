@@ -19,6 +19,7 @@ import { MoreScreen } from './views/dashboard';
 import { NotFoundPage } from './views/NotFoundPage';
 import { PinSetupScreen, PinLoginScreen, PhoneEntryScreen, OtpVerifyScreen, EmailEntryScreen, EmailOtpVerifyScreen, LockScreen, ForgotPinScreen } from './views/auth';
 import { KycHydrationGate } from './components/KycHydrationGate';
+import { KycStepGuard } from './hooks/useKycFlow';
 import KycIntroScreen from './views/kyc/KycIntroScreen';
 import BasicProfileScreen from './views/kyc/BasicProfileScreen';
 import DocumentChoiceScreen from './views/kyc/DocumentChoiceScreen';
@@ -94,26 +95,26 @@ function App() {
                 <Route path="/kyc/document-choice" element={<LockGuard><KycHydrationGate><DocumentChoiceScreen /></KycHydrationGate></LockGuard>} />
                 {/* === Marie Journey: KYC Flow === */}
                 <Route path="/kyc/intro" element={<LockGuard><KycHydrationGate><KycIntroScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/cni-intro" element={<LockGuard><KycHydrationGate><CniIntroScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/cni-recto-guide" element={<LockGuard><KycHydrationGate><CniRectoGuideScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/cni-recto-capture" element={<LockGuard><KycHydrationGate><CniRectoCapture /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/cni-verso-guide" element={<LockGuard><KycHydrationGate><CniVersoGuideScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/cni-verso-capture" element={<LockGuard><KycHydrationGate><CniVersoCapture /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/cni-recto" element={<LockGuard><KycHydrationGate><CniRectoGuideScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/cni-verso" element={<LockGuard><KycHydrationGate><CniVersoGuideScreen /></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/cni-intro" element={<LockGuard><KycHydrationGate><KycStepGuard><CniIntroScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/cni-recto-guide" element={<LockGuard><KycHydrationGate><KycStepGuard><CniRectoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/cni-recto-capture" element={<LockGuard><KycHydrationGate><KycStepGuard><CniRectoCapture /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/cni-verso-guide" element={<LockGuard><KycHydrationGate><KycStepGuard><CniVersoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/cni-verso-capture" element={<LockGuard><KycHydrationGate><KycStepGuard><CniVersoCapture /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/cni-recto" element={<LockGuard><KycHydrationGate><KycStepGuard><CniRectoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/cni-verso" element={<LockGuard><KycHydrationGate><KycStepGuard><CniVersoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 {/* OCR Review → Liveness */}
-                <Route path="/kyc/ocr-review" element={<LockGuard><KycHydrationGate><OcrReviewScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/biometric-consent" element={<LockGuard><KycHydrationGate><BiometricConsentScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/liveness" element={<LockGuard><KycHydrationGate><LivenessScreen /></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/ocr-review" element={<LockGuard><KycHydrationGate><KycStepGuard><OcrReviewScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/biometric-consent" element={<LockGuard><KycHydrationGate><KycStepGuard><BiometricConsentScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/liveness" element={<LockGuard><KycHydrationGate><KycStepGuard><LivenessScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 {/* Bill type select → Capture or Upload → Address → NIU → ... */}
-                <Route path="/kyc/bill-select" element={<LockGuard><KycHydrationGate><BillTypeSelectScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/bill-capture" element={<LockGuard><KycHydrationGate><BillCaptureScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/bill-upload" element={<LockGuard><KycHydrationGate><BillUploadScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/address" element={<LockGuard><KycHydrationGate><AddressScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/niu" element={<LockGuard><KycHydrationGate><NiuScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/consent" element={<LockGuard><KycHydrationGate><ConsentScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/signature" element={<LockGuard><KycHydrationGate><SignatureScreen /></KycHydrationGate></LockGuard>} />
-                <Route path="/kyc/review" element={<LockGuard><KycHydrationGate><ReviewScreen /></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/bill-select" element={<LockGuard><KycHydrationGate><KycStepGuard><BillTypeSelectScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/bill-capture" element={<LockGuard><KycHydrationGate><KycStepGuard><BillCaptureScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/bill-upload" element={<LockGuard><KycHydrationGate><KycStepGuard><BillUploadScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/address" element={<LockGuard><KycHydrationGate><KycStepGuard><AddressScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/niu" element={<LockGuard><KycHydrationGate><KycStepGuard><NiuScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/consent" element={<LockGuard><KycHydrationGate><KycStepGuard><ConsentScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/signature" element={<LockGuard><KycHydrationGate><KycStepGuard><SignatureScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/review" element={<LockGuard><KycHydrationGate><KycStepGuard><ReviewScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/submit-success" element={<LockGuard><KycHydrationGate><SubmitSuccessScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

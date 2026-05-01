@@ -4,9 +4,28 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { ProgressStepper } from '../../components/ProgressStepper';
-import { CheckCircle, FileText, User, MapPin, Shield, Loader2, PenLine, Receipt, AlertCircle } from 'lucide-react';
+import { CheckCircle, FileText, User, MapPin, Shield, Loader2, PenLine, Receipt, AlertCircle, ArrowRight } from 'lucide-react';
 import { getSubmissionBlockerStatus, runKycSyncNow } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
+
+// Map blocking reason keywords to corrective routes
+const BLOCKING_REASON_ROUTES: Record<string, string> = {
+  'CNI_RECTO': '/kyc/cni-recto-capture',
+  'CNI_VERSO': '/kyc/cni-verso-capture',
+  'SELFIE': '/kyc/liveness',
+  'Liveness': '/kyc/liveness',
+  'liveness': '/kyc/liveness',
+  'OCR review': '/kyc/ocr-review',
+  'Consent': '/kyc/consent',
+  'consent': '/kyc/consent',
+};
+
+function getCorrectionRoute(reason: string): string | null {
+  for (const [keyword, route] of Object.entries(BLOCKING_REASON_ROUTES)) {
+    if (reason.includes(keyword)) return route;
+  }
+  return null;
+}
 
 const KYC_STEPS = [
   { label: 'CNI' },
@@ -226,13 +245,26 @@ export default function ReviewScreen() {
           </div>
         ))}
 
-        {/* Blocking reasons from backend */}
+        {/* Blocking reasons from backend with corrective actions */}
         {backendReadiness && !backendReadiness.can_submit && backendReadiness.blocking_reasons.length > 0 && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 space-y-1">
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 space-y-2">
             <p className="text-xs font-semibold text-red-700">Dossier incomplet :</p>
-            {backendReadiness.blocking_reasons.map((r, i) => (
-              <p key={i} className="text-xs text-red-600">• {r}</p>
-            ))}
+            {backendReadiness.blocking_reasons.map((r, i) => {
+              const route = getCorrectionRoute(r);
+              return (
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-red-600 flex-1">• {r}</p>
+                  {route && (
+                    <button
+                      onClick={() => navigate(route)}
+                      className="flex items-center gap-1 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 px-2 py-1 rounded shrink-0 transition-colors"
+                    >
+                      Corriger <ArrowRight className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

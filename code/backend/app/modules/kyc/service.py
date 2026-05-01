@@ -424,6 +424,19 @@ async def process_document_ocr_pipeline(
     document.ocr_raw_json = paddle_result.raw_payload
     document.confidence_per_field = paddle_result.confidences
 
+    # Update ocr_status based on extraction results
+    if paddle_result.engine in ("PADDLE_ERROR", "paddleocr_unavailable", "paddleocr_error"):
+        document.ocr_status = "FAILED"
+        document.ocr_error = f"Engine: {paddle_result.engine}"
+    elif paddle_result.fields and any(
+        v for v in paddle_result.fields.values() if isinstance(v, dict) and v.get("value")
+    ):
+        document.ocr_status = "SUCCESS"
+        document.ocr_error = None
+    else:
+        document.ocr_status = "PARTIAL"
+        document.ocr_error = None
+
     should_enqueue_glm = _needs_glm_fallback(paddle_result, document.doc_type)
     if should_enqueue_glm:
         from app.tasks.ocr import run_glm_ocr_fallback_task
