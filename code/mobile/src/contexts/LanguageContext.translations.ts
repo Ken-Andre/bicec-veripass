@@ -242,5 +242,30 @@ export const translations: Record<string, Record<Language, string>> = {
     'common.continue': { fr: 'Continuer', en: 'Continue' },
     'common.confirm': { fr: 'Confirmer', en: 'Confirm' },
     'common.cancel': { fr: 'Annuler', en: 'Cancel' },
+
+    // Review Screen
+    'review.title': { fr: 'Vérification du dossier', en: 'Review Application' },
+    'review.identity': { fr: 'Identité', en: 'Identity' },
+    'review.address': { fr: 'Adresse', en: 'Address' },
+    'review.niu.yes': { fr: '✓ NIU fourni', en: '✓ NIU provided' },
+    'review.niu.no': { fr: 'Optionnel · non fourni', en: 'Optional · not provided' },
+    'review.consent': { fr: 'Consentements', en: 'Consents' },
+    'review.consent.cgu': { fr: '✓ CGU acceptées', en: '✓ Terms accepted' },
+    'review.submit': { fr: 'Soumettre le dossier KYC', en: 'Submit KYC Application' },
+
+    // Consent Screen
+    'consent.title': { fr: 'Consentements', en: 'Consents' },
+    'consent.cgu': { fr: 'Conditions Générales d\'Utilisation', en: 'Terms of Service' },
+    'consent.privacy': { fr: 'Politique de confidentialité', en: 'Privacy Policy' },
+    'consent.data': { fr: 'Traitement des données personnelles', en: 'Personal Data Processing' },
+    'consent.readDoc': { fr: 'Lire le document', en: 'Read document' },
+    'consent.submit': { fr: 'J\'accepte et je continue', en: 'I accept and continue' },
+
+    // Signature Screen
+    'signature.title': { fr: 'Signature électronique', en: 'Electronic Signature' },
+    'signature.instruction': { fr: 'Signez pour confirmer votre identité', en: 'Sign to confirm your identity' },
+
+    // CNI Capture Quality
+    'capture.quality.cni_fail': { fr: 'Qualité insuffisante', en: 'Insufficient quality' },
 };
 

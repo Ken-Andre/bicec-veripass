@@ -91,6 +91,7 @@ _ROLE_DECISIONS_FRAUD: dict[AgentRole, set[str]] = {
 _REVIEW_STATES = {
     LifecycleState.PENDING_AGENT_REVIEW,
     LifecycleState.PENDING_KYC,
+    LifecycleState.PENDING_INFO,
 }
 
 

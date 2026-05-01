@@ -574,12 +574,20 @@ def _is_meter_number_text(text: str) -> bool:
 
 def _is_bill_amount_text(text: str) -> bool:
     """Validate a bill amount (number with optional separators)."""
-    cleaned = text.replace(" ", "").replace(".", "").replace(",", ".")
-    try:
-        amount = float(cleaned)
-        return 0 < amount < 10_000_000
-    except (ValueError, TypeError):
+    # Extract just the numeric part from text like "TOTAL TTC / WITH TAX: 35.987"
+    nums = re.findall(r"\d[\d\s.,]*\d|\d", text)
+    if not nums:
         return False
+    # Try each number found
+    for num_str in nums:
+        cleaned = num_str.replace(" ", "").replace(",", ".")
+        try:
+            amount = float(cleaned)
+            if 0 < amount < 10_000_000:
+                return True
+        except (ValueError, TypeError):
+            continue
+    return False
 
 
 def _is_bill_date_text(text: str) -> bool:
@@ -864,12 +872,13 @@ def _extract_bill_by_template(
 
 
 def _extract_bill_amount_value(text: str) -> str | None:
-    """Extract a numeric amount from bill text."""
-    cleaned = text.replace(" ", "").replace(",", ".")
-    nums = re.findall(r"\d+(?:\.\d+)?", cleaned)
-    if nums:
-        return nums[0]
-    return None
+    """Extract a numeric amount from bill text like 'TOTAL TTC / WITH TAX: 35.987'."""
+    # Find all numeric patterns (including those with dots as thousands separator)
+    nums = re.findall(r"\d[\d\s.,]*\d|\d", text)
+    if not nums:
+        return None
+    # Return the last number (usually the total, not the label number)
+    return nums[-1].strip()
 
 
 def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:

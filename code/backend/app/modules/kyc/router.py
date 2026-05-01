@@ -174,6 +174,25 @@ async def _store_document_and_create_record(
                 },
             )
 
+    # Check for duplicate document (same hash + same type in same session)
+    existing_doc = await db.execute(
+        select(Document).where(
+            Document.session_id == session.id,
+            Document.doc_type == doc_type,
+            Document.sha256_hash == storage_result["sha256"],
+        ).limit(1)
+    )
+    if existing_doc.scalars().first():
+        await document_storage.delete_relative_path(storage_result["path"])
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "DUPLICATE_DOCUMENT",
+                "message": f"Un document {doc_type} identique existe déjà dans ce dossier.",
+                "retryable": False,
+            },
+        )
+
     # Create document record
     doc = Document(
         id=uuid.uuid4(),
