@@ -1,22 +1,30 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useKyc } from '../../contexts/KycContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Camera, AlertTriangle, X, CheckCircle, Loader2 } from 'lucide-react';
 import { captureKycException } from '../../services/sentry';
 import { fetchWithCorrelation } from '../../services/apiClient';
 import { enqueueOfflineBill } from '../../services/kycSyncService';
+import { compressForUpload } from '../../utils/imageCompression';
 
 type BillType = 'ENEO' | 'CAMWATER';
 
+const MAX_FILE_SIZE_MB = 10;
+
 interface BillCaptureScreenProps {
-  billType: BillType;
+  billType?: BillType;
 }
 
-export default function BillCaptureScreen({ billType }: BillCaptureScreenProps) {
+const UPLOAD_TIMEOUT_MS = 180_000; // 3 minutes
+
+export default function BillCaptureScreen({ billType: propBillType }: BillCaptureScreenProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useLanguage();
   const { setBillCapture, completeStep, sessionId, setSessionId } = useKyc();
+
+  const billType: BillType = (location.state as { billType?: BillType })?.billType ?? propBillType ?? 'ENEO';
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,39 +69,54 @@ export default function BillCaptureScreen({ billType }: BillCaptureScreenProps) 
         const formData = new FormData();
         formData.append('file', blob, `bill_${billType.toLowerCase()}.jpg`);
         formData.append('bill_type', billType);
-        if (sid) {
-          formData.append('session_id', sid);
-        }
-        if (clientSha) {
-          formData.append('client_sha256', clientSha);
-        }
+        if (sid) formData.append('session_id', sid);
+        if (clientSha) formData.append('client_sha256', clientSha);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
         const res = await fetchWithCorrelation('/api/v1/kyc/capture/bill', {
           method: 'POST',
           body: formData,
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         if (!res.ok) {
+          if (res.status === 504) {
+            captureKycException(new Error('bill_capture_504_gateway_timeout'), 'upload_failure', {
+              sessionId: sid,
+              step: 'utility_bill',
+              operation: 'capture_bill_504',
+              extra: { bill_type: billType },
+            });
+            await enqueueOfflineBill({ sessionId: sid, billType, fileDataUrl: dataUrl, clientSha256: clientSha });
+            return;
+          }
           throw new Error(`capture_bill_failed_${res.status}`);
         }
-        return; // success
+        return;
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          captureKycException(new Error('bill_capture_client_timeout'), 'upload_failure', {
+            sessionId: sid,
+            step: 'utility_bill',
+            operation: 'capture_bill_timeout',
+            extra: { bill_type: billType },
+          });
+          await enqueueOfflineBill({ sessionId: sid, billType, fileDataUrl: dataUrl, clientSha256: clientSha });
+          return;
+        }
         captureKycException(err, 'upload_failure', {
           sessionId: sid,
           step: 'utility_bill',
           operation: 'capture_bill_upload',
           extra: { bill_type: billType },
         });
-        // Fall through to offline enqueue
       }
     }
-    // Offline or online failed — enqueue for sync on reconnect
-    await enqueueOfflineBill({
-      sessionId: sid,
-      billType: billType,
-      fileDataUrl: dataUrl,
-      clientSha256: clientSha,
-    });
+
+    await enqueueOfflineBill({ sessionId: sid, billType, fileDataUrl: dataUrl, clientSha256: clientSha });
   }, [billType, computeSha256, ensureSessionId]);
 
   const doCapture = useCallback(async () => {
@@ -101,30 +124,57 @@ export default function BillCaptureScreen({ billType }: BillCaptureScreenProps) 
     capturedRef.current = true;
     setCapturing(true);
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d')!;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d')!;
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    setBillCapture(dataUrl);
+      const rawBlob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((nextBlob) => resolve(nextBlob), 'image/jpeg', 0.90);
+      });
+      if (!rawBlob) {
+        setCapturing(false);
+        capturedRef.current = false;
+        return;
+      }
 
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((nextBlob) => resolve(nextBlob), 'image/jpeg', 0.85);
-    });
+      const compressed = await compressForUpload(rawBlob);
 
-    if (blob) {
+      if (compressed.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        setError(`Image trop volumineuse (${(compressed.size / 1024 / 1024).toFixed(1)} Mo). Max : ${MAX_FILE_SIZE_MB} Mo.`);
+        setCapturing(false);
+        capturedRef.current = false;
+        return;
+      }
+
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve) => {
+        reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.readAsDataURL(compressed);
+      });
+      setBillCapture(dataUrl);
+
       setUploading(true);
-      await uploadBill(blob, dataUrl);
+      await uploadBill(compressed, dataUrl);
       setUploading(false);
-    }
 
-    completeStep('utility_bill');
-    stopCamera();
-    navigate('/kyc/niu');
-  }, [navigate, setBillCapture, completeStep, stopCamera, uploadBill]);
+      completeStep('utility_bill');
+      stopCamera();
+      navigate('/kyc/niu');
+    } catch (err) {
+      captureKycException(err, 'upload_failure', {
+        sessionId,
+        step: 'utility_bill',
+        operation: 'capture_bill_doCapture',
+      });
+      setError('Erreur lors de la capture. Veuillez reessayer.');
+      setCapturing(false);
+      capturedRef.current = false;
+    }
+  }, [navigate, setBillCapture, completeStep, stopCamera, uploadBill, sessionId]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -174,10 +224,18 @@ export default function BillCaptureScreen({ billType }: BillCaptureScreenProps) 
     return (
       <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center text-white p-6 text-center">
         <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
-        <p className="mb-4">{error}</p>
-        <button onClick={() => navigate(-1)} className="text-primary underline">
-          {t('common.back') || 'Retour'}
-        </button>
+        <p className="mb-6">{error}</p>
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <button
+            onClick={() => { setError(''); capturedRef.current = false; startCamera(); }}
+            className="w-full h-12 rounded-2xl bg-white text-slate-900 font-semibold hover:bg-slate-100 transition-colors"
+          >
+            Reessayer
+          </button>
+          <button onClick={() => navigate(-1)} className="text-white/60 text-sm hover:text-white">
+            {t('common.back') || 'Retour'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -247,7 +305,8 @@ export default function BillCaptureScreen({ billType }: BillCaptureScreenProps) 
 
       <div className="bg-black p-6">
         <div className="text-center text-white/60 text-sm mb-4">
-          Prenez une photo claire de votre facture {billLabel} pour prouver votre résidence
+          Prenez une photo claire de votre facture {billLabel} pour prouver votre residence.
+          <br />L'image sera optimisee automatiquement pour un envoi rapide.
         </div>
         <button
           onClick={() => { stopCamera(); navigate(-1); }}

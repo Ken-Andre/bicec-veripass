@@ -100,7 +100,7 @@ export default function AddressScreen() {
       await enqueueOfflineAddress({ sessionId: sid, address: addressData });
     }
     completeStep('address');
-    navigate('/kyc/bill-capture');
+    navigate('/kyc/niu');
   };
 
   return (

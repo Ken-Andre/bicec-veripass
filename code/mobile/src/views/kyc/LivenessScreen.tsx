@@ -46,6 +46,8 @@ export default function LivenessScreen() {
   const selfieCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const selfieDataUrlRef = useRef<string | null>(null);
   const challengeCompleteRef = useRef(false);
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
 
   const toHex = (buffer: ArrayBuffer): string =>
     Array.from(new Uint8Array(buffer))
@@ -152,8 +154,8 @@ export default function LivenessScreen() {
     switch (type) {
       case 'smile': return computeSmileScore(landmarks) > 0.3;
       case 'blink': return computeEAR(landmarks) < 0.2;
-      case 'turn_left': return computeYawAngle(landmarks) < -15;
-      case 'turn_right': return computeYawAngle(landmarks) > 15;
+      case 'turn_left': return computeYawAngle(landmarks) > 15;
+      case 'turn_right': return computeYawAngle(landmarks) < -15;
     }
   }, []);
 
@@ -194,14 +196,14 @@ export default function LivenessScreen() {
       const error = err instanceof Error ? err : new Error(String(err));
       console.error('Camera access error:', error);
       captureKycException(error, 'camera_error', {
-        sessionId,
+        sessionId: sessionIdRef.current,
         step: 'liveness',
         operation: 'liveness_camera_init',
       });
       setMessage(`${t('liveness.camera.error') !== 'liveness.camera.error' ? t('liveness.camera.error') : 'Erreur camera'} - ${error.message}`);
       setStatus('fail');
     }
-  }, [t, sessionId]);
+  }, [t]);
 
   const submitLiveness = useCallback(async (
     landmarks: Array<Record<string, unknown>>,
@@ -340,10 +342,22 @@ export default function LivenessScreen() {
 
       completeStep('liveness');
       resetLivenessAttempts();
+      if (result.face_match_score == null) {
+        captureKycMessage('Liveness OK but face_match_score is null (DeepFace unavailable or no SELFIE doc)', 'liveness_failure', {
+          sessionId,
+          step: 'liveness',
+          operation: 'liveness_face_match_null',
+        });
+      }
       navigate('/kyc/address');
       await runKycSyncNow();
     } catch (err) {
-      const networkLike = err instanceof TypeError || (err instanceof Error && err.message.toLowerCase().includes('fetch'));
+      const networkLike = err instanceof TypeError
+        || (err instanceof Error && (
+          err.message.toLowerCase().includes('fetch')
+          || err.name === 'AbortError'
+          || err.message.toLowerCase().includes('abort')
+        ));
       if (networkLike) {
         await enqueueOfflineLivenessCapture({
           sessionId: ensureSessionId(),
@@ -354,7 +368,7 @@ export default function LivenessScreen() {
         completeStep('liveness');
         resetLivenessAttempts();
         setMessage('Connexion indisponible. La verification sera synchronisee automatiquement au retour reseau.');
-        navigate('/kyc/address');
+      navigate('/kyc/bill-select');
         return;
       }
       captureKycException(err, 'match_error', {
@@ -369,12 +383,8 @@ export default function LivenessScreen() {
 
   const handleRetry = async () => {
     incrementLivenessAttempt();
-    if (livenessAttempts >= 2) {
-      setCooldownSeconds(60);
-      setMessage('Desole pour la gene, mais pour des raisons techniques/securite, cette session est terminee.');
-      setStatus('locked');
-      stopCamera();
-      return;
+    if (livenessAttempts >= 3) {
+      setMessage('Plusieurs tentatives echouees. Verifiez votre connexion ou continuez en agence.');
     }
 
     setMessage('Tentative relancee. Veuillez recommencer le challenge.');
@@ -506,9 +516,9 @@ export default function LivenessScreen() {
               <h2 className="text-2xl font-bold text-slate-800">Echec</h2>
               <p className="text-sm text-red-600 font-medium mt-2 max-w-[250px]">{message}</p>
             </div>
-            <button onClick={handleRetry} disabled={livenessAttempts >= 2} className="flex justify-center items-center gap-2 w-full h-14 rounded-2xl text-base font-semibold bg-slate-900 text-white mt-8 hover:bg-slate-800 transition-colors disabled:opacity-50 active:scale-[0.98]">
+            <button onClick={handleRetry} className="flex justify-center items-center gap-2 w-full h-14 rounded-2xl text-base font-semibold bg-slate-900 text-white mt-8 hover:bg-slate-800 transition-colors disabled:opacity-50 active:scale-[0.98]">
               <Camera className="w-5 h-5" />
-              {livenessAttempts >= 2 ? 'Session bloquee' : 'Reessayer'}
+              Reessayer
             </button>
           </div>
         )}
