@@ -109,6 +109,15 @@ export const translations: Record<string, Record<Language, string>> = {
     'stepper.bill': { fr: 'Facture', en: 'Bill' },
     'stepper.niu': { fr: 'NIU', en: 'NIU' },
     'stepper.consent': { fr: 'Consent.', en: 'Consent' },
+
+    // NIU Screen
+    'niu.title': { fr: 'Numéro fiscal (NIU)', en: 'Tax ID (NIU)' },
+    'niu.skip.warning': { fr: 'Vous pouvez passer cette étape, mais cela peut ralentir votre vérification.', en: 'You can skip this step, but it may slow down your verification.' },
+    'niu.upload': { fr: 'Photographier mon attestation NIU', en: 'Photograph my NIU certificate' },
+    'niu.manual': { fr: 'Saisir manuellement', en: 'Enter manually' },
+    'niu.format.hint': { fr: 'Format : M suivi de 10 à 14 chiffres', en: 'Format: M followed by 10-14 digits' },
+    'niu.skip': { fr: 'Passer cette étape', en: 'Skip this step' },
+    'niu.enter': { fr: 'Entrez votre Numéro Identifiant Unique', en: 'Enter your Unique Identification Number' },
     'stepper.signature': { fr: 'Signature', en: 'Signature' },
     'stepper.review': { fr: 'Revue', en: 'Review' },
 

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { RotateCcw } from 'lucide-react';
 import { getKycSyncSummary, getResumeTargetPath, runKycSyncNow } from '../services/kycSyncService';
 
 export function KycResumeBanner() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [visible, setVisible] = useState(false);
   const [targetPath, setTargetPath] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -63,7 +64,9 @@ export function KycResumeBanner() {
     };
   }, []);
 
-  if (!visible || !targetPath) return null;
+  const isOnTargetPath = targetPath && location.pathname.endsWith(targetPath);
+  const isOnKycRoute = location.pathname.includes('/kyc/');
+  if (!visible || !targetPath || isOnTargetPath || isOnKycRoute) return null;
 
   return (
     <div className="fixed top-16 left-4 right-4 z-[100] bg-white border border-slate-200 text-slate-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl shadow-xl animate-in slide-in-from-top-5 fade-in duration-300">
