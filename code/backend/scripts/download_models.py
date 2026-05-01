@@ -111,3 +111,33 @@ except Exception as e:
     else:
         print(f"⚠️  Inference on dummy image raised: {e}")
         print("   Models may still be usable — continuing.")
+
+# ── DeepFace model pre-download ──
+print()
+print("=" * 60)
+print("DeepFace Model Pre-downloader")
+print("=" * 60)
+
+try:
+    from deepface import DeepFace  # type: ignore
+
+    print("⏳ Pre-downloading Facenet512 + retinaface models...")
+    try:
+        DeepFace.build_model("Facenet512")
+        print("  ✅ Facenet512 model downloaded")
+    except Exception as e:
+        print(f"  ⚠️  Facenet512 download failed: {e}")
+
+    try:
+        from deepface.detectors import FaceDetector  # type: ignore
+        FaceDetector.build_model("retinaface")
+        print("  ✅ retinaface detector downloaded")
+    except Exception as e:
+        print(f"  ⚠️  retinaface download failed: {e}")
+
+    print("✅ DeepFace models pre-download complete.")
+except ImportError as e:
+    print(f"⚠️  DeepFace not installed — skipping model pre-download: {e}")
+except Exception as e:
+    print(f"⚠️  DeepFace pre-download failed: {e}")
+    print("   Face matching will fall back to histogram similarity.")

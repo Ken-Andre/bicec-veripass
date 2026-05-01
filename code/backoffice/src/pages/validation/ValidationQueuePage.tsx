@@ -112,7 +112,10 @@ export default function ValidationQueuePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate('/validation')}
+            onClick={() => {
+              const first = unassignedItems[0];
+              if (first) navigate(`/validation/dossier/${first.id}`);
+            }}
             disabled={unassignedItems.length === 0}
             title="Prendre le prochain dossier non assigné"
           >

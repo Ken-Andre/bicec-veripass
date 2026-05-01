@@ -1,9 +1,9 @@
 """Backoffice Pydantic schemas."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class KYCQueueItemSchema(BaseModel):
@@ -26,17 +26,45 @@ class KYCQueueItemSchema(BaseModel):
 
 
 class AuditLogSchema(BaseModel):
-    """Minimal audit log entry for the backoffice view."""
+    """Audit log entry aligned with DossierTimeline component."""
 
     id: UUID
-    action: str
-    table_name: Optional[str] = None
-    record_id: Optional[str] = None
-    performed_by: Optional[UUID] = None
-    performed_at: datetime
-    client_ip: Optional[str] = None
+    timestamp: datetime = Field(alias="performed_at")
+    agentId: Optional[UUID] = Field(None, alias="performed_by")
+    agentName: str = ""
+    actionType: str = Field(alias="action")
+    previousState: Optional[str] = None
+    newState: Optional[str] = None
+    rationale: str = ""
+    sessionId: Optional[str] = Field(None, alias="record_id")
+    metadata: Optional[dict] = None
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _extract_from_data(cls, data: Any) -> Any:
+        """Extract agentName, rationale, previousState, newState from JSONB fields."""
+        if hasattr(data, "__dict__"):
+            # SQLAlchemy model instance
+            new = getattr(data, "new_data", None) or {}
+            old = getattr(data, "old_data", None) or {}
+            if not hasattr(data, "agentName"):
+                data.agentName = new.get("agent_name", "")
+            if not hasattr(data, "rationale"):
+                data.rationale = new.get("rationale", "")
+            if not hasattr(data, "previousState"):
+                data.previousState = old.get("status", "")
+            if not hasattr(data, "newState"):
+                data.newState = new.get("status", "")
+        elif isinstance(data, dict):
+            new = data.get("new_data") or {}
+            old = data.get("old_data") or {}
+            data.setdefault("agentName", new.get("agent_name", ""))
+            data.setdefault("rationale", new.get("rationale", ""))
+            data.setdefault("previousState", old.get("status", ""))
+            data.setdefault("newState", new.get("status", ""))
+        return data
 
 
 class ReviewDecisionRequest(BaseModel):
@@ -90,10 +118,26 @@ class DossierDocumentBrief(BaseModel):
     id: UUID
     doc_type: str
     sha256_hash: str
+    ocr_status: str = "PENDING"
+    ocr_error: Optional[str] = None
     ocr_engine: Optional[str] = None
     captured_at: datetime
-    field_count: int = 0
-    avg_confidence: Optional[float] = None
+    ocr_fields: list["OCRFieldBrief"] = []
+
+    model_config = {"from_attributes": True}
+
+
+class OCRFieldBrief(BaseModel):
+    """Brief OCR field info for dossier detail view."""
+
+    id: UUID
+    field_name: str
+    extracted_value: Optional[str] = None
+    confidence_score: float = 0.0
+    human_corrected: bool = False
+    corrected_value: Optional[str] = None
+    corrected_by_agent_id: Optional[UUID] = None
+    corrected_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

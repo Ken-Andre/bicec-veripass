@@ -843,18 +843,35 @@ async def submit_consent(
     ):
         raise HTTPException(status_code=400, detail="All consents must be accepted")
 
-    consent = ConsentRecord(
-        id=uuid.uuid4(),
-        session_id=session.id,
-        cgu_accepted=body.cgu_accepted,
-        privacy_accepted=body.privacy_accepted,
-        data_processing_accepted=body.data_processing_accepted,
-        consent_method=body.consent_method,
-        cgu_version="1.0.0",
-        privacy_version="1.0.0",
-        signed_at=datetime.now(timezone.utc),
+    # Upsert: find existing consent or create new one
+    existing_result = await db.execute(
+        select(ConsentRecord)
+        .where(ConsentRecord.session_id == session.id)
+        .order_by(ConsentRecord.signed_at.desc())
+        .limit(1)
     )
-    db.add(consent)
+    existing = existing_result.scalars().first()
+
+    if existing:
+        existing.cgu_accepted = body.cgu_accepted
+        existing.privacy_accepted = body.privacy_accepted
+        existing.data_processing_accepted = body.data_processing_accepted
+        existing.consent_method = body.consent_method
+        existing.signed_at = datetime.now(timezone.utc)
+        consent = existing
+    else:
+        consent = ConsentRecord(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            cgu_accepted=body.cgu_accepted,
+            privacy_accepted=body.privacy_accepted,
+            data_processing_accepted=body.data_processing_accepted,
+            consent_method=body.consent_method,
+            cgu_version="1.0.0",
+            privacy_version="1.0.0",
+            signed_at=datetime.now(timezone.utc),
+        )
+        db.add(consent)
     session.last_step_completed = "consent"
     await db.commit()
 
@@ -915,9 +932,12 @@ async def submit_signature(
 
     # Find or create consent record to attach signature
     result = await db.execute(
-        select(ConsentRecord).where(ConsentRecord.session_id == session.id)
+        select(ConsentRecord)
+        .where(ConsentRecord.session_id == session.id)
+        .order_by(ConsentRecord.signed_at.desc())
+        .limit(1)
     )
-    consent = result.scalar_one_or_none()
+    consent = result.scalars().first()
 
     if consent is None:
         consent = ConsentRecord(
@@ -984,9 +1004,12 @@ async def _compute_kyc_readiness(
         blocking_reasons.append("Missing required bill document (ENEO or CAMWATER)")
 
     result = await db.execute(
-        select(ConsentRecord).where(ConsentRecord.session_id == session.id)
+        select(ConsentRecord)
+        .where(ConsentRecord.session_id == session.id)
+        .order_by(ConsentRecord.signed_at.desc())
+        .limit(1)
     )
-    consent = result.scalar_one_or_none()
+    consent = result.scalars().first()
     has_consent = consent is not None
     if not has_consent:
         blocking_reasons.append("Consent not submitted")

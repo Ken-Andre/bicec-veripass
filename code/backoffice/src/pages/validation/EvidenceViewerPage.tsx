@@ -24,7 +24,7 @@ function getToken(): string | null {
 
 function useAuthenticatedImage(sessionId: string | undefined, docId: string | undefined): string | null {
   const [url, setUrl] = useState<string | null>(null);
-  const urlRef = useRef<string | null>(null);
+  const prevUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sessionId || !docId) return;
@@ -32,27 +32,36 @@ function useAuthenticatedImage(sessionId: string | undefined, docId: string | un
     const token = getToken();
     if (!token) return;
 
-    fetch(`${API_BASE}/backoffice/dossier/${sessionId}/documents/${docId}/file`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const fetchUrl = `${API_BASE}/backoffice/dossier/${sessionId}/documents/${docId}/file`;
+
+    fetch(fetchUrl, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => {
-        if (!res.ok) throw new Error('Failed to load');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.blob();
       })
       .then((blob) => {
         if (!cancelled) {
+          // Revoke previous URL to avoid memory leak
+          if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
           const objectUrl = URL.createObjectURL(blob);
+          prevUrlRef.current = objectUrl;
           setUrl(objectUrl);
-          urlRef.current = objectUrl;
         }
       })
       .catch(() => {});
 
     return () => {
       cancelled = true;
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      // Don't revoke here — let the next fetch or unmount handle it
     };
   }, [sessionId, docId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+    };
+  }, []);
 
   return url;
 }
