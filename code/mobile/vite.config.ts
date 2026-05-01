@@ -28,6 +28,9 @@ export default defineConfig(async ({ mode }) => {
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globIgnores: ['**/sw.js', '**/workbox-*.js'],
+        navigateFallback: '/mobile/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/localhost:3000\/api\//i,

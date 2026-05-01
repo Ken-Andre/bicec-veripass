@@ -20,6 +20,9 @@ registerSW({
   immediate: true,
   onRegistered(r) {
     console.log('Service Worker registered:', r);
+    if (r) {
+      setInterval(() => r.update(), 60 * 60 * 1000);
+    }
   },
   onRegisterError(error) {
     console.error('Service Worker registration failed:', error);
