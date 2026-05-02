@@ -176,29 +176,21 @@ export default function OcrReviewScreen() {
       );
       setFetchState('error');
 
-      // Only pre-fill empty fields if we truly give up
-      // Check if we have bill fields — if so, don't force CNI fallback
-      const hasBillFields = allOcrFields.some(
-        (f) => f._docType === 'BILL_ENEO' || f._docType === 'BILL_CAMWATER'
-      );
-
-      const fallbackFields: OcrField[] = (hasBillFields
-        ? [] // Bill fields already extracted, don't add CNI fallback
-        : [
-            'nom',
-            'prenom',
-            'date_naissance',
-            'lieu_naissance',
-            'sexe',
-            'taille',
-            'profession',
-            'numero_cni',
-            'date_delivrance',
-            'date_expiration',
-            'adresse',
-            'poste_identification',
-          ]
-      ).map((name) => ({
+      // Only pre-fill CNI fallback fields (bill fields are handled separately)
+      const fallbackFields: OcrField[] = [
+        'nom',
+        'prenom',
+        'date_naissance',
+        'lieu_naissance',
+        'sexe',
+        'taille',
+        'profession',
+        'numero_cni',
+        'date_delivrance',
+        'date_expiration',
+        'adresse',
+        'poste_identification',
+      ].map((name) => ({
         field_name: name,
         value: '',
         confidence: 0,

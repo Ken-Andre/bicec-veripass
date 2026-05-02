@@ -73,7 +73,6 @@ export const translations: Record<string, Record<Language, string>> = {
     // KYC OCR Review
     'ocr.review.title': { fr: 'Révision OCR', en: 'OCR Review' },
     'ocr.review.subtitle': { fr: 'Vérifiez les données extraites', en: 'Verify extracted data' },
-    'ocr.processing.subtitle': { fr: 'Nous avons lu votre document. Veuillez corriger si besoin.', en: 'We read your document. Please correct if needed.' },
 
     // KYC Liveness
     'liveness.intro.title': { fr: 'Vérification de vie', en: 'Liveness Check' },
