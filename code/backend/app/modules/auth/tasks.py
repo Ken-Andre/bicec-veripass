@@ -46,6 +46,26 @@ async def _send_otp_flow(phone: str, otp: str, email: Optional[str] = None):
             logger.info(f"[DEV_LOCAL SIMULATION] Fallback email record: {email}")
         return True
 
+    # 1b. Email-only mode — skip SMS entirely
+    if settings.OTP_MODE == "email":
+        target_email = email
+        if not target_email and settings.ENVIRONMENT != "production" and settings.OTP_FALLBACK_EMAIL:
+            target_email = settings.OTP_FALLBACK_EMAIL_ADDRESS or None
+        if not target_email:
+            logger.error(f"OTP_MODE=email but no email address provided for {phone}")
+            raise RuntimeError(
+                f"OTP_MODE=email but no email address available for {phone}."
+            )
+        email_sent = await email_client.send_email(
+            to_email=target_email, subject="VeriPass Verification Code", content=message
+        )
+        if email_sent:
+            logger.info(f"OTP successfully sent to {target_email} via email")
+            return True
+        raise RuntimeError(
+            f"Critical: Failed to send OTP to {target_email} via email (email-only mode)."
+        )
+
     # 2. Try SMS
     try:
         sms_sent = await sms_client.send_sms(to_phone=phone, message=message)
