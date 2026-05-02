@@ -17,12 +17,12 @@ class CorrelationFilter(logging.Filter):
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
     def format(self, record: logging.LogRecord) -> str:
-        # Force interpolation of record.args into record.msg BEFORE the parent
-        # JsonFormatter serialises the fields to JSON.  Without this, messages
-        # from third-party libraries (urllib3, SQLAlchemy pool) that use
-        # %-style placeholders (e.g. "Retrying (%r) after '%r': %s") are
-        # serialised with the raw placeholders still in place.
-        record.message = record.getMessage()
+        # Force interpolation of % args into message before JSON serialization
+        # pythonjsonlogger reads record.msg directly, so we must overwrite it
+        record.msg = record.getMessage()  # interpolate %s/%d/%r placeholders
+        record.args = None                # prevent double-interpolation in super()
+        if self.usesTime():
+            record.asctime = self.formatTime(record, self.datefmt)
         return super().format(record)
 
     def add_fields(

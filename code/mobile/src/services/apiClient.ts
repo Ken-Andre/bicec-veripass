@@ -63,6 +63,7 @@ async function handleResponse(response: Response): Promise<any> {
     const error = new Error(
       errorData.detail || response.statusText || `HTTP ${response.status}`
     ) as ApiError;
+    (error as any).status = response.status;
     error.response = { data: errorData };
     throw error;
   }
