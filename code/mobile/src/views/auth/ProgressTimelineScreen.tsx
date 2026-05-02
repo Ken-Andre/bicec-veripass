@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { ProgressStepper } from '../../components/ProgressStepper';
-import { Camera, MapPin, FileText, PenLine, ArrowRight, Clock } from 'lucide-react';
+import { ArrowRight, Clock } from 'lucide-react';
 
 const KYC_PHASES = [
   { label: 'Identité', sublabel: 'CNI + Selfie', duration: '~5 min' },

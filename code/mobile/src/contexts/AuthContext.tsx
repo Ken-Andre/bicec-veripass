@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // If on lock screen, stay there; otherwise navigate to login
       const onLock = window.location.pathname.includes('/auth/lock');
       if (!onLock) {
-        window.location.href = '/mobile/auth/login';
+        window.location.href = '/mobile/auth/phone';
       }
     });
   }, [logout]);

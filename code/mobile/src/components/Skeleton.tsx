@@ -1,19 +1,18 @@
-import { cn } from '../../lib/utils';
+import { cn } from '../lib/utils';
 
 interface SkeletonProps {
   className?: string;
-  width?: string;
-  height?: string;
+  style?: React.CSSProperties;
 }
 
-export function Skeleton({ className, width, height }: SkeletonProps) {
+export function Skeleton({ className, style }: SkeletonProps) {
   return (
     <div
       className={cn(
         'animate-pulse rounded-xl bg-muted/60',
         className
       )}
-      style={{ width, height }}
+      style={style}
     />
   );
 }
