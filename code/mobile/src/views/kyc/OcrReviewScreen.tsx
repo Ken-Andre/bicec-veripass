@@ -5,6 +5,7 @@ import { useKyc } from '../../contexts/KycContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { ConfidenceBadge } from '../../components/ConfidenceBadge';
 import { ProgressStepper } from '../../components/ProgressStepper';
+import { OcrFieldsSkeleton } from '../../components/Skeleton';
 import { Edit2, AlertCircle, Loader2 } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import { captureKycException } from '../../services/sentry';
@@ -47,6 +48,7 @@ export default function OcrReviewScreen() {
   const [userEditThreshold, setUserEditThreshold] = useState(0.95);
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [retryCount, setRetryCount] = useState(0);
+  const [docStatuses, setDocStatuses] = useState<Record<string, string>>({});
 
   const mountedRef = useRef(true);
 
@@ -87,15 +89,21 @@ export default function OcrReviewScreen() {
       const sessionData = sessionRes.data ?? sessionRes;
       const documents = (sessionData.documents || []) as any[];
 
-      // Collect OCR fields from ALL CNI documents (recto + verso)
+      // Collect OCR fields from ALL documents (CNI + bills)
       const allOcrFields: any[] = [];
+      const docStatusMap: Record<string, string> = {};
       for (const doc of documents) {
-        if (doc.doc_type === 'CNI_RECTO' || doc.doc_type === 'CNI_VERSO') {
+        // Track ocr_status per document type
+        docStatusMap[doc.doc_type] = doc.ocr_status || 'PENDING';
+
+        const isCni = doc.doc_type === 'CNI_RECTO' || doc.doc_type === 'CNI_VERSO';
+        const isBill = doc.doc_type === 'BILL_ENEO' || doc.doc_type === 'BILL_CAMWATER';
+        if (isCni || isBill) {
           const docFields = doc.ocr_fields || [];
           for (const f of docFields) {
             // Deduplicate: prefer fields already seen (first occurrence wins)
             if (!allOcrFields.some((existing) => existing.field_name === f.field_name)) {
-              allOcrFields.push(f);
+              allOcrFields.push({ ...f, _docType: doc.doc_type, _ocrStatus: doc.ocr_status });
             }
           }
         }
@@ -121,6 +129,7 @@ export default function OcrReviewScreen() {
       setStatusMessage(null);
       setFields(extractedFields);
       setFetchState('success');
+      setDocStatuses(docStatusMap);
 
       // Store in KycContext
       setOcrFields(extractedFields);
@@ -168,20 +177,28 @@ export default function OcrReviewScreen() {
       setFetchState('error');
 
       // Only pre-fill empty fields if we truly give up
-      const fallbackFields: OcrField[] = [
-        'nom',
-        'prenom',
-        'date_naissance',
-        'lieu_naissance',
-        'sexe',
-        'taille',
-        'profession',
-        'numero_cni',
-        'date_delivrance',
-        'date_expiration',
-        'adresse',
-        'poste_identification',
-      ].map((name) => ({
+      // Check if we have bill fields — if so, don't force CNI fallback
+      const hasBillFields = allOcrFields.some(
+        (f) => f._docType === 'BILL_ENEO' || f._docType === 'BILL_CAMWATER'
+      );
+
+      const fallbackFields: OcrField[] = (hasBillFields
+        ? [] // Bill fields already extracted, don't add CNI fallback
+        : [
+            'nom',
+            'prenom',
+            'date_naissance',
+            'lieu_naissance',
+            'sexe',
+            'taille',
+            'profession',
+            'numero_cni',
+            'date_delivrance',
+            'date_expiration',
+            'adresse',
+            'poste_identification',
+          ]
+      ).map((name) => ({
         field_name: name,
         value: '',
         confidence: 0,
@@ -252,17 +269,21 @@ export default function OcrReviewScreen() {
   if (loading) {
     return (
       <ScreenLayout title={t('ocr.review.title')} showBack>
-        <div className="flex-1 flex flex-col justify-center items-center py-20">
-          <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground animate-pulse">
-            {statusMessage || t('ocr.loading.text') || 'Analyse de votre document...'}
-          </p>
+        <ProgressStepper steps={KYC_STEPS} currentStep={1} className="mb-4" />
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground animate-pulse">
+              {statusMessage || t('ocr.loading.text') || 'Analyse de votre document...'}
+            </p>
+          </div>
           {retryCount > 0 && (
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground pl-6">
               Tentative {retryCount}/{MAX_RETRIES}
             </p>
           )}
         </div>
+        <OcrFieldsSkeleton />
       </ScreenLayout>
     );
   }
@@ -310,6 +331,24 @@ export default function OcrReviewScreen() {
             {t('ocr.processing.subtitle') ||
               'Vérifiez les informations extraites de votre CNI'}
           </p>
+          {/* OCR status badges per document type */}
+          <div className="flex flex-wrap gap-2 mt-2">
+            {Object.entries(docStatuses).map(([docType, status]) => {
+              const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
+                SUCCESS: { bg: 'bg-green-100', text: 'text-green-700', label: '✓' },
+                PARTIAL: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '~' },
+                FAILED: { bg: 'bg-red-100', text: 'text-red-700', label: '✗' },
+                PENDING: { bg: 'bg-gray-100', text: 'text-gray-500', label: '…' },
+              };
+              const cfg = statusConfig[status] || statusConfig.PENDING;
+              const shortName = docType.replace('BILL_', '').replace('CNI_', 'CNI ');
+              return (
+                <span key={docType} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.bg} ${cfg.text}`}>
+                  {cfg.label} {shortName}
+                </span>
+              );
+            })}
+          </div>
         </div>
 
         <div className="space-y-4">

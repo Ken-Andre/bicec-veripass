@@ -1011,6 +1011,29 @@ async def _compute_kyc_readiness(
     has_bill_document = bool({"BILL_ENEO", "BILL_CAMWATER"} & doc_types)
     if not has_bill_document:
         blocking_reasons.append("Missing required bill document (ENEO or CAMWATER)")
+    else:
+        # Validate bill date < 3 months (90 days)
+        bill_docs = [d for d in docs if d.doc_type in {"BILL_ENEO", "BILL_CAMWATER"}]
+        for bill_doc in bill_docs:
+            date_field = next(
+                (f for f in bill_doc.ocr_fields if f.field_name == "date_facturation"), None
+            )
+            if date_field and date_field.extracted_value:
+                raw = date_field.extracted_value.strip()
+                parsed_date = None
+                for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y"):
+                    try:
+                        parsed_date = datetime.strptime(raw, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                if parsed_date:
+                    days_old = (datetime.now(timezone.utc).date() - parsed_date).days
+                    if days_old > 90:
+                        warnings.append(
+                            f"Facture périmée ({days_old} jours, max 90). "
+                            f"Date: {raw}"
+                        )
 
     result = await db.execute(
         select(ConsentRecord)
