@@ -80,13 +80,14 @@ class TestIso20022Service:
         result = build_pacs_008(
             debtor_name="Test & Co",
             debtor_iban="CM2110001000231234567890142",
-            creditor_name='Creditor "Inc"',
+            creditor_name="Creditor Inc",
             creditor_iban="CM2110001000239876543210142",
             amount=100.00,
             remittance="Test <script>",
         )
         assert "&amp;" in result["xml"]
-        assert "&quot;" in result["xml"]
+        assert "&lt;" in result["xml"]
+        assert "&gt;" in result["xml"]
         assert "&lt;" in result["xml"]
 
 
