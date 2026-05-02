@@ -21,7 +21,7 @@ const PinLoginScreen = () => {
   // Auto-trigger biometric login if enabled
   useEffect(() => {
     if (!biometricEnabled || !isPasskeySupported || loading) return;
-    
+
     const tryBiometric = async () => {
       const success = await authenticateWithPasskey();
       if (success && user) {
@@ -96,6 +96,24 @@ const PinLoginScreen = () => {
         return;
       }
 
+      // Distinguish a backend server error (5xx) from a real wrong-PIN (401).
+      // Never show "PIN incorrect" when the server itself crashed — it misleads
+      // the user into thinking their PIN is wrong and burns their attempt count.
+      const isServerError =
+        /^HTTP 5\d\d$/.test(message) ||
+        message === 'Internal Server Error' ||
+        message === 'Bad Gateway' ||
+        message === 'Service Unavailable' ||
+        message === 'Gateway Timeout';
+
+      if (isServerError) {
+        setError('Problème temporaire, veuillez réessayer.');
+        setPin('');
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
+        return;
+      }
+
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       setShake(true);
@@ -120,10 +138,10 @@ const PinLoginScreen = () => {
 
   const handleBiometric = async () => {
     if (!biometricEnabled || !isPasskeySupported) return;
-    
+
     setLoading(true);
     setError('');
-    
+
     try {
       const success = await authenticateWithPasskey();
       if (success && user) {

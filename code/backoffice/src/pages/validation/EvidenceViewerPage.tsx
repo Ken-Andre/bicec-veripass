@@ -384,6 +384,57 @@ export default function EvidenceViewerPage() {
             </Card>
           )}
 
+          {/* Face Match Comparison: Selfie vs CNI Recto side-by-side */}
+          {(() => {
+            const selfieDoc = documents.find((d: any) => d.doc_type === 'SELFIE');
+            const cniRectoDoc = documents.find((d: any) => d.doc_type === 'CNI_RECTO');
+            if (!selfieDoc || !cniRectoDoc) return null;
+            const selfieUrl = `${API_BASE}/backoffice/dossier/${id}/documents/${selfieDoc.id}/file`;
+            const cniUrl = `${API_BASE}/backoffice/dossier/${id}/documents/${cniRectoDoc.id}/file`;
+            const token = getToken();
+            const faceScore = dossier.biometric_result?.face_match_score;
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Comparaison Visage / CNI
+                    {faceScore != null && (
+                      <Badge variant={faceScore >= 0.8 ? 'default' : 'destructive'}>
+                        {(faceScore * 100).toFixed(0)}% match
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground text-center font-medium">Selfie</p>
+                      <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
+                        <img
+                          src={`${selfieUrl}?token=${token}`}
+                          alt="Selfie"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground text-center font-medium">CNI Recto</p>
+                      <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
+                        <img
+                          src={`${cniUrl}?token=${token}`}
+                          alt="CNI Recto"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           <Card>
             <CardHeader><CardTitle>Historique</CardTitle></CardHeader>
             <CardContent>

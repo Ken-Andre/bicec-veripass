@@ -26,7 +26,7 @@ export default function InfoRequestedScreen() {
     setResubmitting(true);
     try {
       // Start a new KYC session for resubmission
-      const res = await apiClient.post<{ session_id: string }>('/kyc/session/start', {});
+      const res = await apiClient.post<{ session_id: string }, Record<string, never>>('/kyc/session/start', {});
       if (res?.session_id) {
         setStatus('IN_PROGRESS');
         setAccessLevel('GUEST');

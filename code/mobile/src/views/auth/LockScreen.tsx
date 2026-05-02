@@ -46,7 +46,26 @@ const LockScreen = () => {
       // Strip any /mobile prefix to avoid double-basename issue
       const cleanRoute = lastRoute.replace(/^\/mobile/, '') || '/dashboard';
       navigate(cleanRoute, { replace: true });
-    } catch {
+    } catch (err: unknown) {
+      // Distinguish a real PIN failure from a backend server error.
+      // apiClient surfaces the HTTP status in the message as "HTTP 5xx"
+      // or via the standard status text ("Internal Server Error", etc.).
+      const message = err instanceof Error ? err.message : String(err);
+      const isServerError =
+        /^HTTP 5\d\d$/.test(message) ||
+        message === 'Internal Server Error' ||
+        message === 'Bad Gateway' ||
+        message === 'Service Unavailable' ||
+        message === 'Gateway Timeout';
+
+      if (isServerError) {
+        setError('Problème temporaire, veuillez réessayer.');
+        setPin('');
+        setShake(true);
+        setTimeout(() => setShake(false), 500);
+        return;
+      }
+
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       setShake(true);

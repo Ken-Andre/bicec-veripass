@@ -270,11 +270,17 @@ async def verify_otp_endpoint(
         await db.refresh(user)
 
     # Manage KYCSession for State Resume
+    # Use order_by + limit(1) to always pick the most recent active session.
+    # A user may have multiple DRAFT/PENDING_INFO sessions (e.g. after a reset),
+    # which would cause scalar_one_or_none() to raise MultipleResultsFound.
     result = await db.execute(
-        select(KYCSession).where(
+        select(KYCSession)
+        .where(
             KYCSession.user_id == user.id,
             KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
         )
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
     )
     kyc_session = result.scalar_one_or_none()
 
@@ -451,12 +457,15 @@ async def verify_email_otp(
     await reset_otp_attempts(email)
     await mark_otp_session_used(db, email, is_phone=False)
 
-    # Update KYCSession State
+    # Update KYCSession State — limit(1) prevents MultipleResultsFound
     result = await db.execute(
-        select(KYCSession).where(
+        select(KYCSession)
+        .where(
             KYCSession.user_id == current_user.id,
             KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
         )
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
     )
     kyc_session = result.scalar_one_or_none()
     if kyc_session:
@@ -483,12 +492,15 @@ async def setup_pin(
     """Setup PIN for returning mobile user."""
     current_user.pin_hash = hash_password(body.pin)
 
-    # Update KYCSession State
+    # Update KYCSession State — limit(1) prevents MultipleResultsFound
     result = await db.execute(
-        select(KYCSession).where(
+        select(KYCSession)
+        .where(
             KYCSession.user_id == current_user.id,
             KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
         )
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
     )
     kyc_session = result.scalar_one_or_none()
     if kyc_session:
@@ -534,12 +546,17 @@ async def verify_pin(
             detail="Invalid credentials",
         )
 
-    # Manage KYCSession for State Resume
+    # Manage KYCSession for State Resume — limit(1) prevents MultipleResultsFound.
+    # A user who restarted KYC multiple times may have several DRAFT sessions;
+    # we always want the most recent one.
     kyc_result = await db.execute(
-        select(KYCSession).where(
+        select(KYCSession)
+        .where(
             KYCSession.user_id == user.id,
             KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
         )
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
     )
     kyc_session = kyc_result.scalar_one_or_none()
 
@@ -741,12 +758,15 @@ async def refresh_token(
         result = await db.execute(select(User).where(User.id == parsed_uuid))
         user = result.scalar_one_or_none()
         if user:
-            # For mobile users, re-derive session handle if possible
+            # For mobile users, re-derive session handle if possible — limit(1) prevents crash
             kyc_result = await db.execute(
-                select(KYCSession).where(
+                select(KYCSession)
+                .where(
                     KYCSession.user_id == user.id,
                     KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
                 )
+                .order_by(KYCSession.started_at.desc())
+                .limit(1)
             )
             kyc_session = kyc_result.scalar_one_or_none()
             session_handle = make_session_handle(str(kyc_session.id)) if kyc_session else None
