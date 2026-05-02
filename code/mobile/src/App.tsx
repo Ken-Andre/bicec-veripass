@@ -39,6 +39,8 @@ import ConsentScreen from './views/kyc/ConsentScreen';
 import SignatureScreen from './views/kyc/SignatureScreen';
 import ReviewScreen from './views/kyc/ReviewScreen';
 import SubmitSuccessScreen from './views/kyc/SubmitSuccessScreen';
+import RejectionScreen from './views/kyc/RejectionScreen';
+import InfoRequestedScreen from './views/kyc/InfoRequestedScreen';
 import DeleteAccountScreen from './views/settings/DeleteAccountScreen';
 import { KycResumeBanner } from './components/KycResumeBanner';
 import { OfflineBanner } from './components/OfflineBanner';
@@ -116,6 +118,8 @@ function App() {
                 <Route path="/kyc/signature" element={<LockGuard><KycHydrationGate><KycStepGuard><SignatureScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/review" element={<LockGuard><KycHydrationGate><KycStepGuard><ReviewScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/submit-success" element={<LockGuard><KycHydrationGate><SubmitSuccessScreen /></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/rejected" element={<LockGuard><KycHydrationGate><RejectionScreen /></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/info-requested" element={<LockGuard><KycHydrationGate><InfoRequestedScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </KycProvider>

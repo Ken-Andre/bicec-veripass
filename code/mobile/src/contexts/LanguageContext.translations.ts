@@ -267,5 +267,30 @@ export const translations: Record<string, Record<Language, string>> = {
 
     // CNI Capture Quality
     'capture.quality.cni_fail': { fr: 'Qualité insuffisante', en: 'Insufficient quality' },
+
+    // Rejection Screen
+    'rejection.title': { fr: 'Dossier refusé', en: 'Application Rejected' },
+    'rejection.heading': { fr: 'Votre dossier a été refusé', en: 'Your application has been rejected' },
+    'rejection.subtitle': { fr: 'Notre équipe de validation a examiné votre dossier et a pris la décision suivante.', en: 'Our validation team has reviewed your application and made the following decision.' },
+    'rejection.decision': { fr: 'Décision', en: 'Decision' },
+    'rejection.decidedAt': { fr: 'Le', en: 'On' },
+    'rejection.noReason': { fr: 'Aucun motif spécifié.', en: 'No reason specified.' },
+    'rejection.retry': { fr: 'Recommencer la procédure KYC', en: 'Restart KYC procedure' },
+    'rejection.contactSupport': { fr: 'Contacter le support', en: 'Contact support' },
+    'rejection.backDashboard': { fr: 'Retour au tableau de bord', en: 'Back to dashboard' },
+    'rejection.help': { fr: 'Si vous pensez qu\'il s\'agit d\'une erreur, contactez notre support ou rendez-vous en agence BICEC avec vos documents originaux.', en: 'If you believe this is an error, contact our support or visit a BICEC branch with your original documents.' },
+
+    // Info Requested Screen
+    'infoRequested.title': { fr: 'Informations requises', en: 'Information Required' },
+    'infoRequested.heading': { fr: 'Informations complémentaires requises', en: 'Additional information required' },
+    'infoRequested.subtitle': { fr: 'Notre équipe de validation a besoin d\'informations supplémentaires pour traiter votre dossier.', en: 'Our validation team needs additional information to process your application.' },
+    'infoRequested.agentRequest': { fr: 'Demande de l\'agent', en: 'Agent request' },
+    'infoRequested.requestedAt': { fr: 'Demandé le', en: 'Requested on' },
+    'infoRequested.noReason': { fr: 'Informations complémentaires requises.', en: 'Additional information required.' },
+    'infoRequested.resubmit': { fr: 'Fournir les informations', en: 'Provide information' },
+    'infoRequested.resubmitting': { fr: 'Préparation...', en: 'Preparing...' },
+    'infoRequested.contactSupport': { fr: 'Contacter le support', en: 'Contact support' },
+    'infoRequested.backDashboard': { fr: 'Retour au tableau de bord', en: 'Back to dashboard' },
+    'infoRequested.help': { fr: 'Vous pouvez fournir les documents manquants directement depuis l\'application ou vous rendre en agence BICEC.', en: 'You can provide the missing documents directly from the app or visit a BICEC branch.' },
 };
 

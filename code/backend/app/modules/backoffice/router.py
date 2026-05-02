@@ -16,32 +16,28 @@ Endpoints:
 
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request, HTTPException, status
+from fastapi import APIRouter, Depends, Request, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import app.db.base
 from app.core.rate_limit import limiter
 from app.core.config import settings
 from app.core.pagination import PageParams, PageResponse, paginate
-from app.core.security import require_agent_role, get_current_agent, get_current_user
+from app.core.security import require_agent_role, get_current_agent
 from app.core.logging import logger
 from app.db.session import get_db
-from app.modules.auth.models import Agent, AgentRole, User
+from app.modules.auth.models import Agent, AgentRole
+from app.modules.admin.models import Agency
 from app.modules.kyc.models import (
     KYCSession,
     Document,
     OCRField,
     ValidationDecision,
     DossierAssignment,
-    AmlAlert,
-    BiometricResult,
-    ConsentRecord,
     Notification,
     SupportThread,
     SupportMessage,
@@ -61,6 +57,7 @@ from app.modules.backoffice.schemas import (
     DossierBiometricBrief,
     DossierDecisionBrief,
     DossierAmlAlertBrief,
+    OCRFieldBrief,
     ReviewDecisionRequest,
     ReviewDecisionResponse,
     AssignDossierRequest,
@@ -144,31 +141,52 @@ def _extract_client_name_from_docs(documents: list) -> str | None:
 async def list_queue(
     request: Request,
     page: PageParams = Depends(),
+    status_filter: str | None = Query(None, alias="status", description="Filter by KYC status (e.g. PENDING_AGENT_REVIEW, PENDING_INFO, APPROVED, REJECTED, FRAUD_SUSPECT)"),
+    agent_id: uuid.UUID | None = Query(None, description="Filter by assigned agent UUID"),
+    agency_code: str | None = Query(None, description="Filter by agency code"),
+    client_name: str | None = Query(None, description="Search by client name (partial match)"),
     _agent: Agent = Depends(
         require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT)
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    """Paginated KYC session queue — dossiers awaiting agent review."""
+    """Paginated KYC session queue — dossiers awaiting agent review.
+
+    Supports optional filters: status, agent_id, agency_code, client_name.
+    """
     offset = page.offset
     limit = page.limit
+
+    # Base conditions: if no status filter, show review states; otherwise show requested status
+    conditions = []
+    if status_filter:
+        conditions.append(KYCSession.status == status_filter)
+    else:
+        conditions.append(KYCSession.status.in_(_REVIEW_STATES))
+
     base_query = (
         select(KYCSession)
-        .where(KYCSession.status.in_(_REVIEW_STATES))
+        .where(*conditions)
         .options(
             selectinload(KYCSession.user),
             selectinload(KYCSession.agency),
             selectinload(KYCSession.documents).selectinload(Document.ocr_fields),
             selectinload(KYCSession.assignments).selectinload(DossierAssignment.agent),
         )
-        .order_by(KYCSession.priority_flag.desc(), KYCSession.submitted_at.asc())
     )
 
-    count_query = select(func.count()).select_from(
-        select(KYCSession.id)
-        .where(KYCSession.status.in_(_REVIEW_STATES))
-        .subquery()
-    )
+    # Apply filters at query level where possible
+    if agency_code:
+        base_query = base_query.join(KYCSession.agency).where(Agency.code == agency_code)
+
+    base_query = base_query.order_by(KYCSession.priority_flag.desc(), KYCSession.submitted_at.asc())
+
+    # Count query with same filters
+    count_conditions = list(conditions)
+    count_query = select(func.count()).select_from(KYCSession).where(*count_conditions)
+    if agency_code:
+        count_query = count_query.join(KYCSession.agency).where(Agency.code == agency_code)
+
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
@@ -180,8 +198,22 @@ async def list_queue(
     items = []
     for session in sessions:
         user_phone = session.user.phone if session.user else None
-        client_name = _extract_client_name_from_docs(session.documents) or user_phone
-        agency_code = session.agency.code if session.agency else None
+        client_name_extracted = _extract_client_name_from_docs(session.documents) or user_phone
+        agency_code_val = session.agency.code if session.agency else None
+
+        # Filter by agent_id (post-query, since assignments are eager-loaded)
+        if agent_id:
+            has_assignment = any(
+                a.agent_id == agent_id and a.is_current and a.completed_at is None
+                for a in session.assignments
+            )
+            if not has_assignment:
+                continue
+
+        # Filter by client_name (post-query, case-insensitive partial match)
+        if client_name and client_name_extracted:
+            if client_name.lower() not in client_name_extracted.lower():
+                continue
 
         assigned_agent_name = None
         current = next(
@@ -200,11 +232,11 @@ async def list_queue(
             priority_flag=session.priority_flag,
             started_at=session.started_at,
             submitted_at=session.submitted_at,
-            client_name=client_name,
+            client_name=client_name_extracted,
             client_phone=user_phone,
             assigned_agent_name=assigned_agent_name,
             overall_confidence=overall_confidence,
-            agency_code=agency_code,
+            agency_code=agency_code_val,
         ))
 
     total_pages = (total + limit - 1) // limit if total > 0 else 1
@@ -255,17 +287,29 @@ async def get_dossier_detail(
 
     doc_briefs: list[DossierDocumentBrief] = []
     for doc in session.documents:
-        confidences = [float(f.confidence_score) for f in doc.ocr_fields]
-        avg_conf = sum(confidences) / len(confidences) if confidences else None
+        ocr_field_briefs = [
+            OCRFieldBrief(
+                id=f.id,
+                field_name=f.field_name,
+                extracted_value=f.extracted_value,
+                confidence_score=float(f.confidence_score),
+                human_corrected=f.human_corrected or False,
+                corrected_value=f.corrected_value,
+                corrected_by_agent_id=f.corrected_by_agent_id,
+                corrected_at=f.corrected_at,
+            )
+            for f in doc.ocr_fields
+        ]
         doc_briefs.append(
             DossierDocumentBrief(
                 id=doc.id,
                 doc_type=doc.doc_type,
                 sha256_hash=doc.sha256_hash,
+                ocr_status=doc.ocr_status or "PENDING",
+                ocr_error=doc.ocr_error,
                 ocr_engine=doc.ocr_engine,
                 captured_at=doc.captured_at,
-                field_count=len(doc.ocr_fields),
-                avg_confidence=avg_conf,
+                ocr_fields=ocr_field_briefs,
             )
         )
 
@@ -416,7 +460,7 @@ async def submit_review_decision(
         if body.decision != "REJECTED" or "REJECTED" not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"From FRAUD_SUSPECT, only REJECTED is allowed.",
+                detail="From FRAUD_SUSPECT, only REJECTED is allowed.",
             )
     else:
         allowed_decisions = _ROLE_DECISIONS.get(current_agent.role, set())
@@ -871,7 +915,7 @@ async def send_support_message(
     message = SupportMessage(
         id=uuid.uuid4(),
         thread_id=thread_id,
-        sender_type="JEAN",
+        sender_type=current_agent.role.value,
         sender_id=current_agent.id,
         content=body.content,
         sent_at=now,
