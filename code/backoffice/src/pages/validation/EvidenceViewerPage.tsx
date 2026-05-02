@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/Badge';
 import { ImageViewer } from '@/components/shared/ImageViewer';
 import { DossierTimeline } from '@/components/shared/DossierTimeline';
 import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
+import { FaceComparisonCard } from '@/components/shared/FaceComparisonCard';
+import { AddressCoherencePanel } from '@/components/shared/AddressCoherencePanel';
 import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck, Pencil, Save } from 'lucide-react';
 import { reviewDossier, assignDossier, autoAssignDossier } from '@/services/dossier-service';
 import { apiGet, apiPost } from '@/services/api-client';
@@ -363,6 +365,21 @@ export default function EvidenceViewerPage() {
               />
             </CardContent>
           </Card>
+
+          {/* Face Comparison: Selfie vs CNI Recto */}
+          {(() => {
+            const selfieDoc = documents.find((d: any) => d.doc_type === 'SELFIE');
+            const cniRectoDoc = documents.find((d: any) => d.doc_type === 'CNI_RECTO');
+            if (!selfieDoc || !cniRectoDoc) return null;
+            return (
+              <FaceComparisonCard
+                sessionId={id || ''}
+                selfieDocId={selfieDoc.id}
+                cniRectoDocId={cniRectoDoc.id}
+                faceMatchScore={dossier.biometric_result?.face_match_score}
+              />
+            );
+          })()}
 
           {dossier.biometric_result && (
             <Card>

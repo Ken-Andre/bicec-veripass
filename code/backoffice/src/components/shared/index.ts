@@ -8,3 +8,4 @@ export { ImageViewer } from './ImageViewer';
 export { DossierTimeline } from './DossierTimeline';
 export { RequestInfoModal } from './RequestInfoModal';
 export { AddressCoherencePanel } from './AddressCoherencePanel';
+export { FaceComparisonCard } from './FaceComparisonCard';

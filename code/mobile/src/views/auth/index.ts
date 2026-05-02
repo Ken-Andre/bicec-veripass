@@ -6,3 +6,5 @@ export { default as EmailEntryScreen } from './EmailEntryScreen';
 export { default as EmailOtpVerifyScreen } from './EmailOtpVerifyScreen';
 export { default as LockScreen } from './LockScreen';
 export { default as ForgotPinScreen } from './ForgotPinScreen';
+export { default as BiometricOptInScreen } from './BiometricOptInScreen';
+export { default as ProgressTimelineScreen } from './ProgressTimelineScreen';

@@ -292,5 +292,25 @@ export const translations: Record<string, Record<Language, string>> = {
     'infoRequested.contactSupport': { fr: 'Contacter le support', en: 'Contact support' },
     'infoRequested.backDashboard': { fr: 'Retour au tableau de bord', en: 'Back to dashboard' },
     'infoRequested.help': { fr: 'Vous pouvez fournir les documents manquants directement depuis l\'application ou vous rendre en agence BICEC.', en: 'You can provide the missing documents directly from the app or visit a BICEC branch.' },
+
+    // Liveness Intro
+    'liveness.intro.start': { fr: 'Commencer la vérification', en: 'Start verification' },
+    'liveness.intro.step1': { fr: 'Souriez naturellement', en: 'Smile naturally' },
+    'liveness.intro.step2': { fr: 'Clignez des yeux', en: 'Blink your eyes' },
+    'liveness.intro.step3': { fr: 'Tournez la tête légèrement', en: 'Turn your head slightly' },
+    'liveness.intro.privacy': { fr: 'Votre selfie est traité de manière sécurisée et ne sera pas conservé.', en: 'Your selfie is processed securely and will not be stored.' },
+
+    // OCR Processing
+    'ocr.processing.title': { fr: 'Analyse de votre document', en: 'Analyzing your document' },
+    'ocr.processing.subtitle': { fr: 'Extraction automatique des informations en cours...', en: 'Automatic information extraction in progress...' },
+
+    // Progress Timeline
+    'kyc.progress.heading': { fr: 'Votre parcours', en: 'Your journey' },
+    'kyc.progress.subtitle': { fr: 'Voici les étapes à compléter pour ouvrir votre compte.', en: 'Here are the steps to complete to open your account.' },
+    'kyc.progress.duration': { fr: '~10 minutes', en: '~10 minutes' },
+    'kyc.progress.start': { fr: 'Commencer', en: 'Start' },
+
+    // Auth Biometric
+    'auth.biometric.secure': { fr: 'Données biométriques stockées localement', en: 'Biometric data stored locally' },
 };
 

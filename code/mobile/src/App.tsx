@@ -17,7 +17,9 @@ import { HelpScreen } from './views/dashboard';
 import { SupportScreen } from './views/dashboard';
 import { MoreScreen } from './views/dashboard';
 import { NotFoundPage } from './views/NotFoundPage';
-import { PinSetupScreen, PinLoginScreen, PhoneEntryScreen, OtpVerifyScreen, EmailEntryScreen, EmailOtpVerifyScreen, LockScreen, ForgotPinScreen } from './views/auth';
+import { PinSetupScreen, PinLoginScreen, PhoneEntryScreen, OtpVerifyScreen, EmailEntryScreen, EmailOtpVerifyScreen, LockScreen, ForgotPinScreen, BiometricOptInScreen, ProgressTimelineScreen } from './views/auth';
+import OcrProcessingScreen from './views/kyc/OcrProcessingScreen';
+import LivenessIntroScreen from './views/kyc/LivenessIntroScreen';
 import { KycHydrationGate } from './components/KycHydrationGate';
 import { KycStepGuard } from './hooks/useKycFlow';
 import KycIntroScreen from './views/kyc/KycIntroScreen';
@@ -78,8 +80,12 @@ function App() {
                 <Route path="/auth/email-otp" element={<EmailOtpVerifyScreen />} />
                 <Route path="/auth/pin-setup" element={<PinSetupScreen />} />
                 <Route path="/auth/pin-login" element={<PinLoginScreen />} />
+                <Route path="/auth/biometric" element={<BiometricOptInScreen />} />
+                <Route path="/auth/progress" element={<ProgressTimelineScreen />} />
                 <Route path="/auth/lock" element={<LockScreen />} />
                 <Route path="/auth/forgot-pin" element={<ForgotPinScreen />} />
+                <Route path="/auth/biometric" element={<BiometricOptInScreen />} />
+                <Route path="/kyc/progress" element={<ProgressTimelineScreen />} />
                 <Route path="/dashboard" element={<LockGuard><DashboardPage /></LockGuard>} />
                 <Route path="/cards" element={<LockGuard><CardsScreen /></LockGuard>} />
                 <Route path="/transfers" element={<LockGuard><TransfersScreen /></LockGuard>} />
@@ -102,10 +108,14 @@ function App() {
                 <Route path="/kyc/cni-recto-capture" element={<LockGuard><KycHydrationGate><KycStepGuard><CniRectoCapture /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/cni-verso-guide" element={<LockGuard><KycHydrationGate><KycStepGuard><CniVersoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/cni-verso-capture" element={<LockGuard><KycHydrationGate><KycStepGuard><CniVersoCapture /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/ocr-processing" element={<LockGuard><KycHydrationGate><OcrProcessingScreen /></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/liveness-intro" element={<LockGuard><KycHydrationGate><LivenessIntroScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/cni-recto" element={<LockGuard><KycHydrationGate><KycStepGuard><CniRectoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/cni-verso" element={<LockGuard><KycHydrationGate><KycStepGuard><CniVersoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 {/* OCR Review → Liveness */}
+                <Route path="/kyc/ocr-processing" element={<LockGuard><KycHydrationGate><OcrProcessingScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/ocr-review" element={<LockGuard><KycHydrationGate><KycStepGuard><OcrReviewScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
+                <Route path="/kyc/liveness-intro" element={<LockGuard><KycHydrationGate><LivenessIntroScreen /></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/biometric-consent" element={<LockGuard><KycHydrationGate><KycStepGuard><BiometricConsentScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 <Route path="/kyc/liveness" element={<LockGuard><KycHydrationGate><KycStepGuard><LivenessScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                 {/* Bill type select → Capture or Upload → Address → NIU → ... */}
