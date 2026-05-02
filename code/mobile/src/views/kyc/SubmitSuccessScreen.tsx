@@ -3,24 +3,20 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayout } from '../../components/ScreenLayout';
 import { CelebrationOverlay } from '../../components/CelebrationOverlay';
 import { CheckCircle, Clock, FileCheck, Building2, ArrowRight } from 'lucide-react';
-import { useKyc } from '../../contexts/KycContext';
 import { useEffect, useState } from 'react';
 
 export default function SubmitSuccessScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { resetKyc } = useKyc();
   const [showCelebration, setShowCelebration] = useState(true);
 
+  // Auto-redirect to dashboard after 8s (user can click button for immediate navigation)
   useEffect(() => {
-    // Clear KYC state after successful submission and auto-redirect to dashboard
-    // This allows the user to see their pending/restrained status on the homepage.
     const timer = setTimeout(() => {
-      resetKyc();
       navigate('/dashboard', { replace: true });
-    }, 5000);
+    }, 8000);
     return () => clearTimeout(timer);
-  }, [resetKyc, navigate]);
+  }, [navigate]);
 
   return (
     <>

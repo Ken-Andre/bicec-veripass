@@ -28,11 +28,27 @@ export interface KycStepInfo {
   completed: boolean;
 }
 
-// === KYC STATUS (merged from both sources) ===
+// === KYC STATUS ===
+// Source of truth: statuses returned by backend /kyc/review-status endpoint
+// + statuses used internally by the frontend for UI gating.
+// Adding a new backend status here will cause compile errors in exhaustive
+// switch/mapping functions (assertNever), preventing silent fallback bugs.
+
+/** Statuses returned by the backend /kyc/review-status endpoint */
+export type BackendKycStatus =
+  | 'PENDING_AGENT_REVIEW'  // primary post-submit status
+  | 'PENDING_KYC'           // legacy alias
+  | 'PENDING_INFO'          // agent requested more info
+  | 'APPROVED'              // agent approved the dossier
+  | 'REJECTED'              // agent rejected the dossier
+  | 'FRAUD_SUSPECT'         // agent flagged for fraud
+  | 'NO_SUBMISSION';        // no session exists (backend fallback)
+
+/** Full union: backend + frontend-only statuses */
 export type KycStatus =
+  | BackendKycStatus
   | 'DRAFT'
-  | 'PENDING_KYC'
-  | 'PENDING_INFO'
+  | 'ABANDONED'
   | 'COMPLIANCE_REVIEW'
   | 'READY_FOR_OPS'
   | 'PROVISIONING'
@@ -46,16 +62,29 @@ export type KycStatus =
   | 'PENDING_RESUBMIT'
   | 'MONITORED'
   | 'DISABLED'
-  | 'ABANDONED'
+  | 'SUBMITTED'
+  | 'INFO_REQUESTED'
   | 'PENDING'
   | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'FAILED'
-  | 'MANUAL_REVIEW'
-  | 'SUBMITTED'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'INFO_REQUESTED';
+  | 'MANUAL_REVIEW';
+
+/**
+ * Exhaustive check for KycStatus — throws at runtime if a value is unhandled.
+ * Use in switch/mapping to guarantee compile-time coverage.
+ * Example:
+ *   function mapStatus(s: KycStatus): string {
+ *     switch (s) {
+ *       case 'PENDING_AGENT_REVIEW': return '...';
+ *       // ... all cases ...
+ *       default: return assertNever(s);
+ *     }
+ *   }
+ */
+export function assertNever(value: never): never {
+  throw new Error(`Unhandled KycStatus: ${value}`);
+}
 
 // === LANGUAGE ===
 export type Language = 'fr' | 'en';

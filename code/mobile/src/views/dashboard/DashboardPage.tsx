@@ -3,6 +3,7 @@ import { ScreenLayout } from '../../components/ScreenLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useKyc } from '../../contexts/KycContext';
 import type { AccessTier, KycStatus } from '../../types';
+import { assertNever } from '../../types';
 import type { ReviewStatus } from '../../contexts/KycContext';
 import { User, ShieldCheck, CreditCard, Landmark, History, PlusCircle, ArrowRight, LogOut, Settings, Trash2, X, Clock, AlertTriangle, CheckCircle, XCircle, Eye, Ban } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -59,11 +60,18 @@ const TIER_CONFIG: Record<AccessTier, { label: string; color: string; bgColor: s
   },
 };
 
-// Status labels for KYC review states
-const STATUS_LABELS: Record<string, { label: string; description: string }> = {
+// Status labels for KYC review states — typed on KycStatus to catch missing entries at compile time.
+const STATUS_LABELS: Record<KycStatus, { label: string; description: string }> = {
+  // Backend statuses returned by /kyc/review-status
   DRAFT: { label: 'Dossier en preparation', description: 'Completez les etapes pour soumettre votre KYC.' },
+  PENDING_AGENT_REVIEW: { label: 'En cours de validation', description: 'Votre dossier est en attente de traitement par un agent BICEC.' },
   PENDING_KYC: { label: 'Verification agent en cours', description: 'Votre dossier est en attente de traitement par Jean.' },
   PENDING_INFO: { label: 'Informations complementaires requises', description: 'Ajoutez les pieces demandees pour continuer.' },
+  APPROVED: { label: 'Dossier approuve', description: 'Votre dossier a ete approuve. Votre compte est en cours de creation.' },
+  REJECTED: { label: 'Dossier rejete', description: 'Votre dossier a ete rejete. Vous pouvez recommencer la procedure.' },
+  FRAUD_SUSPECT: { label: 'Dossier en verification approfondie', description: 'Votre dossier fait l\'objet d\'un controle special.' },
+  NO_SUBMISSION: { label: 'Aucun dossier soumis', description: 'Commencez votre parcours KYC pour ouvrir votre compte.' },
+  // Frontend-only statuses (conservés pour compatibilité)
   COMPLIANCE_REVIEW: { label: 'Revue conformite AML/CFT', description: 'Votre dossier est en controle compliance.' },
   READY_FOR_OPS: { label: 'Pret pour ouverture de compte', description: 'Le dossier est valide et transmis aux operations.' },
   PROVISIONING: { label: 'Provisioning bancaire en cours', description: 'Creation du compte en cours dans le SI bancaire.' },
@@ -76,9 +84,15 @@ const STATUS_LABELS: Record<string, { label: string; description: string }> = {
   EXPIRY_WARNING: { label: 'Document bientot expire', description: 'Renouvelez vos documents pour maintenir vos acces.' },
   PENDING_RESUBMIT: { label: 'Resoumission requise', description: 'Soumettez les nouveaux documents demandes.' },
   MONITORED: { label: 'Compte sous surveillance', description: 'Votre compte reste actif avec surveillance renforcee.' },
-  REJECTED: { label: 'Dossier rejete', description: 'Votre dossier a ete rejete. Vous pouvez recommencer la procedure.' },
   DISABLED: { label: 'Compte bloque', description: 'Acces suspendu. Contactez le support BICEC.' },
   ABANDONED: { label: 'Session abandonnee', description: 'Votre session a expire. Reprenez le parcours KYC.' },
+  SUBMITTED: { label: 'Dossier soumis', description: 'Votre dossier a ete soumis avec succes.' },
+  INFO_REQUESTED: { label: 'Informations requises', description: 'Des informations supplementaires sont demandees.' },
+  PENDING: { label: 'En attente', description: 'Traitement en cours.' },
+  IN_PROGRESS: { label: 'En cours', description: 'Traitement en cours.' },
+  COMPLETED: { label: 'Termine', description: 'Le traitement est termine.' },
+  FAILED: { label: 'Echec', description: 'Une erreur est survenue.' },
+  MANUAL_REVIEW: { label: 'Revue manuelle', description: 'Votre dossier necessite une revue manuelle.' },
 };
 
 const REVIEW_POLL_INTERVAL_MS = 30_000; // 30s
@@ -160,6 +174,7 @@ export function DashboardPage() {
   const isRejected = reviewStatus?.status === 'REJECTED';
   const isFraudSuspect = accessLevel === 'DISABLED';
   const pendingStatuses = new Set([
+    'PENDING_AGENT_REVIEW',
     'PENDING_KYC',
     'PENDING_INFO',
     'COMPLIANCE_REVIEW',
@@ -219,10 +234,10 @@ export function DashboardPage() {
               </div>
               <div className="space-y-1 flex-1">
                 <h4 className="text-lg font-black text-slate-800">
-                  {statusInfo?.label ?? (isPendingReview ? 'Vérification en cours' : 'Identification Requise')}
+                  {statusInfo?.label ?? 'Chargement du statut...'}
                 </h4>
                 <p className="text-sm text-slate-500 leading-relaxed">
-                  {statusInfo?.description ?? 'Votre profil VeriPass n\'est pas encore certifié par la BICEC.'}
+                  {statusInfo?.description ?? 'Synchronisation avec le serveur en cours.'}
                 </p>
 
                 {/* Decision info */}

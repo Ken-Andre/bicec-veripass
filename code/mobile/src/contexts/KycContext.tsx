@@ -86,6 +86,11 @@ interface KycContextType extends KycState {
   setAccessLevel: (level: AccessTier) => void;
   setStatus: (status: KycStatus) => void;
   setReviewStatus: (status: ReviewStatus | null) => void;
+  /** Reset only temporary UI/form data (captures, OCR, consent). Preserves status/accessLevel/reviewStatus/sessionId. */
+  resetKycForm: () => void;
+  /** Full reset: clears persisted state, resets all fields including status to initial. Use when starting a new KYC. */
+  resetKycFull: () => Promise<void>;
+  /** @deprecated Use resetKycForm() or resetKycFull() instead */
   resetKyc: () => void;
 
   // Backward compatibility with old KycContext
@@ -271,12 +276,44 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
   const setReviewStatus = useCallback((reviewStatus: ReviewStatus | null) => 
     setState(s => ({ ...s, reviewStatus })), []);
 
-  const resetKyc = useCallback(async () => {
+  const resetKycForm = useCallback(() => {
+    setState(s => ({
+      ...s,
+      // Reset UI/form data only
+      cniRectoCapture: null,
+      cniVersoCapture: null,
+      ocrFields: [],
+      livenessAttempts: 0,
+      address: null,
+      billCapture: null,
+      niuCapture: null,
+      niuManual: null,
+      consentCgu: false,
+      consentPrivacy: false,
+      consentData: false,
+      signatureData: null,
+      selectedPlan: null,
+      interests: [],
+      basicProfile: null,
+      documentChoice: null,
+      biometricConsentAccepted: false,
+      completedSteps: [],
+      currentStep: 'cni_recto',
+      // Preserve: sessionId, status, accessLevel, reviewStatus
+    }));
+  }, []);
+
+  const resetKycFull = useCallback(async () => {
     await clearPersistedKycState().catch((err) => {
       console.warn('Failed to clear persisted KYC state', err);
     });
     setState(initialState);
   }, []);
+
+  /** @deprecated Use resetKycForm() or resetKycFull() instead */
+  const resetKyc = useCallback(() => {
+    resetKycFull();
+  }, [resetKycFull]);
 
   // Compute derived fields using useMemo to avoid recomputation on every render
   const step = useMemo(() => state.completedSteps.length, [state.completedSteps]);
@@ -313,6 +350,8 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     setAccessLevel,
     setStatus,
     setReviewStatus,
+    resetKycForm,
+    resetKycFull,
     resetKyc,
     step,
     setStep: () => { /* no-op */ },
@@ -342,6 +381,8 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     setAccessLevel,
     setStatus,
     setReviewStatus,
+    resetKycForm,
+    resetKycFull,
     resetKyc,
     step,
     kycData,
