@@ -4,7 +4,7 @@ Source: architecture-bicec-veripass.md §17, G32
 """
 
 import uuid
-from sqlalchemy import text, select, delete
+from sqlalchemy import text
 from app.core.celery_config import celery
 from app.db.session import AsyncSessionLocal
 from app.core.logging import logger
@@ -86,11 +86,11 @@ async def _cascade_delete_abandoned_session(db, session_id: uuid.UUID, user_id: 
     This ensures an abandoned session cannot be resumed via PIN login.
     """
     from app.modules.kyc.models import (
-        KYCSession, Document, OCRField, BiometricResult, ConsentRecord,
+        Document, OCRField, BiometricResult, ConsentRecord,
     )
     from app.modules.auth.models import User
     from app.modules.kyc.storage import document_storage
-    from pathlib import Path
+    from sqlalchemy import delete, select
 
     # 0. Reset liveness lockout and clear PIN for the session's user
     user_result = await db.execute(select(User).where(User.id == user_id))

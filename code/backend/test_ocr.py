@@ -1,6 +1,6 @@
 import time
 start = time.time()
-from app.services.ocr_service import ocr_service
+from app.services.ocr_service import ocr_service  # noqa: E402
 
 result = ocr_service.extract_from_path("/tmp/test_cni_valid.png")
 elapsed = time.time() - start

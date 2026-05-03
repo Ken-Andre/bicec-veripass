@@ -8,7 +8,15 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.banking.models import BankCard, Transfer, Transaction, SavingsPocket
+from app.modules.kyc.models import KYCSession
 from app.services.iso20022_service import build_pacs_008
+
+
+def _derive_iban(user_id: UUID) -> str:
+    """Derive a stable IBAN from user_id (no Account table yet)."""
+    uid_int = int(user_id)
+    account_number = str(uid_int % 10**11).zfill(11)
+    return f"CM211000100023{account_number}2"
 
 
 # ── Cards ──
@@ -186,3 +194,37 @@ async def update_savings_pocket(
     await db.commit()
     await db.refresh(pocket)
     return pocket
+
+
+# ── Account Info ──
+
+async def get_account_info(db: AsyncSession, user_id: UUID) -> dict | None:
+    """Return aggregated account info from KYC + transactions."""
+    # Latest KYC session for holder name and access level
+    kyc_result = await db.execute(
+        select(KYCSession)
+        .where(KYCSession.user_id == user_id)
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
+    )
+    kyc_session = kyc_result.scalar_one_or_none()
+
+    # Balance = sum of all transaction amounts
+    balance_result = await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), Decimal("0")))
+        .where(Transaction.user_id == user_id)
+    )
+    balance = float(balance_result.scalar() or 0)
+
+    holder_name = kyc_session.client_name or "Client BICEC" if kyc_session else "Client BICEC"
+    access_level = kyc_session.access_level or "RESTRICTED" if kyc_session else "RESTRICTED"
+
+    return {
+        "user_id": user_id,
+        "iban": _derive_iban(user_id),
+        "bic": "BICECMCX",
+        "holder_name": holder_name,
+        "balance": balance,
+        "currency": "XAF",
+        "access_level": access_level,
+    }

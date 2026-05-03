@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+
 
 def get_now() -> datetime:
     return datetime.now(timezone.utc)

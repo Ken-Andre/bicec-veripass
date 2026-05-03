@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.security import get_current_agent, require_agent_role
+from app.core.security import require_agent_role
 from app.db.session import get_db
 from app.modules.auth.models import AgentRole
 

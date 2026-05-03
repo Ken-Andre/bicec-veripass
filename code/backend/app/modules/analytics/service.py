@@ -1,10 +1,9 @@
 """Module service layer logic."""
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.modules.kyc.models import KYCSession, AmlAlert, ValidationDecision
-from app.modules.auth.models import Agent
 
 async def get_dashboard_stats(db: AsyncSession):
     # 1. Dossiers en attente (SUBMITTED, PENDING)

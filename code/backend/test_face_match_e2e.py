@@ -70,7 +70,7 @@ def test_deepface_import() -> bool:
     print("TEST 1: DeepFace import")
     print("=" * 70)
     try:
-        from deepface import DeepFace  # type: ignore
+        from deepface import DeepFace  # type: ignore  # noqa: F401
         print("  ✅ DeepFace imported successfully")
         # Check version
         import deepface
@@ -100,7 +100,7 @@ def test_face_verify_with_detector(detector: str) -> dict:
     
     Returns dict with: success, distance, score, error, elapsed_ms
     """
-    from app.modules.kyc.service import _deepface_verify_if_available, _clamp_01
+    from app.modules.kyc.service import _deepface_verify_if_available, _clamp_01  # noqa: F401
     
     # Use synthetic images — with enforce_detection=False, 
     # DeepFace will process them but Facenet512 embeddings may be meaningless
@@ -149,11 +149,11 @@ def test_face_verify_pipeline() -> dict:
     if score is not None:
         print(f"  ✅ Face match score: {score:.4f} (elapsed: {elapsed_ms:.0f}ms)")
         if score >= 0.8:
-            print(f"  ✅ Score ≥ FACE_MATCH_MIN_SCORE (0.8): PASS")
+            print("  Score ≥ FACE_MATCH_MIN_SCORE (0.8): PASS")
         else:
-            print(f"  ⚠️  Score < FACE_MATCH_MIN_SCORE (0.8): expected with synthetic images")
+            print("  Score < FACE_MATCH_MIN_SCORE (0.8): expected with synthetic images")
     else:
-        print(f"  ❌ Face match returned None (DeepFace unavailable)")
+        print("  Face match returned None (DeepFace unavailable)")
     
     return {"score": score, "elapsed_ms": elapsed_ms}
 
@@ -178,9 +178,9 @@ def test_byte_histogram_fallback() -> dict:
     print(f"  Different face images similarity: {score_diff:.4f}")
     
     if score_same > score_diff:
-        print(f"  ✅ Same-face score > different-face score: PASS")
+        print("  Same-face score > different-face score: PASS")
     else:
-        print(f"  ⚠️  Same-face score ≤ different-face score: synthetic images may not differ enough")
+        print("  Same-face score ≤ different-face score: synthetic images may not differ enough")
     
     return {"score_same": score_same, "score_diff": score_diff}
 
@@ -227,7 +227,7 @@ def test_ocr_extraction() -> dict:
             conf = result.confidences.get(k, 0)
             print(f"     {k}: {v} (conf={conf:.2f})")
     else:
-        print(f"  ⚠️  No fields extracted")
+        print("  No fields extracted")
     
     return {"engine": result.engine, "field_count": len(result.fields), "elapsed_ms": elapsed_ms}
 

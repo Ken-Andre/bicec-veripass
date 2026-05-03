@@ -1,4 +1,3 @@
-import asyncio
 import os
 import urllib.parse
 from typing import AsyncGenerator
@@ -65,8 +64,8 @@ os.environ["SENTRY_DSN"] = ""
 os.environ["SKIP_SENTRY"] = "1"
 
 # Patch sentry_sdk.init to be a no-op before importing app.main
-import sentry_sdk
-_original_init = sentry_sdk.init
+import sentry_sdk  # noqa: E402
+_original_init = sentry_sdk.init  # noqa: F841
 
 def _mock_init(*args, **kwargs):
     # Don't actually initialize Sentry in tests

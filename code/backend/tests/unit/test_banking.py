@@ -1,6 +1,5 @@
 """Unit tests for banking module — ISO 20022 service and schemas."""
 
-import pytest
 from app.services.iso20022_service import build_pacs_008
 
 
@@ -91,7 +90,7 @@ class TestIso20022Service:
         assert "&lt;" in result["xml"]
 
 
-from app.modules.banking.schemas import (
+from app.modules.banking.schemas import (  # noqa: E402
     TransferSendRequest,
     CardFreezeRequest,
     SavingsPocketCreate,

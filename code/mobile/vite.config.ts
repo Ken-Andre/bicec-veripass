@@ -54,7 +54,7 @@ export default defineConfig(async ({ mode }) => {
 
   if (env.SENTRY_AUTH_TOKEN && env.SENTRY_ORG && env.SENTRY_PROJECT) {
     try {
-      const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<any>
+      const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<Record<string, unknown>>
       const sentryModule = await dynamicImport('@sentry/vite-plugin')
       const sentryVitePlugin = sentryModule.sentryVitePlugin as (options: Record<string, unknown>) => unknown
       plugins.push(

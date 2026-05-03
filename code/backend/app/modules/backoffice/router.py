@@ -606,8 +606,8 @@ async def assign_dossier(
     result = await db.execute(
         select(DossierAssignment).where(
             DossierAssignment.session_id == session_id,
-            DossierAssignment.is_current == True,
-            DossierAssignment.completed_at == None,
+            DossierAssignment.is_current == True,  # noqa: E712
+            DossierAssignment.completed_at == None,  # noqa: E711
         )
     )
     current_assignment = result.scalar_one_or_none()
@@ -632,7 +632,7 @@ async def assign_dossier(
         action="DOSSIER_ASSIGN",
         table_name="dossier_assignments",
         record_id=str(session_id),
-        new_data={"agent_id": str(body.agent_id), "agent_name": target_agent.name, "agent_name": _agent.name},
+        new_data={"agent_id": str(body.agent_id), "assigned_to": target_agent.name, "assigned_by": _agent.name},
         performed_by=_agent.id,
         performed_at=now,
         client_ip=request.client.host if request.client else None,
@@ -686,7 +686,7 @@ async def auto_assign_dossier(
 
     agent_query = select(Agent).where(
         Agent.role == AgentRole.JEAN,
-        Agent.is_available == True,
+        Agent.is_available == True,  # noqa: E712
     )
 
     if session.agency_id:
@@ -694,7 +694,7 @@ async def auto_assign_dossier(
             select(Agent)
             .where(
                 Agent.role == AgentRole.JEAN,
-                Agent.is_available == True,
+                Agent.is_available == True,  # noqa: E712
                 Agent.agency_id == session.agency_id,
             )
             .order_by(Agent.active_dossier_count.asc())
@@ -722,8 +722,8 @@ async def auto_assign_dossier(
     result = await db.execute(
         select(DossierAssignment).where(
             DossierAssignment.session_id == session_id,
-            DossierAssignment.is_current == True,
-            DossierAssignment.completed_at == None,
+            DossierAssignment.is_current == True,  # noqa: E712
+            DossierAssignment.completed_at == None,  # noqa: E711
         )
     )
     current_assignment = result.scalar_one_or_none()
@@ -749,9 +749,9 @@ async def auto_assign_dossier(
         record_id=str(session_id),
         new_data={
             "agent_id": str(target_agent.id),
-            "agent_name": target_agent.name,
+            "assigned_to": target_agent.name,
             "method": "auto",
-            "agent_name": _agent.name,
+            "assigned_by": _agent.name,
         },
         performed_by=_agent.id,
         performed_at=now,

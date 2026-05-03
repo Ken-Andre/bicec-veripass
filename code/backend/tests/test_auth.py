@@ -1,7 +1,6 @@
 """Tests unitaires pour le module Auth (Issue #50 — AUTH-04)."""
 
 import pytest
-from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock
 
 from app.core.security import (

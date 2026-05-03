@@ -84,6 +84,7 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET || format('test-secret-{0}', github.run_id) }}
           ENVIRONMENT: testing
           OTP_MODE: dev_local
+          PYTHONPATH: .
         run: cd code/backend && uv run pytest -v
 
   build-mobile:

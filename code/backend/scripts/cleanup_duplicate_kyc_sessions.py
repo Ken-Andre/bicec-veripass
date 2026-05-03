@@ -9,7 +9,6 @@ Run this BEFORE applying the unique constraint migration.
 
 import asyncio
 from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import async_session_maker
 from app.modules.kyc.models import KYCSession

@@ -7,7 +7,6 @@ import hashlib
 from app.main import app
 from app.core.security import get_current_user
 from app.modules.auth.models import User
-from app.modules.kyc.storage import document_storage
 
 
 @pytest.fixture

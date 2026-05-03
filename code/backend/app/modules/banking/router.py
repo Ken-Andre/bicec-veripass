@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.modules.auth.models import User
 from app.modules.banking import service
 from app.modules.banking.schemas import (
+    AccountInfoResponse,
     CardResponse,
     CardFreezeRequest,
     TransferSendRequest,
@@ -24,6 +25,20 @@ from app.modules.banking.schemas import (
 )
 
 router = APIRouter()
+
+
+# ── Account ──
+
+@router.get("/account", response_model=AccountInfoResponse)
+async def get_account(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return user's account info (balance derived from transactions)."""
+    info = await service.get_account_info(db, current_user.id)
+    if not info:
+        raise HTTPException(status_code=404, detail="Account info not found")
+    return AccountInfoResponse(**info)
 
 
 # ── Cards ──

@@ -1,7 +1,6 @@
 import os
 import time
 import uuid
-from typing import Dict
 from contextlib import asynccontextmanager
 
 import sentry_sdk

@@ -3,7 +3,6 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from datetime import datetime
-from uuid import UUID
 
 
 # === ADR-001 Lifecycle States & Access Tiers ===

@@ -20,10 +20,10 @@ from sqlalchemy.orm import selectinload
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.security import get_current_user, get_current_agent, make_session_handle, verify_session_handle, require_agent_role
+from app.core.security import get_current_user, make_session_handle, verify_session_handle
 from app.core.logging import logger
 from app.db.session import get_db
-from app.modules.auth.models import User, Agent, AgentRole
+from app.modules.auth.models import User
 from app.modules.kyc.models import (
     KYCSession,
     Document,
@@ -31,7 +31,6 @@ from app.modules.kyc.models import (
     BiometricResult,
     ConsentRecord,
     ValidationDecision,
-    AmlAlert,
     Notification,
 )
 from app.modules.kyc.service import (

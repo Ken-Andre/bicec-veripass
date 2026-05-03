@@ -5,11 +5,11 @@ from datetime import timedelta
 from typing import Optional
 from fastapi import APIRouter, Request, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.redis import get_redis, lock_key
+from app.core.redis import get_redis
 from app.core.security import (
     hash_password,
     verify_password,
@@ -24,7 +24,7 @@ from app.core.security import (
 from app.core.logging import logger
 from app.db.session import get_db
 from app.modules.auth.models import User, Agent, OTPSession
-from app.modules.kyc.models import KYCSession, ConsentRecord, Notification
+from app.modules.kyc.models import KYCSession
 from app.modules.auth.utils import (
     generate_otp,
     store_otp,

@@ -11,9 +11,7 @@ into the production backend, adding image alignment, MRZ parsing, and timing met
 from __future__ import annotations
 
 import io
-import os
 import re
-import tempfile
 import time
 from pathlib import Path
 from typing import Any
