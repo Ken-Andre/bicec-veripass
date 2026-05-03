@@ -421,3 +421,13 @@ export interface Transfer {
   iso?: IsoTransactionMeta;
   createdAt: string;
 }
+
+export interface AccountInfo {
+  user_id: string;
+  iban: string;
+  bic: string;
+  holder_name: string;
+  balance: number;
+  currency: string;
+  access_level: string;
+}

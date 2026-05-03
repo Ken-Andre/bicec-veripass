@@ -1,6 +1,7 @@
 // TODO INFRA-02 intégration : pointer vers FastAPI backend sur :8000
 
 export interface ApiError extends Error {
+  status?: number;
   response?: {
     data: unknown;
   };
@@ -43,7 +44,7 @@ function fetchWithTimeout(
   });
 }
 
-async function handleResponse(response: Response): Promise<any> {
+async function handleResponse<T>(response: Response): Promise<T> {
   if (response.status === 401) {
     // JWT expired or invalid — clear token and trigger handler
     localStorage.removeItem('vp_token');
@@ -54,23 +55,23 @@ async function handleResponse(response: Response): Promise<any> {
   }
 
   if (!response.ok) {
-    let errorData: any = {};
+    let errorData: Record<string, unknown> = {};
     try {
       errorData = await response.json();
     } catch {
       // ignore JSON parse error
     }
     const error = new Error(
-      errorData.detail || response.statusText || `HTTP ${response.status}`
+      (errorData.detail as string) || response.statusText || `HTTP ${response.status}`
     ) as ApiError;
-    (error as any).status = response.status;
+    error.status = response.status;
     error.response = { data: errorData };
     throw error;
   }
 
   // 204 No Content
   if (response.status === 204) {
-    return null;
+    return null as T;
   }
 
   return response.json();
@@ -99,7 +100,7 @@ export const createApiClient = (baseUrl: string) => {
         },
         options?.timeout ?? 15000
       );
-      return handleResponse(response);
+      return handleResponse<T>(response);
     },
 
     post: async <T, D>(
@@ -121,7 +122,7 @@ export const createApiClient = (baseUrl: string) => {
         },
         options?.timeout ?? defaultTimeout
       );
-      return handleResponse(response);
+      return handleResponse<T>(response);
     },
 
     put: async <T, D>(
@@ -138,7 +139,7 @@ export const createApiClient = (baseUrl: string) => {
         },
         options?.timeout ?? 15000
       );
-      return handleResponse(response);
+      return handleResponse<T>(response);
     },
 
     delete: async <T>(
@@ -153,7 +154,7 @@ export const createApiClient = (baseUrl: string) => {
         },
         options?.timeout ?? 15000
       );
-      return handleResponse(response);
+      return handleResponse<T>(response);
     },
   };
 };

@@ -11,6 +11,8 @@ export const translations: Record<string, Record<Language, string>> = {
     'welcome.security.desc': { fr: 'Vos données sont protégées', en: 'Your data is protected' },
     'welcome.modernity': { fr: 'Modernité', en: 'Modernity' },
     'welcome.modernity.desc': { fr: 'Une expérience 100% digitale', en: 'A 100% digital experience' },
+    'welcome.cta.primary': { fr: 'Ouvrir mon compte', en: 'Open my account' },
+    'welcome.cta.secondary': { fr: 'Me connecter', en: 'Log in' },
 
     // Auth
     'auth.phone.title': { fr: 'Votre numéro de téléphone', en: 'Your phone number' },
@@ -127,13 +129,21 @@ export const translations: Record<string, Record<Language, string>> = {
     'nav.more': { fr: 'Plus', en: 'More' },
 
     // Dashboard
+    'dashboard.greeting': { fr: 'Bonjour,', en: 'Hello,' },
     'dashboard.balance': { fr: 'Solde', en: 'Balance' },
+    'dashboard.mainAccount': { fr: 'Compte principal', en: 'Main account' },
+    'dashboard.kycRequired': { fr: 'Complétez votre vérification d\'identité pour accéder à tous les services BICEC.', en: 'Complete your identity verification to access all BICEC services.' },
+    'dashboard.completeKyc': { fr: 'Continuer ma vérification', en: 'Continue my verification' },
+    'dashboard.recentTransactions': { fr: 'Dernières opérations', en: 'Recent transactions' },
+    'dashboard.pockets': { fr: 'Mes poches', en: 'My pockets' },
+    'dashboard.ecosystem': { fr: 'Écosystème BICEC', en: 'BICEC Ecosystem' },
     'dashboard.restricted.banner': { fr: 'Complétez votre KYC pour débloquer les services', en: 'Complete your KYC to unlock services' },
     'dashboard.limited.banner': { fr: 'Ajoutez votre NIU pour l\'accès complet', en: 'Add your NIU for full access' },
     'dashboard.ecosystem.title': { fr: 'Écosystème BICEC', en: 'BICEC Ecosystem' },
     'dashboard.ecosystem.hint': { fr: 'Connectez vos applications BICEC', en: 'Connect your BICEC apps' },
 
     // Cards
+    'cards.empty': { fr: 'Aucune carte disponible', en: 'No card available' },
     'cards.frozen': { fr: 'Carte gelée', en: 'Card frozen' },
     'cards.frozenDesc': { fr: 'La carte est temporairement bloquée', en: 'Card is temporarily blocked' },
     'cards.freeze': { fr: 'Geler', en: 'Freeze' },
@@ -186,6 +196,7 @@ export const translations: Record<string, Record<Language, string>> = {
 
     // Transactions
     'transactions.title': { fr: 'Transactions', en: 'Transactions' },
+    'transactions.empty': { fr: 'Aucune opération pour le moment', en: 'No transaction yet' },
     'transactions.filter.all': { fr: 'Tout', en: 'All' },
     'transactions.filter.in': { fr: 'Entrées', en: 'Income' },
     'transactions.filter.out': { fr: 'Sorties', en: 'Expenses' },
@@ -200,6 +211,7 @@ export const translations: Record<string, Record<Language, string>> = {
     'savings.goal': { fr: 'Objectif', en: 'Goal' },
     'savings.initialAmount': { fr: 'Montant initial', en: 'Initial amount' },
     'savings.createBtn': { fr: 'Créer la poche', en: 'Create pocket' },
+    'savings.empty': { fr: 'Aucune poche d\'épargne', en: 'No savings pocket' },
     'savings.tip': { fr: 'Conseil : mettez de côté régulièrement même de petites sommes.', en: 'Tip: set aside regularly even small amounts.' },
 
     // Settings
@@ -217,6 +229,7 @@ export const translations: Record<string, Record<Language, string>> = {
 
     // Notifications
     'notifications.title': { fr: 'Notifications', en: 'Notifications' },
+    'notifications.empty': { fr: 'Aucune notification', en: 'No notification' },
 
     // Help
     'help.title': { fr: 'Aide', en: 'Help' },
@@ -227,6 +240,7 @@ export const translations: Record<string, Record<Language, string>> = {
 
     // Support
     'support.title': { fr: 'Support', en: 'Support' },
+    'support.empty': { fr: 'Démarrez une conversation avec notre équipe.', en: 'Start a conversation with our team.' },
     'support.placeholder': { fr: 'Tapez votre message...', en: 'Type your message...' },
 
     // More
@@ -241,6 +255,7 @@ export const translations: Record<string, Record<Language, string>> = {
     'common.continue': { fr: 'Continuer', en: 'Continue' },
     'common.confirm': { fr: 'Confirmer', en: 'Confirm' },
     'common.cancel': { fr: 'Annuler', en: 'Cancel' },
+    'common.seeAll': { fr: 'Voir tout', en: 'See all' },
 
     // Review Screen
     'review.title': { fr: 'Vérification du dossier', en: 'Review Application' },

@@ -9,6 +9,7 @@ import { KycStepGuard } from './hooks/useKycFlow';
 import { KycResumeBanner } from './components/KycResumeBanner';
 import { OfflineBanner } from './components/OfflineBanner';
 import { PageLoader } from './components/PageLoader';
+import { DashboardLayout } from './components/DashboardLayout';
 
 const queryClient = new QueryClient();
 
@@ -156,19 +157,22 @@ function App() {
                   <Route path="/auth/forgot-pin" element={<ForgotPinScreen />} />
                   <Route path="/auth/biometric" element={<BiometricOptInScreen />} />
                   <Route path="/kyc/progress" element={<ProgressTimelineScreen />} />
-                  <Route path="/dashboard" element={<LockGuard><DashboardPage /></LockGuard>} />
-                  <Route path="/cards" element={<LockGuard><CardsScreen /></LockGuard>} />
-                  <Route path="/transfers" element={<LockGuard><TransfersScreen /></LockGuard>} />
-                  <Route path="/transfers/send" element={<LockGuard><TransferSendScreen /></LockGuard>} />
-                  <Route path="/transfers/receive" element={<LockGuard><TransferReceiveScreen /></LockGuard>} />
-                  <Route path="/savings" element={<LockGuard><SavingsScreen /></LockGuard>} />
-                  <Route path="/transactions" element={<LockGuard><TransactionHistoryScreen /></LockGuard>} />
-                  <Route path="/more" element={<LockGuard><MoreScreen /></LockGuard>} />
-                  <Route path="/settings" element={<LockGuard><SettingsScreen /></LockGuard>} />
-                  <Route path="/notifications" element={<LockGuard><NotificationsScreen /></LockGuard>} />
-                  <Route path="/help" element={<LockGuard><HelpScreen /></LockGuard>} />
-                  <Route path="/support" element={<LockGuard><SupportScreen /></LockGuard>} />
-                  <Route path="/settings/delete-account" element={<LockGuard><DeleteAccountScreen /></LockGuard>} />
+                  {/* Dashboard routes with global BottomNav */}
+                  <Route element={<LockGuard><DashboardLayout /></LockGuard>}>
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/cards" element={<CardsScreen />} />
+                    <Route path="/transfers" element={<TransfersScreen />} />
+                    <Route path="/transfers/send" element={<TransferSendScreen />} />
+                    <Route path="/transfers/receive" element={<TransferReceiveScreen />} />
+                    <Route path="/savings" element={<SavingsScreen />} />
+                    <Route path="/transactions" element={<TransactionHistoryScreen />} />
+                    <Route path="/more" element={<MoreScreen />} />
+                    <Route path="/settings" element={<SettingsScreen />} />
+                    <Route path="/notifications" element={<NotificationsScreen />} />
+                    <Route path="/help" element={<HelpScreen />} />
+                    <Route path="/support" element={<SupportScreen />} />
+                    <Route path="/settings/delete-account" element={<DeleteAccountScreen />} />
+                  </Route>
                   <Route path="/kyc/basic-profile" element={<LockGuard><KycHydrationGate><BasicProfileScreen /></KycHydrationGate></LockGuard>} />
                   <Route path="/kyc/document-choice" element={<LockGuard><KycHydrationGate><DocumentChoiceScreen /></KycHydrationGate></LockGuard>} />
                   {/* === Marie Journey: KYC Flow === */}
