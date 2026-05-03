@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { FileText, SkipForward, AlertTriangle } from 'lucide-react';
 import { fetchWithCorrelation } from '../../services/apiClient';
 import { enqueueOfflineNiu } from '../../services/kycSyncService';
@@ -39,7 +40,7 @@ export default function NiuScreen() {
   };
 
   return (
-    <ScreenLayout title={t('niu.title')} showBack>
+    <ScreenLayoutV2 title={t('niu.title')} showBack>
       <div className="flex flex-col gap-4 py-4">
         {mode === 'choose' && (
           <>
@@ -84,13 +85,12 @@ export default function NiuScreen() {
               className="w-full px-3 py-3 rounded-lg border bg-background text-lg font-mono tracking-wider"
               maxLength={15}
             />
-            <button
+            <Button
               onClick={() => handleSubmit('DECLARATIVE')}
               disabled={!/^M\d{10,14}$/.test(niuValue)}
-              className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium disabled:opacity-50"
             >
               {t('common.continue')}
-            </button>
+            </Button>
           </>
         )}
 
@@ -101,12 +101,12 @@ export default function NiuScreen() {
               <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">Camera ouverte pour photographier l'attestation NIU</p>
             </div>
-            <button onClick={() => handleSubmit('UPLOADED')} className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium">
+            <Button onClick={() => handleSubmit('UPLOADED')}>
               {t('common.continue')}
-            </button>
+            </Button>
           </>
         )}
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

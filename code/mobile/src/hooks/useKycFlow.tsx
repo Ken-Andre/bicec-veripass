@@ -11,6 +11,7 @@ import { useKyc } from '../contexts/KycContext';
 import type { KycStepType } from '../types';
 
 // Canonical step order — each step requires all previous steps to be completed
+// eslint-disable-next-line react-refresh/only-export-components
 export const KYC_STEP_ORDER: KycStepType[] = [
   'cni_recto',
   'cni_verso',
@@ -65,6 +66,7 @@ const STEP_TO_FIRST_ROUTE: Record<KycStepType, string> = {
  * Find the first incomplete step in the KYC flow.
  * Returns null if all steps are completed.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function findFirstMissingStep(completedSteps: KycStepType[]): KycStepType | null {
   for (const step of KYC_STEP_ORDER) {
     if (!completedSteps.includes(step)) {
@@ -78,6 +80,7 @@ export function findFirstMissingStep(completedSteps: KycStepType[]): KycStepType
  * Get the route for the first missing step.
  * Returns '/dashboard' if all steps are completed.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function getRouteForMissingStep(completedSteps: KycStepType[]): string {
   const missing = findFirstMissingStep(completedSteps);
   if (!missing) return '/dashboard';
@@ -87,6 +90,7 @@ export function getRouteForMissingStep(completedSteps: KycStepType[]): string {
 /**
  * Get the previous step route for back navigation.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function getPreviousStepRoute(currentPath: string): string {
   const currentStep = ROUTE_TO_STEP[currentPath];
   if (!currentStep) return '/dashboard';
@@ -119,6 +123,7 @@ export function KycStepGuard({ children }: { children: React.ReactNode }) {
 /**
  * Hook: navigate to the previous step in the KYC flow.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useKycBack() {
   const goBack = (currentPath: string) => {
     return getPreviousStepRoute(currentPath);

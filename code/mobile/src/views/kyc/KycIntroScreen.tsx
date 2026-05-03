@@ -1,10 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
+import { ProgressStepper } from '../../components/ProgressStepper';
 import { FileText, Camera, CheckCircle, Shield } from 'lucide-react';
 import { useKyc } from '../../contexts/KycContext';
 import { fetchWithCorrelation } from '../../services/apiClient';
+
+const KYC_STEPS = [
+  { label: 'CNI' },
+  { label: 'OCR' },
+  { label: 'Visage' },
+  { label: 'Adresse' },
+  { label: 'Facture' },
+  { label: 'NIU' },
+  { label: 'Consent.' },
+  { label: 'Signature' },
+  { label: 'Revue' },
+];
 
 export default function KycIntroScreen() {
   const { t } = useLanguage();
@@ -42,8 +56,9 @@ export default function KycIntroScreen() {
   };
 
   return (
-    <ScreenLayout title={t('kyc.progress.title')} showBack>
-      <div className="flex flex-col items-center gap-6 py-8">
+    <ScreenLayoutV2 title={t('kyc.progress.title')} showBack>
+      <ProgressStepper steps={KYC_STEPS} currentStep={0} className="mb-6" />
+      <div className="flex flex-col items-center gap-6 py-4">
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold">{t('kyc.whatYouNeed.title')}</h2>
           <p className="text-muted-foreground">{t('kyc.whatYouNeed.time')}</p>
@@ -51,33 +66,33 @@ export default function KycIntroScreen() {
 
         <div className="w-full space-y-3">
           {t('kyc.whatYouNeed.cni') && (
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
               <FileText className="w-5 h-5 text-primary" />
-              <span>{t('kyc.whatYouNeed.cni')}</span>
+              <span className="text-sm font-medium">{t('kyc.whatYouNeed.cni')}</span>
             </div>
           )}
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
             <Camera className="w-5 h-5 text-primary" />
-            <span>{t('kyc.whatYouNeed.selfie')}</span>
+            <span className="text-sm font-medium">{t('kyc.whatYouNeed.selfie')}</span>
           </div>
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
             <Shield className="w-5 h-5 text-primary" />
-            <span>{t('kyc.whatYouNeed.address')}</span>
+            <span className="text-sm font-medium">{t('kyc.whatYouNeed.address')}</span>
           </div>
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
             <CheckCircle className="w-5 h-5 text-primary" />
-            <span>{t('kyc.whatYouNeed.niu')}</span>
+            <span className="text-sm font-medium">{t('kyc.whatYouNeed.niu')}</span>
           </div>
         </div>
 
-        <button
+        <Button
           onClick={ensureKycSession}
+          loading={starting}
           disabled={starting}
-          className="w-full max-w-sm bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
         >
           {t('kyc.whatYouNeed.ready')}
-        </button>
+        </Button>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

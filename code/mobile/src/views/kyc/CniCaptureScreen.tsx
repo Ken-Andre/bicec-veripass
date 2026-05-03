@@ -4,12 +4,14 @@ import { useKyc } from '../../contexts/KycContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { computeLaplacianVariance } from '../../services/mediapipeService';
 import { evaluateCni } from '../../services/cniValidator';
-import { Camera, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { Camera, AlertTriangle, CheckCircle, X, Loader2 } from 'lucide-react';
+import { Button } from '../../components/ui/button';
 import { enqueueOfflineCniCapture, runKycSyncNow } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
 import { captureKycException, captureKycMessage } from '../../services/sentry';
 
 type QualityStatus = 'checking' | 'good' | 'blurry' | 'dark' | 'glare' | 'cni_fail';
+type CameraState = 'loading' | 'ready' | 'error';
 
 interface CniCaptureScreenProps {
   side: 'recto' | 'verso';
@@ -19,6 +21,7 @@ interface CniCaptureScreenProps {
 const BLUR_THRESHOLD = 100;
 const DARK_THRESHOLD = 40;
 const GLARE_THRESHOLD = 245;
+const CAMERA_INIT_TIMEOUT_MS = 5000;
 
 export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenProps) {
   const navigate = useNavigate();
@@ -31,7 +34,10 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
   const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraState, setCameraState] = useState<CameraState>('loading');
   const capturedRef = useRef(false);
+  const initTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const ensureSessionId = useCallback(() => {
     if (sessionId) return sessionId;
     const generated = `offline-${Date.now()}`;
@@ -43,6 +49,11 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
     setCameraReady(false);
+    setCameraState('loading');
+    if (initTimerRef.current) {
+      clearTimeout(initTimerRef.current);
+      initTimerRef.current = null;
+    }
   }, []);
 
   const toHex = (buffer: ArrayBuffer): string =>
@@ -149,10 +160,32 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     setCapturing(false);
     stopCamera();
     navigate(nextRoute);
-  }, [side, nextRoute, setCniCapture, completeStep, stopCamera, navigate, uploadDocument]);
+  }, [side, nextRoute, setCniCapture, completeStep, stopCamera, navigate, uploadDocument, sessionId]);
+
+  /* ── Robust stream attachment ───────────────────────────────────────────────
+     Attaches a MediaStream to the <video> element, retrying via rAF if the
+     ref is not yet mounted (fixes race condition in Strict Mode / fast nav).
+  ──────────────────────────────────────────────────────────────────────────── */
+  const attachStream = useCallback((stream: MediaStream) => {
+    const video = videoRef.current;
+    if (!video) {
+      requestAnimationFrame(() => attachStream(stream));
+      return;
+    }
+    video.srcObject = stream;
+    const markReady = () => setCameraReady(true);
+    video.onloadedmetadata = () => {
+      video.play().then(markReady).catch(markReady);
+    };
+    video.onplaying = markReady;
+    // Safety net: force ready after timeout so user is never stuck
+    initTimerRef.current = setTimeout(markReady, CAMERA_INIT_TIMEOUT_MS);
+  }, []);
 
   const startCamera = useCallback(async () => {
     try {
+      setCameraState('loading');
+      setCameraReady(false);
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API not available in this browser context (requires HTTPS or localhost).');
       }
@@ -168,15 +201,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
         });
       }
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        const markReady = () => setCameraReady(true);
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().then(markReady).catch(markReady);
-        };
-        videoRef.current.onplaying = markReady;
-        setTimeout(markReady, 2000);
-      }
+      attachStream(stream);
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err));
       console.error('Camera access error:', error);
@@ -186,12 +211,14 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
         operation: 'capture_cni_camera_init',
         extra: { side: side.toUpperCase() },
       });
+      setCameraState('error');
       setError(`${t('capture.camera.error')} - ${error.message}`);
     }
-  }, [t, sessionId, side]);
+  }, [t, sessionId, side, attachStream]);
 
   useEffect(() => {
     if (!cameraReady) return;
+    setCameraState('ready');
 
     const interval = setInterval(() => {
       if (!videoRef.current || !canvasRef.current || capturedRef.current) return;
@@ -247,7 +274,6 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           return;
         }
 
-        // Additional CNI-specific quality gate (skip aspect_ratio on live feed)
         const cniResult = evaluateCni({
           width: vw,
           height: vh,
@@ -308,23 +334,32 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     }
   };
 
-  if (error) {
+  /* ── Error state ─────────────────────────────────────────────────────────── */
+  if (error || cameraState === 'error') {
     return (
-      <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center text-white p-6 text-center">
+      <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center text-white p-6 text-center safe-bottom safe-top">
         <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
-        <p className="mb-4">{error}</p>
-        <button
-          onClick={() => navigate(-1)}
-          className="text-primary underline"
-        >
-          {t('common.back')}
-        </button>
+        <p className="mb-6 text-lg font-medium leading-relaxed">{error || t('capture.camera.error')}</p>
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <Button
+            onClick={() => { setError(''); setCameraState('loading'); startCamera(); }}
+          >
+            {t('common.retry') || 'Réessayer'}
+          </Button>
+          <button
+            onClick={() => { stopCamera(); navigate(-1); }}
+            className="text-white/70 text-sm font-medium hover:text-white transition-colors"
+          >
+            {t('common.back') || 'Retour'}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      {/* Camera viewport */}
       <div className="relative flex-1 overflow-hidden">
         <video
           ref={videoRef}
@@ -335,9 +370,20 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
         />
         <canvas ref={canvasRef} className="hidden" />
 
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* Loading overlay — prevents blank screen during init */}
+        {cameraState === 'loading' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20">
+            <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+            <p className="text-white/90 text-sm font-medium">
+              {t('capture.initializing') || 'Initialisation de la caméra…'}
+            </p>
+          </div>
+        )}
+
+        {/* Document frame overlay */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div
-            className={`relative w-[85%] aspect-[1.586/1] border-4 ${borderColor()} rounded-lg`}
+            className={`relative w-[85%] aspect-[1.586/1] border-4 ${borderColor()} rounded-lg transition-colors duration-300`}
             style={{
               boxShadow: quality === 'good' ? '0 0 20px rgba(34, 197, 94, 0.5)' : '0 0 20px rgba(249, 115, 22, 0.5)'
             }}
@@ -349,7 +395,8 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           </div>
         </div>
 
-        <div className="absolute bottom-24 left-0 right-0 flex flex-col items-center gap-3">
+        {/* Bottom controls */}
+        <div className="absolute bottom-24 left-0 right-0 flex flex-col items-center gap-3 z-10">
           <div className={`rounded-full px-4 py-2 text-sm font-medium ${qualityColor()}`}>
             {qualityLabel()}
           </div>
@@ -357,7 +404,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           {!capturing && quality === 'good' && (
             <button
               onClick={doCapture}
-              className="flex items-center gap-2 rounded-full bg-green-500 px-6 py-3 text-white font-semibold text-sm shadow-lg"
+              className="flex items-center gap-2 rounded-full bg-green-500 px-6 py-3 text-white font-semibold text-sm shadow-lg active:scale-95 transition-transform"
             >
               <Camera className="h-5 w-5" />
               {t('capture.manual')}
@@ -365,7 +412,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           )}
 
           {quality !== 'good' && !capturing && (
-            <div className="text-white/80 text-sm text-center">
+            <div className="text-white/80 text-sm text-center px-6">
               {t('capture.adjust')}
             </div>
           )}
@@ -373,21 +420,24 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           {capturing && (
             <div className="flex items-center gap-2 text-white text-sm font-medium animate-pulse">
               <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              Traitement en cours…
+              {t('capture.processing') || 'Traitement en cours…'}
             </div>
           )}
         </div>
 
-        <div className="absolute top-4 left-4">
+        {/* Top-left close */}
+        <div className="absolute top-4 left-4 z-10">
           <button
             onClick={() => { stopCamera(); navigate(-1); }}
-            className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white"
+            className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white active:scale-90 transition-transform"
+            aria-label={t('common.close') || 'Fermer'}
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="absolute top-4 right-4 flex items-center gap-2">
+        {/* Top-right quality indicator */}
+        <div className="absolute top-4 right-4 z-10">
           {quality === 'good' ? (
             <CheckCircle className="w-6 h-6 text-green-500" />
           ) : (
@@ -396,13 +446,14 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
         </div>
       </div>
 
-      <div className="bg-black p-6">
+      {/* Footer tip + cancel */}
+      <div className="bg-black p-6 safe-bottom">
         <div className="text-center text-white/60 text-sm mb-4">
           {side === 'recto' ? t('cni.recto.tip') : t('cni.verso.tip')}
         </div>
         <button
           onClick={() => { stopCamera(); navigate(-1); }}
-          className="text-white/60 text-sm w-full text-center hover:text-white"
+          className="text-white/60 text-sm w-full text-center hover:text-white transition-colors"
         >
           {t('common.cancel')}
         </button>

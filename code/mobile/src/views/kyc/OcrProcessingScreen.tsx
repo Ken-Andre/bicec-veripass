@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { Loader2 } from 'lucide-react';
 
 export default function OcrProcessingScreen() {
@@ -11,7 +11,6 @@ export default function OcrProcessingScreen() {
 
   useEffect(() => {
     cancelledRef.current = false;
-    // Simulate OCR processing time, then navigate to review
     const timer = setTimeout(() => {
       if (!cancelledRef.current) {
         navigate('/kyc/ocr-review');
@@ -24,7 +23,7 @@ export default function OcrProcessingScreen() {
   }, [navigate]);
 
   return (
-    <ScreenLayout title="">
+    <ScreenLayoutV2>
       <div className="flex-1 flex flex-col items-center justify-center gap-8 py-12">
         <div className="relative w-24 h-24">
           <div className="absolute inset-0 rounded-full border-4 border-muted" />
@@ -38,7 +37,7 @@ export default function OcrProcessingScreen() {
         </div>
 
         <div className="text-center space-y-3">
-          <h2 className="text-xl font-bold text-slate-800">
+          <h2 className="text-xl font-bold text-foreground">
             {t('ocr.processing.title') || 'Analyse en cours...'}
           </h2>
           <p className="text-muted-foreground max-w-xs mx-auto">
@@ -52,6 +51,6 @@ export default function OcrProcessingScreen() {
           </div>
         </div>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

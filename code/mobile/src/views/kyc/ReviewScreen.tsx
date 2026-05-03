@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { ProgressStepper } from '../../components/ProgressStepper';
-import { CheckCircle, FileText, User, MapPin, Shield, Loader2, PenLine, Receipt, AlertCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle, FileText, User, MapPin, Shield, PenLine, Receipt, AlertCircle, ArrowRight, RotateCcw } from 'lucide-react';
 import { getSubmissionBlockerStatus, runKycSyncNow } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
 
@@ -162,14 +163,14 @@ export default function ReviewScreen() {
         <p className="text-xs text-muted-foreground">{detail}</p>
       </div>
       {children}
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${ok ? 'bg-green-500 text-white' : 'bg-red-100 text-red-500'}`}>
+      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${ok ? 'bg-success text-white' : 'bg-destructive/10 text-destructive'}`}>
         {ok ? '✓' : '✗'}
       </div>
     </div>
   );
 
   return (
-    <ScreenLayout title={t('review.title')} showBack>
+    <ScreenLayoutV2 title={t('review.title')} showBack>
       <ProgressStepper steps={KYC_STEPS} currentStep={8} className="mb-4" />
       <div className="flex flex-col gap-4 py-2">
         <h2 className="text-lg font-bold">{t('review.title')}</h2>
@@ -196,10 +197,10 @@ export default function ReviewScreen() {
             label={t('review.address') || 'Adresse'}
             detail={
               address
-                ? `${address?.quartier}, ${address?.city}${address?.gps_lat ? ' · ✓ GPS' : ''}`
-                : 'AKW, DLA · ✓ GPS'
+                ? `${address.quartier}, ${address.city}${address.gps_lat ? ' · ✓ GPS' : ''}`
+                : (t('review.address.missing') || 'Non renseigné')
             }
-            ok={true}
+            ok={!!address}
           />
 
           <CheckItem
@@ -230,7 +231,7 @@ export default function ReviewScreen() {
             ok={hasSignature}
           >
             {signatureData && (
-              <div className="w-12 h-8 bg-white border rounded overflow-hidden">
+              <div className="w-12 h-8 bg-card border rounded overflow-hidden">
                 <img src={signatureData} alt="Signature" className="w-full h-full object-contain" />
               </div>
             )}
@@ -239,25 +240,25 @@ export default function ReviewScreen() {
 
         {/* Warnings from backend */}
         {backendReadiness?.warnings?.map((w, i) => (
-          <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
-            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-            <p className="text-xs text-amber-700">{w}</p>
+          <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
+            <AlertCircle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+            <p className="text-xs text-warning">{w}</p>
           </div>
         ))}
 
         {/* Blocking reasons from backend with corrective actions */}
         {backendReadiness && !backendReadiness.can_submit && backendReadiness.blocking_reasons.length > 0 && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 space-y-2">
-            <p className="text-xs font-semibold text-red-700">Dossier incomplet :</p>
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
+            <p className="text-xs font-semibold text-destructive">Dossier incomplet :</p>
             {backendReadiness.blocking_reasons.map((r, i) => {
               const route = getCorrectionRoute(r);
               return (
                 <div key={i} className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-red-600 flex-1">• {r}</p>
+                  <p className="text-xs text-destructive flex-1">• {r}</p>
                   {route && (
                     <button
                       onClick={() => navigate(route)}
-                      className="flex items-center gap-1 text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 px-2 py-1 rounded shrink-0 transition-colors"
+                      className="flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 px-2 py-1 rounded shrink-0 transition-colors"
                     >
                       Corriger <ArrowRight className="w-3 h-3" />
                     </button>
@@ -270,27 +271,26 @@ export default function ReviewScreen() {
 
         {/* Offline blocker */}
         {offlineBlocked && (
-          <div className="p-3 rounded-lg bg-orange-50 border border-orange-200">
-            <p className="text-xs text-orange-700">⚠ {offlineBlocked}</p>
+          <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
+            <p className="text-xs text-warning">⚠ {offlineBlocked}</p>
           </div>
         )}
 
         {/* Submit error */}
         {submitError && (
-          <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{submitError}</p>
+          <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{submitError}</p>
         )}
 
         {/* Submit button — driven by backend readiness */}
-        <button
+        <Button
           onClick={handleSubmit}
+          loading={submitting || loadingReadiness}
           disabled={submitting || !canSubmit}
-          className="w-full bg-primary text-primary-foreground py-4 rounded-xl font-semibold disabled:opacity-40 mt-2 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+          className="mt-2"
         >
-          {submitting ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : loadingReadiness ? (
+          {loadingReadiness && !submitting ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <RotateCcw className="w-5 h-5 animate-spin" />
               Vérification…
             </>
           ) : (
@@ -299,12 +299,12 @@ export default function ReviewScreen() {
               {t('review.submit') || 'Soumettre le dossier KYC'}
             </>
           )}
-        </button>
+        </Button>
 
         {loadingReadiness && (
           <p className="text-xs text-center text-muted-foreground">Chargement du statut du dossier…</p>
         )}
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

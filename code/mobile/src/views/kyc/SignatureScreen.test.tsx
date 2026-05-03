@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Integration tests for SignatureScreen.
  *
@@ -50,10 +51,6 @@ vi.mock('../../contexts/KycContext', () => ({
 vi.mock('../../contexts/LanguageContext', () => ({
   useLanguage: vi.fn().mockReturnValue({ t: (key: string) => key }),
   LanguageProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-vi.mock('../../components/ScreenLayout', () => ({
-  ScreenLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 import { enqueueOfflineSignature } from '../../services/kycSyncService';

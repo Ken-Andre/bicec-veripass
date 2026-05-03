@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { Button } from '../../components/ui/button';
 import { Sun, Hand, Focus, Camera } from 'lucide-react';
 
@@ -15,7 +15,7 @@ export default function CniRectoGuideScreen() {
   ];
 
   return (
-    <ScreenLayout showBack title={t('cni.recto.title')}>
+    <ScreenLayoutV2 showBack title={t('cni.recto.title')}>
       <div className="flex-1 flex flex-col items-center justify-between pt-8 pb-6">
         <div className="text-center">
           <div className="mb-8">
@@ -39,14 +39,11 @@ export default function CniRectoGuideScreen() {
             ))}
           </div>
         </div>
-        <Button 
-          onClick={() => navigate('/kyc/cni-recto-capture')} 
-          className="w-full h-14 rounded-xl text-base font-semibold bg-primary text-primary-foreground"
-        >
-          <Camera className="w-5 h-5 mr-2" />
+        <Button onClick={() => navigate('/kyc/cni-recto-capture')}>
+          <Camera className="w-5 h-5" />
           {t('capture.open.camera')}
         </Button>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

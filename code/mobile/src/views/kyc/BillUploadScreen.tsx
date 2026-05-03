@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useKyc } from '../../contexts/KycContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { Upload, FileImage, AlertCircle, Loader2, CheckCircle, XCircle, WifiOff } from 'lucide-react';
 import { captureKycException } from '../../services/sentry';
 import { fetchWithCorrelation } from '../../services/apiClient';
@@ -180,22 +181,22 @@ export default function BillUploadScreen() {
   const billLabel = billType === 'ENEO' ? 'ENEO (electricite)' : 'CAMWATER (eau)';
 
   return (
-    <ScreenLayout title="Facture" showBack>
+    <ScreenLayoutV2 title="Facture" showBack>
       <div className="flex flex-col gap-6 py-6 w-full max-w-sm mx-auto">
         {/* Header */}
         <div className="text-center">
           <FileImage className="w-12 h-12 mx-auto text-primary mb-3" />
-          <h2 className="text-xl font-bold text-slate-800">Importer votre facture</h2>
-          <p className="text-sm text-slate-500 mt-1">{billLabel}</p>
+          <h2 className="text-xl font-bold text-foreground">Importer votre facture</h2>
+          <p className="text-sm text-muted-foreground mt-1">{billLabel}</p>
         </div>
 
         {/* Size limits info */}
-        <div className="flex items-start gap-3 bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-200">
+        <div className="flex items-start gap-3 bg-accent/10 text-accent p-4 rounded-xl border border-accent/20">
           <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="font-semibold">Taille maximale : {MAX_FILE_SIZE_MB} Mo</p>
-            <p className="text-blue-600 mt-1">Formats : JPG, PNG, PDF</p>
-            <p className="text-blue-600">Les images sont compressees automatiquement pour un envoi rapide.</p>
+            <p className="text-accent mt-1">Formats : JPG, PNG, PDF</p>
+            <p className="text-accent">Les images sont compressees automatiquement pour un envoi rapide.</p>
           </div>
         </div>
 
@@ -204,19 +205,19 @@ export default function BillUploadScreen() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="flex flex-col items-center justify-center gap-4 w-full h-48 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors active:scale-[0.98]"
+            className="flex flex-col items-center justify-center gap-4 w-full h-48 rounded-2xl border-2 border-dashed border-border bg-muted/50 text-muted-foreground hover:bg-muted transition-colors active:scale-[0.98]"
           >
             {uploading ? (
               <Loader2 className="w-10 h-10 animate-spin text-primary" />
             ) : (
-              <Upload className="w-10 h-10 text-slate-400" />
+              <Upload className="w-10 h-10 text-muted-foreground" />
             )}
             <div className="text-center">
               <p className="font-bold">{uploading ? 'Envoi en cours...' : 'Choisir un fichier'}</p>
               {uploading ? (
-                <p className="text-sm text-slate-400 mt-1">Depuis {elapsed}s — patientez</p>
+                <p className="text-sm text-muted-foreground mt-1">Depuis {elapsed}s — patientez</p>
               ) : (
-                <p className="text-sm text-slate-400 mt-1">Appuyez pour parcourir vos fichiers</p>
+                <p className="text-sm text-muted-foreground mt-1">Appuyez pour parcourir vos fichiers</p>
               )}
             </div>
           </button>
@@ -232,11 +233,11 @@ export default function BillUploadScreen() {
 
         {/* Preview */}
         {preview && (
-          <div className="relative rounded-2xl overflow-hidden border border-slate-200">
-            <img src={preview} alt="Apercu facture" className="w-full h-auto max-h-64 object-contain bg-slate-100" />
+          <div className="relative rounded-2xl overflow-hidden border border-border">
+            <img src={preview} alt="Apercu facture" className="w-full h-auto max-h-64 object-contain bg-muted" />
             {uploadDone && (
-              <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                <CheckCircle className="w-16 h-16 text-green-600" />
+              <div className="absolute inset-0 bg-success/20 flex items-center justify-center">
+                <CheckCircle className="w-16 h-16 text-success" />
               </div>
             )}
           </div>
@@ -244,37 +245,37 @@ export default function BillUploadScreen() {
 
         {/* File info */}
         {fileName && (
-          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl text-sm">
-            <FileImage className="w-5 h-5 text-slate-400" />
+          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl text-sm">
+            <FileImage className="w-5 h-5 text-muted-foreground" />
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-slate-800 truncate">{fileName}</p>
-              <p className="text-slate-500">
+              <p className="font-medium text-foreground truncate">{fileName}</p>
+              <p className="text-muted-foreground">
                 {(fileSize / 1024 / 1024).toFixed(2)} Mo
                 {compressedSize !== null && compressedSize !== fileSize && (
-                  <span className="text-green-600 ml-2">
+                  <span className="text-success ml-2">
                     → {(compressedSize / 1024).toFixed(0)} Ko
                   </span>
                 )}
               </p>
             </div>
-            {uploadDone && <CheckCircle className="w-5 h-5 text-green-500" />}
+            {uploadDone && <CheckCircle className="w-5 h-5 text-success" />}
           </div>
         )}
 
         {/* Uploading feedback */}
         {uploading && (
-          <div className="flex items-start gap-3 bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200">
+          <div className="flex items-start gap-3 bg-warning/10 text-warning p-4 rounded-xl border border-warning/20">
             <Loader2 className="w-5 h-5 shrink-0 mt-0.5 animate-spin" />
             <div className="text-sm">
               <p className="font-semibold">Envoi en cours... ({elapsed}s)</p>
-              <p className="text-amber-600 mt-1">La facture est envoyee et analysee. Ceci peut prendre un moment sur connexion lente.</p>
+              <p className="text-warning mt-1">La facture est envoyee et analysee. Ceci peut prendre un moment sur connexion lente.</p>
             </div>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="flex items-start gap-3 bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">
+          <div className="flex items-start gap-3 bg-destructive/10 text-destructive p-4 rounded-xl border border-destructive/20">
             {error.includes('synchronisee') ? (
               <WifiOff className="w-5 h-5 shrink-0 mt-0.5" />
             ) : (
@@ -286,14 +287,14 @@ export default function BillUploadScreen() {
 
         {/* Retry on error */}
         {error && !uploading && (
-          <button
+          <Button
             onClick={() => { setError(''); fileInputRef.current?.click(); }}
-            className="w-full h-12 rounded-2xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
+            className="w-full"
           >
             Reessayer
-          </button>
+          </Button>
         )}
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

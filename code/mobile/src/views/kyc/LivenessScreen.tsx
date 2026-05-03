@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { CheckCircle, XCircle, Loader2, Camera } from 'lucide-react';
 import { initFaceLandmarker, detectForVideo, isFacePresent, computeSmileScore, computeEAR, computeYawAngle } from '../../services/mediapipeService';
 import type { LivenessResult } from '../../types';
@@ -297,7 +298,7 @@ export default function LivenessScreen() {
 
     animFrameRef.current = requestAnimationFrame(detect);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [status, currentChallenge, checkChallenge, stopCamera, t]);
+  }, [status, currentChallenge, checkChallenge, stopCamera, t, captureSelfieFrame]);
 
   useEffect(() => {
     if (!biometricConsentAccepted) {
@@ -415,9 +416,9 @@ export default function LivenessScreen() {
   };
 
   const getOvalBorderColor = () => {
-    if (!faceDetected) return 'border-red-500';
-    if (holdCount > 0) return 'border-green-500';
-    return 'border-orange-500';
+    if (!faceDetected) return 'border-destructive';
+    if (holdCount > 0) return 'border-success';
+    return 'border-warning';
   };
 
   const holdProgressPercent = Math.min((holdCount / HOLD_FRAMES) * 100, 100);
@@ -429,7 +430,7 @@ export default function LivenessScreen() {
   };
 
   return (
-    <ScreenLayout title={t('liveness.intro.title') !== 'liveness.intro.title' ? t('liveness.intro.title') : 'Verification Faciale'} showBack>
+    <ScreenLayoutV2 title={t('liveness.intro.title') !== 'liveness.intro.title' ? t('liveness.intro.title') : 'Verification Faciale'} showBack>
       <div className="flex flex-col items-center gap-6 py-6 w-full max-w-sm mx-auto h-full justify-center">
 
         {(status === 'loading' || status === 'ready') && (
@@ -469,19 +470,19 @@ export default function LivenessScreen() {
 
             <div className="flex gap-3 mt-2">
               {CHALLENGES.map((_, i) => (
-                <div key={i} className={`w-3 h-3 rounded-full transition-all duration-300 ${i < currentChallenge ? 'bg-green-500 scale-110' : i === currentChallenge ? 'bg-primary ring-4 ring-primary/30' : 'bg-muted'}`} />
+                <div key={i} className={`w-3 h-3 rounded-full transition-all duration-300 ${i < currentChallenge ? 'bg-success scale-110' : i === currentChallenge ? 'bg-primary ring-4 ring-primary/30' : 'bg-muted'}`} />
               ))}
             </div>
 
             <div className="w-full h-3 bg-muted rounded-full overflow-hidden mt-2 border border-black/5">
               <div
-                className="h-full bg-green-500 transition-all duration-200"
+                className="h-full bg-success transition-all duration-200"
                 style={{ width: `${holdProgressPercent}%` }}
               ></div>
             </div>
 
             {message && (
-              <div className="animate-in slide-in-from-bottom flex items-start gap-2 bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm font-semibold text-left border border-red-200 shadow-sm w-full">
+              <div className="animate-in slide-in-from-bottom flex items-start gap-2 bg-destructive/10 text-destructive px-4 py-3 rounded-xl text-sm font-semibold text-left border border-destructive/20 shadow-sm w-full">
                 <XCircle className="w-5 h-5 shrink-0" />
                 <p>{message}</p>
               </div>
@@ -494,61 +495,63 @@ export default function LivenessScreen() {
 
         {status === 'success' && (
           <div className="flex flex-col items-center justify-center gap-6 py-12 animate-in fade-in zoom-in duration-500 w-full">
-            <div className="w-28 h-28 bg-green-50 rounded-full flex items-center justify-center border-4 border-green-100">
-              <CheckCircle className="w-16 h-16 text-green-500" />
+            <div className="w-28 h-28 bg-success/10 rounded-full flex items-center justify-center border-4 border-success/20">
+              <CheckCircle className="w-16 h-16 text-success" />
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Verification reussie</h2>
+              <h2 className="text-2xl font-bold text-foreground">Verification reussie</h2>
               <p className="text-muted-foreground mt-2">Votre identite a ete confirmee.</p>
             </div>
-            <button onClick={handleSubmit} className="w-full h-14 rounded-2xl text-base font-semibold gradient-primary text-white mt-8 shadow-lg shadow-primary/20 hover:opacity-90 transition-opacity active:scale-[0.98]">
+            <Button onClick={handleSubmit} className="w-full h-14 mt-8">
               Continuer
-            </button>
+            </Button>
           </div>
         )}
 
         {status === 'fail' && (
           <div className="flex flex-col items-center justify-center gap-6 py-12 w-full animate-in fade-in zoom-in">
-            <div className="w-28 h-28 bg-red-50 rounded-full flex items-center justify-center border-4 border-red-100">
-              <XCircle className="w-16 h-16 text-red-500" />
+            <div className="w-28 h-28 bg-destructive/10 rounded-full flex items-center justify-center border-4 border-destructive/20">
+              <XCircle className="w-16 h-16 text-destructive" />
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Echec</h2>
-              <p className="text-sm text-red-600 font-medium mt-2 max-w-[250px]">{message}</p>
+              <h2 className="text-2xl font-bold text-foreground">Echec</h2>
+              <p className="text-sm text-destructive font-medium mt-2 max-w-[250px]">{message}</p>
             </div>
-            <button onClick={handleRetry} className="flex justify-center items-center gap-2 w-full h-14 rounded-2xl text-base font-semibold bg-slate-900 text-white mt-8 hover:bg-slate-800 transition-colors disabled:opacity-50 active:scale-[0.98]">
+            <Button onClick={handleRetry} variant="secondary" className="w-full h-14 mt-8 gap-2">
               <Camera className="w-5 h-5" />
               Reessayer
-            </button>
+            </Button>
           </div>
         )}
 
         {status === 'locked' && (
           <div className="flex flex-col items-center justify-center gap-6 py-12 w-full animate-in fade-in zoom-in">
-            <div className="w-28 h-28 bg-red-50 rounded-full flex items-center justify-center border-4 border-red-100">
-              <XCircle className="w-16 h-16 text-red-500" />
+            <div className="w-28 h-28 bg-destructive/10 rounded-full flex items-center justify-center border-4 border-destructive/20">
+              <XCircle className="w-16 h-16 text-destructive" />
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-800">Session verrouillee</h2>
-              <p className="text-sm text-red-600 font-medium mt-2 max-w-[280px]">{message}</p>
-              <p className="text-sm text-slate-600 mt-3">Nouvelle tentative possible dans {cooldownSeconds}s</p>
+              <h2 className="text-2xl font-bold text-foreground">Session verrouillee</h2>
+              <p className="text-sm text-destructive font-medium mt-2 max-w-[280px]">{message}</p>
+              <p className="text-sm text-muted-foreground mt-3">Nouvelle tentative possible dans {cooldownSeconds}s</p>
             </div>
-            <button
+            <Button
               onClick={handleRestartSession}
               disabled={cooldownSeconds > 0}
-              className="w-full h-14 rounded-2xl text-base font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+              variant="secondary"
+              className="w-full h-14"
             >
               Recommencer
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleGoToBranch}
-              className="w-full h-14 rounded-2xl text-base font-semibold bg-white border border-slate-300 text-slate-800 hover:bg-slate-50 transition-colors"
+              variant="outline"
+              className="w-full h-14"
             >
               Aller en agence
-            </button>
+            </Button>
           </div>
         )}
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Integration tests for AddressScreen.
  *
@@ -47,10 +48,6 @@ vi.mock('../../contexts/LanguageContext', () => ({
   LanguageProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('../../components/ScreenLayout', () => ({
-  ScreenLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
 import { enqueueOfflineAddress } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
 import { useKyc } from '../../contexts/KycContext';
@@ -77,7 +74,7 @@ const GEO_QUARTIERS = [
 ];
 
 function mockGeoAndApiResponses(apiSuccess = true) {
-  mockFetch.mockImplementation(((url: string, _options?: any) => {
+  mockFetch.mockImplementation(((url: string, _options?: unknown) => { // eslint-disable-line @typescript-eslint/no-unused-vars
     if (url === '/api/v1/kyc/geo/regions') {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(GEO_REGIONS) } as unknown as Response);
     }

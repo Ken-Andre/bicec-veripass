@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserCircle2, CalendarDays, Flag, ChevronRight } from 'lucide-react';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { useKyc } from '../../contexts/KycContext';
 
 const NATIONALITIES = [
@@ -42,7 +43,7 @@ export default function BasicProfileScreen() {
   };
 
   return (
-    <ScreenLayout title="Profil de base" showBack>
+    <ScreenLayoutV2 title="Profil de base" showBack>
       <div className="flex flex-col gap-4 py-2">
         <div className="rounded-2xl border border-primary/10 bg-primary/5 p-4">
           <p className="text-sm font-semibold text-primary">
@@ -50,9 +51,9 @@ export default function BasicProfileScreen() {
           </p>
         </div>
 
-        <label className="text-sm font-semibold text-slate-700">Prenom</label>
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <UserCircle2 className="h-5 w-5 text-slate-400" />
+        <label className="text-sm font-semibold text-foreground">Prenom</label>
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3">
+          <UserCircle2 className="h-5 w-5 text-muted-foreground" />
           <input
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
@@ -61,9 +62,9 @@ export default function BasicProfileScreen() {
           />
         </div>
 
-        <label className="text-sm font-semibold text-slate-700">Nom</label>
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <UserCircle2 className="h-5 w-5 text-slate-400" />
+        <label className="text-sm font-semibold text-foreground">Nom</label>
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3">
+          <UserCircle2 className="h-5 w-5 text-muted-foreground" />
           <input
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
@@ -72,9 +73,9 @@ export default function BasicProfileScreen() {
           />
         </div>
 
-        <label className="text-sm font-semibold text-slate-700">Date de naissance</label>
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <CalendarDays className="h-5 w-5 text-slate-400" />
+        <label className="text-sm font-semibold text-foreground">Date de naissance</label>
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3">
+          <CalendarDays className="h-5 w-5 text-muted-foreground" />
           <input
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
@@ -83,11 +84,11 @@ export default function BasicProfileScreen() {
           />
         </div>
 
-        <label className="text-sm font-semibold text-slate-700">Nationalite</label>
-        <div className="rounded-2xl border border-slate-200 bg-white p-2">
+        <label className="text-sm font-semibold text-foreground">Nationalite</label>
+        <div className="rounded-2xl border border-border bg-card p-2">
           <div className="flex items-center gap-2 px-2 pb-2">
-            <Flag className="h-5 w-5 text-slate-400" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Pays eligibles</span>
+            <Flag className="h-5 w-5 text-muted-foreground" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pays eligibles</span>
           </div>
           <div className="space-y-2">
             {NATIONALITIES.map((n) => (
@@ -100,8 +101,8 @@ export default function BasicProfileScreen() {
                   n.enabled
                     ? nationality === n.code
                       ? 'border border-primary bg-primary/10 text-primary'
-                      : 'border border-slate-200 bg-white text-slate-700'
-                    : 'cursor-not-allowed border border-slate-100 bg-slate-50 text-slate-400'
+                      : 'border border-border bg-card text-foreground'
+                    : 'cursor-not-allowed border border-border bg-muted text-muted-foreground'
                 }`}
               >
                 <span className="font-semibold">{n.label}</span>
@@ -113,16 +114,15 @@ export default function BasicProfileScreen() {
           </div>
         </div>
 
-        <button
+        <Button
           onClick={handleContinue}
           disabled={!isValid}
-          className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-bold text-white transition disabled:opacity-50"
+          className="mt-4"
         >
           Continuer
           <ChevronRight className="h-5 w-5" />
-        </button>
+        </Button>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }
-

@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { ConfidenceBadge } from '../../components/ConfidenceBadge';
 import { ProgressStepper } from '../../components/ProgressStepper';
 import { OcrFieldsSkeleton } from '../../components/Skeleton';
-import { Edit2, AlertCircle, Loader2 } from 'lucide-react';
+import { Edit2, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import { captureKycException } from '../../services/sentry';
 
@@ -31,7 +32,6 @@ type OcrField = {
 
 type FetchState = 'loading' | 'error' | 'success';
 
-// Exponential backoff: 2s, 4s, 8s
 const RETRY_DELAYS = [2000, 4000, 8000];
 const MAX_RETRIES = 3;
 
@@ -60,9 +60,9 @@ export default function OcrReviewScreen() {
 
   const fetchThresholds = async () => {
     try {
-      const res = await apiClient.get<any>('/ocr/config/thresholds');
+      const res = await apiClient.get<Record<string, unknown>>('/ocr/config/thresholds');
       if (mountedRef.current && res) {
-        setUserEditThreshold(res.user_edit_threshold ?? 0.95);
+        setUserEditThreshold((res.user_edit_threshold as number) ?? 0.95);
       }
     } catch (err) {
       console.warn('Failed to fetch OCR thresholds:', err);
@@ -79,29 +79,24 @@ export default function OcrReviewScreen() {
       );
       setFetchState('loading');
 
-      // Fetch current session — the response already includes documents
-      // with their nested ocr_fields, so no second API call is needed.
-      const sessionRes = await apiClient.get<any>('/kyc/session/current', {
+      const sessionRes = await apiClient.get<Record<string, unknown>>('/kyc/session/current', {
         timeout: 15000,
       });
       if (!mountedRef.current) return;
 
-      const sessionData = sessionRes.data ?? sessionRes;
-      const documents = (sessionData.documents || []) as any[];
+      const sessionData = (sessionRes.data ?? sessionRes) as Record<string, unknown>;
+      const documents = (sessionData.documents || []) as Record<string, unknown>[];
 
-      // Collect OCR fields from ALL documents (CNI + bills)
-      const allOcrFields: any[] = [];
+      const allOcrFields: Record<string, unknown>[] = [];
       const docStatusMap: Record<string, string> = {};
       for (const doc of documents) {
-        // Track ocr_status per document type
-        docStatusMap[doc.doc_type] = doc.ocr_status || 'PENDING';
+        docStatusMap[doc.doc_type as string] = (doc.ocr_status as string) || 'PENDING';
 
         const isCni = doc.doc_type === 'CNI_RECTO' || doc.doc_type === 'CNI_VERSO';
         const isBill = doc.doc_type === 'BILL_ENEO' || doc.doc_type === 'BILL_CAMWATER';
         if (isCni || isBill) {
-          const docFields = doc.ocr_fields || [];
+          const docFields = (doc.ocr_fields || []) as Record<string, unknown>[];
           for (const f of docFields) {
-            // Deduplicate: prefer fields already seen (first occurrence wins)
             if (!allOcrFields.some((existing) => existing.field_name === f.field_name)) {
               allOcrFields.push({ ...f, _docType: doc.doc_type, _ocrStatus: doc.ocr_status });
             }
@@ -117,36 +112,34 @@ export default function OcrReviewScreen() {
         return;
       }
 
-      // Map API OCR field records to UI fields
       const extractedFields: OcrField[] = allOcrFields.map((f) => ({
-        field_name: f.field_name,
-        value: f.extracted_value || f.corrected_value || '',
-        confidence: f.confidence_score ?? 0,
+        field_name: f.field_name as string,
+        value: (f.extracted_value || f.corrected_value || '') as string,
+        confidence: (f.confidence_score as number) ?? 0,
         editable:
-          f.human_corrected ? true : (f.confidence_score ?? 0) < userEditThreshold,
+          f.human_corrected ? true : ((f.confidence_score as number) ?? 0) < userEditThreshold,
       }));
 
       setStatusMessage(null);
       setFields(extractedFields);
       setFetchState('success');
       setDocStatuses(docStatusMap);
-
-      // Store in KycContext
       setOcrFields(extractedFields);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (!mountedRef.current) return;
 
-      const isTimeout = err.name === 'AbortError' || err.code === 'ECONNABORTED';
+      const isTimeout = (err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ECONNABORTED';
+      const errMsg = err instanceof Error ? err.message : String(err);
       const isServerError =
-        err.message?.includes('503') ||
-        err.message?.includes('504') ||
-        err.message?.includes('500') ||
-        err.message?.includes('Service Unavailable') ||
-        err.message?.includes('Gateway Time-out') ||
-        err.message?.includes('Internal Server Error');
+        errMsg.includes('503') ||
+        errMsg.includes('504') ||
+        errMsg.includes('500') ||
+        errMsg.includes('Service Unavailable') ||
+        errMsg.includes('Gateway Time-out') ||
+        errMsg.includes('Internal Server Error');
       const isSessionExpired =
-        err.message?.includes('Session expirée') ||
-        err.message?.includes('401');
+        errMsg.includes('Session expirée') ||
+        errMsg.includes('401');
 
       if (isSessionExpired) {
         setFetchState('error');
@@ -167,7 +160,6 @@ export default function OcrReviewScreen() {
         return fetchOcrWithRetry(attempt + 1);
       }
 
-      // All retries exhausted or non-retryable error
       console.warn('OCR fetch failed, using manual entry:', err);
       setStatusMessage(
         isServerError
@@ -176,20 +168,10 @@ export default function OcrReviewScreen() {
       );
       setFetchState('error');
 
-      // Only pre-fill CNI fallback fields (bill fields are handled separately)
       const fallbackFields: OcrField[] = [
-        'nom',
-        'prenom',
-        'date_naissance',
-        'lieu_naissance',
-        'sexe',
-        'taille',
-        'profession',
-        'numero_cni',
-        'date_delivrance',
-        'date_expiration',
-        'adresse',
-        'poste_identification',
+        'nom', 'prenom', 'date_naissance', 'lieu_naissance', 'sexe', 'taille',
+        'profession', 'numero_cni', 'date_delivrance', 'date_expiration',
+        'adresse', 'poste_identification',
       ].map((name) => ({
         field_name: name,
         value: '',
@@ -203,7 +185,7 @@ export default function OcrReviewScreen() {
         sessionId,
         step: 'ocr_review',
         operation: 'ocr_fetch',
-        extra: { retryCount: attempt, error: err.message },
+        extra: { retryCount: attempt, error: err instanceof Error ? err.message : String(err) },
       });
     } finally {
       if (mountedRef.current) setLoading(false);
@@ -220,6 +202,7 @@ export default function OcrReviewScreen() {
     return () => {
       mountedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setCurrentStep, t, sessionId]);
 
   const handleSubmit = async () => {
@@ -236,12 +219,10 @@ export default function OcrReviewScreen() {
       });
 
       if (Object.keys(corrections).length > 0) {
-        // API expects OCRConfirmSubmitRequest with corrected_fields key
         await apiClient.post('/kyc/ocr/confirm', { corrected_fields: corrections });
       }
 
       setOcrFields(updatedFields);
-
       completeStep('ocr_review');
       navigate('/kyc/biometric-consent');
     } catch (err) {
@@ -252,7 +233,6 @@ export default function OcrReviewScreen() {
         operation: 'ocr_confirm_submit',
         extra: { corrected_fields_count: Object.keys(editedValues).length },
       });
-      // Still proceed — worst case user manually entered data
       completeStep('ocr_review');
       navigate('/kyc/biometric-consent');
     }
@@ -260,7 +240,7 @@ export default function OcrReviewScreen() {
 
   if (loading) {
     return (
-      <ScreenLayout title={t('ocr.review.title')} showBack>
+      <ScreenLayoutV2 title={t('ocr.review.title')} showBack>
         <ProgressStepper steps={KYC_STEPS} currentStep={1} className="mb-4" />
         <div className="flex flex-col gap-2 mb-4">
           <div className="flex items-center gap-2">
@@ -276,33 +256,34 @@ export default function OcrReviewScreen() {
           )}
         </div>
         <OcrFieldsSkeleton />
-      </ScreenLayout>
+      </ScreenLayoutV2>
     );
   }
 
   return (
-    <ScreenLayout title={t('ocr.review.title')} showBack>
+    <ScreenLayoutV2 title={t('ocr.review.title')} showBack>
       <ProgressStepper steps={KYC_STEPS} currentStep={1} className="mb-4" />
       <div className="flex flex-col gap-6 py-2">
         {fetchState === 'error' && statusMessage && (
-          <div className="bg-red-50 p-4 rounded-2xl border border-red-200">
+          <div className="bg-destructive/10 p-4 rounded-2xl border border-destructive/20">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+              <AlertCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
               <div className="flex-1">
-                <p className="text-sm text-red-700 font-bold">{statusMessage}</p>
+                <p className="text-sm text-destructive font-bold">{statusMessage}</p>
                 <div className="flex gap-4 mt-3">
                   <button
                     onClick={() => {
                       setLoading(true);
                       fetchOcrWithRetry(0);
                     }}
-                    className="text-xs font-bold bg-white px-3 py-1.5 rounded-lg border border-red-200 text-red-700 shadow-sm active:scale-95 transition-all"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold bg-card px-3 py-1.5 rounded-lg border border-destructive/20 text-destructive shadow-sm active:scale-95 transition-all"
                   >
-                    🚀 {t('common.retry') || 'Réessayer'}
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    {t('common.retry') || 'Réessayer'}
                   </button>
                   <button
                     onClick={() => setStatusMessage(null)}
-                    className="text-xs font-bold text-red-600 underline underline-offset-2"
+                    className="text-xs font-bold text-destructive underline underline-offset-2"
                   >
                     {t('ocr.error.skip_to_manual') || 'Saisie manuelle'}
                   </button>
@@ -313,8 +294,8 @@ export default function OcrReviewScreen() {
         )}
 
         {fetchState === 'success' && statusMessage && (
-          <div className="bg-orange-50 p-4 rounded-2xl border border-orange-200">
-            <p className="text-sm text-orange-700 font-medium">{statusMessage}</p>
+          <div className="bg-warning/10 p-4 rounded-2xl border border-warning/20">
+            <p className="text-sm text-warning font-medium">{statusMessage}</p>
           </div>
         )}
 
@@ -323,14 +304,13 @@ export default function OcrReviewScreen() {
             {t('ocr.processing.subtitle') ||
               'Vérifiez les informations extraites de votre CNI'}
           </p>
-          {/* OCR status badges per document type */}
           <div className="flex flex-wrap gap-2 mt-2">
             {Object.entries(docStatuses).map(([docType, status]) => {
               const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-                SUCCESS: { bg: 'bg-green-100', text: 'text-green-700', label: '✓' },
-                PARTIAL: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: '~' },
-                FAILED: { bg: 'bg-red-100', text: 'text-red-700', label: '✗' },
-                PENDING: { bg: 'bg-gray-100', text: 'text-gray-500', label: '…' },
+                SUCCESS: { bg: 'bg-success/20', text: 'text-success', label: '✓' },
+                PARTIAL: { bg: 'bg-warning/20', text: 'text-warning', label: '~' },
+                FAILED: { bg: 'bg-destructive/20', text: 'text-destructive', label: '✗' },
+                PENDING: { bg: 'bg-muted', text: 'text-muted-foreground', label: '…' },
               };
               const cfg = statusConfig[status] || statusConfig.PENDING;
               const shortName = docType.replace('BILL_', '').replace('CNI_', 'CNI ');
@@ -397,7 +377,7 @@ export default function OcrReviewScreen() {
                       >
                         <span
                           className={`text-sm font-semibold ${!currentValue
-                            ? 'text-red-400 italic'
+                            ? 'text-destructive italic'
                             : 'text-foreground'
                             }`}
                         >
@@ -416,18 +396,15 @@ export default function OcrReviewScreen() {
         </div>
 
         <div className="pt-4 pb-10">
-          <button
-            onClick={handleSubmit}
-            className="w-full h-14 rounded-2xl text-base font-bold bg-primary text-white shadow-xl shadow-primary/20 hover:opacity-90 active:scale-[0.98] transition-all"
-          >
+          <Button onClick={handleSubmit}>
             {t('common.continue')}
-          </button>
+          </Button>
           <p className="text-[11px] text-center text-muted-foreground mt-4 px-6">
             En continuant, vous confirmez que les informations ci-dessus
             correspondent exactement à votre pièce d'identité officielle.
           </p>
         </div>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

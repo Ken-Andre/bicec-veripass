@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { XCircle, ArrowRight, MessageCircle, RotateCcw } from 'lucide-react';
 
 export default function RejectionScreen() {
@@ -27,14 +28,14 @@ export default function RejectionScreen() {
   };
 
   return (
-    <ScreenLayout title={t('rejection.title') || 'Dossier refusé'}>
+    <ScreenLayoutV2 title={t('rejection.title') || 'Dossier refusé'}>
       <div className="flex flex-col items-center gap-6 py-8">
-        <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center border-4 border-red-100">
-          <XCircle className="w-14 h-14 text-red-500" />
+        <div className="w-24 h-24 bg-destructive/10 rounded-full flex items-center justify-center border-4 border-destructive/20">
+          <XCircle className="w-14 h-14 text-destructive" />
         </div>
 
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-slate-800">
+          <h2 className="text-2xl font-bold text-foreground">
             {t('rejection.heading') || 'Votre dossier a été refusé'}
           </h2>
           <p className="text-muted-foreground mt-2 max-w-xs mx-auto">
@@ -43,16 +44,16 @@ export default function RejectionScreen() {
         </div>
 
         {/* Decision card */}
-        <div className="w-full max-w-sm bg-red-50 border border-red-200 rounded-2xl p-5 space-y-3">
+        <div className="w-full max-w-sm bg-destructive/10 border border-destructive/20 rounded-2xl p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <XCircle className="w-5 h-5 text-red-500" />
-            <span className="text-sm font-bold text-red-800">
+            <XCircle className="w-5 h-5 text-destructive" />
+            <span className="text-sm font-bold text-destructive">
               {t('rejection.decision') || 'Décision'}
             </span>
           </div>
-          <p className="text-sm text-red-700 leading-relaxed">{reason}</p>
+          <p className="text-sm text-destructive/80 leading-relaxed">{reason}</p>
           {decidedAt && (
-            <p className="text-xs text-red-400">
+            <p className="text-xs text-destructive/50">
               {t('rejection.decidedAt') || 'Le'} {decidedAt}
             </p>
           )}
@@ -60,21 +61,15 @@ export default function RejectionScreen() {
 
         {/* What Marie can do */}
         <div className="w-full max-w-sm space-y-3">
-          <button
-            onClick={handleRetry}
-            className="w-full flex items-center justify-center gap-3 bg-primary text-primary-foreground py-4 rounded-2xl font-semibold text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
-          >
+          <Button onClick={handleRetry}>
             <RotateCcw className="w-5 h-5" />
             {t('rejection.retry') || 'Recommencer la procédure KYC'}
-          </button>
+          </Button>
 
-          <button
-            onClick={() => navigate('/support')}
-            className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-700 py-4 rounded-2xl font-medium active:scale-[0.98] transition-all"
-          >
+          <Button variant="secondary" onClick={() => navigate('/support')}>
             <MessageCircle className="w-5 h-5" />
             {t('rejection.contactSupport') || 'Contacter le support'}
-          </button>
+          </Button>
 
           <button
             onClick={() => navigate('/dashboard')}
@@ -89,6 +84,6 @@ export default function RejectionScreen() {
           {t('rejection.help') || 'Si vous pensez qu\'il s\'agit d\'une erreur, contactez notre support ou rendez-vous en agence BICEC avec vos documents originaux.'}
         </p>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

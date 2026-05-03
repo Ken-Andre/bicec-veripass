@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Integration tests for ConsentScreen.
  *
@@ -11,7 +12,8 @@
  * via vi.mocked() after the module import.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from '@testing-library/react';
 
@@ -42,10 +44,6 @@ vi.mock('../../contexts/KycContext', () => ({
 vi.mock('../../contexts/LanguageContext', () => ({
   useLanguage: vi.fn().mockReturnValue({ t: (key: string) => key }),
   LanguageProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-vi.mock('../../components/ScreenLayout', () => ({
-  ScreenLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 import { enqueueOfflineConsent } from '../../services/kycSyncService';
@@ -111,19 +109,16 @@ describe('ConsentScreen integration', () => {
     expect(submitBtn).toBeDisabled();
   });
 
-  it('enables submit after all three checkboxes are clicked', () => {
+  it('enables submit after all three checkboxes are clicked', async () => {
     renderConsentScreen();
 
-    // Each consent row has an outer <button> with a nested <Checkbox> button.
-    // Both call toggle(). We use fireEvent.click on the outer button directly
-    // (not user.click which can trigger both handlers due to event bubbling).
-    const cguBtn = screen.getByText('consent.cgu').closest('button')!;
-    const privacyBtn = screen.getByText('consent.privacy').closest('button')!;
-    const dataBtn = screen.getByText('consent.data').closest('button')!;
+    // Click the visible label rows (not the sr-only checkboxes) — closer to real user behavior.
+    const user = userEvent.setup();
+    const [cguRow, privacyRow, dataRow] = screen.getAllByTestId('consent-row');
 
-    fireEvent.click(cguBtn);
-    fireEvent.click(privacyBtn);
-    fireEvent.click(dataBtn);
+    await user.click(cguRow);
+    await user.click(privacyRow);
+    await user.click(dataRow);
 
     const submitBtn = screen.getByText('consent.submit');
     expect(submitBtn).not.toBeDisabled();
@@ -134,17 +129,16 @@ describe('ConsentScreen integration', () => {
 
     renderConsentScreen();
 
-    // Click checkboxes via outer buttons (fireEvent to avoid double-toggle)
-    const cguBtn = screen.getByText('consent.cgu').closest('button')!;
-    const privacyBtn = screen.getByText('consent.privacy').closest('button')!;
-    const dataBtn = screen.getByText('consent.data').closest('button')!;
+    // Toggle consent rows
+    const user = userEvent.setup();
+    const [cguRow, privacyRow, dataRow] = screen.getAllByTestId('consent-row');
 
-    fireEvent.click(cguBtn);
-    fireEvent.click(privacyBtn);
-    fireEvent.click(dataBtn);
+    await user.click(cguRow);
+    await user.click(privacyRow);
+    await user.click(dataRow);
 
     // Submit
-    fireEvent.click(screen.getByText('consent.submit'));
+    await user.click(screen.getByText('consent.submit'));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
@@ -163,15 +157,14 @@ describe('ConsentScreen integration', () => {
 
     renderConsentScreen();
 
-    const cguBtn = screen.getByText('consent.cgu').closest('button')!;
-    const privacyBtn = screen.getByText('consent.privacy').closest('button')!;
-    const dataBtn = screen.getByText('consent.data').closest('button')!;
+    const user = userEvent.setup();
+    const [cguRow, privacyRow, dataRow] = screen.getAllByTestId('consent-row');
 
-    fireEvent.click(cguBtn);
-    fireEvent.click(privacyBtn);
-    fireEvent.click(dataBtn);
+    await user.click(cguRow);
+    await user.click(privacyRow);
+    await user.click(dataRow);
 
-    fireEvent.click(screen.getByText('consent.submit'));
+    await user.click(screen.getByText('consent.submit'));
 
     await waitFor(() => {
       expect(mockEnqueue).toHaveBeenCalledWith(
@@ -193,15 +186,14 @@ describe('ConsentScreen integration', () => {
 
     renderConsentScreen();
 
-    const cguBtn = screen.getByText('consent.cgu').closest('button')!;
-    const privacyBtn = screen.getByText('consent.privacy').closest('button')!;
-    const dataBtn = screen.getByText('consent.data').closest('button')!;
+    const user = userEvent.setup();
+    const [cguRow, privacyRow, dataRow] = screen.getAllByTestId('consent-row');
 
-    fireEvent.click(cguBtn);
-    fireEvent.click(privacyBtn);
-    fireEvent.click(dataBtn);
+    await user.click(cguRow);
+    await user.click(privacyRow);
+    await user.click(dataRow);
 
-    fireEvent.click(screen.getByText('consent.submit'));
+    await user.click(screen.getByText('consent.submit'));
 
     await waitFor(() => {
       expect(mockEnqueue).toHaveBeenCalledWith(

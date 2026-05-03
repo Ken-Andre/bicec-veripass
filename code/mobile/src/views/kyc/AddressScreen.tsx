@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { MapPin, Navigation, Loader2, CheckCircle } from 'lucide-react';
 import { useKyc } from '../../contexts/KycContext';
 import { fetchWithCorrelation } from '../../services/apiClient';
@@ -104,7 +105,7 @@ export default function AddressScreen() {
   };
 
   return (
-    <ScreenLayout title={t('address.title')} showBack>
+    <ScreenLayoutV2 title={t('address.title')} showBack>
       <div className="flex flex-col gap-4 py-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <MapPin className="w-4 h-4" />
@@ -112,34 +113,34 @@ export default function AddressScreen() {
         </div>
 
         {/* GPS Capture Section */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Navigation className="w-5 h-5 text-blue-600" />
+              <Navigation className="w-5 h-5 text-accent" />
               <div>
-                <p className="text-sm font-medium text-blue-900">Localisation GPS</p>
+                <p className="text-sm font-medium text-accent">Localisation GPS</p>
                 {form.gps_lat && form.gps_lng ? (
-                  <p className="text-xs text-blue-700">
+                  <p className="text-xs text-accent">
                     {gpsSuccess ? '✓ Position capturée' : 'Position capturée (hors zone)'}
                     <br />
                     Lat: {form.gps_lat.toFixed(4)}, Lng: {form.gps_lng.toFixed(4)}
                   </p>
                 ) : (
-                  <p className="text-xs text-blue-700">Requise pour validation</p>
+                  <p className="text-xs text-accent">Requise pour validation</p>
                 )}
               </div>
             </div>
             <button
               onClick={captureGps}
               disabled={gpsLoading}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+              className="px-3 py-2 bg-accent text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
             >
               {gpsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : gpsSuccess ? <CheckCircle className="w-4 h-4" /> : <Navigation className="w-4 h-4" />}
               {gpsLoading ? 'Acquisition...' : gpsSuccess ? 'Reprendre' : 'Capturer'}
             </button>
           </div>
           {gpsError && (
-            <p className="text-xs text-red-600 mt-2 bg-red-50 px-2 py-1 rounded">{gpsError}</p>
+            <p className="text-xs text-destructive mt-2 bg-destructive/10 px-2 py-1 rounded">{gpsError}</p>
           )}
         </div>
 
@@ -194,14 +195,14 @@ export default function AddressScreen() {
           </div>
         </div>
 
-        <button
+        <Button
           onClick={handleSubmit}
           disabled={!form.region || !form.city || !form.quartier || !form.gps_lat}
-          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium disabled:opacity-50 mt-4"
+          className="w-full mt-4"
         >
           {t('common.continue')}
-        </button>
+        </Button>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }
