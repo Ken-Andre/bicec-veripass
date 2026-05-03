@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { Delete, Lock } from 'lucide-react';
@@ -90,7 +90,7 @@ const LockScreen = () => {
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
   return (
-    <ScreenLayout className="bg-slate-50">
+    <ScreenLayoutV2 className="bg-muted/50">
       <div className="flex-1 flex flex-col items-center pt-8">
         <div className="text-center w-full px-6">
           <div className="h-20 w-20 rounded-3xl bg-primary-bicec-red shadow-lg shadow-primary-bicec-red/20 flex items-center justify-center mx-auto mb-8">
@@ -98,7 +98,7 @@ const LockScreen = () => {
           </div>
 
           <h1 className="text-3xl font-black text-primary-bicec-blue tracking-tight">Session verrouillée</h1>
-          <p className="text-slate-500 text-lg mt-2 mb-10">Saisissez votre code pour reprendre</p>
+          <p className="text-muted-foreground text-lg mt-2 mb-10">Saisissez votre code pour reprendre</p>
 
           {/* PIN Dots Indicators */}
           <div className={cn(
@@ -110,15 +110,15 @@ const LockScreen = () => {
                 'h-5 w-5 rounded-full border-2 transition-all duration-300 shadow-sm',
                 i < pin.length
                   ? 'bg-primary-bicec-blue border-primary-bicec-blue scale-125 shadow-primary-bicec-blue/20'
-                  : 'bg-white border-slate-200',
-                error && i < pin.length && 'bg-red-500 border-red-500',
+                  : 'bg-card border-border',
+                error && i < pin.length && 'bg-destructive border-destructive',
               )} />
             ))}
           </div>
 
           {error && (
             <div className="mt-6 mb-2">
-              <p className="text-red-600 text-xs font-bold uppercase tracking-widest leading-loose">
+              <p className="text-destructive text-xs font-bold uppercase tracking-widest leading-loose">
                 {error}
               </p>
             </div>
@@ -141,8 +141,8 @@ const LockScreen = () => {
                   'h-20 w-20 mx-auto flex items-center justify-center rounded-full text-3xl font-bold transition-all border shadow-sm',
                   d === '' && 'invisible pointer-events-none',
                   d === 'del'
-                    ? 'border-transparent text-slate-400 active:text-primary-bicec-blue active:scale-90'
-                    : 'bg-white border-slate-100 text-slate-800 active:scale-90 active:bg-slate-50 active:shadow-inner active:border-primary-bicec-blue/30',
+                    ? 'border-transparent text-muted-foreground active:text-primary-bicec-blue active:scale-90'
+                    : 'bg-card border-border text-foreground active:scale-90 active:bg-muted/50 active:shadow-inner active:border-primary-bicec-blue/30',
                   (attempts >= MAX_ATTEMPTS || loading) && 'opacity-30',
                 )}
               >
@@ -161,7 +161,7 @@ const LockScreen = () => {
           </div>
         </div>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 };
 

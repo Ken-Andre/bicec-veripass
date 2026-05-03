@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { Fingerprint, Delete, ShieldCheck, HelpCircle } from 'lucide-react';
@@ -25,9 +26,6 @@ const PinLoginScreen = () => {
     const tryBiometric = async () => {
       const success = await authenticateWithPasskey();
       if (success && user) {
-        // Biometric succeeded — we still need a token from the backend
-        // For now, try PIN verify with empty PIN or use stored token
-        // In production, this would exchange a passkey assertion for a JWT
         try {
           const res = await apiClient.post<{ access_token: string }, { phone: string; pin: string }>('/auth/pin/verify', {
             phone: user.phone || '',
@@ -42,14 +40,11 @@ const PinLoginScreen = () => {
           });
           navigate('/dashboard');
         } catch {
-          // Biometric auth succeeded but backend didn't accept it
-          // Fall through to PIN entry
           setError('Connectez-vous avec votre PIN');
         }
       }
     };
 
-    // Small delay to let the page render first
     const timer = setTimeout(tryBiometric, 500);
     return () => clearTimeout(timer);
   }, [biometricEnabled, isPasskeySupported, authenticateWithPasskey, user, login, navigate, loading]);
@@ -87,8 +82,6 @@ const PinLoginScreen = () => {
 
       navigate('/dashboard');
     } catch (err: unknown) {
-      // Check if PIN was revoked (403) — redirect to OTP
-      // apiClient puts the backend `detail` string as Error.message
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('OTP')) {
         setError('Session expirée. Redirection vers OTP...');
@@ -96,9 +89,6 @@ const PinLoginScreen = () => {
         return;
       }
 
-      // Distinguish a backend server error (5xx) from a real wrong-PIN (401).
-      // Never show "PIN incorrect" when the server itself crashed — it misleads
-      // the user into thinking their PIN is wrong and burns their attempt count.
       const isServerError =
         /^HTTP 5\d\d$/.test(message) ||
         message === 'Internal Server Error' ||
@@ -145,7 +135,6 @@ const PinLoginScreen = () => {
     try {
       const success = await authenticateWithPasskey();
       if (success && user) {
-        // Biometric succeeded — exchange for JWT via backend
         try {
           const res = await apiClient.post<{ access_token: string }, { phone: string; pin: string }>('/auth/pin/verify', {
             phone: user.phone || '',
@@ -175,7 +164,7 @@ const PinLoginScreen = () => {
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
   return (
-    <ScreenLayout className="bg-slate-50">
+    <ScreenLayoutV2 className="bg-slate-50">
       <div className="flex-1 flex flex-col items-center pt-8">
         <div className="text-center w-full px-6">
           <div className="h-20 w-20 rounded-3xl bg-primary shadow-lg shadow-primary/20 flex items-center justify-center mx-auto mb-8">
@@ -183,7 +172,7 @@ const PinLoginScreen = () => {
           </div>
 
           <h1 className="text-3xl font-black text-primary tracking-tight">Bon retour</h1>
-          <p className="text-slate-500 text-lg mt-2 mb-10">Saisissez votre code secret</p>
+          <p className="text-muted-foreground text-lg mt-2 mb-10">Saisissez votre code secret</p>
 
           {/* PIN Dots Indicators */}
           <div className={cn(
@@ -196,14 +185,14 @@ const PinLoginScreen = () => {
                 i < pin.length
                   ? 'bg-primary border-primary scale-125 shadow-primary/20'
                   : 'bg-white border-slate-200',
-                error && i < pin.length && 'bg-red-500 border-red-500',
+                error && i < pin.length && 'bg-destructive border-destructive',
               )} />
             ))}
           </div>
 
           {error && (
             <div className="mt-6 mb-2">
-              <p className="text-red-600 text-xs font-bold uppercase tracking-widest leading-loose">
+              <p className="text-destructive text-xs font-bold uppercase tracking-widest leading-loose">
                 {error}
               </p>
             </div>
@@ -226,8 +215,8 @@ const PinLoginScreen = () => {
                   'h-20 w-20 mx-auto flex items-center justify-center rounded-full text-3xl font-bold transition-all border shadow-sm',
                   d === '' && 'invisible pointer-events-none',
                   d === 'del'
-                    ? 'border-transparent text-slate-400 active:text-primary active:scale-90'
-                    : 'bg-white border-slate-100 text-slate-800 active:scale-90 active:bg-slate-50 active:shadow-inner active:border-primary/30',
+                    ? 'border-transparent text-muted-foreground active:text-primary active:scale-90'
+                    : 'bg-white border-slate-100 text-foreground active:scale-90 active:bg-slate-50 active:shadow-inner active:border-primary/30',
                   (attempts >= MAX_ATTEMPTS || loading) && 'opacity-30',
                 )}
               >
@@ -238,39 +227,41 @@ const PinLoginScreen = () => {
 
           <div className="flex flex-col gap-4 mt-10">
             <button
+              type="button"
               onClick={handleForgotPin}
-              className="flex items-center justify-center gap-2 w-full py-2 text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-primary transition-colors"
+              className="flex items-center justify-center gap-2 w-full py-2 text-xs font-bold text-muted-foreground uppercase tracking-widest hover:text-primary transition-colors"
             >
               <HelpCircle className="w-4 h-4" />
               PIN Oublié ?
             </button>
 
             {biometricEnabled && isPasskeySupported ? (
-              <button
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
                 onClick={handleBiometric}
+                loading={loading}
                 disabled={loading || attempts >= MAX_ATTEMPTS}
-                className={cn(
-                  "flex items-center justify-center gap-2 w-full py-4 rounded-2xl border shadow-sm text-sm font-bold transition-all",
-                  "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 active:scale-[0.98]",
-                  (loading || attempts >= MAX_ATTEMPTS) && 'opacity-50 cursor-not-allowed'
-                )}
               >
-                <Fingerprint className="h-6 w-6" />
-                {loading ? 'Connexion...' : 'Connexion biométrique'}
-              </button>
+                <Fingerprint className="h-5 w-5" />
+                Connexion biométrique
+              </Button>
             ) : (
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="md"
                 disabled
-                className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-400 text-sm font-bold opacity-50 cursor-not-allowed"
               >
-                <Fingerprint className="h-6 w-6" />
+                <Fingerprint className="h-5 w-5" />
                 {isPasskeySupported ? 'Biométrie non activée' : 'Biométrie indisponible'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 };
 

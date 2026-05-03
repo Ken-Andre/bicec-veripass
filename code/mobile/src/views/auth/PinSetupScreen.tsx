@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { Delete, Lock } from 'lucide-react';
@@ -57,7 +58,7 @@ const PinSetupScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [step, pin, confirmPin, navigate, setPinSetupCompleted]);
+  }, [step, pin, confirmPin, navigate, setPinSetupCompleted, onboardingFlow]);
 
   // Auto-submit when 6 digits are entered for better UX
   useEffect(() => {
@@ -76,7 +77,7 @@ const PinSetupScreen = () => {
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
   return (
-    <ScreenLayout
+    <ScreenLayoutV2
       showBack
       title="Sécurité PIN"
       className="bg-slate-50"
@@ -89,7 +90,7 @@ const PinSetupScreen = () => {
         <h2 className="text-3xl font-extrabold tracking-tight text-primary text-center">
           {step === 'create' ? 'Définir un PIN' : 'Confirmer'}
         </h2>
-        <p className="text-slate-500 text-lg text-center mt-3 mb-10 px-4 max-w-[280px]">
+        <p className="text-muted-foreground text-lg text-center mt-3 mb-10 px-4 max-w-[280px]">
           {step === 'create'
             ? 'Choisissez 6 chiffres pour protéger votre application.'
             : 'Veuillez ressaisir votre code pour confirmer.'}
@@ -108,8 +109,8 @@ const PinSetupScreen = () => {
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-50 border border-red-100 rounded-xl animate-shake">
-            <p className="text-red-600 text-xs font-bold text-center">{error}</p>
+          <div className="mb-6 p-3 bg-destructive/10 border border-destructive/20 rounded-xl animate-shake">
+            <p className="text-destructive text-xs font-bold text-center">{error}</p>
           </div>
         )}
 
@@ -128,8 +129,8 @@ const PinSetupScreen = () => {
                   'h-20 w-20 mx-auto flex items-center justify-center rounded-full text-3xl font-bold transition-all border shadow-sm',
                   d === '' && 'invisible pointer-events-none',
                   d === 'del'
-                    ? 'border-transparent text-slate-400 active:text-primary active:scale-90'
-                    : 'bg-white border-slate-100 text-slate-800 hover:border-primary/30 active:scale-90 active:bg-slate-50 active:shadow-inner',
+                    ? 'border-transparent text-muted-foreground active:text-primary active:scale-90'
+                    : 'bg-white border-slate-100 text-foreground hover:border-primary/30 active:scale-90 active:bg-slate-50 active:shadow-inner',
                 )}
               >
                 {d === 'del' ? <Delete className="w-8 h-8" /> : d}
@@ -139,20 +140,16 @@ const PinSetupScreen = () => {
         </div>
 
         <div className="w-full pt-4 pb-8">
-          <button
+          <Button
             onClick={handleSubmit}
-            disabled={currentPin.length !== 6 || loading}
-            className="bicec-button w-full h-16 text-lg"
+            loading={loading}
+            disabled={currentPin.length !== 6}
           >
-            {loading ? (
-              <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              step === 'confirm' ? 'Enregistrer le PIN' : 'Continuer'
-            )}
-          </button>
+            {step === 'confirm' ? 'Enregistrer le PIN' : 'Continuer'}
+          </Button>
         </div>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 };
 

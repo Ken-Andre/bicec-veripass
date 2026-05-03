@@ -1,5 +1,5 @@
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, ChevronRight, Phone, FileText } from 'lucide-react';
 
@@ -15,39 +15,39 @@ export function HelpScreen() {
   const navigate = useNavigate();
 
   return (
-    <ScreenLayout showBack title={t('help.title')}>
+    <ScreenLayoutV2 showBack title={t('help.title')}>
       <div className="space-y-6 pt-2">
         <div className="grid grid-cols-2 gap-3">
           <button onClick={() => navigate('/support')} className="bg-primary/10 rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-95 transition-all">
             <MessageCircle className="h-6 w-6 text-primary" />
             <span className="text-xs font-semibold text-primary">{t('help.chat')}</span>
           </button>
-          <a href="tel:+237612345678" className="bg-emerald-50 rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-95 transition-all">
-            <Phone className="h-6 w-6 text-emerald-600" />
-            <span className="text-xs font-semibold text-emerald-600">{t('help.call')}</span>
+          <a href="tel:+237612345678" className="bg-success/10 rounded-2xl p-4 flex flex-col items-center gap-2 active:scale-95 transition-all">
+            <Phone className="h-6 w-6 text-success" />
+            <span className="text-xs font-semibold text-success">{t('help.call')}</span>
           </a>
         </div>
 
-        <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-slate-400" />
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
               {t('help.faq')}
             </h3>
           </div>
           {faqItems.map((item, i) => (
-            <details key={i} className="border-b border-slate-50 last:border-0">
-              <summary className="px-4 py-3 text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50 transition-colors list-none flex items-center justify-between">
+            <details key={i} className="border-b border-border/50 last:border-0">
+              <summary className="px-4 py-3 text-sm font-medium text-foreground cursor-pointer hover:bg-muted/50 transition-colors list-none flex items-center justify-between">
                 {t('help.language') === 'fr' ? item.q.fr : item.q.en}
-                <ChevronRight className="h-4 w-4 text-slate-300 shrink-0 transition-transform open:rotate-90" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 transition-transform open:rotate-90" />
               </summary>
-              <div className="px-4 pb-3 text-xs text-slate-500 leading-relaxed">
+              <div className="px-4 pb-3 text-xs text-muted-foreground leading-relaxed">
                 {t('help.language') === 'fr' ? item.a.fr : item.a.en}
               </div>
             </details>
           ))}
         </div>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

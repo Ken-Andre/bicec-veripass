@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { Copy, CheckCircle, QrCode } from 'lucide-react';
 
 export function TransferReceiveScreen() {
@@ -34,41 +35,38 @@ export function TransferReceiveScreen() {
   ];
 
   return (
-    <ScreenLayout showBack title={t('receive.title')}>
+    <ScreenLayoutV2 showBack title={t('receive.title')}>
       <div className="space-y-6 pt-2">
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 flex flex-col items-center">
-          <div className="h-40 w-40 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-            <QrCode className="h-20 w-20 text-slate-300" />
+        <div className="bg-card border border-border rounded-2xl p-6 flex flex-col items-center">
+          <div className="h-40 w-40 rounded-2xl bg-muted flex items-center justify-center mb-4">
+            <QrCode className="h-20 w-20 text-muted-foreground/40" />
           </div>
-          <p className="text-xs text-slate-400">{t('receive.scanQr')}</p>
+          <p className="text-xs text-muted-foreground">{t('receive.scanQr')}</p>
         </div>
 
-        <div className="bg-white border border-slate-100 rounded-2xl divide-y divide-slate-100">
+        <div className="bg-card border border-border rounded-2xl divide-y divide-border/50">
           {fields.map((field) => (
             <div key={field.label} className="flex items-center justify-between px-4 py-3">
               <div>
-                <p className="text-xs text-slate-400">{field.label}</p>
-                <p className="text-sm font-medium text-slate-800 font-mono">{field.value}</p>
+                <p className="text-xs text-muted-foreground">{field.label}</p>
+                <p className="text-sm font-medium text-foreground font-mono">{field.value}</p>
               </div>
-              <button onClick={() => handleCopy(field.label, field.value)} className="p-2 rounded-lg active:bg-slate-100 transition-colors">
+              <button onClick={() => handleCopy(field.label, field.value)} className="p-2 rounded-lg active:bg-muted transition-colors">
                 {copied === field.label ? (
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
+                  <CheckCircle className="h-4 w-4 text-success" />
                 ) : (
-                  <Copy className="h-4 w-4 text-slate-400" />
+                  <Copy className="h-4 w-4 text-muted-foreground" />
                 )}
               </button>
             </div>
           ))}
         </div>
 
-        <button
-          onClick={() => handleCopy('iban-full', ribInfo.iban)}
-          className="w-full h-12 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 flex items-center justify-center gap-2 active:scale-95 transition-all"
-        >
+        <Button variant="secondary" onClick={() => handleCopy('iban-full', ribInfo.iban)}>
           <Copy className="h-4 w-4" />
           {t('receive.copyIban')}
-        </button>
+        </Button>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

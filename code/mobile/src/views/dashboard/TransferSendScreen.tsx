@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { apiClient } from '../../services/apiClient';
 import { buildPacs008, downloadIsoXml, isValidIban, isValidBic } from '../../services/iso20022';
 import type { BuiltCreditTransfer } from '../../types';
@@ -97,21 +98,21 @@ export function TransferSendScreen() {
 
   if (step === 'success') {
     return (
-      <ScreenLayout>
+      <ScreenLayoutV2>
         <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
-          <div className="h-20 w-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 animate-bounce">
-            <CheckCircle className="h-10 w-10 text-emerald-500" />
+          <div className="h-20 w-20 rounded-full bg-success/20 flex items-center justify-center mx-auto mb-6 animate-bounce">
+            <CheckCircle className="h-10 w-10 text-success" />
           </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">{t('transfer.success.title')}</h2>
-          <p className="text-slate-500 text-sm mb-2">
+          <h2 className="text-xl font-bold text-foreground mb-2">{t('transfer.success.title')}</h2>
+          <p className="text-muted-foreground text-sm mb-2">
             {formatAmount(amount)} XAF → {creditorName || recipient}
           </p>
           {iso && (
-            <div className="bg-white border border-slate-100 rounded-2xl p-4 w-full max-w-sm text-left mb-6 mt-4">
+            <div className="bg-card border border-border rounded-2xl p-4 w-full max-w-sm text-left mb-6 mt-4">
               <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between"><span className="text-slate-400">{t('transfer.iso.scheme')}</span><span className="font-mono">{iso.scheme}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">{t('transfer.iso.endToEnd')}</span><span className="font-mono truncate ml-2">{iso.endToEndId}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">{t('transfer.iso.msgId')}</span><span className="font-mono truncate ml-2">{iso.msgId}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('transfer.iso.scheme')}</span><span className="font-mono">{iso.scheme}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('transfer.iso.endToEnd')}</span><span className="font-mono truncate ml-2">{iso.endToEndId}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{t('transfer.iso.msgId')}</span><span className="font-mono truncate ml-2">{iso.msgId}</span></div>
               </div>
               <button
                 onClick={() => downloadIsoXml(`pacs008-${iso.endToEndId}.xml`, iso.xml)}
@@ -122,20 +123,20 @@ export function TransferSendScreen() {
               </button>
             </div>
           )}
-          <button onClick={() => navigate('/dashboard')} className="w-full max-w-sm h-14 rounded-2xl bg-primary text-white text-base font-semibold active:scale-95 transition-all">
+          <Button onClick={() => navigate('/dashboard')} className="w-full max-w-sm h-14">
             {t('transfer.success.back')}
-          </button>
+          </Button>
         </div>
-      </ScreenLayout>
+      </ScreenLayoutV2>
     );
   }
 
   return (
-    <ScreenLayout showBack title={t('transfer.send.title')}>
+    <ScreenLayoutV2 showBack title={t('transfer.send.title')}>
       <div className="flex-1 flex flex-col justify-between pt-4">
         {step === 'type' && (
           <div className="space-y-4">
-            <p className="text-slate-500 text-sm mb-2">{t('transfer.send.chooseType')}</p>
+            <p className="text-muted-foreground text-sm mb-2">{t('transfer.send.chooseType')}</p>
             {[
               { type: 'bicec' as const, icon: Building2, label: t('transfer.send.bicec'), desc: t('transfer.send.bicecDesc') },
               { type: 'mobile' as const, icon: Smartphone, label: t('transfer.send.mobile'), desc: t('transfer.send.mobileDesc') },
@@ -143,16 +144,16 @@ export function TransferSendScreen() {
               <button
                 key={item.type}
                 onClick={() => handleSelectType(item.type)}
-                className="w-full bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 active:scale-95 transition-all text-left"
+                className="w-full bg-card border border-border rounded-2xl p-4 flex items-center gap-4 active:scale-95 transition-all text-left"
               >
                 <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <item.icon className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                  <p className="text-xs text-slate-400">{item.desc}</p>
+                  <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                  <p className="text-xs text-muted-foreground">{item.desc}</p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-slate-300" />
+                <ArrowRight className="h-4 w-4 text-muted-foreground/60" />
               </button>
             ))}
           </div>
@@ -161,82 +162,82 @@ export function TransferSendScreen() {
         {step === 'details' && (
           <div className="space-y-5">
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">
+              <label className="text-sm font-medium text-foreground mb-2 block">
                 {transferType === 'bicec' ? t('transfer.iso.iban') : t('transfer.send.phoneNumber')}
               </label>
               <input
                 value={recipient}
                 onChange={(e) => setRecipient(transferType === 'bicec' ? e.target.value.toUpperCase() : e.target.value)}
                 placeholder={transferType === 'bicec' ? 'CM21 10001 00023 12345678901 42' : 'Ex: 6 99 00 00 00'}
-                className="w-full h-14 rounded-xl border border-slate-200 px-4 text-base font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                className="w-full h-14 rounded-xl border border-border px-4 text-base font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 inputMode={transferType === 'mobile' ? 'tel' : 'text'}
               />
               {transferType === 'bicec' && recipient.length > 4 && !ibanValid && (
-                <p className="text-xs text-red-500 mt-1">{t('transfer.iso.invalidIban')}</p>
+                <p className="text-xs text-destructive mt-1">{t('transfer.iso.invalidIban')}</p>
               )}
             </div>
             {transferType === 'bicec' && (
               <>
                 <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">{t('transfer.iso.name')}</label>
-                  <input value={creditorName} onChange={(e) => setCreditorName(e.target.value)} placeholder="John Doe" className="w-full h-14 rounded-xl border border-slate-200 px-4 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+                  <label className="text-sm font-medium text-foreground mb-2 block">{t('transfer.iso.name')}</label>
+                  <input value={creditorName} onChange={(e) => setCreditorName(e.target.value)} placeholder="John Doe" className="w-full h-14 rounded-xl border border-border px-4 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">{t('transfer.iso.bic')}</label>
-                  <input value={creditorBic} onChange={(e) => setCreditorBic(e.target.value.toUpperCase())} placeholder="BICECMCX" className="w-full h-14 rounded-xl border border-slate-200 px-4 text-base font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+                  <label className="text-sm font-medium text-foreground mb-2 block">{t('transfer.iso.bic')}</label>
+                  <input value={creditorBic} onChange={(e) => setCreditorBic(e.target.value.toUpperCase())} placeholder="BICECMCX" className="w-full h-14 rounded-xl border border-border px-4 text-base font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
                 </div>
               </>
             )}
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">{t('transfer.send.amount')}</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">{t('transfer.send.amount')}</label>
               <div className="relative">
-                <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} placeholder="0" className="w-full h-14 rounded-xl border border-slate-200 px-4 text-base pr-16 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" inputMode="numeric" />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">XAF</span>
+                <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} placeholder="0" className="w-full h-14 rounded-xl border border-border px-4 text-base pr-16 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" inputMode="numeric" />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">XAF</span>
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">{t('transfer.send.motif')}</label>
-              <input value={motif} onChange={(e) => setMotif(e.target.value.slice(0, 140))} placeholder={t('transfer.send.motifPlaceholder')} className="w-full h-14 rounded-xl border border-slate-200 px-4 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+              <label className="text-sm font-medium text-foreground mb-2 block">{t('transfer.send.motif')}</label>
+              <input value={motif} onChange={(e) => setMotif(e.target.value.slice(0, 140))} placeholder={t('transfer.send.motifPlaceholder')} className="w-full h-14 rounded-xl border border-border px-4 text-base focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
             </div>
-            <button onClick={() => setStep('confirm')} disabled={!detailsValid} className="w-full h-14 rounded-2xl bg-primary text-white text-base font-semibold disabled:opacity-40 active:scale-95 transition-all">
+            <Button onClick={() => setStep('confirm')} disabled={!detailsValid} className="w-full h-14">
               {t('common.continue')}
-            </button>
+            </Button>
           </div>
         )}
 
         {step === 'confirm' && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-100 rounded-2xl p-5">
-              <h3 className="text-sm font-semibold text-slate-800 mb-4">{t('transfer.send.summary')}</h3>
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">{t('transfer.send.summary')}</h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">{t('transfer.send.to')}</span>
-                  <span className="font-medium text-slate-800">{recipient}</span>
+                  <span className="text-muted-foreground">{t('transfer.send.to')}</span>
+                  <span className="font-medium text-foreground">{recipient}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">{t('transfer.send.amount')}</span>
-                  <span className="font-bold text-slate-800">{formatAmount(amount)} FCFA</span>
+                  <span className="text-muted-foreground">{t('transfer.send.amount')}</span>
+                  <span className="font-bold text-foreground">{formatAmount(amount)} FCFA</span>
                 </div>
                 {motif && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">{t('transfer.send.motif')}</span>
-                    <span className="text-slate-600">{motif}</span>
+                    <span className="text-muted-foreground">{t('transfer.send.motif')}</span>
+                    <span className="text-muted-foreground">{motif}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm border-t border-slate-100 pt-3">
-                  <span className="text-slate-400">{t('transfer.send.fees')}</span>
-                  <span className="text-emerald-500 font-medium">0 FCFA</span>
+                <div className="flex justify-between text-sm border-t border-border pt-3">
+                  <span className="text-muted-foreground">{t('transfer.send.fees')}</span>
+                  <span className="text-success font-medium">0 FCFA</span>
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">{t('transfer.send.enterPin')}</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">{t('transfer.send.enterPin')}</label>
               <div className="flex justify-center gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className={cn(
                     'h-4 w-4 rounded-full transition-all',
-                    i < pin.length ? 'bg-primary scale-110' : 'bg-slate-200',
+                    i < pin.length ? 'bg-primary scale-110' : 'bg-muted',
                   )} />
                 ))}
               </div>
@@ -245,19 +246,19 @@ export function TransferSendScreen() {
                   <button key={i} onClick={() => {
                     if (d === '⌫') setPin(pin.slice(0, -1));
                     else if (d && pin.length < 6) setPin(pin + d);
-                  }} className={cn('h-12 rounded-xl text-lg font-semibold bg-white border border-slate-100 active:scale-95 transition-all', d === '' && 'invisible')}>
+                  }} className={cn('h-12 rounded-xl text-lg font-semibold bg-card border border-border active:scale-95 transition-all', d === '' && 'invisible')}>
                     {d}
                   </button>
                 ))}
               </div>
             </div>
 
-            <button onClick={handleConfirm} disabled={pin.length !== 6 || loading} className="w-full h-14 rounded-2xl bg-primary text-white text-base font-semibold disabled:opacity-40 active:scale-95 transition-all">
+            <Button onClick={handleConfirm} disabled={pin.length !== 6 || loading} className="w-full h-14">
               {loading ? '...' : t('common.confirm')}
-            </button>
+            </Button>
           </div>
         )}
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

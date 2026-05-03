@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { Delete, Lock, MessageSquareCheck, Mail } from 'lucide-react';
@@ -111,16 +112,16 @@ const ForgotPinScreen = () => {
     };
 
     return (
-      <ScreenLayout showBack title="Vérification SMS">
-        <div className="flex-1 flex flex-col pt-4">
+      <ScreenLayoutV2 showBack title="Vérification SMS">
+        <form onSubmit={(e) => { e.preventDefault(); handleVerify(); }} className="flex-1 flex flex-col pt-4">
           <div className="space-y-8 flex-1">
             <div className="space-y-3">
               <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
                 <MessageSquareCheck className="w-8 h-8 text-primary" />
               </div>
               <h2 className="text-3xl font-extrabold tracking-tight text-primary">Vérification</h2>
-              <p className="text-slate-500 text-lg leading-relaxed">
-                Code envoyé au <span className="font-bold text-slate-800">{user?.phone}</span>
+              <p className="text-muted-foreground text-lg leading-relaxed">
+                Code envoyé au <span className="font-bold text-foreground">{user?.phone}</span>
               </p>
             </div>
 
@@ -137,7 +138,7 @@ const ForgotPinScreen = () => {
                   onKeyDown={(e) => handleKeyDown(i, e)}
                   className={cn(
                     'h-16 w-full max-w-[50px] rounded-2xl border-2 text-center text-2xl font-bold transition-all outline-none',
-                    digit ? 'border-primary bg-white shadow-sm' : 'border-slate-100 bg-slate-50',
+                    digit ? 'border-primary bg-white shadow-sm' : 'border-muted bg-muted/50',
                     'focus:border-primary focus:ring-4 focus:ring-primary/10 focus:bg-white',
                   )}
                 />
@@ -145,16 +146,17 @@ const ForgotPinScreen = () => {
             </div>
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl animate-shake">
-                <p className="text-red-600 text-sm font-semibold text-center">{error}</p>
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-2xl animate-shake">
+                <p className="text-destructive text-sm font-semibold text-center">{error}</p>
               </div>
             )}
 
             <div className="text-center pt-2">
               <button
+                type="button"
                 onClick={handleResend}
                 disabled={resendTimer > 0}
-                className="text-sm font-bold text-primary active:opacity-70 disabled:text-slate-400 transition-colors uppercase tracking-widest"
+                className="text-sm font-bold text-primary active:opacity-70 disabled:text-muted-foreground transition-colors uppercase tracking-widest"
               >
                 {resendTimer > 0 ? `Renvoyer (${resendTimer}s)` : "Renvoyer le code"}
               </button>
@@ -162,20 +164,12 @@ const ForgotPinScreen = () => {
           </div>
 
           <div className="pt-8 pb-4">
-            <button
-              onClick={handleVerify}
-              disabled={!isComplete || loading}
-              className="bicec-button w-full h-16 text-lg"
-            >
-              {loading ? (
-                <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                'Vérifier'
-              )}
-            </button>
+            <Button type="submit" loading={loading} disabled={!isComplete}>
+              Vérifier
+            </Button>
           </div>
-        </div>
-      </ScreenLayout>
+        </form>
+      </ScreenLayoutV2>
     );
   }
 
@@ -234,16 +228,16 @@ const ForgotPinScreen = () => {
     };
 
     return (
-      <ScreenLayout showBack title="Vérification Email">
-        <div className="flex-1 flex flex-col pt-4">
+      <ScreenLayoutV2 showBack title="Vérification Email">
+        <form onSubmit={(e) => { e.preventDefault(); handleVerify(); }} className="flex-1 flex flex-col pt-4">
           <div className="space-y-8 flex-1">
             <div className="space-y-3">
               <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
                 <Mail className="w-8 h-8 text-primary" />
               </div>
               <h2 className="text-3xl font-extrabold tracking-tight text-primary">Code Email</h2>
-              <p className="text-slate-500 text-lg leading-relaxed">
-                Code envoyé à <span className="font-bold text-slate-800">{user?.email}</span>
+              <p className="text-muted-foreground text-lg leading-relaxed">
+                Code envoyé à <span className="font-bold text-foreground">{user?.email}</span>
               </p>
             </div>
 
@@ -260,7 +254,7 @@ const ForgotPinScreen = () => {
                   onKeyDown={(e) => handleKeyDown(i, e)}
                   className={cn(
                     'h-16 w-full max-w-[50px] rounded-2xl border-2 text-center text-2xl font-bold transition-all outline-none',
-                    digit ? 'border-primary bg-white shadow-sm' : 'border-slate-100 bg-slate-50',
+                    digit ? 'border-primary bg-white shadow-sm' : 'border-muted bg-muted/50',
                     'focus:border-primary focus:ring-4 focus:ring-primary/10 focus:bg-white',
                   )}
                 />
@@ -268,16 +262,17 @@ const ForgotPinScreen = () => {
             </div>
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl animate-shake">
-                <p className="text-red-600 text-sm font-semibold text-center">{error}</p>
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-2xl animate-shake">
+                <p className="text-destructive text-sm font-semibold text-center">{error}</p>
               </div>
             )}
 
             <div className="text-center pt-2">
               <button
+                type="button"
                 onClick={handleResend}
                 disabled={resendTimer > 0}
-                className="text-sm font-bold text-primary active:opacity-70 disabled:text-slate-400 transition-colors uppercase tracking-widest"
+                className="text-sm font-bold text-primary active:opacity-70 disabled:text-muted-foreground transition-colors uppercase tracking-widest"
               >
                 {resendTimer > 0 ? `Renvoyer (${resendTimer}s)` : "Renvoyer le code"}
               </button>
@@ -285,20 +280,12 @@ const ForgotPinScreen = () => {
           </div>
 
           <div className="pt-8 pb-4">
-            <button
-              onClick={handleVerify}
-              disabled={!isComplete || loading}
-              className="bicec-button w-full h-16 text-lg"
-            >
-              {loading ? (
-                <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                'Vérifier'
-              )}
-            </button>
+            <Button type="submit" loading={loading} disabled={!isComplete}>
+              Vérifier
+            </Button>
           </div>
-        </div>
-      </ScreenLayout>
+        </form>
+      </ScreenLayoutV2>
     );
   }
 
@@ -358,7 +345,7 @@ const ForgotPinScreen = () => {
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
   return (
-    <ScreenLayout showBack title="Nouveau PIN" className="bg-slate-50">
+    <ScreenLayoutV2 showBack title="Nouveau PIN" className="bg-slate-50">
       <div className="flex-1 flex flex-col pt-2 items-center">
         <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6">
           <Lock className="w-8 h-8 text-primary" />
@@ -367,7 +354,7 @@ const ForgotPinScreen = () => {
         <h2 className="text-3xl font-extrabold tracking-tight text-primary text-center">
           {pinStep === 'create' ? 'Nouveau PIN' : 'Confirmer'}
         </h2>
-        <p className="text-slate-500 text-lg text-center mt-3 mb-10 px-4 max-w-[280px]">
+        <p className="text-muted-foreground text-lg text-center mt-3 mb-10 px-4 max-w-[280px]">
           {pinStep === 'create'
             ? 'Choisissez 6 chiffres pour votre nouveau code.'
             : 'Veuillez ressaisir votre code pour confirmer.'}
@@ -385,8 +372,8 @@ const ForgotPinScreen = () => {
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-50 border border-red-100 rounded-xl animate-shake">
-            <p className="text-red-600 text-xs font-bold text-center">{error}</p>
+          <div className="mb-6 p-3 bg-destructive/10 border border-destructive/20 rounded-xl animate-shake">
+            <p className="text-destructive text-xs font-bold text-center">{error}</p>
           </div>
         )}
 
@@ -404,7 +391,7 @@ const ForgotPinScreen = () => {
                   'h-20 w-20 mx-auto flex items-center justify-center rounded-full text-3xl font-bold transition-all border shadow-sm',
                   d === '' && 'invisible pointer-events-none',
                   d === 'del'
-                    ? 'border-transparent text-slate-400 active:text-primary active:scale-90'
+                    ? 'border-transparent text-muted-foreground active:text-primary active:scale-90'
                     : 'bg-white border-slate-100 text-slate-800 hover:border-primary/30 active:scale-90 active:bg-slate-50 active:shadow-inner',
                 )}
               >
@@ -415,20 +402,16 @@ const ForgotPinScreen = () => {
         </div>
 
         <div className="w-full pt-4 pb-8">
-          <button
+          <Button
             onClick={handleSubmit}
-            disabled={currentPin.length !== 6 || loading}
-            className="bicec-button w-full h-16 text-lg"
+            loading={loading}
+            disabled={currentPin.length !== 6}
           >
-            {loading ? (
-              <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              pinStep === 'confirm' ? 'Enregistrer le PIN' : 'Continuer'
-            )}
-          </button>
+            {pinStep === 'confirm' ? 'Enregistrer le PIN' : 'Continuer'}
+          </Button>
         </div>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 };
 

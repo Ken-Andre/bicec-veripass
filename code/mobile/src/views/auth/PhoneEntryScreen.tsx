@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
 import { apiClient } from '../../services/apiClient';
 import { Mail, Phone } from 'lucide-react';
 
@@ -15,8 +17,6 @@ const PhoneEntryScreen = () => {
   const [error, setError] = useState('');
 
   const mode = searchParams.get('mode') || 'signup';
-
-  // For login mode: toggle between phone and email
   const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('phone');
 
   const isPhoneValid = /^[0-9]{9}$/.test(phone);
@@ -31,7 +31,6 @@ const PhoneEntryScreen = () => {
     setError('');
     try {
       if (mode === 'login') {
-        // LOGIN FLOW: verify credentials exist before sending OTP
         if (loginMethod === 'phone') {
           const fullPhone = `+237${phone}`;
           const checkRes = await apiClient.get<{ exists: boolean; phone?: string }>(`/auth/user/exists?phone=${encodeURIComponent(fullPhone)}`);
@@ -44,7 +43,6 @@ const PhoneEntryScreen = () => {
           await apiClient.post<void, { phone?: string; email?: string }>('/auth/otp/send', { phone: fullPhone });
           navigate('/auth/otp', { state: { mode: 'login', identifier: fullPhone } });
         } else {
-          // Login by email — check if any user has this email
           const checkRes = await apiClient.get<{ exists: boolean; phone: string }>(`/auth/user/exists?email=${encodeURIComponent(email)}`);
           if (!checkRes.exists) {
             setError('Email non reconnu. Créez d\'abord un compte.');
@@ -56,7 +54,6 @@ const PhoneEntryScreen = () => {
           navigate('/auth/otp', { state: { mode: 'login', identifier: email } });
         }
       } else {
-        // SIGNUP FLOW: user must NOT exist
         const fullPhone = `+237${phone}`;
         const checkRes = await apiClient.get<{ exists: boolean }>(`/auth/user/exists?phone=${encodeURIComponent(fullPhone)}`);
         if (checkRes.exists) {
@@ -76,30 +73,54 @@ const PhoneEntryScreen = () => {
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleCheckAndSend();
+  };
+
+  const footer = (
+    <div className="space-y-4">
+      <Button
+        type="submit"
+        form="phone-form"
+        loading={loading}
+        disabled={!isValid}
+        fullWidth
+      >
+        {mode === 'login' ? 'Envoyer le code' : 'Envoyer le code SMS'}
+      </Button>
+      {mode === 'signup' && (
+        <p className="text-center text-xs text-muted-foreground font-medium">
+          En continuant, vous recevrez un SMS de vérification. Des frais d'opérateur peuvent s'appliquer.
+        </p>
+      )}
+    </div>
+  );
+
   if (mode === 'login') {
     return (
-      <ScreenLayout showBack title="Connexion">
-        <div className="flex-1 flex flex-col pt-4">
+      <ScreenLayoutV2 showBack title="Connexion" footer={footer}>
+        <form id="phone-form" onSubmit={handleSubmit} className="flex-1 flex flex-col pt-4">
           <div className="space-y-6">
             <div className="space-y-2">
               <h2 className="text-3xl font-extrabold tracking-tight text-primary">Bon retour</h2>
-              <p className="text-slate-500 text-lg">Connectez-vous avec votre numéro ou email.</p>
+              <p className="text-muted-foreground text-lg">Connectez-vous avec votre numéro ou email.</p>
             </div>
 
             {/* Login method toggle */}
-            <div className="flex rounded-2xl bg-slate-100 p-1">
+            <div className="flex rounded-2xl bg-muted p-1">
               <button
+                type="button"
                 onClick={() => setLoginMethod('phone')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${loginMethod === 'phone' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'
-                  }`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${loginMethod === 'phone' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground'}`}
               >
                 <Phone className="w-4 h-4" />
                 Téléphone
               </button>
               <button
+                type="button"
                 onClick={() => setLoginMethod('email')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${loginMethod === 'email' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'
-                  }`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${loginMethod === 'email' ? 'bg-white shadow-sm text-primary' : 'text-muted-foreground'}`}
               >
                 <Mail className="w-4 h-4" />
                 Email
@@ -108,12 +129,11 @@ const PhoneEntryScreen = () => {
 
             {loginMethod === 'phone' ? (
               <div className="flex flex-col gap-4 pt-4">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-400 px-1">Numéro de téléphone</label>
-                <div className="flex gap-3 h-16 group">
-                  <div className="flex items-center justify-center rounded-2xl bg-slate-100 px-4 text-lg font-bold text-slate-700 border-2 border-transparent transition-colors group-focus-within:border-primary/20 group-focus-within:bg-white">
-                    🇨🇲 +237
+                <div className="flex gap-3 h-16">
+                  <div className="flex items-center justify-center rounded-2xl bg-muted px-4 text-lg font-bold text-foreground border-2 border-border">
+                    +237
                   </div>
-                  <input
+                  <Input
                     type="tel"
                     inputMode="numeric"
                     pattern="[0-9]*"
@@ -121,68 +141,52 @@ const PhoneEntryScreen = () => {
                     value={phone}
                     onChange={(e) => setPhoneValue(e.target.value.replace(/\D/g, ''))}
                     placeholder="6XX XXX XXX"
-                    className="premium-input flex-1 h-full text-xl font-bold tracking-widest placeholder:tracking-normal placeholder:font-medium placeholder:text-slate-300"
+                    className="flex-1"
+                    inputClassName="text-xl font-bold tracking-widest placeholder:tracking-normal placeholder:font-medium"
                     autoFocus
                   />
                 </div>
               </div>
             ) : (
               <div className="flex flex-col gap-4 pt-4">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-400 px-1">Adresse email</label>
-                <input
+                <Input
                   type="email"
                   inputMode="email"
                   value={email}
                   onChange={(e) => setEmailValue(e.target.value.toLowerCase().trim())}
                   placeholder="votre@email.com"
-                  className="premium-input h-16 text-lg font-bold"
                   autoFocus
                 />
               </div>
             )}
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl animate-shake">
-                <p className="text-red-600 text-sm font-semibold">{error}</p>
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-2xl animate-shake">
+                <p className="text-destructive text-sm font-semibold">{error}</p>
               </div>
             )}
           </div>
-
-          <div className="mt-auto py-8">
-            <button
-              onClick={handleCheckAndSend}
-              disabled={!isValid || loading}
-              className="bicec-button w-full h-16 text-lg"
-            >
-              {loading ? (
-                <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                'Envoyer le code'
-              )}
-            </button>
-          </div>
-        </div>
-      </ScreenLayout>
+        </form>
+      </ScreenLayoutV2>
     );
   }
 
-  // SIGNUP mode (original)
+  // SIGNUP mode
   return (
-    <ScreenLayout showBack title="Identification">
-      <div className="flex-1 flex flex-col pt-4">
+    <ScreenLayoutV2 showBack title="Identification" footer={footer}>
+      <form id="phone-form" onSubmit={handleSubmit} className="flex-1 flex flex-col pt-4">
         <div className="space-y-6">
           <div className="space-y-2">
             <h2 className="text-3xl font-extrabold tracking-tight text-primary">Votre numéro</h2>
-            <p className="text-slate-500 text-lg">Un code de sécurité vous sera envoyé par SMS pour valider votre identité.</p>
+            <p className="text-muted-foreground text-lg">Un code de sécurité vous sera envoyé par SMS pour valider votre identité.</p>
           </div>
 
           <div className="flex flex-col gap-4 pt-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-slate-400 px-1">Numéro de téléphone</label>
-            <div className="flex gap-3 h-16 group">
-              <div className="flex items-center justify-center rounded-2xl bg-slate-100 px-4 text-lg font-bold text-slate-700 border-2 border-transparent transition-colors group-focus-within:border-primary/20 group-focus-within:bg-white">
-                🇨🇲 +237
+            <div className="flex gap-3 h-16">
+              <div className="flex items-center justify-center rounded-2xl bg-muted px-4 text-lg font-bold text-foreground border-2 border-border">
+                +237
               </div>
-              <input
+              <Input
                 type="tel"
                 inputMode="numeric"
                 pattern="[0-9]*"
@@ -190,36 +194,21 @@ const PhoneEntryScreen = () => {
                 value={phone}
                 onChange={(e) => setPhoneValue(e.target.value.replace(/\D/g, ''))}
                 placeholder="6XX XXX XXX"
-                className="premium-input flex-1 h-full text-xl font-bold tracking-widest placeholder:tracking-normal placeholder:font-medium placeholder:text-slate-300"
+                className="flex-1"
+                inputClassName="text-xl font-bold tracking-widest placeholder:tracking-normal placeholder:font-medium"
                 autoFocus
               />
             </div>
           </div>
+
           {error && (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl animate-shake">
-              <p className="text-red-600 text-sm font-semibold">{error}</p>
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-2xl animate-shake">
+              <p className="text-destructive text-sm font-semibold">{error}</p>
             </div>
           )}
         </div>
-
-        <div className="mt-auto py-8">
-          <button
-            onClick={handleCheckAndSend}
-            disabled={!isValid || loading}
-            className="bicec-button w-full h-16 text-lg"
-          >
-            {loading ? (
-              <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              'Envoyer le code SMS'
-            )}
-          </button>
-          <p className="text-center text-xs text-slate-400 font-medium mt-4">
-            En continuant, vous recevrez un SMS de vérification. Des frais d'opérateur peuvent s'appliquer.
-          </p>
-        </div>
-      </div>
-    </ScreenLayout>
+      </form>
+    </ScreenLayoutV2>
   );
 };
 

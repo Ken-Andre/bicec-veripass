@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { MessageSquareCheck } from 'lucide-react';
@@ -74,13 +75,11 @@ const OtpVerifyScreen = () => {
 
       login(token, userRes);
 
-      // Login flow: after phone OTP verify, go directly to PIN login
       if (mode === 'login') {
         localStorage.removeItem('vp_onboarding_flow');
         navigate('/auth/pin-login', { replace: true });
       } else {
         localStorage.setItem('vp_onboarding_flow', '1');
-        // Signup flow: go to email entry
         navigate('/auth/email', { state: { mode } });
       }
     } catch (err: unknown) {
@@ -104,42 +103,44 @@ const OtpVerifyScreen = () => {
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleVerify();
+  };
+
   // Guard: if identifier was lost (page reload, back navigation), show friendly error
   if (!identifier) {
     return (
-      <ScreenLayout showBack title="Sécurité">
-        <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center px-4">
-          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center">
-            <MessageSquareCheck className="w-8 h-8 text-red-500" />
+      <ScreenLayoutV2 showBack title="Sécurité" center>
+        <div className="flex flex-col items-center gap-6 text-center">
+          <div className="w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center">
+            <MessageSquareCheck className="w-8 h-8 text-destructive" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-slate-800">Session expirée</h2>
-            <p className="text-slate-500 text-sm">
+            <h2 className="text-xl font-bold text-foreground">Session expirée</h2>
+            <p className="text-muted-foreground text-sm">
               Votre session OTP a expiré ou la page a été rechargée. Veuillez recommencer.
             </p>
           </div>
-          <button
-            onClick={() => navigate('/auth/phone')}
-            className="bicec-button w-full h-14"
-          >
+          <Button onClick={() => navigate('/auth/phone')}>
             Retour à l'accueil
-          </button>
+          </Button>
         </div>
-      </ScreenLayout>
+      </ScreenLayoutV2>
     );
   }
 
   return (
-    <ScreenLayout showBack title="Sécurité">
-      <div className="flex-1 flex flex-col pt-4">
+    <ScreenLayoutV2 showBack title="Sécurité">
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col pt-4">
         <div className="space-y-8 flex-1">
           <div className="space-y-3">
             <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
               <MessageSquareCheck className="w-8 h-8 text-primary" />
             </div>
             <h2 className="text-3xl font-extrabold tracking-tight text-primary">Vérification</h2>
-            <p className="text-slate-500 text-lg leading-relaxed">
-              Nous avons envoyé un code à 6 chiffres sur le <span className="font-bold text-slate-800">{identifier}</span>
+            <p className="text-muted-foreground text-lg leading-relaxed">
+              Nous avons envoyé un code à 6 chiffres sur le <span className="font-bold text-foreground">{identifier}</span>
             </p>
           </div>
 
@@ -156,7 +157,7 @@ const OtpVerifyScreen = () => {
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 className={cn(
                   'h-16 w-full max-w-[50px] rounded-2xl border-2 text-center text-2xl font-bold transition-all outline-none',
-                  digit ? 'border-primary bg-white shadow-sm' : 'border-slate-100 bg-slate-50',
+                  digit ? 'border-primary bg-white shadow-sm' : 'border-muted bg-muted/50',
                   'focus:border-primary focus:ring-4 focus:ring-primary/10 focus:bg-white',
                 )}
               />
@@ -164,16 +165,17 @@ const OtpVerifyScreen = () => {
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl animate-shake">
-              <p className="text-red-600 text-sm font-semibold text-center">{error}</p>
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-2xl animate-shake">
+              <p className="text-destructive text-sm font-semibold text-center">{error}</p>
             </div>
           )}
 
           <div className="text-center pt-2">
             <button
+              type="button"
               onClick={handleResend}
               disabled={resendTimer > 0}
-              className="text-sm font-bold text-primary active:opacity-70 disabled:text-slate-400 transition-colors uppercase tracking-widest"
+              className="text-sm font-bold text-primary active:opacity-70 disabled:text-muted-foreground transition-colors uppercase tracking-widest"
             >
               {resendTimer > 0 ? `Renvoyer (${resendTimer}s)` : 'Renvoyer le code'}
             </button>
@@ -181,20 +183,12 @@ const OtpVerifyScreen = () => {
         </div>
 
         <div className="pt-8 pb-4">
-          <button
-            onClick={handleVerify}
-            disabled={!isComplete || loading}
-            className="bicec-button w-full h-16 text-lg"
-          >
-            {loading ? (
-              <div className="h-6 w-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              'Valider le compte'
-            )}
-          </button>
+          <Button type="submit" loading={loading} disabled={!isComplete}>
+            Valider le compte
+          </Button>
         </div>
-      </div>
-    </ScreenLayout>
+      </form>
+    </ScreenLayoutV2>
   );
 };
 

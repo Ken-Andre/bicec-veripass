@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { ProgressStepper } from '../../components/ProgressStepper';
 import { ArrowRight, Clock } from 'lucide-react';
 
@@ -16,10 +17,10 @@ export default function ProgressTimelineScreen() {
   const navigate = useNavigate();
 
   return (
-    <ScreenLayout title={t('kyc.progress.title') || 'Ouverture de compte'}>
+    <ScreenLayoutV2 title={t('kyc.progress.title') || 'Ouverture de compte'}>
       <div className="flex flex-col gap-8 py-4">
         <div className="text-center space-y-2">
-          <h2 className="text-xl font-bold text-slate-800">
+          <h2 className="text-xl font-bold text-foreground">
             {t('kyc.progress.heading') || 'Votre parcours'}
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -37,14 +38,11 @@ export default function ProgressTimelineScreen() {
           variant="vertical"
         />
 
-        <button
-          onClick={() => navigate('/kyc/cni-intro')}
-          className="w-full flex items-center justify-center gap-3 bg-primary text-primary-foreground py-4 rounded-2xl font-semibold text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
-        >
+        <Button onClick={() => navigate('/kyc/cni-intro')}>
           {t('kyc.progress.start') || 'Commencer'}
           <ArrowRight className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }

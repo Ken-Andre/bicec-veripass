@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { ScreenLayout } from '../../components/ScreenLayout';
-import { Fingerprint, Shield, ArrowRight, Loader2 } from 'lucide-react';
+import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
+import { Fingerprint, Shield, ArrowRight } from 'lucide-react';
 
 export default function BiometricOptInScreen() {
   const { t } = useLanguage();
@@ -29,14 +30,14 @@ export default function BiometricOptInScreen() {
   };
 
   return (
-    <ScreenLayout title="">
+    <ScreenLayoutV2>
       <div className="flex flex-col items-center gap-6 py-8">
         <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
           <Fingerprint className="w-12 h-12 text-primary" />
         </div>
 
         <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold text-slate-800">
+          <h2 className="text-2xl font-bold text-foreground">
             {t('auth.biometric.title') || 'Connexion rapide'}
           </h2>
           <p className="text-muted-foreground max-w-xs mx-auto">
@@ -50,26 +51,18 @@ export default function BiometricOptInScreen() {
         </div>
 
         {error && (
-          <p className="text-sm text-red-600 text-center">{error}</p>
+          <p className="text-sm text-destructive text-center">{error}</p>
         )}
 
         <div className="w-full max-w-sm space-y-3">
           {isPasskeySupported ? (
-            <button
-              onClick={handleEnable}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 bg-primary text-primary-foreground py-4 rounded-2xl font-semibold text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Fingerprint className="w-5 h-5" />
-              )}
+            <Button onClick={handleEnable} loading={loading}>
+              <Fingerprint className="w-5 h-5" />
               {loading ? '...' : (t('auth.biometric.enable') || 'Activer la biométrie')}
-            </button>
+            </Button>
           ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
-              <p className="text-sm text-amber-700">
+            <div className="bg-warning/10 border border-warning/20 rounded-2xl p-4 text-center">
+              <p className="text-sm text-warning">
                 {t('auth.biometric.unsupported') || 'Biométrie non disponible sur cet appareil'}
               </p>
             </div>
@@ -84,6 +77,6 @@ export default function BiometricOptInScreen() {
           </button>
         </div>
       </div>
-    </ScreenLayout>
+    </ScreenLayoutV2>
   );
 }
