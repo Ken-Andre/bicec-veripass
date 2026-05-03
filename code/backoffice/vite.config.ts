@@ -39,6 +39,15 @@ export default defineConfig(async ({ mode }) => {
     },
     build: {
       sourcemap: mode === 'production',
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes('node_modules')) return 'vendor';
+            if (id.includes('/pages/validation/')) return 'validation-screens';
+            if (id.includes('/pages/compliance/')) return 'compliance-screens';
+          },
+        },
+      },
     },
     server: {
       port: 3001,

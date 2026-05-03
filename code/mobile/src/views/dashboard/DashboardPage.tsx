@@ -3,7 +3,6 @@ import { ScreenLayout } from '../../components/ScreenLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useKyc } from '../../contexts/KycContext';
 import type { AccessTier, KycStatus } from '../../types';
-import { assertNever } from '../../types';
 import type { ReviewStatus } from '../../contexts/KycContext';
 import { User, ShieldCheck, CreditCard, Landmark, History, PlusCircle, ArrowRight, LogOut, Settings, Trash2, X, Clock, AlertTriangle, CheckCircle, XCircle, Eye, Ban } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

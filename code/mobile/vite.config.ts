@@ -86,6 +86,13 @@ export default defineConfig(async ({ mode }) => {
     },
     build: {
       sourcemap: mode === 'production',
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes('node_modules')) return 'vendor';
+          },
+        },
+      },
     },
     server: {
       port: 3000,
