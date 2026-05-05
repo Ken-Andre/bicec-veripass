@@ -296,7 +296,8 @@ async function uploadLiveness(item: KycSyncQueueItem): Promise<void> {
   }
 
   // Submit liveness result (landmarks + challenge)
-  const { selfie_data_url, ...livenessBody } = payload;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { selfie_data_url: _selfieDataUrl, ...livenessBody } = payload;
   const response = await fetchWithCorrelation('/api/v1/kyc/capture/liveness', {
     method: 'POST',
     headers: {

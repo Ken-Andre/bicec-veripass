@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
+import type { KycStepType } from '../../types';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { Button } from '../../components/ui/button';
 import { ProgressStepper } from '../../components/ProgressStepper';
@@ -9,7 +10,7 @@ import { CheckCircle, FileText, User, MapPin, Shield, PenLine, Receipt, AlertCir
 import { getSubmissionBlockerStatus, runKycSyncNow } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
 
-// Map blocking reason keywords to corrective routes
+// Map blocking reason keywords to corrective routes AND steps
 const BLOCKING_REASON_ROUTES: Record<string, string> = {
   'CNI_RECTO': '/kyc/cni-recto-capture',
   'CNI_VERSO': '/kyc/cni-verso-capture',
@@ -21,9 +22,27 @@ const BLOCKING_REASON_ROUTES: Record<string, string> = {
   'consent': '/kyc/consent',
 };
 
+const BLOCKING_REASON_STEPS: Record<string, KycStepType> = {
+  'CNI_RECTO': 'cni_recto',
+  'CNI_VERSO': 'cni_verso',
+  'SELFIE': 'liveness',
+  'Liveness': 'liveness',
+  'liveness': 'liveness',
+  'OCR review': 'ocr_review',
+  'Consent': 'consent',
+  'consent': 'consent',
+};
+
 function getCorrectionRoute(reason: string): string | null {
   for (const [keyword, route] of Object.entries(BLOCKING_REASON_ROUTES)) {
     if (reason.includes(keyword)) return route;
+  }
+  return null;
+}
+
+function getCorrectionStep(reason: string): KycStepType | null {
+  for (const [keyword, step] of Object.entries(BLOCKING_REASON_STEPS)) {
+    if (reason.includes(keyword)) return step;
   }
   return null;
 }
@@ -57,10 +76,27 @@ interface ReadinessData {
   required_missing_documents: string[];
 }
 
+/**
+ * Resolve a checklist value using backend-first logic:
+ * - If backend is loaded and has an explicit flag → use it (true/false)
+ * - If backend is loaded but has NO explicit flag → null ("Non vérifié")
+ * - If backend is not loaded → fallback to local value
+ */
+function resolveChecklist(
+  backendLoaded: boolean,
+  backendValue: boolean | undefined,
+  hasExplicitFlag: boolean,
+  localFallback: boolean | undefined,
+): boolean | null {
+  if (!backendLoaded) return localFallback ?? null;
+  if (hasExplicitFlag) return backendValue ?? false;
+  return null; // No explicit flag → "Non vérifié"
+}
+
 export default function ReviewScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { address, signatureData, billCapture } = useKyc();
+  const { address, signatureData, billCapture, completeStep, setEditStep } = useKyc();
   const [session, setSession] = useState<SessionData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -72,23 +108,19 @@ export default function ReviewScreen() {
     const load = async () => {
       setLoadingReadiness(true);
       try {
-        // Sync pending offline ops first
         await runKycSyncNow();
 
-        // Fetch session info (informational only — doesn't gate submit)
         const sessionRes = await fetchWithCorrelation('/api/v1/kyc/session/current');
         if (sessionRes.ok) {
           const data = await sessionRes.json();
           setSession(data);
         }
 
-        // The real submit gate: backend readiness
         const readinessRes = await fetchWithCorrelation('/api/v1/kyc/readiness');
         if (readinessRes.ok) {
           setBackendReadiness(await readinessRes.json() as ReadinessData);
         }
 
-        // Offline queue check (only blocks if there are FAILED ops pending)
         const offlineStatus = await getSubmissionBlockerStatus();
         setOfflineBlocked(offlineStatus.canSubmit ? null : offlineStatus.blockingReason);
       } catch (error) {
@@ -101,22 +133,64 @@ export default function ReviewScreen() {
     void load();
   }, []);
 
-  // Source of truth: backend says can_submit AND no offline queue blocker
   const canSubmit = Boolean(backendReadiness?.can_submit) && !offlineBlocked && !loadingReadiness;
 
   const docTypes = session?.documents?.map(d => d.doc_type) || [];
-  const hasCni = docTypes.includes('CNI_RECTO') && docTypes.includes('CNI_VERSO');
-  const hasSelfie = docTypes.includes('SELFIE') || backendReadiness?.has_biometric_result;
-  const hasBill = docTypes.some(d => d.startsWith('BILL_')) || !!billCapture || backendReadiness?.has_bill_document;
-  const hasConsent = !!session?.consent_record?.cgu_accepted || backendReadiness?.has_consent;
-  const hasSignature = !!signatureData;
-  const hasOcrReview = backendReadiness?.has_ocr_review;
+  const backendLoaded = !loadingReadiness && backendReadiness !== null;
+
+  // Backend-first checklist resolution
+  const hasCni = resolveChecklist(
+    backendLoaded,
+    backendReadiness ? !backendReadiness.blocking_reasons.some(r => r.includes('CNI_RECTO') || r.includes('CNI_VERSO')) : undefined,
+    backendLoaded, // Always explicit from blocking_reasons
+    docTypes.includes('CNI_RECTO') && docTypes.includes('CNI_VERSO'),
+  );
+
+  const hasSelfie = resolveChecklist(
+    backendLoaded,
+    backendReadiness?.has_biometric_result,
+    backendLoaded && backendReadiness !== undefined, // has_biometric_result is explicit
+    docTypes.includes('SELFIE'),
+  );
+
+  const hasBill = resolveChecklist(
+    backendLoaded,
+    backendReadiness?.has_bill_document,
+    backendLoaded && backendReadiness !== undefined, // has_bill_document is explicit
+    docTypes.some(d => d.startsWith('BILL_')) || !!billCapture,
+  );
+
+  const hasConsent = resolveChecklist(
+    backendLoaded,
+    backendReadiness?.has_consent,
+    backendLoaded && backendReadiness !== undefined, // has_consent is explicit
+    !!session?.consent_record?.cgu_accepted,
+  );
+
+  const hasOcrReview = resolveChecklist(
+    backendLoaded,
+    backendReadiness?.has_ocr_review,
+    backendLoaded && backendReadiness !== undefined, // has_ocr_review is explicit
+    undefined, // No local fallback for OCR review
+  );
+
+  // Address: no explicit backend flag → "Non vérifié" when backend loaded
+  const hasAddress: boolean | null = backendLoaded ? null : !!address;
+
+  // Signature: no explicit backend flag → "Non vérifié" when backend loaded
+  const hasSignature: boolean | null = backendLoaded ? null : !!signatureData;
+
+  const handleCorrect = (route: string, step: KycStepType | null) => {
+    if (step) {
+      setEditStep(step);
+    }
+    navigate(route);
+  };
 
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      // Re-check offline queue just before submit
       const offlineStatus = await getSubmissionBlockerStatus();
       if (!offlineStatus.canSubmit) {
         setSubmitError(offlineStatus.blockingReason);
@@ -128,6 +202,8 @@ export default function ReviewScreen() {
       });
 
       if (res.ok) {
+        completeStep('submission');
+        setEditStep(null);
         navigate('/kyc/submit-success');
       } else {
         const body = await res.json().catch(() => null);
@@ -153,7 +229,7 @@ export default function ReviewScreen() {
     icon: React.ReactNode;
     label: string;
     detail?: string;
-    ok: boolean | undefined;
+    ok: boolean | null | undefined;
     children?: React.ReactNode;
   }) => (
     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
@@ -163,9 +239,15 @@ export default function ReviewScreen() {
         <p className="text-xs text-muted-foreground">{detail}</p>
       </div>
       {children}
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${ok ? 'bg-success text-white' : 'bg-destructive/10 text-destructive'}`}>
-        {ok ? '✓' : '✗'}
-      </div>
+      {ok === null ? (
+        <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-muted text-muted-foreground">
+          ?
+        </div>
+      ) : (
+        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${ok ? 'bg-success text-white' : 'bg-destructive/10 text-destructive'}`}>
+          {ok ? '✓' : '✗'}
+        </div>
+      )}
     </div>
   );
 
@@ -176,19 +258,23 @@ export default function ReviewScreen() {
         <h2 className="text-lg font-bold">{t('review.title')}</h2>
         <p className="text-sm text-muted-foreground">Vérifiez votre dossier avant soumission</p>
 
-        {/* Checklist — informational, driven by backend flags when available */}
+        {/* Checklist — backend-first: explicit backend flags take priority */}
         <div className="space-y-3">
           <CheckItem
             icon={<User className="w-5 h-5" />}
             label={t('review.identity') || 'Identité'}
-            detail={`${hasCni ? '✓ CNI recto/verso' : '✗ CNI manquant'}${hasSelfie ? ' · ✓ Selfie' : ' · ✗ Selfie manquant'}`}
-            ok={hasCni && hasSelfie}
+            detail={
+              hasCni === null
+                ? 'Non vérifié'
+                : `${hasCni ? '✓ CNI recto/verso' : '✗ CNI manquant'}${hasSelfie ? ' · ✓ Selfie' : hasSelfie === false ? ' · ✗ Selfie manquant' : ''}`
+            }
+            ok={hasCni === null ? null : hasCni && (hasSelfie ?? false)}
           />
 
           <CheckItem
             icon={<Receipt className="w-5 h-5" />}
             label="Justificatif de domicile"
-            detail={hasBill ? '✓ Facture (ENEO/CAMWATER)' : '✗ Facture manquante'}
+            detail={hasBill === null ? 'Non vérifié' : hasBill ? '✓ Facture (ENEO/CAMWATER)' : '✗ Facture manquante'}
             ok={hasBill}
           />
 
@@ -196,11 +282,13 @@ export default function ReviewScreen() {
             icon={<MapPin className="w-5 h-5" />}
             label={t('review.address') || 'Adresse'}
             detail={
-              address
-                ? `${address.quartier}, ${address.city}${address.gps_lat ? ' · ✓ GPS' : ''}`
-                : (t('review.address.missing') || 'Non renseigné')
+              hasAddress === null
+                ? 'Non vérifié'
+                : address
+                  ? `${address.quartier}, ${address.city}${address.gps_lat ? ' · ✓ GPS' : ''}`
+                  : (t('review.address.missing') || 'Non renseigné')
             }
-            ok={!!address}
+            ok={hasAddress}
           />
 
           <CheckItem
@@ -213,21 +301,21 @@ export default function ReviewScreen() {
           <CheckItem
             icon={<Shield className="w-5 h-5" />}
             label={t('review.consent') || 'Consentements'}
-            detail={hasConsent ? t('review.consent.cgu') || '✓ CGU acceptées' : '✗ CGU non acceptées'}
+            detail={hasConsent === null ? 'Non vérifié' : hasConsent ? t('review.consent.cgu') || '✓ CGU acceptées' : '✗ CGU non acceptées'}
             ok={hasConsent}
           />
 
           <CheckItem
             icon={<PenLine className="w-5 h-5" />}
             label="OCR & Identité vérifiée"
-            detail={hasOcrReview ? '✓ Champs vérifiés' : '✗ Revue OCR non effectuée'}
+            detail={hasOcrReview === null ? 'Non vérifié' : hasOcrReview ? '✓ Champs vérifiés' : '✗ Revue OCR non effectuée'}
             ok={hasOcrReview}
           />
 
           <CheckItem
             icon={<PenLine className="w-5 h-5" />}
             label="Signature électronique"
-            detail={hasSignature ? '✓ Signée électroniquement' : '✗ Signature manquante'}
+            detail={hasSignature === null ? 'Non vérifié' : hasSignature ? '✓ Signée électroniquement' : '✗ Signature manquante'}
             ok={hasSignature}
           >
             {signatureData && (
@@ -252,12 +340,13 @@ export default function ReviewScreen() {
             <p className="text-xs font-semibold text-destructive">Dossier incomplet :</p>
             {backendReadiness.blocking_reasons.map((r, i) => {
               const route = getCorrectionRoute(r);
+              const step = getCorrectionStep(r);
               return (
                 <div key={i} className="flex items-center justify-between gap-2">
                   <p className="text-xs text-destructive flex-1">• {r}</p>
                   {route && (
                     <button
-                      onClick={() => navigate(route)}
+                      onClick={() => handleCorrect(route, step)}
                       className="flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 px-2 py-1 rounded shrink-0 transition-colors"
                     >
                       Corriger <ArrowRight className="w-3 h-3" />

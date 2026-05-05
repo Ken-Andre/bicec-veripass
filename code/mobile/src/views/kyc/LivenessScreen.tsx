@@ -28,7 +28,6 @@ export default function LivenessScreen() {
     completeStep,
     sessionId,
     setSessionId,
-    biometricConsentAccepted,
   } = useKyc();
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'challenge' | 'success' | 'fail' | 'locked'>('loading');
@@ -301,13 +300,9 @@ export default function LivenessScreen() {
   }, [status, currentChallenge, checkChallenge, stopCamera, t, captureSelfieFrame]);
 
   useEffect(() => {
-    if (!biometricConsentAccepted) {
-      navigate('/kyc/biometric-consent', { replace: true });
-      return;
-    }
     startCamera();
     return () => stopCamera();
-  }, [biometricConsentAccepted, navigate, startCamera, stopCamera]);
+  }, [startCamera, stopCamera]);
 
   useEffect(() => {
     if (status !== 'locked' || cooldownSeconds <= 0) return;

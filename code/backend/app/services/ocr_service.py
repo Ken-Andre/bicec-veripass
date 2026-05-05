@@ -1307,6 +1307,7 @@ class OCRService:
                 aligned = img_arr
                 logger.debug("Card alignment failed, using original image")
             enhanced = _enhance_for_ocr(aligned)
+            _t_align = time.perf_counter()
         _t_enhance = time.perf_counter()
 
         # Step 3: Run PaddleOCR

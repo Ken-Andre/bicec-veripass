@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { apiClient, setSessionExpiredHandler } from '../services/apiClient';
 import { isPasskeySupported, registerPasskey, authenticatePasskey, removePasskey } from '../services/passkeyService';
+import { clearPersistedKycState } from '../services/kycOfflineStore';
 
 interface User {
   id: string;
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(false);
     setIsLocked(false);
     clearTimer();
+    void clearPersistedKycState();
   }, [clearTimer]);
 
   // Register session expired handler with apiClient so 401 responses trigger logout
@@ -208,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLocked(false);
     setBiometricEnabled(false);
     clearTimer();
+    void clearPersistedKycState();
   }, [clearTimer]);
 
   const handleSetBiometric = useCallback(async (enabled: boolean): Promise<boolean> => {
@@ -243,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setIsLocked(false);
     clearTimer();
+    void clearPersistedKycState();
   };
 
   return (

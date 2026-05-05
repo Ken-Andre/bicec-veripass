@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { ProgressStepper } from '../../components/ProgressStepper';
 import { FileText, Camera, CheckCircle, Shield } from 'lucide-react';
 import { useKyc } from '../../contexts/KycContext';
+import type { BackendSessionData, BackendReadinessData } from '../../contexts/KycContext';
 import { fetchWithCorrelation } from '../../services/apiClient';
 
 const KYC_STEPS = [
@@ -23,7 +24,7 @@ const KYC_STEPS = [
 export default function KycIntroScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { setSessionId, basicProfile, documentChoice } = useKyc();
+  const { setSessionId, basicProfile, documentChoice, hydrateKycFromBackend } = useKyc();
   const [starting, setStarting] = useState(false);
 
   const ensureKycSession = async () => {
@@ -38,14 +39,46 @@ export default function KycIntroScreen() {
     if (starting) return;
     setStarting(true);
     try {
-      const res = await fetchWithCorrelation('/api/v1/kyc/session/start', {
-        method: 'POST',
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { session_id?: string };
-        if (data.session_id) {
-          setSessionId(data.session_id);
+      // 1. Check if a session already exists on the backend
+      let session: BackendSessionData | null = null;
+      const currentRes = await fetchWithCorrelation('/api/v1/kyc/session/current');
+
+      if (currentRes.ok) {
+        session = (await currentRes.json()) as BackendSessionData;
+      } else {
+        // 2. No existing session → create a new one
+        const startRes = await fetchWithCorrelation('/api/v1/kyc/session/start', {
+          method: 'POST',
+        });
+        if (startRes.ok) {
+          const data = (await startRes.json()) as { session_id?: string };
+          if (data.session_id) {
+            setSessionId(data.session_id);
+            // Fetch the newly created session
+            const newSessionRes = await fetchWithCorrelation('/api/v1/kyc/session/current');
+            if (newSessionRes.ok) {
+              session = (await newSessionRes.json()) as BackendSessionData;
+            }
+          }
+        } else {
+          // Offline fallback
+          setSessionId(`offline-${Date.now()}`);
         }
+      }
+
+      // 3. Reconcile local state with backend truth
+      if (session) {
+        setSessionId(session.id);
+        let readiness: BackendReadinessData | null = null;
+        try {
+          const readinessRes = await fetchWithCorrelation('/api/v1/kyc/readiness');
+          if (readinessRes.ok) {
+            readiness = (await readinessRes.json()) as BackendReadinessData;
+          }
+        } catch {
+          // Readiness unavailable — reconcile with session only
+        }
+        hydrateKycFromBackend(session, readiness);
       }
     } catch {
       setSessionId(`offline-${Date.now()}`);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { WifiOff, Wifi, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useConnectivity } from '../hooks/useConnectivity';
@@ -8,21 +8,32 @@ export const OfflineBanner = () => {
   const { isOnline, isSyncing, pendingCount, needsReuploadCount, failedCount, syncNow } = useConnectivity();
   const [dismissed, setDismissed] = useState(false);
   const [justCameOnline, setJustCameOnline] = useState(false);
+  const prevIsOnline = useRef(isOnline);
 
   // Detect transition from offline → online to show "back online" message briefly
   useEffect(() => {
-    if (isOnline && !dismissed) {
-      setJustCameOnline(true);
-      const timer = window.setTimeout(() => setJustCameOnline(false), 4000);
+    const cameOnline = isOnline && !prevIsOnline.current;
+    prevIsOnline.current = isOnline;
+
+    if (cameOnline && !dismissed) {
+      // Defer setState to avoid synchronous setState inside effect body
+      const showTimer = window.setTimeout(() => setJustCameOnline(true), 0);
+      const hideTimer = window.setTimeout(() => setJustCameOnline(false), 4000);
+      return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
+    }
+    if (!isOnline) {
+      const timer = window.setTimeout(() => setJustCameOnline(false), 0);
       return () => clearTimeout(timer);
     }
-    setJustCameOnline(false);
   }, [isOnline, dismissed]);
 
   // Reset dismissed state when going offline
   useEffect(() => {
-    if (!isOnline) setDismissed(false);
-  }, [isOnline]);
+    if (!isOnline && dismissed) {
+      const timer = window.setTimeout(() => setDismissed(false), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOnline, dismissed]);
 
   const hasIssues = needsReuploadCount > 0 || failedCount > 0;
   const hasPending = pendingCount > 0;

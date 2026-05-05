@@ -4,7 +4,7 @@ import { useKyc } from '../../contexts/KycContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { computeLaplacianVariance } from '../../services/mediapipeService';
 import { evaluateCni } from '../../services/cniValidator';
-import { Camera, AlertTriangle, CheckCircle, X, Loader2 } from 'lucide-react';
+import { Camera, AlertTriangle, CheckCircle, X, Loader2, ChevronLeft, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { enqueueOfflineCniCapture, runKycSyncNow } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
@@ -12,6 +12,7 @@ import { captureKycException, captureKycMessage } from '../../services/sentry';
 
 type QualityStatus = 'checking' | 'good' | 'blurry' | 'dark' | 'glare' | 'cni_fail';
 type CameraState = 'loading' | 'ready' | 'error';
+type ScreenState = 'camera' | 'review' | 'uploading' | 'error';
 
 interface CniCaptureScreenProps {
   side: 'recto' | 'verso';
@@ -22,6 +23,15 @@ const BLUR_THRESHOLD = 100;
 const DARK_THRESHOLD = 40;
 const GLARE_THRESHOLD = 245;
 const CAMERA_INIT_TIMEOUT_MS = 5000;
+const UPLOAD_TIMEOUT_MS = 90_000;
+
+const UPLOAD_TIPS = [
+  'Analyse en cours…',
+  'Vérification des données…',
+  'Extraction des informations…',
+  'Validation du document…',
+  'Presque terminé…',
+];
 
 export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenProps) {
   const navigate = useNavigate();
@@ -31,10 +41,14 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [quality, setQuality] = useState<QualityStatus>('checking');
-  const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraState, setCameraState] = useState<CameraState>('loading');
+  const [screenState, setScreenState] = useState<ScreenState>('camera');
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const capturedRef = useRef(false);
   const initTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -72,9 +86,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     }
   }, []);
 
-  const UPLOAD_TIMEOUT_MS = 20_000;
-
-  const uploadDocument = useCallback(async (blob: Blob, dataUrl: string) => {
+  const uploadDocument = useCallback(async (blob: Blob, dataUrl: string): Promise<'success' | 'offline' | 'error'> => {
     const clientSha = await computeSha256(blob);
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), UPLOAD_TIMEOUT_MS);
@@ -103,6 +115,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
       }
 
       await runKycSyncNow();
+      return 'success';
     } catch (err) {
       clearTimeout(timeoutId);
       const isTimeout = err instanceof Error && (err.name === 'AbortError' || err.message.includes('abort'));
@@ -121,46 +134,14 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
         clientSha256: clientSha,
       });
       if (isTimeout) {
-        console.warn('CNI upload timed out after 20s — saved offline for later sync.');
+        console.warn('CNI upload timed out after 90s — saved offline for later sync.');
+        return 'offline';
       } else {
         console.warn('Upload error, queued offline replay:', err);
+        return 'error';
       }
     }
   }, [side, sessionId, computeSha256, ensureSessionId]);
-
-  const doCapture = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current || capturedRef.current) return;
-    capturedRef.current = true;
-    setCapturing(true);
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d')!;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    setCniCapture(side, dataUrl);
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((nextBlob) => resolve(nextBlob), 'image/jpeg', 0.85);
-    });
-    if (blob) {
-      await uploadDocument(blob, dataUrl);
-    } else {
-      captureKycMessage('Failed to create image blob from CNI capture canvas', 'upload_failure', {
-        sessionId,
-        step: side === 'recto' ? 'cni_recto' : 'cni_verso',
-        operation: 'capture_cni_blob_generation',
-      });
-    }
-
-    completeStep(side === 'recto' ? 'cni_recto' : 'cni_verso');
-    setCapturing(false);
-    stopCamera();
-    navigate(nextRoute);
-  }, [side, nextRoute, setCniCapture, completeStep, stopCamera, navigate, uploadDocument, sessionId]);
 
   /* ── Robust stream attachment ───────────────────────────────────────────────
      Attaches a MediaStream to the <video> element, retrying via rAF if the
@@ -216,6 +197,76 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     }
   }, [t, sessionId, side, attachStream]);
 
+  const doCapture = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || capturedRef.current) return;
+    capturedRef.current = true;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    setCniCapture(side, dataUrl);
+    setCapturedImage(dataUrl);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85);
+    });
+
+    if (!blob) {
+      captureKycMessage('Failed to create image blob from CNI capture canvas', 'upload_failure', {
+        sessionId,
+        step: side === 'recto' ? 'cni_recto' : 'cni_verso',
+        operation: 'capture_cni_blob_generation',
+      });
+      setError("Impossible de créer l'image. Veuillez réessayer.");
+      capturedRef.current = false;
+      return;
+    }
+
+    setCapturedBlob(blob);
+    stopCamera();
+    setScreenState('review');
+  }, [side, setCniCapture, stopCamera, sessionId]);
+
+  const handleRetake = useCallback(() => {
+    setCapturedImage(null);
+    setCapturedBlob(null);
+    capturedRef.current = false;
+    setScreenState('camera');
+    startCamera();
+  }, [startCamera]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!capturedBlob || !capturedImage) return;
+    setScreenState('uploading');
+
+    const uploadStatus = await uploadDocument(capturedBlob, capturedImage);
+
+    if (uploadStatus === 'success') {
+      completeStep(side === 'recto' ? 'cni_recto' : 'cni_verso');
+      navigate(nextRoute);
+    } else if (uploadStatus === 'offline') {
+      setErrorMsg('Connexion instable. La photo a été sauvegardée localement et sera envoyée automatiquement dès que possible.');
+      setScreenState('error');
+    } else {
+      setErrorMsg("Échec de l'envoi. Veuillez réessayer.");
+      setScreenState('error');
+    }
+  }, [capturedBlob, capturedImage, side, nextRoute, completeStep, navigate, uploadDocument]);
+
+  const handleRetryUpload = useCallback(() => {
+    setScreenState('review');
+  }, []);
+
+  const handleContinueOffline = useCallback(() => {
+    completeStep(side === 'recto' ? 'cni_recto' : 'cni_verso');
+    navigate(nextRoute);
+  }, [side, completeStep, navigate, nextRoute]);
+
   useEffect(() => {
     if (!cameraReady) return;
     setCameraState('ready');
@@ -228,7 +279,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
       if (!vw || !vh) { setQuality('good'); return; }
 
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return;
 
       canvas.width = vw;
@@ -264,7 +315,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
         const offscreen = document.createElement('canvas');
         offscreen.width = smallW;
         offscreen.height = smallH;
-        const offCtx = offscreen.getContext('2d')!;
+        const offCtx = offscreen.getContext('2d', { willReadFrequently: true })!;
         offCtx.drawImage(video, 0, 0, smallW, smallH);
 
         const variance = computeLaplacianVariance(offCtx, smallW, smallH);
@@ -301,6 +352,15 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     return () => stopCamera();
   }, [startCamera, stopCamera]);
 
+  // Animated tips during upload
+  useEffect(() => {
+    if (screenState !== 'uploading') return;
+    const interval = setInterval(() => {
+      setCurrentTipIndex((prev) => (prev + 1) % UPLOAD_TIPS.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [screenState]);
+
   const qualityLabel = () => {
     switch (quality) {
       case 'good': return t('capture.quality.good');
@@ -334,7 +394,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     }
   };
 
-  /* ── Error state ─────────────────────────────────────────────────────────── */
+  /* ── Camera error state ──────────────────────────────────────────────────── */
   if (error || cameraState === 'error') {
     return (
       <div className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-center text-white p-6 text-center safe-bottom safe-top">
@@ -380,84 +440,166 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
           </div>
         )}
 
-        {/* Document frame overlay */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div
-            className={`relative w-[85%] aspect-[1.586/1] border-4 ${borderColor()} rounded-lg transition-colors duration-300`}
-            style={{
-              boxShadow: quality === 'good' ? '0 0 20px rgba(34, 197, 94, 0.5)' : '0 0 20px rgba(249, 115, 22, 0.5)'
-            }}
-          >
-            <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 rounded-tl-lg" style={{ borderColor: 'inherit' }} />
-            <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 rounded-tr-lg" style={{ borderColor: 'inherit' }} />
-            <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 rounded-bl-lg" style={{ borderColor: 'inherit' }} />
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 rounded-br-lg" style={{ borderColor: 'inherit' }} />
-          </div>
-        </div>
-
-        {/* Bottom controls */}
-        <div className="absolute bottom-24 left-0 right-0 flex flex-col items-center gap-3 z-10">
-          <div className={`rounded-full px-4 py-2 text-sm font-medium ${qualityColor()}`}>
-            {qualityLabel()}
-          </div>
-
-          {!capturing && quality === 'good' && (
-            <button
-              onClick={doCapture}
-              className="flex items-center gap-2 rounded-full bg-green-500 px-6 py-3 text-white font-semibold text-sm shadow-lg active:scale-95 transition-transform"
-            >
-              <Camera className="h-5 w-5" />
-              {t('capture.manual')}
-            </button>
-          )}
-
-          {quality !== 'good' && !capturing && (
-            <div className="text-white/80 text-sm text-center px-6">
-              {t('capture.adjust')}
+        {/* Review screen — confirm / retake */}
+        {screenState === 'review' && capturedImage && (
+          <div className="absolute inset-0 bg-black z-30 flex flex-col">
+            {/* Header */}
+            <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 safe-top">
+              <button
+                onClick={handleRetake}
+                className="flex items-center gap-1 text-white/80 text-sm font-medium hover:text-white transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                Reprendre
+              </button>
+              <p className="text-white font-semibold text-sm">
+                {side === 'recto' ? 'Recto' : 'Verso'}
+              </p>
+              <div className="w-16" />
             </div>
-          )}
-
-          {capturing && (
-            <div className="flex items-center gap-2 text-white text-sm font-medium animate-pulse">
-              <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              {t('capture.processing') || 'Traitement en cours…'}
+            {/* Image preview */}
+            <div className="flex-1 flex items-center justify-center p-6 pt-16 pb-4">
+              <img
+                src={capturedImage}
+                alt="CNI preview"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              />
             </div>
-          )}
-        </div>
+            {/* Bottom actions */}
+            <div className="p-6 safe-bottom bg-black/80 backdrop-blur-sm">
+              <p className="text-white/80 text-sm text-center mb-4">
+                Vérifiez que le document est bien lisible et complet avant de confirmer.
+              </p>
+              <div className="flex flex-col gap-3">
+                <Button onClick={handleConfirm} className="w-full">
+                  Confirmer
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleRetake}
+                  className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Reprendre la photo
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* Top-left close */}
-        <div className="absolute top-4 left-4 z-10">
+        {/* Uploading overlay — spinner + animated tips */}
+        {screenState === 'uploading' && (
+          <div className="absolute inset-0 bg-black/95 z-40 flex flex-col items-center justify-center text-white p-6 text-center">
+            <Loader2 className="w-14 h-14 text-primary animate-spin mb-8" />
+            <p className="text-xl font-semibold mb-3 transition-opacity duration-500">
+              {UPLOAD_TIPS[currentTipIndex]}
+            </p>
+            <p className="text-white/50 text-sm">
+              Ne fermez pas cette page
+            </p>
+          </div>
+        )}
+
+        {/* Error overlay — retry / continue offline */}
+        {screenState === 'error' && (
+          <div className="absolute inset-0 bg-black/95 z-40 flex flex-col items-center justify-center text-white p-6 text-center">
+            <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+            <p className="text-lg font-medium mb-2">Problème de connexion</p>
+            <p className="text-white/70 text-sm mb-8 max-w-xs">
+              {errorMsg}
+            </p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              <Button onClick={handleRetryUpload} className="w-full">
+                Réessayer
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleContinueOffline}
+                className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white"
+              >
+                Continuer hors ligne
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Document frame overlay — only visible in camera mode */}
+        {screenState === 'camera' && (
+          <>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div
+                className={`relative w-[85%] aspect-[1.586/1] border-4 ${borderColor()} rounded-lg transition-colors duration-300`}
+                style={{
+                  boxShadow: quality === 'good' ? '0 0 20px rgba(34, 197, 94, 0.5)' : '0 0 20px rgba(249, 115, 22, 0.5)'
+                }}
+              >
+                <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 rounded-tl-lg" style={{ borderColor: 'inherit' }} />
+                <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 rounded-tr-lg" style={{ borderColor: 'inherit' }} />
+                <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 rounded-bl-lg" style={{ borderColor: 'inherit' }} />
+                <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 rounded-br-lg" style={{ borderColor: 'inherit' }} />
+              </div>
+            </div>
+
+            {/* Bottom controls */}
+            <div className="absolute bottom-24 left-0 right-0 flex flex-col items-center gap-3 z-10">
+              <div className={`rounded-full px-4 py-2 text-sm font-medium ${qualityColor()}`}>
+                {qualityLabel()}
+              </div>
+
+              {quality === 'good' && (
+                <button
+                  onClick={doCapture}
+                  className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-white font-semibold text-sm shadow-lg active:scale-95 transition-transform"
+                >
+                  <Camera className="h-5 w-5" />
+                  {t('capture.manual')}
+                </button>
+              )}
+
+              {quality !== 'good' && (
+                <div className="text-white/80 text-sm text-center px-6">
+                  {t('capture.adjust')}
+                </div>
+              )}
+            </div>
+
+            {/* Top-left close */}
+            <div className="absolute top-4 left-4 z-10 safe-top">
+              <button
+                onClick={() => { stopCamera(); navigate(-1); }}
+                className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white active:scale-90 transition-transform"
+                aria-label={t('common.close') || 'Fermer'}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Top-right quality indicator */}
+            <div className="absolute top-4 right-4 z-10 safe-top">
+              {quality === 'good' ? (
+                <CheckCircle className="w-6 h-6 text-green-500" />
+              ) : (
+                <AlertTriangle className="w-6 h-6 text-orange-500" />
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Footer tip + cancel — only visible in camera mode */}
+      {screenState === 'camera' && (
+        <div className="bg-black p-6 safe-bottom">
+          <div className="text-center text-white/60 text-sm mb-4">
+            {side === 'recto' ? t('cni.recto.tip') : t('cni.verso.tip')}
+          </div>
           <button
             onClick={() => { stopCamera(); navigate(-1); }}
-            className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white active:scale-90 transition-transform"
-            aria-label={t('common.close') || 'Fermer'}
+            className="text-white/60 text-sm w-full text-center hover:text-white transition-colors"
           >
-            <X className="w-6 h-6" />
+            {t('common.cancel')}
           </button>
         </div>
-
-        {/* Top-right quality indicator */}
-        <div className="absolute top-4 right-4 z-10">
-          {quality === 'good' ? (
-            <CheckCircle className="w-6 h-6 text-green-500" />
-          ) : (
-            <AlertTriangle className="w-6 h-6 text-orange-500" />
-          )}
-        </div>
-      </div>
-
-      {/* Footer tip + cancel */}
-      <div className="bg-black p-6 safe-bottom">
-        <div className="text-center text-white/60 text-sm mb-4">
-          {side === 'recto' ? t('cni.recto.tip') : t('cni.verso.tip')}
-        </div>
-        <button
-          onClick={() => { stopCamera(); navigate(-1); }}
-          className="text-white/60 text-sm w-full text-center hover:text-white transition-colors"
-        >
-          {t('common.cancel')}
-        </button>
-      </div>
+      )}
     </div>
   );
 }

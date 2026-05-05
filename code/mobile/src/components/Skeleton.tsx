@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { cn } from '../lib/utils';
 
 interface SkeletonProps {
@@ -27,10 +28,14 @@ export function SkeletonField() {
 }
 
 export function SkeletonCard({ lines = 3 }: { lines?: number }) {
+  const widths = useMemo(
+    () => Array.from({ length: lines }, (_, i) => `${60 + ((i * 17 + 7) % 30)}%`),
+    [lines]
+  );
   return (
     <div className="p-4 rounded-2xl border border-muted/20 space-y-3">
-      {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton key={i} className="h-4" style={{ width: `${60 + Math.random() * 30}%` }} />
+      {widths.map((width, i) => (
+        <Skeleton key={i} className="h-4" style={{ width }} />
       ))}
     </div>
   );

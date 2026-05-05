@@ -6,8 +6,9 @@
  * - useKycBack: computes the previous step in the flow
  */
 
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useKyc } from '../contexts/KycContext';
+import { LoadingState } from '../components/ui/LoadingState';
 import type { KycStepType } from '../types';
 
 // Canonical step order — each step requires all previous steps to be completed
@@ -46,6 +47,20 @@ const ROUTE_TO_STEP: Record<string, KycStepType> = {
   '/kyc/signature': 'signature',
   '/kyc/review': 'submission',
   '/kyc/submit-success': 'submission',
+};
+
+// Map KycStepType to ALL routes belonging to that step (for editStep bypass)
+const STEP_TO_ROUTES: Record<KycStepType, string[]> = {
+  cni_recto: ['/kyc/cni-intro', '/kyc/cni-recto-guide', '/kyc/cni-recto-capture', '/kyc/cni-recto'],
+  cni_verso: ['/kyc/cni-verso-guide', '/kyc/cni-verso-capture', '/kyc/cni-verso'],
+  ocr_review: ['/kyc/ocr-review'],
+  liveness: ['/kyc/biometric-consent', '/kyc/liveness'],
+  utility_bill: ['/kyc/bill-select', '/kyc/bill-capture', '/kyc/bill-upload'],
+  address: ['/kyc/address'],
+  niu: ['/kyc/niu'],
+  consent: ['/kyc/consent'],
+  signature: ['/kyc/signature'],
+  submission: ['/kyc/review', '/kyc/submit-success'],
 };
 
 // Map KycStepType to the first route of that step
@@ -103,18 +118,62 @@ export function getPreviousStepRoute(currentPath: string): string {
 }
 
 /**
- * Guard component: redirects to the first missing step if prerequisites aren't met.
- * Wraps KYC route elements to enforce step ordering.
+ * Guard component with 4-phase logic:
+ *
+ * Phase 1: Not hydrated → neutral loading state (no navigation)
+ * Phase 2: Hydrated but not reconciled with backend → syncing state
+ * Phase 3: editStep set → bypass guard for the targeted step's routes only
+ * Phase 4: Normal guard → redirect to first missing step
  */
 export function KycStepGuard({ children }: { children: React.ReactNode }) {
-  const { completedSteps, hydrated } = useKyc();
+  const { completedSteps, hydrated, reconciliationStatus, editStep, setEditStep } = useKyc();
+  const location = useLocation();
 
-  if (!hydrated) return <>{children}</>;
+  // Phase 1: Not yet hydrated from IndexedDB → neutral state
+  if (!hydrated) {
+    console.log(`[KYC:guard] ts=${Date.now()} PHASE=1 route=${location.pathname} hydrated=${hydrated} → LoadingState(Chargement)`);
+    return <LoadingState message="Chargement..." />;
+  }
 
+  // Phase 2: Hydrated but backend reconciliation pending → neutral state
+  // 'skipped' and 'failed' pass through (offline mode or error fallback)
+  if (reconciliationStatus === 'pending') {
+    console.log(`[KYC:guard] ts=${Date.now()} PHASE=2 route=${location.pathname} reconcStatus=${reconciliationStatus} completedSteps=${JSON.stringify(completedSteps)} → LoadingState(Synchronisation)`);
+    return <LoadingState message="Synchronisation..." />;
+  }
+
+  // Phase 3: Edit mode — only allow the targeted step's routes
+  if (editStep) {
+    // If the edit step is now completed, clear edit mode and redirect to review
+    if (completedSteps.includes(editStep)) {
+      setEditStep(null);
+      if (location.pathname !== '/kyc/review') {
+        return <Navigate to="/kyc/review" replace />;
+      }
+    } else {
+      const allowedRoutes = STEP_TO_ROUTES[editStep] || [];
+      if (allowedRoutes.includes(location.pathname)) {
+        return <>{children}</>;
+      }
+      // On a route not belonging to the edit step → redirect to edit step's first route
+      const editRoute = STEP_TO_FIRST_ROUTE[editStep];
+      if (editRoute && location.pathname !== editRoute) {
+        return <Navigate to={editRoute} replace />;
+      }
+    }
+  }
+
+  // Phase 4: Normal guard — allow any route belonging to the missing step,
+  // otherwise redirect to the first route of that step.
   const missingStep = findFirstMissingStep(completedSteps);
-  if (missingStep) {
+  const allowedRoutesForMissing = missingStep ? STEP_TO_ROUTES[missingStep] || [] : [];
+  const isOnAllowedRoute = allowedRoutesForMissing.includes(location.pathname);
+  console.log(`[KYC:guard] ts=${Date.now()} PHASE=4 route=${location.pathname} completedSteps=${JSON.stringify(completedSteps)} missingStep=${missingStep || 'null'} allowed=${isOnAllowedRoute} reconcStatus=${reconciliationStatus}`);
+  if (missingStep && !isOnAllowedRoute) {
     const redirectPath = STEP_TO_FIRST_ROUTE[missingStep];
-    return <Navigate to={redirectPath} replace />;
+    if (location.pathname !== redirectPath) {
+      return <Navigate to={redirectPath} replace />;
+    }
   }
 
   return <>{children}</>;

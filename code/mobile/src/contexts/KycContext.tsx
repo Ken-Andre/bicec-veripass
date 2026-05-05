@@ -13,6 +13,33 @@ import {
   loadPersistedKycState,
   persistKycState,
 } from '../services/kycOfflineStore';
+import { fetchWithCorrelation } from '../services/apiClient';
+
+/** Status de réconciliation backend → local */
+export type ReconciliationStatus = 'pending' | 'done' | 'skipped' | 'failed';
+
+/** Données session backend (/session/current) */
+export interface BackendSessionData {
+  id: string;
+  status: KycStatus;
+  access_level: AccessTier;
+  last_step_completed: string;
+  documents: { doc_type: string; id: string }[];
+  biometric_result: { result: string; score: number } | null;
+  consent_record: { cgu_accepted: boolean; data_consent_accepted: boolean; privacy_consent_accepted: boolean } | null;
+}
+
+/** Données readiness backend (/readiness) */
+export interface BackendReadinessData {
+  can_submit: boolean;
+  blocking_reasons: string[];
+  warnings: string[];
+  has_ocr_review: boolean;
+  has_consent: boolean;
+  has_biometric_result: boolean;
+  has_bill_document: boolean;
+  required_missing_documents: string[];
+}
 
 // ADR-001: Review status from backend /review-status endpoint
 export interface ReviewStatusNotification {
@@ -65,6 +92,8 @@ interface KycState {
 
 interface KycContextType extends KycState {
   hydrated: boolean;
+  reconciliationStatus: ReconciliationStatus;
+  editStep: KycStepType | null;
   setSessionId: (id: string) => void;
   setCurrentStep: (step: KycStepType) => void;
   completeStep: (step: KycStepType) => void;
@@ -86,10 +115,15 @@ interface KycContextType extends KycState {
   setAccessLevel: (level: AccessTier) => void;
   setStatus: (status: KycStatus) => void;
   setReviewStatus: (status: ReviewStatus | null) => void;
+  setEditStep: (step: KycStepType | null) => void;
   /** Reset only temporary UI/form data (captures, OCR, consent). Preserves status/accessLevel/reviewStatus/sessionId. */
   resetKycForm: () => void;
   /** Full reset: clears persisted state, resets all fields including status to initial. Use when starting a new KYC. */
   resetKycFull: () => Promise<void>;
+  /** Controlled fresh start: clears persisted state, resets all fields, marks as reconciled. */
+  startFreshKyc: () => Promise<void>;
+  /** Reconcile local state with backend truth. Call after fetching /session/current + /readiness. */
+  hydrateKycFromBackend: (session: BackendSessionData, readiness: BackendReadinessData | null) => void;
   /** @deprecated Use resetKycForm() or resetKycFull() instead */
   resetKyc: () => void;
 
@@ -135,13 +169,18 @@ const KycContext = createContext<KycContextType>({} as KycContextType);
 export function KycProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<KycState>(initialState);
   const [hydrated, setHydrated] = useState(false);
+  const [reconciliationStatus, setReconciliationStatus] = useState<ReconciliationStatus>('pending');
+  const [editStep, setEditStep] = useState<KycStepType | null>(null);
 
   // Restore an existing KYC draft (if any) from IndexedDB on mount.
+  // reconciliationStatus stays 'pending' until hydrateKycFromBackend() is called
+  // or 'skipped' if offline/failed.
   useEffect(() => {
     let active = true;
     void (async () => {
+      let persisted: Awaited<ReturnType<typeof loadPersistedKycState>> = null;
       try {
-        const persisted = await loadPersistedKycState();
+        persisted = await loadPersistedKycState();
         if (active && persisted) {
           setState({
             ...initialState,
@@ -155,6 +194,7 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to restore KYC draft from IndexedDB', err);
       } finally {
         if (active) {
+          console.log(`[KYC:hydrate] ts=${Date.now()} hydrated=true IndexedDB=${persisted ? 'found' : 'empty'} completedSteps=${JSON.stringify(persisted?.completedSteps || [])} sessionId=${persisted?.sessionId || 'null'} reconcStatus=still-pending`);
           setHydrated(true);
         }
       }
@@ -171,6 +211,54 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
       console.warn('Failed to persist KYC draft to IndexedDB', err);
     });
   }, [state, hydrated]);
+
+  // ─── AUTO-RECONCILIATION ──────────────────────────────────────────────────
+  // Runs once after hydration to align local state with backend.
+  // Sets reconciliationStatus to 'done' (backend session found, reconciled)
+  // or 'skipped' (no backend session, stale wiped / network error → offline).
+  // Without this, KycStepGuard Phase 2 blocks all guarded routes.
+  useEffect(() => {
+    if (!hydrated) return;
+    let active = true;
+    void (async () => {
+      const ts = Date.now();
+      console.log(`[KYC:AR] ts=${ts} START hydrated=true completedSteps=${JSON.stringify(state.completedSteps)} sessionId=${state.sessionId || 'null'}`);
+      try {
+        const res = await fetchWithCorrelation('/api/v1/kyc/session/current');
+        if (!active) { console.log(`[KYC:AR] ts=${Date.now()} ABORTED`); return; }
+        if (res.ok) {
+          const session = await res.json() as BackendSessionData;
+          console.log(`[KYC:AR] ts=${Date.now()} FETCH /session/current status=${res.status} id=${session.id || 'null'} isFreshDraft=${session.status === 'DRAFT' && (session.documents?.length ?? 0) === 0}`);
+          if (session.id) {
+            let readiness: BackendReadinessData | null = null;
+            try { const r = await fetchWithCorrelation('/api/v1/kyc/readiness'); if (r.ok) readiness = await r.json(); } catch { console.log(`[KYC:AR] FETCH /readiness FAILED`); }
+            if (active) {
+              console.log(`[KYC:AR] ts=${Date.now()} ACTION hydrateKycFromBackend oldSteps=${JSON.stringify(state.completedSteps)}`);
+              hydrateKycFromBackend(session, readiness);
+              console.log(`[KYC:AR] ts=${Date.now()} TRANSITION reconcStatus→done`);
+            }
+            return;
+          }
+        }
+        if (active) {
+          setState(s => {
+            const hasStale = s.completedSteps.length > 0 || s.sessionId !== null;
+            console.log(`[KYC:AR] ts=${Date.now()} DECISION no-backend-session ok=${res.ok} hasStale=${hasStale} steps=${JSON.stringify(s.completedSteps)}`);
+            if (!hasStale) return s;
+            console.log(`[KYC:AR] ts=${Date.now()} ACTION wipe-stale oldSteps=${JSON.stringify(s.completedSteps)}`);
+            return { ...initialState, completedSteps: [] };
+          });
+          setReconciliationStatus('skipped');
+          console.log(`[KYC:AR] ts=${Date.now()} TRANSITION reconcStatus→skipped`);
+        }
+      } catch {
+        console.log(`[KYC:AR] ts=${Date.now()} DECISION network-error keeping-local steps=${JSON.stringify(state.completedSteps)}`);
+        if (active) { setReconciliationStatus('skipped'); console.log(`[KYC:AR] ts=${Date.now()} TRANSITION reconcStatus→skipped`); }
+      }
+    })();
+    return () => { active = false; };
+  }, [hydrated]);
+  // ─── END AUTO-RECONCILIATION ───────────────────────────────────────────────
 
   // ADR-001: Poll review status if PENDING or SUBMITTED
   useEffect(() => {
@@ -308,7 +396,80 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
       console.warn('Failed to clear persisted KYC state', err);
     });
     setState(initialState);
+    setReconciliationStatus('pending');
+    setEditStep(null);
   }, []);
+
+  /** Controlled fresh start: clears everything, marks as reconciled. */
+  const startFreshKyc = useCallback(async () => {
+    await clearPersistedKycState().catch((err) => {
+      console.warn('Failed to clear persisted KYC state', err);
+    });
+    setState(initialState);
+    setReconciliationStatus('done');
+    setEditStep(null);
+  }, []);
+
+  /** Map backend session data to local completedSteps. */
+  const mapSessionToCompletedSteps = useCallback((
+    session: BackendSessionData,
+    readiness: BackendReadinessData | null,
+  ): KycStepType[] => {
+    const steps: KycStepType[] = [];
+    const docTypes = session.documents.map(d => d.doc_type);
+
+    if (docTypes.includes('CNI_RECTO')) steps.push('cni_recto');
+    if (docTypes.includes('CNI_VERSO')) steps.push('cni_verso');
+    if (readiness?.has_ocr_review ?? false) steps.push('ocr_review');
+    if (readiness?.has_biometric_result ?? session.biometric_result !== null) steps.push('liveness');
+    if (readiness?.has_bill_document ?? docTypes.some(d => d.startsWith('BILL_'))) steps.push('utility_bill');
+    // Address: pas de flag backend explicite → on ne déduit pas depuis blocking_reasons
+    // On garde le local si le backend ne dit rien
+    if (readiness?.has_consent ?? session.consent_record?.cgu_accepted ?? false) steps.push('consent');
+    // Signature: pas de flag backend explicite → idem
+
+    return steps;
+  }, []);
+
+  /** Reconcile local state with backend truth. */
+  const hydrateKycFromBackend = useCallback((
+    session: BackendSessionData,
+    readiness: BackendReadinessData | null,
+  ) => {
+    const backendSteps = mapSessionToCompletedSteps(session, readiness);
+    const isFreshDraft = session.status === 'DRAFT' && session.documents.length === 0;
+
+    setState(s => {
+      if (isFreshDraft) {
+        // Backend says fresh start — wipe local stale data
+        return {
+          ...initialState,
+          sessionId: session.id,
+          status: session.status,
+          accessLevel: session.access_level,
+          completedSteps: [],
+        };
+      }
+
+      // Merge: backend truth for completedSteps, keep local wizard state for in-progress captures
+      const mergedSteps = [...new Set([...backendSteps, ...s.completedSteps])];
+      // Remove steps that backend says are NOT done (backend prime)
+      const reconciledSteps = mergedSteps.filter(step => backendSteps.includes(step));
+
+      return {
+        ...s,
+        sessionId: session.id ?? s.sessionId,
+        status: session.status ?? s.status,
+        accessLevel: session.access_level ?? s.accessLevel,
+        completedSteps: reconciledSteps,
+        // Clear local captures that backend doesn't know about
+        ...(session.biometric_result === null ? { } : {}),
+        ...(session.consent_record === null ? { consentCgu: false, consentPrivacy: false, consentData: false } : {}),
+      };
+    });
+
+    setReconciliationStatus('done');
+  }, [mapSessionToCompletedSteps]);
 
   /** @deprecated Use resetKycForm() or resetKycFull() instead */
   const resetKyc = useCallback(() => {
@@ -329,6 +490,8 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
   const contextValue = useMemo(() => ({
     ...state,
     hydrated,
+    reconciliationStatus,
+    editStep,
     setSessionId,
     setCurrentStep,
     completeStep,
@@ -350,8 +513,11 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     setAccessLevel,
     setStatus,
     setReviewStatus,
+    setEditStep,
     resetKycForm,
     resetKycFull,
+    startFreshKyc,
+    hydrateKycFromBackend,
     resetKyc,
     step,
     setStep: () => { /* no-op */ },
@@ -360,6 +526,8 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
   }), [
     state,
     hydrated,
+    reconciliationStatus,
+    editStep,
     setSessionId,
     setCurrentStep,
     completeStep,
@@ -381,8 +549,11 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     setAccessLevel,
     setStatus,
     setReviewStatus,
+    setEditStep,
     resetKycForm,
     resetKycFull,
+    startFreshKyc,
+    hydrateKycFromBackend,
     resetKyc,
     step,
     kycData,

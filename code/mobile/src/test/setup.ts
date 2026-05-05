@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Vitest global setup for jsdom environment.
  * Provides stubs for APIs that jsdom does not implement.

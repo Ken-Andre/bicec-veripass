@@ -32,17 +32,14 @@ const PinSetupScreen = lazy(() =>
 const PinLoginScreen = lazy(() =>
   import('./views/auth/PinLoginScreen').then(m => ({ default: m.default }))
 );
+const LockScreen = lazy(() =>
+  import('./views/auth/LockScreen').then(m => ({ default: m.default }))
+);
 const BiometricOptInScreen = lazy(() =>
   import('./views/auth/BiometricOptInScreen').then(m => ({ default: m.default }))
 );
 const ProgressTimelineScreen = lazy(() =>
   import('./views/auth/ProgressTimelineScreen').then(m => ({ default: m.default }))
-);
-const LockScreen = lazy(() =>
-  import('./views/auth/LockScreen').then(m => ({ default: m.default }))
-);
-const ForgotPinScreen = lazy(() =>
-  import('./views/auth/ForgotPinScreen').then(m => ({ default: m.default }))
 );
 
 // --- Dashboard screens ---
@@ -151,10 +148,7 @@ function App() {
                   <Route path="/auth/email-otp" element={<EmailOtpVerifyScreen />} />
                   <Route path="/auth/pin-setup" element={<PinSetupScreen />} />
                   <Route path="/auth/pin-login" element={<PinLoginScreen />} />
-                  <Route path="/auth/biometric" element={<BiometricOptInScreen />} />
-                  <Route path="/auth/progress" element={<ProgressTimelineScreen />} />
                   <Route path="/auth/lock" element={<LockScreen />} />
-                  <Route path="/auth/forgot-pin" element={<ForgotPinScreen />} />
                   <Route path="/auth/biometric" element={<BiometricOptInScreen />} />
                   <Route path="/kyc/progress" element={<ProgressTimelineScreen />} />
                   {/* Dashboard routes with global BottomNav */}
@@ -187,9 +181,7 @@ function App() {
                   <Route path="/kyc/cni-recto" element={<LockGuard><KycHydrationGate><KycStepGuard><CniRectoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                   <Route path="/kyc/cni-verso" element={<LockGuard><KycHydrationGate><KycStepGuard><CniVersoGuideScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                   {/* OCR Review → Liveness */}
-                  <Route path="/kyc/ocr-processing" element={<LockGuard><KycHydrationGate><OcrProcessingScreen /></KycHydrationGate></LockGuard>} />
                   <Route path="/kyc/ocr-review" element={<LockGuard><KycHydrationGate><KycStepGuard><OcrReviewScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
-                  <Route path="/kyc/liveness-intro" element={<LockGuard><KycHydrationGate><LivenessIntroScreen /></KycHydrationGate></LockGuard>} />
                   <Route path="/kyc/biometric-consent" element={<LockGuard><KycHydrationGate><KycStepGuard><BiometricConsentScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                   <Route path="/kyc/liveness" element={<LockGuard><KycHydrationGate><KycStepGuard><LivenessScreen /></KycStepGuard></KycHydrationGate></LockGuard>} />
                   {/* Bill type select → Capture or Upload → Address → NIU → ... */}
