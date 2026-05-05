@@ -8,7 +8,6 @@ export default defineConfig(async ({ mode }) => {
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      updateViaCache: 'none',
       injectRegister: 'auto',
       manifest: {
         name: 'BICEC VeriPass',

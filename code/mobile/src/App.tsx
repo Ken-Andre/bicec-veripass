@@ -132,6 +132,15 @@ function CniVersoCapture() {
 }
 
 function App() {
+  const { needsRefresh, updateSW } = useServiceWorker();
+
+  // Auto-apply SW updates to prevent stale cached code loops
+  useEffect(() => {
+    if (needsRefresh) {
+      updateSW();
+    }
+  }, [needsRefresh, updateSW]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
