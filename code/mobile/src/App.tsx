@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -10,6 +10,7 @@ import { KycResumeBanner } from './components/KycResumeBanner';
 import { OfflineBanner } from './components/OfflineBanner';
 import { PageLoader } from './components/PageLoader';
 import { DashboardLayout } from './components/DashboardLayout';
+import { useServiceWorker } from './hooks/use-service-worker';
 
 const queryClient = new QueryClient();
 
