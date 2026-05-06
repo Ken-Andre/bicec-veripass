@@ -87,19 +87,59 @@ export default function OcrReviewScreen() {
       const sessionData = (sessionRes.data ?? sessionRes) as Record<string, unknown>;
       const documents = (sessionData.documents || []) as Record<string, unknown>[];
 
+      // Select best document per doc_type — prefer latest with valid OCR engine
+      const bestByType = new Map<string, Record<string, unknown>>();
+      for (const doc of documents) {
+        const dtype = doc.doc_type as string;
+        const eng = doc.ocr_engine as string | undefined;
+        const current = bestByType.get(dtype);
+        if (!current) {
+          bestByType.set(dtype, doc);
+        } else {
+          const currentOk = (current.ocr_engine as string) !== 'paddleocr_error';
+          const docOk = eng !== 'paddleocr_error';
+          // Prefer documents that have a working OCR engine
+          if (!currentOk && docOk) {
+            bestByType.set(dtype, doc);
+          } else if (currentOk === docOk) {
+            // Both OK or both error: pick the latest capture
+            const currentTime = new Date((current.captured_at as string) || 0).getTime();
+            const docTime = new Date((doc.captured_at as string) || 0).getTime();
+            if (docTime > currentTime) {
+              bestByType.set(dtype, doc);
+            }
+          }
+        }
+      }
+
+      // Debug log: show which documents were selected and why
+      console.log(
+        '[OCR:source] selected docs per type:',
+        Array.from(bestByType.entries()).map(([t, d]) => ({
+          type: t,
+          docId: ((d.id as string) || '').slice(-12),
+          engine: d.ocr_engine,
+          status: d.ocr_status,
+          fieldsCount: ((d.ocr_fields || []) as Record<string, unknown>[]).length,
+          nonNullCount: ((d.ocr_fields || []) as Record<string, unknown>[]).filter(
+            (f: Record<string, unknown>) => f.extracted_value
+          ).length,
+          captured: (d.captured_at as string || '').slice(0, 19),
+        }))
+      );
+
+      // Build OCR fields from selected documents only — no global field_name dedup
       const allOcrFields: Record<string, unknown>[] = [];
       const docStatusMap: Record<string, string> = {};
-      for (const doc of documents) {
-        docStatusMap[doc.doc_type as string] = (doc.ocr_status as string) || 'PENDING';
 
-        const isCni = doc.doc_type === 'CNI_RECTO' || doc.doc_type === 'CNI_VERSO';
-        const isBill = doc.doc_type === 'BILL_ENEO' || doc.doc_type === 'BILL_CAMWATER';
+      for (const [dtype, doc] of bestByType.entries()) {
+        docStatusMap[dtype] = (doc.ocr_status as string) || 'PENDING';
+        const isCni = dtype === 'CNI_RECTO' || dtype === 'CNI_VERSO';
+        const isBill = dtype === 'BILL_ENEO' || dtype === 'BILL_CAMWATER';
         if (isCni || isBill) {
           const docFields = (doc.ocr_fields || []) as Record<string, unknown>[];
           for (const f of docFields) {
-            if (!allOcrFields.some((existing) => existing.field_name === f.field_name)) {
-              allOcrFields.push({ ...f, _docType: doc.doc_type, _ocrStatus: doc.ocr_status });
-            }
+            allOcrFields.push({ ...f, _docType: dtype, _ocrStatus: doc.ocr_status });
           }
         }
       }

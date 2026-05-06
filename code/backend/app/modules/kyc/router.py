@@ -324,6 +324,8 @@ async def get_current_session(
                 doc_type=doc.doc_type,
                 file_path=doc.file_path,
                 sha256_hash=doc.sha256_hash,
+                ocr_status=doc.ocr_status,
+                ocr_error=doc.ocr_error,
                 ocr_engine=doc.ocr_engine,
                 confidence_per_field=doc.confidence_per_field,
                 capture_quality_metrics=doc.capture_quality_metrics,
