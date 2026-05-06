@@ -70,6 +70,7 @@ interface ReadinessData {
   blocking_reasons: string[];
   warnings: string[];
   has_ocr_review: boolean;
+  has_ocr_review_confirmed: boolean;
   has_consent: boolean;
   has_biometric_result: boolean;
   has_bill_document: boolean;
@@ -169,8 +170,8 @@ export default function ReviewScreen() {
 
   const hasOcrReview = resolveChecklist(
     backendLoaded,
-    backendReadiness?.has_ocr_review,
-    backendLoaded && backendReadiness !== undefined, // has_ocr_review is explicit
+    backendReadiness?.has_ocr_review_confirmed,
+    backendLoaded && backendReadiness !== undefined, // has_ocr_review_confirmed is explicit
     undefined, // No local fallback for OCR review
   );
 

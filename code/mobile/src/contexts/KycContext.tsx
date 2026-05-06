@@ -35,6 +35,7 @@ export interface BackendReadinessData {
   blocking_reasons: string[];
   warnings: string[];
   has_ocr_review: boolean;
+  has_ocr_review_confirmed: boolean;
   has_consent: boolean;
   has_biometric_result: boolean;
   has_bill_document: boolean;
@@ -420,7 +421,7 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
 
     if (docTypes.includes('CNI_RECTO')) steps.push('cni_recto');
     if (docTypes.includes('CNI_VERSO')) steps.push('cni_verso');
-    if (readiness?.has_ocr_review ?? false) steps.push('ocr_review');
+    if (readiness?.has_ocr_review_confirmed ?? false) steps.push('ocr_review');
     if (readiness?.has_biometric_result ?? session.biometric_result !== null) steps.push('liveness');
     if (readiness?.has_bill_document ?? docTypes.some(d => d.startsWith('BILL_'))) steps.push('utility_bill');
     // Address: pas de flag backend explicite → on ne déduit pas depuis blocking_reasons

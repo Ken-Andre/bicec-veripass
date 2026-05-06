@@ -155,6 +155,7 @@ class KYCReadinessResponse(BaseModel):
     warnings: list[str] = []
     required_missing_documents: list[str] = []
     has_ocr_review: bool
+    has_ocr_review_confirmed: bool = False
     has_consent: bool
     has_biometric_result: bool
     has_bill_document: bool = False

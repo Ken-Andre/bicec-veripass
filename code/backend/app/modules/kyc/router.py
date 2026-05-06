@@ -636,6 +636,7 @@ async def submit_ocr_review(
             )
 
     session.last_step_completed = "ocr_review"
+    session.ocr_review_confirmed = True
     await db.commit()
 
     return {"status": "success", "message": "OCR review submitted"}
@@ -1053,6 +1054,7 @@ async def _compute_kyc_readiness(
         for field in doc.ocr_fields:
             ocr_scores.append(1.0 if field.human_corrected else float(field.confidence_score))
     has_ocr_review = len(ocr_scores) > 0
+    has_ocr_review_confirmed = bool(session.ocr_review_confirmed)
     if not has_ocr_review:
         blocking_reasons.append("OCR review not completed. Please confirm identity fields first.")
 
@@ -1082,6 +1084,7 @@ async def _compute_kyc_readiness(
         warnings=warnings,
         required_missing_documents=missing,
         has_ocr_review=has_ocr_review,
+        has_ocr_review_confirmed=has_ocr_review_confirmed,
         has_consent=has_consent,
         has_biometric_result=has_biometric_result,
         has_bill_document=has_bill_document,

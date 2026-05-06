@@ -47,6 +47,7 @@ class KYCSession(Base):
 
     client_name = Column(String(200), nullable=True)
     last_step_completed = Column(String(100), nullable=True)
+    ocr_review_confirmed = Column(Boolean, default=False)
     submission_ip = Column(INET, nullable=True)
 
     # Relationships
