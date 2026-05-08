@@ -240,6 +240,73 @@ docker compose up --build -d pwa
 docker compose up --build -d api celery_notifications
 ```
 
+---
+
+### Erreur 5 : Agent Antigravity echoue silencieusement — `worktreeconfig` Git
+
+**Symptomes :**
+- L'agent demarre puis se termine immediatement sans message clair
+- Erreur : `core.repositoryformatversion does not support extension: worktreeconfig`
+- Erreur : `workspace infos is nil`
+- Erreur : `GetAgentScripts ... worktreeconfig`
+- Les prompts echouent ou l'agent ne repond pas
+
+**Cause :**
+Le depot a ete utilise avec des Git worktrees lies (`git worktree add`). Meme apres suppression des worktrees, la configuration Git locale conserve :
+
+```ini
+[extensions]
+    worktreeConfig = true
+```
+
+Certains IDE et outils d'agents AI ne gerent pas cette extension et echouent silencieusement.
+
+**Solution :**
+
+**1. Verifier les worktrees existants :**
+```powershell
+git worktree list
+```
+
+Si des worktrees lies existent et ne sont plus necessaires, les supprimer :
+```powershell
+git worktree remove --force "C:\chemin\vers\ancien-worktree"
+git worktree prune -v
+git worktree list
+```
+
+**2. Supprimer la configuration `worktreeconfig` obsolete :**
+```powershell
+git config --local --unset-all extensions.worktreeconfig
+git config --local core.repositoryformatversion 0
+```
+
+**3. Verifier la correction :**
+```powershell
+git config --local --get core.repositoryformatversion
+git config --local --get extensions.worktreeconfig
+git worktree list
+```
+
+Resultat attendu :
+- `core.repositoryformatversion` retourne `0`
+- `extensions.worktreeconfig` ne retourne rien
+- seul le worktree principal du depot apparait
+
+**4. Redemarrer l'agent :**
+Fermer completement Antigravity, rouvrir le depot, et retester avec une invite simple.
+
+**Fichier concerne :** Configuration Git locale (`.git/config` du depot)
+
+**Verification alternative :**
+```powershell
+git rev-parse --git-dir
+Get-Content .git\config
+git config --local --list --show-origin
+```
+
+---
+
 ## Notes pour la production
 
 - Le comportement 401 pour OTP expire est correct **cote backend** — le frontend doit juste rediriger vers `/auth/phone` (pas `/auth/login`).
