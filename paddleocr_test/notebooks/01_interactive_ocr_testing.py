@@ -3,33 +3,39 @@ Interactive OCR Testing — PaddleOCR & GLM-OCR
 ==============================================
 
 Dynamically test OCR on CNI images with zero hardcoding.
-Upload any image, choose your engine, and inspect extracted fields.
+Upload any image, capture from camera, choose your engine, and inspect extracted fields.
 
 Run:  marimo edit 01_interactive_ocr_testing.py
 """
 
 import marimo
 
-__generated_with = "0.23.1"
+__generated_with = "0.23.5"
 app = marimo.App(layout_file="layouts/01_interactive_ocr_testing.slides.json")
 
 
 @app.cell
 def _():
-    """Imports and shared state."""
     import marimo as mo
     import os
     import sys
     import json
     import io
+    import base64
     from pathlib import Path
 
+    _notebook_dir = Path.cwd()
+    _venv_ocr = _notebook_dir / ".venv_ocr"
+    _site_pkgs = _venv_ocr / "Lib" / "site-packages"
+    if _site_pkgs.exists():
+        sys.path.insert(0, str(_site_pkgs))
+    sys.path.insert(0, str(_notebook_dir))
+
+    import anywidget
     import numpy as np
+    import traitlets
     from PIL import Image
 
-    # Add parent dir so we can import ocr_utils
-    _notebook_dir = Path(globals().get("__file__", ".")).resolve().parent
-    sys.path.insert(0, str(_notebook_dir))
     from ocr_utils import (
         get_paddle_ocr,
         paddle_ocr_pipeline,
@@ -46,13 +52,15 @@ def _():
         CNI_FIELDS,
     )
 
-    # Base directory for sample images
     images_dir = _notebook_dir.parent / "images"
     return (
+        CNI_FIELDS,
         DEFAULT_GLM_RECTO_PROMPT,
         DEFAULT_GLM_VERSO_PROMPT,
         Image,
         Path,
+        anywidget,
+        base64,
         compute_sha256,
         draw_ocr_boxes,
         find_gguf_models,
@@ -65,7 +73,127 @@ def _():
         paddle_ocr_pipeline,
         sanitize_glm_output,
         set_glm_ocr_model_path,
+        traitlets,
     )
+
+
+@app.cell
+def _(anywidget, mo, traitlets):
+    """Custom anywidget for camera capture using getUserMedia."""
+
+    class CameraCapture(anywidget.AnyWidget):
+        _esm = r"""
+        function render({ model, el }) {
+            const container = document.createElement("div");
+            container.style.display = "flex";
+            container.style.flexDirection = "column";
+            container.style.alignItems = "center";
+            container.style.gap = "8px";
+
+            const video = document.createElement("video");
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true;
+            video.style.width = "100%";
+            video.style.maxWidth = "400px";
+            video.style.borderRadius = "8px";
+            video.style.backgroundColor = "#000";
+            video.style.display = "none";
+
+            const btn = document.createElement("button");
+            btn.textContent = "📸 Take Photo";
+            btn.style.padding = "10px 20px";
+            btn.style.fontSize = "16px";
+            btn.style.cursor = "pointer";
+            btn.style.display = "none";
+
+            const retakeBtn = document.createElement("button");
+            retakeBtn.textContent = "🔄 Retake";
+            retakeBtn.style.padding = "10px 20px";
+            retakeBtn.style.fontSize = "16px";
+            retakeBtn.style.cursor = "pointer";
+            retakeBtn.style.display = "none";
+
+            const status = document.createElement("p");
+            status.style.color = "#888";
+            status.textContent = "Starting camera...";
+
+            const canvas = document.createElement("canvas");
+            let stream = null;
+
+            async function startCamera() {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "environment" }
+                    });
+                } catch (e1) {
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: true
+                        });
+                    } catch (e2) {
+                        try {
+                            stream = await navigator.mediaDevices.getUserMedia({
+                                video: { facingMode: "user" }
+                            });
+                        } catch (e3) {
+                            status.textContent = "Camera error: " + e3.message;
+                            status.style.color = "red";
+                            return;
+                        }
+                    }
+                }
+                video.srcObject = stream;
+                video.style.display = "block";
+                btn.style.display = "inline-block";
+                status.textContent = "";
+            }
+
+            btn.onclick = () => {
+                if (!stream) return;
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext("2d").drawImage(video, 0, 0);
+                const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+                const base64 = dataUrl.split(",")[1];
+                model.set("value", base64);
+                model.save_changes();
+                stream.getTracks().forEach(t => t.stop());
+                stream = null;
+                video.style.display = "none";
+                btn.style.display = "none";
+                retakeBtn.style.display = "inline-block";
+                status.textContent = "✅ Photo captured!";
+                status.style.color = "green";
+            };
+
+            retakeBtn.onclick = () => {
+                retakeBtn.style.display = "none";
+                model.set("value", "");
+                model.save_changes();
+                status.textContent = "Starting camera...";
+                status.style.color = "#888";
+                startCamera();
+            };
+
+            container.appendChild(status);
+            container.appendChild(video);
+            container.appendChild(btn);
+            container.appendChild(retakeBtn);
+            el.appendChild(container);
+
+            startCamera();
+
+            return () => {
+                if (stream) stream.getTracks().forEach(t => t.stop());
+            };
+        }
+        export default { render };
+        """
+        value = traitlets.Unicode("").tag(sync=True)
+
+    mo.md("### 📷 Camera widget ready")
+    return (CameraCapture,)
 
 
 @app.cell
@@ -131,10 +259,10 @@ def _(glm_selector, mo, set_glm_ocr_model_path):
 
 
 @app.cell
-def _(mo, sample_files):
+def _(CameraCapture, mo, sample_files):
     """Image source selector — create widgets only (no .value reads here)."""
     source_radio = mo.ui.radio(
-        options=["Upload Image", "Sample Images"],
+        options=["Upload Image", "Sample Images", "Camera Capture"],
         value="Sample Images" if sample_files else "Upload Image",
         label="📸 Image source",
     )
@@ -151,13 +279,20 @@ def _(mo, sample_files):
         label="Pick from paddleocr_test/images/",
         value=sample_files[0] if sample_files else None,
     )
-    return file_upload, sample_dropdown, source_radio
+
+    camera_widget = CameraCapture()
+    return camera_widget, file_upload, sample_dropdown, source_radio
 
 
 @app.cell
-def _(file_upload, mo, sample_dropdown, source_radio):
+def _(camera_widget, file_upload, mo, sample_dropdown, source_radio):
     """Display image source widgets — reactive on source_radio.value."""
-    _source_widget = file_upload if source_radio.value == "Upload Image" else sample_dropdown
+    if source_radio.value == "Upload Image":
+        _source_widget = file_upload
+    elif source_radio.value == "Camera Capture":
+        _source_widget = camera_widget
+    else:
+        _source_widget = sample_dropdown
 
     mo.vstack([
         source_radio,
@@ -169,6 +304,8 @@ def _(file_upload, mo, sample_dropdown, source_radio):
 @app.cell
 def _(
     Image,
+    base64,
+    camera_widget,
     compute_sha256,
     file_upload,
     images_dir,
@@ -187,6 +324,13 @@ def _(
         if file_upload.value:  # tuple of FileUploadResults
             image_bytes = file_upload.contents(0)
             image_name = file_upload.name(0) or "uploaded"
+            pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            image_sha256 = compute_sha256(image_bytes)
+    elif source_radio.value == "Camera Capture":
+        _b64 = camera_widget.value
+        if _b64:
+            image_bytes = base64.b64decode(_b64)
+            image_name = "camera_capture"
             pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             image_sha256 = compute_sha256(image_bytes)
     else:
@@ -209,14 +353,14 @@ def _(
             ),
         ])
         if pil_image
-        else mo.md("*No image loaded yet. Upload or select one above.*")
+        else mo.md("*No image loaded yet. Upload, select, or capture one above.*")
     )
     _load_output
     return image_bytes, pil_image
 
 
 @app.cell
-def _(DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMPT, mo):
+def _(DEFAULT_GLM_RECTO_PROMPT, mo):
     """Engine selection and options."""
     engine_choice = mo.ui.dropdown(
         options={
@@ -338,11 +482,18 @@ def _(
                 glm_result = glm_res
             except Exception as _e:
                 glm_result = {"error": str(_e), "model": "glm_ocr", "success": False}
-    return annotated_pil, detected_side, glm_result, paddle_result
+    return annotated_pil, glm_result, paddle_result
 
 
 @app.cell
-def _(CNI_FIELDS, annotated_pil, image_to_bytes, mo, paddle_result, show_blocks):
+def _(
+    CNI_FIELDS,
+    annotated_pil,
+    image_to_bytes,
+    mo,
+    paddle_result,
+    show_blocks,
+):
     """Display PaddleOCR results."""
     if paddle_result is None:
         _paddle_output = mo.md("")
