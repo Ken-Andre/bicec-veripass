@@ -50,53 +50,39 @@ def _():
     output_dir.mkdir(exist_ok=True)
 
     # Standardized CNI Layout Configuration (Normalized to 800x500)
-    # Positions calibrated for templates 6.png (Recto) and 3.png (Verso)
-    # Note: Templates already have labels printed — we only render DATA VALUES.
+    # Positions calibrated precisely using text detection bounding boxes
     # Fonts used: 'sans_bold' -> Arial Bold, 'handwriting' -> Segoesc (for signature)
-
-    GRID_X0, GRID_Y0 = 275, 114
-    CELL_W, CELL_H = 36, 50
-    VAL_OFFSET_Y = 24
-    VAL_OFFSET_X = 4
-
-    def grid_pos(col, row):
-        return (int(GRID_X0 + col * CELL_W + VAL_OFFSET_X), int(GRID_Y0 + row * CELL_H + VAL_OFFSET_Y))
 
     CNI_FIELD_CONFIG = {
         "horizontal": {
             "recto": {
-                # Nom (bold, taille calibrée sur le template)
-                "nom_value": {"pos": grid_pos(0, 0), "field": "nom", "color": (10, 10, 10), "font": "sans_bold", "size": 18},
-                # Prénom
-                "prenom_value": {"pos": grid_pos(0, 1), "field": "prenom", "color": (10, 10, 10), "font": "sans_bold", "size": 16},
-                # Date naissance
-                "date_naissance_value": {"pos": grid_pos(0, 2), "field": "date_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
-                # Lieu naissance
-                "lieu_naissance_value": {"pos": grid_pos(0, 3), "field": "lieu_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
-                # Sexe + Taille
-                "sexe_value": {"pos": grid_pos(0, 4), "field": "sexe", "color": (10, 10, 10), "font": "sans", "size": 13},
-                "taille_value": {"pos": grid_pos(4, 4), "field": "taille", "color": (10, 10, 10), "font": "sans", "size": 13},
-                # Profession
-                "profession_value": {"pos": grid_pos(0, 5), "field": "profession", "color": (10, 10, 10), "font": "sans", "size": 12},
+                # Text fields are placed precisely below their corresponding labels
+                "nom_value": {"pos": (230, 108), "field": "nom", "color": (10, 10, 10), "font": "sans_bold", "size": 18},
+                "prenom_value": {"pos": (230, 172), "field": "prenom", "color": (10, 10, 10), "font": "sans_bold", "size": 16},
+                "date_naissance_value": {"pos": (230, 235), "field": "date_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "lieu_naissance_value": {"pos": (230, 274), "field": "lieu_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "sexe_value": {"pos": (230, 312), "field": "sexe", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "taille_value": {"pos": (320, 312), "field": "taille", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "profession_value": {"pos": (230, 348), "field": "profession", "color": (10, 10, 10), "font": "sans", "size": 12},
             },
             "verso": {
                 # Père value (below PÈRE/FATHER)
-                "pere_value": {"pos": (35, 45), "field": "pere", "color": (10, 10, 10), "font": "sans", "size": 14},
+                "pere_value": {"pos": (29, 39), "field": "pere", "color": (10, 10, 10), "font": "sans", "size": 14},
                 # Mère value (below MÈRE/MOTHER)
-                "mere_value": {"pos": (35, 113), "field": "mere", "color": (10, 10, 10), "font": "sans", "size": 14},
+                "mere_value": {"pos": (30, 109), "field": "mere", "color": (10, 10, 10), "font": "sans", "size": 14},
                 # SP value (6 digits only)
-                "sp_value": {"pos": (35, 184), "field": "sp", "color": (10, 10, 10), "font": "sans_bold", "size": 14},
+                "sp_value": {"pos": (29, 173), "field": "sp", "color": (10, 10, 10), "font": "sans_bold", "size": 14},
                 # Adresse value
-                "adresse_value": {"pos": (35, 260), "field": "adresse", "color": (10, 10, 10), "font": "sans", "size": 12},
+                "adresse_value": {"pos": (31, 220), "field": "adresse", "color": (10, 10, 10), "font": "sans", "size": 12},
                 # Autorité (nom du signataire, zone centrale bas)
-                "autorite_name": {"pos": (318, 290), "field": "autorite", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
+                "autorite_name": {"pos": (231, 176), "field": "autorite", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
                 # Dates délivrance / expiration
-                "delivrance_value": {"pos": (525, 184), "field": "date_delivrance", "color": (10, 10, 10), "font": "sans", "size": 12},
-                "expiration_value": {"pos": (525, 260), "field": "date_expiration", "color": (10, 10, 10), "font": "sans", "size": 12},
+                "delivrance_value": {"pos": (429, 176), "field": "date_delivrance", "color": (10, 10, 10), "font": "sans", "size": 12},
+                "expiration_value": {"pos": (429, 234), "field": "date_expiration", "color": (10, 10, 10), "font": "sans", "size": 12},
                 # Poste identification (2L+2D)
-                "poste_value": {"pos": (609, 184), "field": "poste_identification", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
+                "poste_value": {"pos": (582, 177), "field": "poste_identification", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
                 # NIN
-                "identifiant_value": {"pos": (631, 260), "field": "numero_cni", "color": (10, 10, 10), "font": "sans_bold", "size": 10},
+                "identifiant_value": {"pos": (583, 234), "field": "numero_cni", "color": (10, 10, 10), "font": "sans_bold", "size": 10},
                 # MRZ Lines (Mono font pour alignement)
                 "mrz_l1": {"pos": (39, 362), "field": "mrz_l1", "color": (0, 0, 0), "font": "mono", "size": 16},
                 "mrz_l2": {"pos": (39, 392), "field": "mrz_l2", "color": (0, 0, 0), "font": "mono", "size": 16},
