@@ -275,13 +275,18 @@ STOP_WORDS = {
     "CARD", "CARTE", "NATIONALE", "IDENTITE", "SIGNATURE", "SEXE", "NAME", "NOM",
     "SURNAME", "GIVEN", "NAMES", "PROFESSION", "OCCUPATION", "MENAGERE", "TRAVAIL",
     "INGENIEUR", "REPUBLIQUEDUCAMEROUN", "REPUBLICOFCAMEROON", "CARTENATIONALEDIDENTITE",
-    "PERE/FATHER", "MERE/MOTHER", "S.P/S.M", "AUTORITE/AUTHORITY", "DATEDE", "DELIVRANCE",
+    # Parent labels — stored BOTH as compound strings AND individual tokens because
+    # _is_stop_word() extracts individual words via regex \b[A-ZÀ-Ÿ]{3,}\b.  Without
+    # the individual tokens "PERE"/"MERE" etc., a block containing just "PERE" would
+    # NOT match STOP_WORDS and would leak into nom/prenom candidates.
+    "PERE/FATHER", "MERE/MOTHER", "PERE", "MERE", "FATHER", "MOTHER",
+    "S.P/S.M", "AUTORITE", "AUTHORITY", "AUTORITE/AUTHORITY", "DATEDE", "DELIVRANCE",
     "POSTEDIDENTIFICATION", "DATEOFISSUE", "IDENTIFSCATIONPOSS", "DATEDEXPIRATION/",
     "DENTIFLANTUNIQUE", "DATEOEEXPIRY", "UNIOUEIDENDFIE", "DENTIFIANURIQUE",
     "OHOUEIDENTIFIER", "FENO", "PRÉNOMS", "PRENOMS", "PRÉNOM", "PRENOM",
     "HEIGHT", "TAILLE", "ADRESSE", "ADDRESS", "DATE", "BIRTH", "NAISSANCE",
     "LIEU", "PLACE", "PLACEOFBIRTH", "LIEUDENAISSANCE", "NUMERO", "NUMBER",
-    "IDENTIFIANT", "UNIQUE", "IDENTIFIER", "POSTE", "D'IDENTIFICATION",
+    "IDENTIFIANT", "UNIQUE", "IDENTIFIER", "POSTE", "IDENTIFICATION",
     "NATIONALIDENTITY", "CARTENATIONALED'IDENTITE", "CNI",
     "CARTENATIONALED", "IDENTITE", "DIDENTITE", "NATIONALED",
 }
@@ -402,8 +407,10 @@ CNI_RECTO_ZONES = [
 
 CNI_VERSO_ZONES = [
     # Zone             cy_min  cy_max  cx_min  cx_max  validator
-    ("nom",             0.02,   0.16,   0.02,   0.40, "is_name"),
-    ("prenom",          0.16,   0.30,   0.02,   0.40, "is_name"),
+    # NOTE: nom/prenom intentionally EXCLUDED from verso zones.
+    # On the Cameroonian CNI verso, the top section contains PARENT names
+    # (NOM DU PERE / NOM DE LA MERE), not the cardholder's own name.
+    # The cardholder's nom/prenom must come from the recto side only.
     ("lieu_naissance",  0.38,   0.55,   0.02,   0.25, "is_place"),
     ("date_delivrance", 0.33,   0.48,   0.40,   0.75, "is_date"),
     ("date_expiration", 0.46,   0.58,   0.40,   0.75, "is_date"),
@@ -1037,6 +1044,7 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                 if ("PRENOM" not in _cand_upper
                     and "NOM" not in _cand_upper
                     and not _is_parent_val
+                    and not is_parent_nom
                     and not _is_stop_word(meilleur_candidat.get("text", ""))):
                     parsed_data["nom"] = {
                         "value": meilleur_candidat["text"],
@@ -1172,14 +1180,39 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
 
     # --- Fallback heuristic for missing nom/prenom ---
     if parsed_data["nom"]["value"] is None or parsed_data["prenom"]["value"] is None:
+        # Build a set of cy coordinates for parent-label blocks so we can
+        # exclude blocks that immediately follow a PERE/MERE label (those are
+        # parent name values, not the subject's identity fields).
+        _PARENT_LABEL_KEYWORDS = {"PERE", "FATHER", "MERE", "MOTHER"}
+        _parent_label_cys: list[float] = []
+        for _b in blocks:
+            _b_words = re.findall(r"\b[A-ZÀ-Ÿ]{3,}\b", _b.get("text", "").upper())
+            if any(w in _PARENT_LABEL_KEYWORDS for w in _b_words):
+                _parent_label_cys.append(float(_b.get("cy", 0)))
+
+        # Tolerance: blocks within this many pixels below a parent label are
+        # treated as parent VALUES (not the subject's name).
+        _PARENT_PROXIMITY_PX = 60
+
+        def _is_parent_value(block_cy: float) -> bool:
+            """Return True if block_cy is within parent-label proximity zone."""
+            return any(
+                label_cy < block_cy <= label_cy + _PARENT_PROXIMITY_PX
+                for label_cy in _parent_label_cys
+            )
+
         caps_blocks = []
         for b in blocks:
             words = re.findall(r"\b[A-ZÀ-Ÿ]{3,}\b", b.get("text", ""))
             if not words:
                 continue
             has_stop = any(w in STOP_WORDS for w in words)
-            if not has_stop:
-                caps_blocks.append(b)
+            if has_stop:
+                continue
+            # Exclude blocks that are in a parent-value zone
+            if _parent_label_cys and _is_parent_value(float(b.get("cy", 0))):
+                continue
+            caps_blocks.append(b)
 
         caps_blocks.sort(key=lambda b: b.get("cy", 0))
 
@@ -1416,7 +1449,8 @@ class OCRService:
         else:
             # CNI extraction: detect side, use CNI templates + legacy fallback
             recto_keywords = {"REPUBLIQUE", "IDENTITY", "CARD", "CARTE", "NATIONALE", "RECTO"}
-            verso_keywords = {"AUTORITE", "AUTHORITY", "MRZ", "VERSO", "EMPREINTE", "FINGERPRINT"}
+            verso_keywords = {"AUTORITE", "AUTHORITY", "MRZ", "VERSO", "EMPREINTE", "FINGERPRINT",
+                              "PERE", "FATHER", "MERE", "MOTHER", "ADRESSE", "POSTE"}
             
             has_mrz = any("<<" in b.get("text", "") for b in blocks)
             
@@ -1461,6 +1495,33 @@ class OCRService:
         if not is_bill:
             # CNI-specific post-processing: lieu_naissance dedup, DOB plausibility
             # (skipped for bills — they have different field semantics)
+
+            # 0. Guard: nom/prenom must not be parent values.
+            #    Collect all text values that appear immediately below a PERE/MERE
+            #    label block (within 60px cy). If nom or prenom matches one of these
+            #    parent values, clear it so GLM fallback can correct it.
+            _PARENT_LABEL_KW = {"PERE", "FATHER", "MERE", "MOTHER"}
+            _PARENT_PROX_PX = 60
+            _parent_value_texts: set[str] = set()
+            for _pb in blocks:
+                _pb_words = re.findall(r"\b[A-ZÀ-Ÿ]{3,}\b", _pb.get("text", "").upper())
+                if any(w in _PARENT_LABEL_KW for w in _pb_words):
+                    _label_cy = float(_pb.get("cy", 0))
+                    for _vb in blocks:
+                        _vb_cy = float(_vb.get("cy", 0))
+                        if _label_cy < _vb_cy <= _label_cy + _PARENT_PROX_PX:
+                            _parent_value_texts.add(_vb.get("text", "").upper().strip())
+            if _parent_value_texts:
+                for _field in ["nom", "prenom"]:
+                    _field_val = spatial_data.get(_field, {}).get("value")
+                    if _field_val and _field_val.upper().strip() in _parent_value_texts:
+                        logger.warning(
+                            f"Post-processing: '{_field_val}' matched parent value set — "
+                            f"clearing {_field} to avoid parent/subject confusion"
+                        )
+                        spatial_data[_field] = {"value": None, "conf": 0.0}
+                        if "PARENT_DEDUP" not in spatial_data.get("methode", ""):
+                            spatial_data["methode"] += " + PARENT_DEDUP"
 
             # 1. Deduplicate lieu_naissance vs nom/prenom
             if spatial_data.get("lieu_naissance", {}).get("value") is not None:

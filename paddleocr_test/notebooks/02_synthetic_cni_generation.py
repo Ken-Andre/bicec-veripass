@@ -22,7 +22,7 @@ def _():
     import marimo as mo
     import os
     import sys
-    import io
+    from io import BytesIO
     import json
     import random
     from pathlib import Path
@@ -50,99 +50,66 @@ def _():
     output_dir.mkdir(exist_ok=True)
 
     # Standardized CNI Layout Configuration (Normalized to 800x500)
+    # Positions calibrated for templates 6.png (Recto) and 3.png (Verso)
+    # Note: Templates already have labels printed — we only render DATA VALUES.
+    # Fonts used: 'sans_bold' -> Arial Bold, 'handwriting' -> Segoesc (for signature)
+
+    GRID_X0, GRID_Y0 = 275, 114
+    CELL_W, CELL_H = 36, 50
+    VAL_OFFSET_Y = 24
+    VAL_OFFSET_X = 4
+
+    def grid_pos(col, row):
+        return (int(GRID_X0 + col * CELL_W + VAL_OFFSET_X), int(GRID_Y0 + row * CELL_H + VAL_OFFSET_Y))
+
     CNI_FIELD_CONFIG = {
         "horizontal": {
             "recto": {
-                # Header (Gold Serif)
-                "header_fr": {"pos": (400, 35), "text": "RÉPUBLIQUE DU CAMEROUN", "color": (153, 115, 0), "font": "serif_bold", "size": 22, "align": "center"},
-                "header_en": {"pos": (400, 60), "text": "REPUBLIC OF CAMEROON", "color": (153, 115, 0), "font": "serif_bold", "size": 22, "align": "center"},
-
-                # Vertical Labels (Left Side)
-                "vert_label_en": {"pos": (30, 40), "text": "NATIONAL IDENTITY CARD", "color": (153, 115, 0), "font": "sans", "size": 16, "rotate": 90},
-                "vert_label_fr": {"pos": (30, 280), "text": "CARTE NATIONALE D'IDENTITÉ", "color": (0, 102, 51), "font": "sans", "size": 16, "rotate": 90},
-
-                # Values (Black Sans Bold)
-                "nom_value": {"pos": (240, 155), "field": "nom", "color": (5, 5, 5), "font": "sans_bold", "size": 24},
-                "prenom_value": {"pos": (240, 215), "field": "prenom", "color": (5, 5, 5), "font": "sans_bold", "size": 22},
-                "date_naissance_value": {"pos": (240, 275), "field": "date_naissance", "color": (5, 5, 5), "font": "sans_bold", "size": 19},
-                "lieu_naissance_value": {"pos": (240, 330), "field": "lieu_naissance", "color": (5, 5, 5), "font": "sans_bold", "size": 19},
-                "sexe_value": {"pos": (240, 395), "field": "sexe", "color": (5, 5, 5), "font": "sans_bold", "size": 19},
-                "taille_value": {"pos": (365, 395), "field": "taille", "color": (5, 5, 5), "font": "sans_bold", "size": 19},
-                "profession_value": {"pos": (240, 455), "field": "profession", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-
-                # Signature (Blue ink)
-                "signature_value": {"pos": (480, 450), "field": "prenom", "color": (10, 30, 150), "font": "handwriting", "size": 32, "align": "center"},
-
-                # NIN on Recto
-                "nin_recto": {"pos": (620, 115), "field": "numero_cni", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
+                # Nom (bold, taille calibrée sur le template)
+                "nom_value": {"pos": grid_pos(0, 0), "field": "nom", "color": (10, 10, 10), "font": "sans_bold", "size": 18},
+                # Prénom
+                "prenom_value": {"pos": grid_pos(0, 1), "field": "prenom", "color": (10, 10, 10), "font": "sans_bold", "size": 16},
+                # Date naissance
+                "date_naissance_value": {"pos": grid_pos(0, 2), "field": "date_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
+                # Lieu naissance
+                "lieu_naissance_value": {"pos": grid_pos(0, 3), "field": "lieu_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
+                # Sexe + Taille
+                "sexe_value": {"pos": grid_pos(0, 4), "field": "sexe", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "taille_value": {"pos": grid_pos(4, 4), "field": "taille", "color": (10, 10, 10), "font": "sans", "size": 13},
+                # Profession
+                "profession_value": {"pos": grid_pos(0, 5), "field": "profession", "color": (10, 10, 10), "font": "sans", "size": 12},
             },
             "verso": {
-                "pere_value": {"pos": (40, 60), "field": "pere", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-                "mere_value": {"pos": (40, 150), "field": "mere", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-                "sp_value": {"pos": (40, 245), "field": "sp", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-                "adresse_value": {"pos": (40, 335), "field": "adresse", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-
-                # Authority & Dates
-                "autorite_name": {"pos": (380, 420), "field": "autorite", "color": (5, 5, 5), "font": "sans_bold", "size": 16, "align": "center"},
-                "delivrance_value": {"pos": (540, 265), "field": "date_delivrance", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-                "expiration_value": {"pos": (540, 355), "field": "date_expiration", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-                "poste_value": {"pos": (730, 265), "field": "poste_identification", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-                "identifiant_value": {"pos": (730, 355), "field": "numero_cni", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-
-                # Card Serial
-                "serial_value": {"pos": (780, 475), "field": "serial", "color": (5, 5, 5), "font": "sans_bold", "size": 22, "align": "right"},
-
-                # MRZ for Horizontal (Bottom)
-                "mrz_l1": {"pos": (40, 400), "field": "mrz_l1", "color": (5, 5, 5), "font": "mono", "size": 18},
-                "mrz_l2": {"pos": (40, 425), "field": "mrz_l2", "color": (5, 5, 5), "font": "mono", "size": 18},
-                "mrz_l3": {"pos": (40, 450), "field": "mrz_l3", "color": (5, 5, 5), "font": "mono", "size": 18},
+                # Père value (below PÈRE/FATHER)
+                "pere_value": {"pos": (35, 45), "field": "pere", "color": (10, 10, 10), "font": "sans", "size": 14},
+                # Mère value (below MÈRE/MOTHER)
+                "mere_value": {"pos": (35, 113), "field": "mere", "color": (10, 10, 10), "font": "sans", "size": 14},
+                # SP value (6 digits only)
+                "sp_value": {"pos": (35, 184), "field": "sp", "color": (10, 10, 10), "font": "sans_bold", "size": 14},
+                # Adresse value
+                "adresse_value": {"pos": (35, 260), "field": "adresse", "color": (10, 10, 10), "font": "sans", "size": 12},
+                # Autorité (nom du signataire, zone centrale bas)
+                "autorite_name": {"pos": (318, 290), "field": "autorite", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
+                # Dates délivrance / expiration
+                "delivrance_value": {"pos": (525, 184), "field": "date_delivrance", "color": (10, 10, 10), "font": "sans", "size": 12},
+                "expiration_value": {"pos": (525, 260), "field": "date_expiration", "color": (10, 10, 10), "font": "sans", "size": 12},
+                # Poste identification (2L+2D)
+                "poste_value": {"pos": (609, 184), "field": "poste_identification", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
+                # NIN
+                "identifiant_value": {"pos": (631, 260), "field": "numero_cni", "color": (10, 10, 10), "font": "sans_bold", "size": 10},
+                # MRZ Lines (Mono font pour alignement)
+                "mrz_l1": {"pos": (39, 362), "field": "mrz_l1", "color": (0, 0, 0), "font": "mono", "size": 16},
+                "mrz_l2": {"pos": (39, 392), "field": "mrz_l2", "color": (0, 0, 0), "font": "mono", "size": 16},
+                "mrz_l3": {"pos": (39, 422), "field": "mrz_l3", "color": (0, 0, 0), "font": "mono", "size": 16},
             }
         },
         "vertical": {
-            "recto": {
-                # Header
-                "header_fr": {"pos": (250, 40), "text": "RÉPUBLIQUE DU CAMEROUN", "color": (153, 115, 0), "font": "serif_bold", "size": 18, "align": "center"},
-                "header_en": {"pos": (250, 65), "text": "REPUBLIC OF CAMEROON", "color": (153, 115, 0), "font": "serif_bold", "size": 18, "align": "center"},
-
-                # Main fields
-                "nom_value": {"pos": (50, 650), "field": "nom", "color": (5, 5, 5), "font": "sans_bold", "size": 24},
-                "prenom_value": {"pos": (50, 710), "field": "prenom", "color": (5, 5, 5), "font": "sans_bold", "size": 22},
-                "date_naissance_value": {"pos": (50, 780), "field": "date_naissance", "color": (5, 5, 5), "font": "sans_bold", "size": 20},
-                "lieu_naissance_value": {"pos": (280, 780), "field": "lieu_naissance", "color": (5, 5, 5), "font": "sans_bold", "size": 20},
-                "sexe_value": {"pos": (50, 840), "field": "sexe", "color": (5, 5, 5), "font": "sans_bold", "size": 20},
-                "taille_value": {"pos": (180, 840), "field": "taille", "color": (5, 5, 5), "font": "sans_bold", "size": 20},
-                "profession_value": {"pos": (50, 900), "field": "profession", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-
-                # NIN (Vertical on Recto for some versions)
-                "nin_value": {"pos": (460, 650), "field": "numero_cni", "color": (5, 5, 5), "font": "sans_bold", "size": 26, "rotate": 90},
-            },
-            "verso": {
-                # Top part
-                "pere_value": {"pos": (50, 60), "field": "pere", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-                "mere_value": {"pos": (50, 120), "field": "mere", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-                "adresse_value": {"pos": (50, 180), "field": "adresse", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-
-                # Authority
-                "autorite": {"pos": (250, 350), "field": "autorite", "color": (5, 5, 5), "font": "sans_bold", "size": 16, "align": "center"},
-
-                # MRZ (Rotated 90 on Vertical Verso)
-                "mrz_l1": {"pos": (450, 80), "field": "mrz_l1", "color": (5, 5, 5), "font": "mono", "size": 22, "rotate": 90},
-                "mrz_l2": {"pos": (485, 80), "field": "mrz_l2", "color": (5, 5, 5), "font": "mono", "size": 22, "rotate": 90},
-                "mrz_l3": {"pos": (520, 80), "field": "mrz_l3", "color": (5, 5, 5), "font": "mono", "size": 22, "rotate": 90},
-
-                # Serial (Bottom Right)
-                "serial_value": {"pos": (400, 470), "field": "serial", "color": (5, 5, 5), "font": "sans_bold", "size": 18, "align": "right"},
-
-                # Additional Verso Fields
-                "sp_value": {"pos": (50, 240), "field": "sp", "color": (5, 5, 5), "font": "sans_bold", "size": 18},
-                "delivrance_value": {"pos": (50, 300), "field": "date_delivrance", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-                "expiration_value": {"pos": (280, 300), "field": "date_expiration", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-                "poste_value": {"pos": (50, 360), "field": "poste_identification", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-                "identifiant_value": {"pos": (280, 360), "field": "numero_cni", "color": (5, 5, 5), "font": "sans_bold", "size": 16},
-            }
+            "recto": {},
+            "verso": {}
         }
     }
     return (
+        BytesIO,
         CAMEROON_CITIES,
         CAMEROON_FIRSTNAMES,
         CAMEROON_PROFESSIONS,
@@ -171,54 +138,6 @@ def _(mo):
     Generate realistic Cameroonian CNI images for OCR model training.
     **Pipeline:** Faker data → Pillow render → Albumentations augment → Dataset export.
     """)
-    return
-
-
-@app.cell
-def _(images_dir, mo):
-    """Template selection."""
-    _template_files = []
-    if images_dir.exists():
-        _template_files = sorted(
-            f.name for f in images_dir.iterdir()
-            if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")
-            and "cni" in f.name.lower()
-        )
-
-    template_picker = mo.ui.dropdown(
-        options={f: str(images_dir / f) for f in _template_files} if _template_files else {},
-        label="📄 CNI Template Image",
-        value=_template_files[0] if _template_files else None,
-    )
-
-    mo.vstack([
-        mo.md(f"### Template Selection\nAvailable CNI images: {len(_template_files)}"),
-        template_picker,
-    ])
-    return (template_picker,)
-
-
-@app.cell
-def _(Image, Path, mo, template_picker):
-    """Load and display template."""
-    _template_path = template_picker.value
-    template_image = None
-
-    if _template_path and Path(_template_path).exists():
-        template_image = Image.open(_template_path).convert("RGB")
-
-    _tmpl_output = (
-        mo.vstack([
-            mo.md(
-                f"**Template loaded:** `{Path(_template_path).name}`  \n"
-                f"**Size:** {template_image.size[0]}×{template_image.size[1]}"
-            ),
-            mo.image(src=Path(_template_path).read_bytes()),
-        ])
-        if template_image
-        else mo.md("*No template selected. Choose a CNI image above.*")
-    )
-    _tmpl_output
     return
 
 
@@ -276,10 +195,11 @@ def _(
         issue_date = fake.date_between(start_date="-5y", end_date="today")
         expiry_date = issue_date.replace(year=issue_date.year + 10)
 
-        # Cameroon NIN format: [Year][ID Type][Random/Sequence] - 17 digits
-        nin_prefix = issue_date.strftime("%Y") + "1"
-        nin_random = f"{random.randint(100000000000, 999999999999)}"
-        nin = f"{nin_prefix}{nin_random}"
+        # NIN camerounais : YYYY (année délivrance) + 13 chiffres = 17 chiffres total
+        # Ex réel: 20210474231620883 (2021 + 0474231620883)
+        nin_year = issue_date.strftime("%Y")  # 4 chiffres
+        nin_seq = f"{random.randint(1000000000000, 9999999999999)}"  # 13 chiffres
+        nin = f"{nin_year}{nin_seq}"
 
         # MRZ Generation (TD1 format: 3 lines x 30 characters)
         # Line 1: I<CMR[DocumentNumber][CheckDigit]<<<<<<<<<<<<<<<
@@ -310,18 +230,23 @@ def _(
             "date_naissance": dob.strftime("%d.%m.%Y"),
             "lieu_naissance": random.choice(CAMEROON_CITIES).upper(),
             "sexe": gender,
-            "taille": f"{random.uniform(1.50, 1.95):.2f}",
+            # Taille avec virgule comme sur la vraie carte (ex: 1,54)
+            "taille": f"{random.uniform(1.50, 1.95):.2f}".replace(".", ","),
             "profession": random.choice(CAMEROON_PROFESSIONS).upper(),
             "pere": f"{random.choice(CAMEROON_SURNAMES)} {random.choice(CAMEROON_FIRSTNAMES)}".upper(),
             "mere": f"{random.choice(CAMEROON_SURNAMES)} {random.choice(CAMEROON_FIRSTNAMES)}".upper(),
-            "sp": f"{random.choice(['A', 'B', 'C', 'LT'])}{random.randint(10000, 99999)}",
-            "adresse": f"{random.choice(CAMEROON_CITIES)} - {fake.street_name()}".upper(),
+            # SP = 6 chiffres uniquement (ex: 600001, 123456)
+            "sp": f"{random.randint(100000, 999999)}",
+            # Adresse = VILLE simple ou VILLE - QUARTIER
+            "adresse": random.choice([
+                random.choice(CAMEROON_CITIES).upper(),
+                f"{random.choice(CAMEROON_CITIES)} - {random.choice(['BASTOS', 'MELEN', 'MVOG-MBI', 'BIYEM-ASSI', 'ESSOS', 'AKWA', 'BONABERI', 'MAKEPE', 'NDOKOTI'])}".upper(),
+            ]),
             "numero_cni": nin,
             "date_delivrance": issue_date.strftime("%d.%m.%Y"),
             "date_expiration": expiry_date.strftime("%d.%m.%Y"),
-            "autorite": "MARTIN MBARGA NGUÉLÉ",
-            "poste_identification": f"{random.choice(['CE', 'LT', 'OU', 'AD', 'EN'])}{random.randint(1, 20):02d}",
-            "serial": f"{random.randint(100000000, 999999999)}",
+            "autorite": "MARTIN MBARGA AGUÈLE",
+            "poste_identification": f"{random.choice(['AD','CE','EN','ES','LT','NO','NW','OU','SU','SW'])}{random.randint(1, 99):02d}",
             "mrz_l1": mrz_l1,
             "mrz_l2": mrz_l2,
             "mrz_l3": mrz_l3,
@@ -357,45 +282,71 @@ def _(generate_btn, generate_cni_record, mo, num_records):
 
 @app.cell
 def _(images_dir, mo):
-    """Template picker for both sides."""
-    _template_files = []
-    if images_dir.exists():
-        _template_files = sorted(
-            f.name for f in images_dir.iterdir()
-            if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")
-            and "cni" in f.name.lower()
-        )
+    """Template picker recto+verso — scanne dossiers + upload depuis la machine."""
+    _SCAN_DIRS = [
+        images_dir,
+        images_dir.parent / "output" / "pdf_pages" / "trybeg",
+    ]
+    _options: dict[str, str] = {}
+    for _d in _SCAN_DIRS:
+        if _d.exists():
+            for _f in sorted(_d.iterdir()):
+                if _f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
+                    _label = f"{_d.name}/{_f.name}"
+                    _options[_label] = str(_f)
+
+    # 6.png = recto, 3.png = verso (templates vus sur les vraies cartes)
+    _recto_default = next((k for k in _options if k.endswith("6.png")), next(iter(_options), None))
+    _verso_default = next((k for k in _options if k.endswith("3.png")), None)
 
     recto_picker = mo.ui.dropdown(
-        options={f: str(images_dir / f) for f in _template_files} if _template_files else {},
-        label="📄 Recto (Front) Template",
-        value=next((f for f in _template_files if "recto" in f.lower()), _template_files[0] if _template_files else None),
+        options=_options,
+        label="📄 Recto (depuis les dossiers)",
+        value=_recto_default,
+    )
+    verso_picker = mo.ui.dropdown(
+        options=_options,
+        label="📄 Verso (depuis les dossiers)",
+        value=_verso_default,
     )
 
-    verso_picker = mo.ui.dropdown(
-        options={f: str(images_dir / f) for f in _template_files} if _template_files else {},
-        label="📄 Verso (Back) Template",
-        value=next((f for f in _template_files if "verso" in f.lower()), _template_files[1] if len(_template_files) > 1 else None),
+    recto_upload = mo.ui.file(
+        filetypes=[".png", ".jpg", ".jpeg", ".webp"],
+        label="☝️ Ou uploader une image Recto",
+        multiple=False,
+    )
+    verso_upload = mo.ui.file(
+        filetypes=[".png", ".jpg", ".jpeg", ".webp"],
+        label="☝️ Ou uploader une image Verso",
+        multiple=False,
     )
 
     mo.vstack([
-        mo.md("### 📑 Template Configuration"),
+        mo.md(f"### 📑 Sélection des Templates\n*{len(_options)} images trouvées dans les dossiers*"),
         mo.hstack([recto_picker, verso_picker]),
+        mo.md("---"),
+        mo.hstack([recto_upload, verso_upload]),
     ])
-    return recto_picker, verso_picker
+    return recto_picker, recto_upload, verso_picker, verso_upload
 
 
 @app.cell
-def _(Image, Path, layout_type, mo, recto_picker, verso_picker):
-    """Load and display templates."""
+def _(Image, BytesIO, Path, layout_type, mo, recto_picker, recto_upload, verso_picker, verso_upload):
+    """Load and display templates (uploads prioritaire sinon dropdown)."""
     def load_img(p):
         if not (p and Path(p).exists()): return None
         img = Image.open(p).convert("RGB")
         target_size = (800, 500) if layout_type.value == "horizontal" else (500, 800)
         return img.resize(target_size)
 
-    recto_img = load_img(recto_picker.value)
-    verso_img = load_img(verso_picker.value)
+    def load_uploaded(uploaded):
+        if not uploaded: return None
+        img = Image.open(BytesIO(uploaded[0].contents)).convert("RGB")
+        target_size = (800, 500) if layout_type.value == "horizontal" else (500, 800)
+        return img.resize(target_size)
+
+    recto_img = load_uploaded(recto_upload.value) or load_img(recto_picker.value)
+    verso_img = load_uploaded(verso_upload.value) or load_img(verso_picker.value)
 
     _tmpl_output = (
         mo.hstack([
@@ -410,8 +361,6 @@ def _(Image, Path, layout_type, mo, recto_picker, verso_picker):
 @app.cell
 def _(mo):
     """Font and rendering settings."""
-    mo.md("### 🔤 Rendering Settings")
-
     layout_type = mo.ui.radio(
         options=["horizontal", "vertical"],
         value="horizontal",
@@ -423,8 +372,9 @@ def _(mo):
     render_btn = mo.ui.run_button(label="🖼️ Render Dual-Side Preview (3 samples)")
 
     mo.vstack([
+        mo.md("### 🔤 Rendering Settings"),
         layout_type,
-        mo.hstack([font_size_mult, render_btn])
+        mo.hstack([font_size_mult, render_btn]),
     ])
     return font_size_mult, layout_type, render_btn
 
@@ -534,11 +484,16 @@ def _(
             ])
         )
 
-    _render_output = (
-        mo.vstack(_gallery_items)
-        if _gallery_items
-        else mo.md("Click Render to see preview.")
-    )
+    if _gallery_items:
+        _render_output = mo.vstack(_gallery_items)
+    elif not records:
+        _render_output = mo.md("⚠️ **Aucune donnée générée.** Clique d'abord sur **🎲 Generate Dataset** dans la section **Data Generation Config** ci-dessus, puis sur **🖼️ Render Dual-Side Preview**.")
+    elif not recto_img or not verso_img:
+        _render_output = mo.md("⚠️ **Template(s) manquant(s).** Sélectionne une image Recto et Verso dans la section **Sélection des Templates** ci-dessus (dropdown ou upload).")
+    elif not render_btn.value:
+        _render_output = mo.md("💡 **Prêt à rendere.** Remonte à la section **🔤 Rendering Settings** et clique sur **🖼️ Render Dual-Side Preview (3 samples)**.")
+    else:
+        _render_output = mo.md("⚠️ La génération a échoué — vérifie tes templates et réessaie.")
     _render_output
     return (preview_gallery,)
 
@@ -569,7 +524,7 @@ def _(mo):
             brightness_limit,
         ])
     _aug_config_output
-    return blur_limit, brightness_limit, has_alb, noise_var, rotation_limit
+    return aug_count, blur_limit, brightness_limit, has_alb, noise_var, rotation_limit
 
 
 @app.cell
@@ -578,7 +533,7 @@ def _(has_alb, mo):
     aug_btn = mo.ui.run_button(label="🔄 Augment Preview (3 samples)") if has_alb else None
 
     _aug_btn_output = mo.md("")
-    if has_alb and aug_btn:
+    if has_alb and aug_btn is not None:
         _aug_btn_output = mo.vstack([
             mo.md("### Augmented Samples"),
             aug_btn,
@@ -605,13 +560,14 @@ def _(
     """Execute augmentation."""
     _aug_output = mo.md("")
 
-    if has_alb and aug_btn and aug_btn.value and preview_gallery:
+    if has_alb and aug_btn is not None and aug_btn.value and preview_gallery:
         import albumentations as A
 
         _transform = A.Compose([
             A.Rotate(limit=rotation_limit.value, p=0.8),
             A.GaussianBlur(blur_limit=blur_limit.value, p=0.5),
-            A.GaussNoise(var_limit=noise_var.value, p=0.4),
+            # albumentations >= 2.0 : var_limit → std_range (tuple normalisé 0–1)
+            A.GaussNoise(std_range=(0.01, noise_var.value / 255.0), p=0.4),
             A.RandomBrightnessContrast(
                 brightness_limit=brightness_limit.value / 100.0,
                 contrast_limit=0.2,

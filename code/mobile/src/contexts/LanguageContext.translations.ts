@@ -325,6 +325,10 @@ export const translations: Record<string, Record<Language, string>> = {
     'kyc.progress.start': { fr: 'Commencer', en: 'Start' },
 
     // Auth Biometric
+    'cni.intro.title': { fr: "Vérification d'identité", en: 'Identity Verification' },
+    'cni.intro.why': { fr: "Nous devons vérifier votre identité pour sécuriser votre compte et respecter la réglementation bancaire.", en: 'We need to verify your identity to secure your account and comply with banking regulations.' },
+    'cni.intro.secure': { fr: 'Vos données sont cryptées et sécurisées', en: 'Your data is encrypted and secure' },
     'auth.biometric.secure': { fr: 'Données biométriques stockées localement', en: 'Biometric data stored locally' },
+    'ocr.loading.text': { fr: 'Analyse de votre document en cours...', en: 'Analyzing your document...' },
 };
 
