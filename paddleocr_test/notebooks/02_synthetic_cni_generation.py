@@ -66,24 +66,20 @@ def _():
                 "profession_value": {"pos": (230, 348), "field": "profession", "color": (10, 10, 10), "font": "sans", "size": 12},
             },
             "verso": {
-                # Père value (below PÈRE/FATHER)
-                "pere_value": {"pos": (29, 39), "field": "pere", "color": (10, 10, 10), "font": "sans", "size": 14},
-                # Mère value (below MÈRE/MOTHER)
-                "mere_value": {"pos": (30, 109), "field": "mere", "color": (10, 10, 10), "font": "sans", "size": 14},
-                # SP value (6 digits only)
-                "sp_value": {"pos": (29, 173), "field": "sp", "color": (10, 10, 10), "font": "sans_bold", "size": 14},
-                # Adresse value
-                "adresse_value": {"pos": (31, 220), "field": "adresse", "color": (10, 10, 10), "font": "sans", "size": 12},
-                # Autorité (nom du signataire, zone centrale bas)
-                "autorite_name": {"pos": (231, 176), "field": "autorite", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
-                # Dates délivrance / expiration
-                "delivrance_value": {"pos": (429, 176), "field": "date_delivrance", "color": (10, 10, 10), "font": "sans", "size": 12},
-                "expiration_value": {"pos": (429, 234), "field": "date_expiration", "color": (10, 10, 10), "font": "sans", "size": 12},
-                # Poste identification (2L+2D)
-                "poste_value": {"pos": (582, 177), "field": "poste_identification", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
-                # NIN
-                "identifiant_value": {"pos": (583, 234), "field": "numero_cni", "color": (10, 10, 10), "font": "sans_bold", "size": 10},
-                # MRZ Lines (Mono font pour alignement)
+                # ── Colonne gauche (X≈39) — Parents, SP, Adresse ──
+                "pere_value": {"pos": (39, 67), "field": "pere", "color": (10, 10, 10), "font": "sans", "size": 14},
+                "mere_value": {"pos": (39, 141), "field": "mere", "color": (10, 10, 10), "font": "sans", "size": 14},
+                "sp_value": {"pos": (39, 220), "field": "sp", "color": (10, 10, 10), "font": "sans_bold", "size": 14},
+                "adresse_value": {"pos": (39, 290), "field": "adresse", "color": (10, 10, 10), "font": "sans", "size": 12},
+                # ── Colonne centre (X≈293) — Autorité ──
+                "autorite_name": {"pos": (293, 290), "field": "autorite", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
+                # ── Colonne droite-centre (X≈546) — Dates ──
+                "delivrance_value": {"pos": (546, 242), "field": "date_delivrance", "color": (10, 10, 10), "font": "sans", "size": 12},
+                "expiration_value": {"pos": (546, 290), "field": "date_expiration", "color": (10, 10, 10), "font": "sans", "size": 12},
+                # ── Colonne extrême-droite (X≈683) — Poste + Identifiant ──
+                "poste_value": {"pos": (683, 242), "field": "poste_identification", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
+                "identifiant_value": {"pos": (683, 290), "field": "numero_cni", "color": (10, 10, 10), "font": "sans_bold", "size": 10},
+                # ── MRZ (bas de carte) ──
                 "mrz_l1": {"pos": (39, 362), "field": "mrz_l1", "color": (0, 0, 0), "font": "mono", "size": 16},
                 "mrz_l2": {"pos": (39, 392), "field": "mrz_l2", "color": (0, 0, 0), "font": "mono", "size": 16},
                 "mrz_l3": {"pos": (39, 422), "field": "mrz_l3", "color": (0, 0, 0), "font": "mono", "size": 16},
