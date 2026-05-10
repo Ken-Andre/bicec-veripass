@@ -234,3 +234,4 @@ paddleocr_test/notebooks/output/pdf_pages/trybeg/*.png
 paddleocr_test/notebooks/output/*/*/*.jpg
 paddleocr_test/notebooks/output/*.png
 paddleocr_test/notebooks/output/*.jpg
+paddleocr_test/notebooks/output/images/*.jpg

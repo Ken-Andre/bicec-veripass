@@ -57,32 +57,32 @@ def _():
         "horizontal": {
             "recto": {
                 # Text fields are placed precisely below their corresponding labels
-                "nom_value": {"pos": (230, 108), "field": "nom", "color": (10, 10, 10), "font": "sans_bold", "size": 18},
-                "prenom_value": {"pos": (230, 172), "field": "prenom", "color": (10, 10, 10), "font": "sans_bold", "size": 16},
-                "date_naissance_value": {"pos": (230, 235), "field": "date_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
-                "lieu_naissance_value": {"pos": (230, 274), "field": "lieu_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
-                "sexe_value": {"pos": (230, 312), "field": "sexe", "color": (10, 10, 10), "font": "sans", "size": 13},
-                "taille_value": {"pos": (320, 312), "field": "taille", "color": (10, 10, 10), "font": "sans", "size": 13},
-                "profession_value": {"pos": (230, 348), "field": "profession", "color": (10, 10, 10), "font": "sans", "size": 12},
+                "nom_value": {"pos": (227, 107), "field": "nom", "color": (10, 10, 10), "font": "sans_bold", "size": 18},
+                "prenom_value": {"pos": (227, 172), "field": "prenom", "color": (10, 10, 10), "font": "sans_bold", "size": 16},
+                "date_naissance_value": {"pos": (227, 238), "field": "date_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "lieu_naissance_value": {"pos": (227, 274), "field": "lieu_naissance", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "sexe_value": {"pos": (227, 313), "field": "sexe", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "taille_value": {"pos": (320, 313), "field": "taille", "color": (10, 10, 10), "font": "sans", "size": 13},
+                "profession_value": {"pos": (227, 348), "field": "profession", "color": (10, 10, 10), "font": "sans", "size": 12},
             },
             "verso": {
-                # ── Colonne gauche (X≈39) — Parents, SP, Adresse ──
-                "pere_value": {"pos": (39, 67), "field": "pere", "color": (10, 10, 10), "font": "sans", "size": 14},
-                "mere_value": {"pos": (39, 141), "field": "mere", "color": (10, 10, 10), "font": "sans", "size": 14},
-                "sp_value": {"pos": (39, 220), "field": "sp", "color": (10, 10, 10), "font": "sans_bold", "size": 14},
-                "adresse_value": {"pos": (39, 290), "field": "adresse", "color": (10, 10, 10), "font": "sans", "size": 12},
-                # ── Colonne centre (X≈293) — Autorité ──
-                "autorite_name": {"pos": (293, 290), "field": "autorite", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
-                # ── Colonne droite-centre (X≈546) — Dates ──
-                "delivrance_value": {"pos": (546, 242), "field": "date_delivrance", "color": (10, 10, 10), "font": "sans", "size": 12},
-                "expiration_value": {"pos": (546, 290), "field": "date_expiration", "color": (10, 10, 10), "font": "sans", "size": 12},
-                # ── Colonne extrême-droite (X≈683) — Poste + Identifiant ──
-                "poste_value": {"pos": (683, 242), "field": "poste_identification", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
-                "identifiant_value": {"pos": (683, 290), "field": "numero_cni", "color": (10, 10, 10), "font": "sans_bold", "size": 10},
+                # ── Colonne gauche (X≈31) — Parents, SP, Adresse ──
+                "pere_value": {"pos": (31, 55), "field": "pere", "color": (10, 10, 10), "font": "sans", "size": 14},
+                "mere_value": {"pos": (31, 122), "field": "mere", "color": (10, 10, 10), "font": "sans", "size": 14},
+                "sp_value": {"pos": (31, 184), "field": "sp", "color": (10, 10, 10), "font": "sans_bold", "size": 14},
+                "adresse_value": {"pos": (31, 238), "field": "adresse", "color": (10, 10, 10), "font": "sans", "size": 12},
+                # ── Colonne centre (X≈232) — Autorité ──
+                "autorite_name": {"pos": (232, 238), "field": "autorite", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
+                # ── Colonne droite-centre (X≈430) — Dates ──
+                "delivrance_value": {"pos": (430, 204), "field": "date_delivrance", "color": (10, 10, 10), "font": "sans", "size": 12},
+                "expiration_value": {"pos": (430, 258), "field": "date_expiration", "color": (10, 10, 10), "font": "sans", "size": 12},
+                # ── Colonne extrême-droite (X≈582) — Poste + Identifiant ──
+                "poste_value": {"pos": (582, 204), "field": "poste_identification", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
+                "identifiant_value": {"pos": (582, 258), "field": "numero_cni", "color": (10, 10, 10), "font": "sans_bold", "size": 10},
                 # ── MRZ (bas de carte) ──
-                "mrz_l1": {"pos": (39, 362), "field": "mrz_l1", "color": (0, 0, 0), "font": "mono", "size": 16},
-                "mrz_l2": {"pos": (39, 392), "field": "mrz_l2", "color": (0, 0, 0), "font": "mono", "size": 16},
-                "mrz_l3": {"pos": (39, 422), "field": "mrz_l3", "color": (0, 0, 0), "font": "mono", "size": 16},
+                "mrz_l1": {"pos": (60, 335), "field": "mrz_l1", "color": (0, 0, 0), "font": "mono", "size": 16},
+                "mrz_l2": {"pos": (60, 415), "field": "mrz_l2", "color": (0, 0, 0), "font": "mono", "size": 16},
+                "mrz_l3": {"pos": (60, 495), "field": "mrz_l3", "color": (0, 0, 0), "font": "mono", "size": 16},
             }
         },
         "vertical": {
@@ -460,9 +460,9 @@ def _(
             mo.vstack([
                 mo.md(f"#### Sample {_i+1}: {records[_i]['nom']} {records[_i]['prenom']}"),
                 mo.hstack([
-                    mo.image(src=_r_bytes) if _r else mo.md("No Recto"),
-                    mo.image(src=_v_bytes) if _v else mo.md("No Verso")
-                ])
+                    mo.image(src=_r_bytes, width=400) if _r else mo.md("No Recto"),
+                    mo.image(src=_v_bytes, width=400) if _v else mo.md("No Verso")
+                ], justify="start")
             ])
         )
 
