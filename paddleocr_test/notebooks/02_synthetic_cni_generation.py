@@ -12,7 +12,7 @@ Run:  marimo edit 02_synthetic_cni_generation.py
 
 import marimo
 
-__generated_with = "0.23.5"
+__generated_with = "0.23.1"
 app = marimo.App()
 
 
@@ -25,6 +25,7 @@ def _():
     from io import BytesIO
     import json
     import random
+    from datetime import datetime
     from pathlib import Path
 
     import string
@@ -76,13 +77,12 @@ def _():
                 # ── Colonne droite-centre (X≈430) — Dates ──
                 "delivrance_value": {"pos": (430, 204), "field": "date_delivrance", "color": (10, 10, 10), "font": "sans", "size": 12},
                 "expiration_value": {"pos": (430, 258), "field": "date_expiration", "color": (10, 10, 10), "font": "sans", "size": 12},
-                # ── Colonne extrême-droite (X≈582) — Poste + Identifiant ──
                 "poste_value": {"pos": (582, 204), "field": "poste_identification", "color": (10, 10, 10), "font": "sans_bold", "size": 12},
                 "identifiant_value": {"pos": (582, 258), "field": "numero_cni", "color": (10, 10, 10), "font": "sans_bold", "size": 10},
-                # ── MRZ (bas de carte) ──
-                "mrz_l1": {"pos": (60, 335), "field": "mrz_l1", "color": (0, 0, 0), "font": "mono", "size": 16},
-                "mrz_l2": {"pos": (60, 415), "field": "mrz_l2", "color": (0, 0, 0), "font": "mono", "size": 16},
-                "mrz_l3": {"pos": (60, 495), "field": "mrz_l3", "color": (0, 0, 0), "font": "mono", "size": 16},
+                # MRZ (bas de carte) - TD1 Format (3 lines)
+                "mrz_l1": {"pos": (60, 345), "field": "mrz_l1", "color": (0, 0, 0), "font": "mono", "size": 15},
+                "mrz_l2": {"pos": (60, 385), "field": "mrz_l2", "color": (0, 0, 0), "font": "mono", "size": 15},
+                "mrz_l3": {"pos": (60, 425), "field": "mrz_l3", "color": (0, 0, 0), "font": "mono", "size": 15},
             }
         },
         "vertical": {
@@ -104,6 +104,7 @@ def _():
         Path,
         image_to_bytes,
         images_dir,
+        datetime,
         json,
         mo,
         np,
@@ -313,7 +314,17 @@ def _(images_dir, mo):
 
 
 @app.cell
-def _(Image, BytesIO, Path, layout_type, mo, recto_picker, recto_upload, verso_picker, verso_upload):
+def _(
+    BytesIO,
+    Image,
+    Path,
+    layout_type,
+    mo,
+    recto_picker,
+    recto_upload,
+    verso_picker,
+    verso_upload,
+):
     """Load and display templates (uploads prioritaire sinon dropdown)."""
     def load_img(p):
         if not (p and Path(p).exists()): return None
@@ -506,7 +517,7 @@ def _(mo):
             brightness_limit,
         ])
     _aug_config_output
-    return aug_count, blur_limit, brightness_limit, has_alb, noise_var, rotation_limit
+    return blur_limit, brightness_limit, has_alb, noise_var, rotation_limit
 
 
 @app.cell
@@ -611,6 +622,7 @@ def _(mo):
 @app.cell
 def _(
     CNI_FIELD_CONFIG,
+    datetime,
     export_btn,
     json,
     layout_type,
@@ -648,7 +660,8 @@ def _(
                 "data": record
             })
 
-        _output_path = output_dir / "dataset_manifest.json"
+        _ts_str = f"_{datetime.now():%Y%m%d_%H%M%S}"
+        _output_path = output_dir / f"dataset_manifest{_ts_str}.json"
         _output_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
         _export_output = mo.md(f"✅ **Exported {len(records)} image pairs** to `{img_dir}` and manifest to `{_output_path}`")
 

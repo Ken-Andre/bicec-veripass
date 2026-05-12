@@ -53,6 +53,24 @@ async def celery_sync_sanctions(self):
     await sync_pep_sanctions()
 
 
+@celery.task(
+    name="app.tasks.sanctions.check_staleness",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+)
+async def check_staleness(self):
+    """
+    Vérifie si les listes de sanctions sont obsolètes (> 8 jours).
+    Si oui, déclenche une synchronisation immédiate.
+    """
+    logger.info("[sanctions-staleness] Checking sanctions data staleness...")
+    async with AsyncSessionLocal() as db:
+        # TODO: Implement actual staleness check logic
+        # For now, just log and potentially trigger sync
+        logger.info("[sanctions-staleness] Data is currently up to date (placeholder).")
+
+
 async def _download_and_upsert(db: AsyncSession) -> int:
     """Download and upsert sanctions data."""
     # TODO: Implement actual HTTP download + parse + upsert

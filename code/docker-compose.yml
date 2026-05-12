@@ -141,6 +141,7 @@ services:
       - SMTP_TLS=${SMTP_TLS:-false}
       - SMTP_SSL=${SMTP_SSL:-false}
       - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
+      - OTP_FALLBACK_EMAIL_ADDRESS=${OTP_FALLBACK_EMAIL_ADDRESS}
       - OCR_CONFIDENCE_THRESHOLD=0.90
       - PADDLE_WARMUP_ON_START=true  # Warmup au démarrage du worker, pas à la 1ère requête
       - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
@@ -320,6 +321,7 @@ services:
       - SMTP_TLS=${SMTP_TLS:-false}
       - SMTP_SSL=${SMTP_SSL:-false}
       - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
+      - OTP_FALLBACK_EMAIL_ADDRESS=${OTP_FALLBACK_EMAIL_ADDRESS}
       - SKIP_MIGRATIONS=1
       - SENTRY_DSN=${SENTRY_DSN_BACKEND}
     depends_on:
@@ -479,7 +481,7 @@ services:
     restart: unless-stopped
     mem_limit: 128m
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8025/api/v1/info"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8025/api/v1/info || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
