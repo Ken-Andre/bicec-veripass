@@ -16,13 +16,12 @@ app = marimo.App(layout_file="layouts/01_interactive_ocr_testing.slides.json")
 
 @app.cell
 def _():
-    import marimo as mo
-    import os
-    import sys
-    import json
-    import io
     import base64
+    import io
+    import sys
     from pathlib import Path
+
+    import marimo as mo
 
     _notebook_dir = Path.cwd()
     _venv_ocr = _notebook_dir / ".venv_ocr"
@@ -32,25 +31,22 @@ def _():
     sys.path.insert(0, str(_notebook_dir))
 
     import anywidget
-    import numpy as np
     import traitlets
-    from PIL import Image
-
     from ocr_utils import (
-        get_paddle_ocr,
-        paddle_ocr_pipeline,
-        glm_ocr_extract,
+        CNI_FIELDS,
         DEFAULT_GLM_RECTO_PROMPT,
         DEFAULT_GLM_VERSO_PROMPT,
+        compute_sha256,
+        draw_ocr_boxes,
+        find_gguf_models,
+        glm_ocr_extract,
+        image_to_bytes,
+        numpy_to_pil,
+        paddle_ocr_pipeline,
         sanitize_glm_output,
         set_glm_ocr_model_path,
-        find_gguf_models,
-        draw_ocr_boxes,
-        numpy_to_pil,
-        image_to_bytes,
-        compute_sha256,
-        CNI_FIELDS,
     )
+    from PIL import Image
 
     images_dir = _notebook_dir.parent / "images"
     return (
@@ -202,7 +198,8 @@ def _(images_dir, mo):
     sample_files = []
     if images_dir.exists():
         sample_files = sorted(
-            f.name for f in images_dir.iterdir()
+            f.name
+            for f in images_dir.iterdir()
             if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")
         )
 
@@ -222,7 +219,9 @@ def _(Path, find_gguf_models, mo):
 
     if _main_models:
         _glm_options = {
-            f"{m['name']} ({m['size_mb']:.0f} MB) — {Path(m['path']).parent.name}": m["path"]
+            f"{m['name']} ({m['size_mb']:.0f} MB) — {Path(m['path']).parent.name}": m[
+                "path"
+            ]
             for m in _main_models
         }
         glm_selector = mo.ui.dropdown(
@@ -236,12 +235,16 @@ def _(Path, find_gguf_models, mo):
             label="🤖 GLM-OCR Model Path (paste GGUF path)",
             placeholder="C:\\path\\to\\GLM-OCR.i1-Q4_K_M.gguf",
         )
-        _glm_status = "No GGUF models auto-detected. Paste the path to your GLM-OCR model."
+        _glm_status = (
+            "No GGUF models auto-detected. Paste the path to your GLM-OCR model."
+        )
 
-    mo.vstack([
-        mo.md(f"### GLM-OCR Model\n{_glm_status}"),
-        glm_selector,
-    ])
+    mo.vstack(
+        [
+            mo.md(f"### GLM-OCR Model\n{_glm_status}"),
+            glm_selector,
+        ]
+    )
     return (glm_selector,)
 
 
@@ -294,10 +297,12 @@ def _(camera_widget, file_upload, mo, sample_dropdown, source_radio):
     else:
         _source_widget = sample_dropdown
 
-    mo.vstack([
-        source_radio,
-        _source_widget,
-    ])
+    mo.vstack(
+        [
+            source_radio,
+            _source_widget,
+        ]
+    )
     return
 
 
@@ -344,14 +349,16 @@ def _(
                 image_sha256 = compute_sha256(image_bytes)
 
     _load_output = (
-        mo.vstack([
-            mo.image(src=image_bytes),
-            mo.md(
-                f"**Loaded:** `{image_name}`  \n"
-                f"**Size:** {pil_image.size[0]}\u00d7{pil_image.size[1]}  \n"
-                f"**SHA-256:** `{image_sha256[:16]}\u2026`"
-            ),
-        ])
+        mo.vstack(
+            [
+                mo.image(src=image_bytes),
+                mo.md(
+                    f"**Loaded:** `{image_name}`  \n"
+                    f"**Size:** {pil_image.size[0]}\u00d7{pil_image.size[1]}  \n"
+                    f"**SHA-256:** `{image_sha256[:16]}\u2026`"
+                ),
+            ]
+        )
         if pil_image
         else mo.md("*No image loaded yet. Upload, select, or capture one above.*")
     )
@@ -384,40 +391,41 @@ def _(DEFAULT_GLM_RECTO_PROMPT, mo):
 
     show_blocks = mo.ui.checkbox(label="Show OCR block details", value=True)
 
-    # GLM-OCR prompt — dynamically updated based on card_side
     glm_prompt = mo.ui.text_area(
         value=DEFAULT_GLM_RECTO_PROMPT,
-        label="🟣 GLM-OCR Prompt (edit if needed)",
+        label="🟣 GLM-OCR Prompt (auto-adapts to side, editable)",
         placeholder="JSON prompt...",
         full_width=True,
     )
 
     run_button = mo.ui.run_button(label="🚀 Run OCR", kind="neutral")
 
-    mo.vstack([
-        mo.md("### ⚙️ OCR Engine & Options"),
-        mo.hstack([engine_choice, card_side]),
-        show_blocks,
-        glm_prompt,
-        run_button,
-    ])
+    mo.vstack(
+        [
+            mo.md("### ⚙️ OCR Engine & Options"),
+            mo.hstack([engine_choice, card_side]),
+            show_blocks,
+            glm_prompt,
+            run_button,
+        ]
+    )
     return card_side, engine_choice, glm_prompt, run_button, show_blocks
 
 
 @app.cell
 def _(DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMPT, card_side, mo):
-    """Show the active prompt for the selected card side (read-only info)."""
+    """Show the active prompt for reference."""
     _side_val = card_side.value
     if _side_val == "verso":
-        _active_prompt = DEFAULT_GLM_VERSO_PROMPT
-        _side_label = "📂 VERSO — NIN & Validity only"
+        _active = DEFAULT_GLM_VERSO_PROMPT
+        _side_label = "📂 VERSO prompt"
     elif _side_val == "recto":
-        _active_prompt = DEFAULT_GLM_RECTO_PROMPT
-        _side_label = "📄 RECTO — Identity fields only"
+        _active = DEFAULT_GLM_RECTO_PROMPT
+        _side_label = "📄 RECTO prompt"
     else:
-        _active_prompt = "(auto-selected at runtime based on PaddleOCR detection)"
-        _side_label = "🤖 AUTO — prompt chosen after PaddleOCR detection"
-    mo.md(f"**Active prompt mode:** {_side_label}\n\n```\n{_active_prompt}\n```")
+        _active = "Auto — prompt selected at runtime from PaddleOCR detection"
+        _side_label = "🤖 AUTO"
+    mo.md(f"**{_side_label}**\n\n```\n{_active[:300]}...\n```")
     return
 
 
@@ -447,7 +455,7 @@ def _(
     if run_button.value and pil_image is not None:
         _engine = engine_choice.value
 
-        # --- PaddleOCR (Run first to allow auto-detection) ---
+        # --- PaddleOCR (run first for side auto-detection) ---
         if _engine in ("paddleocr", "both"):
             paddle_result = paddle_ocr_pipeline(pil_image)
             if "extraction" in paddle_result:
@@ -455,7 +463,10 @@ def _(
                 if "VERSO" in _method:
                     detected_side = "verso"
 
-            if "aligned_image" in paddle_result and paddle_result["aligned_image"] is not None:
+            if (
+                "aligned_image" in paddle_result
+                and paddle_result["aligned_image"] is not None
+            ):
                 _aligned = paddle_result["aligned_image"]
                 if show_blocks.value and "blocks" in paddle_result:
                     _annotated = draw_ocr_boxes(_aligned, paddle_result["blocks"])
@@ -463,21 +474,28 @@ def _(
                     _annotated = _aligned
                 annotated_pil = numpy_to_pil(_annotated)
 
-        # --- Card Side Final Choice ---
+        # --- Final side decision (user override wins) ---
         final_side = card_side.value if card_side.value != "auto" else detected_side
 
-        # --- GLM-OCR ---
+        # --- GLM-OCR with side-aware prompt routing ---
         if _engine in ("glm_ocr", "both") and image_bytes:
-            # Determine prompt
-            _prompt = glm_prompt.value.strip()
-            if card_side.value == "auto":
-                _prompt = DEFAULT_GLM_VERSO_PROMPT if final_side == "verso" else DEFAULT_GLM_RECTO_PROMPT
+            # Auto-select prompt based on detected side, UNLESS user customized it
+            _user_prompt = glm_prompt.value.strip()
+            if _user_prompt in (DEFAULT_GLM_RECTO_PROMPT, DEFAULT_GLM_VERSO_PROMPT):
+                _prompt = (
+                    DEFAULT_GLM_VERSO_PROMPT
+                    if final_side == "verso"
+                    else DEFAULT_GLM_RECTO_PROMPT
+                )
+            else:
+                _prompt = _user_prompt  # respect user edit
 
             try:
                 glm_res = glm_ocr_extract(image_bytes, prompt=_prompt)
-                # Apply sanitization to kill hallucinations
                 if glm_res.get("success") and "parsed_fields" in glm_res:
-                    glm_res["parsed_fields"] = sanitize_glm_output(glm_res["parsed_fields"], side=final_side)
+                    glm_res["parsed_fields"] = sanitize_glm_output(
+                        glm_res["parsed_fields"], side=final_side
+                    )
                     glm_res["detected_side"] = final_side
                 glm_result = glm_res
             except Exception as _e:
@@ -498,7 +516,9 @@ def _(
     if paddle_result is None:
         _paddle_output = mo.md("")
     elif "error" in paddle_result:
-        _paddle_output = mo.md(f"### PaddleOCR Result\n❌ **Error:** {paddle_result['error']}")
+        _paddle_output = mo.md(
+            f"### PaddleOCR Result\n❌ **Error:** {paddle_result['error']}"
+        )
     else:
         _blocks = paddle_result.get("blocks", [])
         _extraction = paddle_result.get("extraction", {})
@@ -538,17 +558,19 @@ def _(
             _img_bytes = image_to_bytes(annotated_pil)
             _img_widget = mo.image(src=_img_bytes)
 
-        _paddle_output = mo.vstack([
-            mo.md(
-                f"### 🟢 PaddleOCR Result\n"
-                f"**Method:** `{_method}`  \n"
-                f"**Blocks detected:** {len(_blocks)}\n\n"
-                f"{_paddle_table}\n"
-                f"{_blocks_md}"
-            ),
-            mo.md("#### Annotated Image (PaddleOCR)"),
-            _img_widget,
-        ])
+        _paddle_output = mo.vstack(
+            [
+                mo.md(
+                    f"### 🟢 PaddleOCR Result\n"
+                    f"**Method:** `{_method}`  \n"
+                    f"**Blocks detected:** {len(_blocks)}\n\n"
+                    f"{_paddle_table}\n"
+                    f"{_blocks_md}"
+                ),
+                mo.md("#### Annotated Image (PaddleOCR)"),
+                _img_widget,
+            ]
+        )
 
     _paddle_output
     return
@@ -560,7 +582,9 @@ def _(CNI_FIELDS, glm_result, mo):
     if glm_result is None:
         _glm_output = mo.md("")
     elif glm_result.get("error"):
-        _glm_output = mo.md(f"### 🟣 GLM-OCR Result\n❌ **Error:** {glm_result['error']}")
+        _glm_output = mo.md(
+            f"### 🟣 GLM-OCR Result\n❌ **Error:** {glm_result['error']}"
+        )
     else:
         _raw = glm_result.get("raw_text", "")
         _parsed = glm_result.get("parsed_fields", {})
@@ -576,9 +600,7 @@ def _(CNI_FIELDS, glm_result, mo):
             for _gkey in CNI_FIELDS:
                 _gval = _parsed.get(_gkey, "—") or "—"
                 _glm_rows.append(f"| {_gkey} | `{_gval}` |")
-            _glm_table = (
-                "| Field | Value |\n|-------|-------|\n" + "\n".join(_glm_rows)
-            )
+            _glm_table = "| Field | Value |\n|-------|-------|\n" + "\n".join(_glm_rows)
         else:
             _glm_table = f"**Raw output:**\n```\n{_raw[:500]}\n```"
 
@@ -586,16 +608,18 @@ def _(CNI_FIELDS, glm_result, mo):
             {"📄 Raw output": f"```\n{_raw[:1000]}\n```"},
         )
 
-        _glm_output = mo.vstack([
-            mo.md(
-                f"### 🟣 GLM-OCR Result\n"
-                f"**Model:** `{glm_result.get('model', 'N/A')}`  \n"
-                f"**Success:** {glm_result.get('success', False)}  \n"
-                f"**Parsing mode:** {_mode_label}\n\n"
-                f"{_glm_table}"
-            ),
-            _raw_collapsible,
-        ])
+        _glm_output = mo.vstack(
+            [
+                mo.md(
+                    f"### 🟣 GLM-OCR Result\n"
+                    f"**Model:** `{glm_result.get('model', 'N/A')}`  \n"
+                    f"**Success:** {glm_result.get('success', False)}  \n"
+                    f"**Parsing mode:** {_mode_label}\n\n"
+                    f"{_glm_table}"
+                ),
+                _raw_collapsible,
+            ]
+        )
 
     _glm_output
     return
@@ -617,13 +641,14 @@ def _(CNI_FIELDS, glm_result, mo, paddle_result):
             _p_c = _p_val.get("conf", 0.0) if isinstance(_p_val, dict) else 0.0
             _g_v = _g_parsed.get(_ckey) or "—"
             _match = "✅" if str(_p_v).upper() == str(_g_v).upper() else "❌"
-            _comp_rows.append(f"| {_ckey} | `{_p_v}` | {_p_c:.2f} | `{_g_v}` | {_match} |")
+            _comp_rows.append(
+                f"| {_ckey} | `{_p_v}` | {_p_c:.2f} | `{_g_v}` | {_match} |"
+            )
 
         _comparison_output = mo.md(
             "### 📊 Engine Comparison\n\n"
             "| Field | PaddleOCR | Conf | GLM-OCR | Match |\n"
-            "|-------|-----------|------|---------|-------|\n"
-            + "\n".join(_comp_rows)
+            "|-------|-----------|------|---------|-------|\n" + "\n".join(_comp_rows)
         )
 
     _comparison_output

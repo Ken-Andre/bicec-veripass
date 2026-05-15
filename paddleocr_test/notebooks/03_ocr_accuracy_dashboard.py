@@ -8,9 +8,11 @@ Track per-field metrics, confidence distributions, and error patterns.
 Run:  marimo edit 03_ocr_accuracy_dashboard.py
 """
 
-import marimo as mo
+from ocr_utils import CNI_FIELDS
+import marimo
 
-app = mo.App()
+__generated_with = "0.23.1"
+app = marimo.App()
 
 
 @app.cell
@@ -41,13 +43,18 @@ def _():
         CNI_FIELDS,
     )
 
-    images_dir = _notebook_dir.parent / "images"
-
+    images_dir = _notebook_dir.parent /"notebooks"/"output"/ "images"
     return (
-        mo, os, sys, io, json, Path, defaultdict, np, Image,
-        paddle_ocr_pipeline, glm_ocr_extract, DEFAULT_GLM_KYC_PROMPT,
-        set_glm_ocr_model_path, find_gguf_models, numpy_to_pil,
-        image_to_bytes, compute_sha256, CNI_FIELDS, images_dir, _notebook_dir,
+        DEFAULT_GLM_KYC_PROMPT,
+        Image,
+        Path,
+        find_gguf_models,
+        glm_ocr_extract,
+        images_dir,
+        io,
+        mo,
+        paddle_ocr_pipeline,
+        set_glm_ocr_model_path,
     )
 
 
@@ -59,10 +66,11 @@ def _(mo):
     Batch-test OCR engines and compare accuracy metrics across images.
     Load ground truth, run OCR, and see per-field analysis.
     """)
+    return
 
 
 @app.cell
-def _(mo, find_gguf_models, Path):
+def _(Path, find_gguf_models, mo):
     """GLM-OCR model selector."""
     _gguf_models = find_gguf_models()
     # Only show main LLM models in dropdown; mmproj is auto-detected by glm_ocr_extract()
@@ -81,7 +89,6 @@ def _(mo, find_gguf_models, Path):
         mo.md("### GLM-OCR Model"),
         glm_selector,
     ])
-
     return (glm_selector,)
 
 
@@ -91,38 +98,35 @@ def _(glm_selector, set_glm_ocr_model_path):
     _val = glm_selector.value
     if _val and isinstance(_val, str) and _val.strip():
         set_glm_ocr_model_path(_val.strip())
-
     return
 
 
 @app.cell
-def _(mo, images_dir):
+def _(images_dir, mo):
     """Discover images for batch test."""
-    _image_files = []
+    image_files = []
     if images_dir.exists():
-        _image_files = sorted(
+        image_files = sorted(
             f for f in images_dir.iterdir()
             if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")
         )
 
-    mo.md(f"### 📸 Image Batch\nFound **{len(_image_files)}** images in `{images_dir}`")
-
-    return (_image_files,)
+    mo.md(f"### 📸 Image Batch\nFound **{len(image_files)}** images in `{images_dir}`")
+    return (image_files,)
 
 
 @app.cell
-def _(mo, _image_files):
+def _(image_files, mo):
     """Select images for batch test."""
-    _file_options = {f.name: str(f) for f in _image_files} if _image_files else {}
+    _file_options = {f.name: str(f) for f in image_files} if image_files else {}
     batch_selector = mo.ui.multiselect(options=_file_options, label="Select images to test")
 
     batch_selector
-
     return (batch_selector,)
 
 
 @app.cell
-def _(mo):
+def ground_truth_placeholder(mo):
     """Ground truth input."""
     gt_input = mo.ui.text_area(
         value="{}",
@@ -139,22 +143,37 @@ def _(mo):
         """),
         gt_input,
     ])
-
-    return (gt_input,)
+    return
 
 
 @app.cell
 def _(gt_input, json, mo):
     """Parse ground truth."""
-    ground_truth = {}
+    _raw = None
     _gt_parse_error = ""
     if gt_input.value.strip():
         try:
-            ground_truth = json.loads(gt_input.value)
+            _raw = json.loads(gt_input.value)
         except json.JSONDecodeError as _e:
             _gt_parse_error = str(_e)
 
-    _gt_output = mo.md(f"⚠️ Invalid JSON: {_gt_parse_error}") if _gt_parse_error else mo.md(f"**Parsed {len(ground_truth)} ground truth entries.**")
+    _entries = 0
+    ground_truth = {}
+    if isinstance(_raw, dict):
+        _entries = len(_raw)
+        ground_truth = _raw
+    elif isinstance(_raw, list):
+        for _entry in _raw:
+            if isinstance(_entry, dict) and "data" in _entry:
+                _d = _entry["data"]
+                if "recto" in _entry:
+                    ground_truth[_entry["recto"]] = _d
+                if "verso" in _entry:
+                    ground_truth[_entry["verso"]] = _d
+        _entries = len(ground_truth)
+
+    _suffix = "" if not _gt_parse_error else f" (raw parse had issue: {_gt_parse_error})"
+    _gt_output = mo.md(f"**Parsed {_entries} ground truth entries.**{_suffix}")
     _gt_output
 
     return (ground_truth,)
@@ -180,16 +199,22 @@ def _(DEFAULT_GLM_KYC_PROMPT, mo):
         glm_prompt,
         run_batch,
     ])
-
-    return (glm_prompt, run_batch)
+    return glm_prompt, run_batch
 
 
 @app.cell
 def _(
-    mo, run_batch, batch_selector, ground_truth,
-    paddle_ocr_pipeline, glm_ocr_extract, glm_prompt,
     DEFAULT_GLM_KYC_PROMPT,
-    json, Image, io, Path,
+    Image,
+    Path,
+    batch_selector,
+    glm_ocr_extract,
+    glm_prompt,
+    ground_truth,
+    io,
+    mo,
+    paddle_ocr_pipeline,
+    run_batch,
 ):
     """Execute batch OCR and collect results."""
     batch_results = []
@@ -209,7 +234,7 @@ def _(
                 if "extraction" in _p_result:
                     _ext = _p_result["extraction"]
                     _result_entry["paddleocr"] = {}
-                    for _pkey in ("nom", "prenom", "numero_cni"):
+                    for _pkey in CNI_FIELDS:
                         _pfield = _ext.get(_pkey, {})
                         if isinstance(_pfield, dict):
                             _result_entry["paddleocr"][_pkey] = {
@@ -228,7 +253,7 @@ def _(
                     _g_parsed = _g_result.get("parsed_fields", {})
                     if _g_parsed and any(v is not None for v in _g_parsed.values()):
                         _result_entry["glm_ocr"] = {}
-                        for _gkey in ("nom", "prenom", "numero_cni"):
+                        for _gkey in CNI_FIELDS:
                             _result_entry["glm_ocr"][_gkey] = {
                                 "value": _g_parsed.get(_gkey),
                                 "confidence": None,
@@ -248,7 +273,7 @@ def _(
                 _result_entry["paddleocr_match"] = {}
                 _result_entry["glm_ocr_match"] = {}
 
-                for _gtkey in ("nom", "prenom", "numero_cni"):
+                for _gtkey in CNI_FIELDS:
                     _gt_val = str(_gt.get(_gtkey, "")).upper().strip()
                     _p_v = str(
                         _result_entry.get("paddleocr", {}).get(_gtkey, {}).get("value", "") or ""
@@ -267,12 +292,11 @@ def _(
         else mo.md("*Select images and click 'Run Batch OCR Test' to see results.*")
     )
     _batch_output
-
     return (batch_results,)
 
 
 @app.cell
-def _(mo, batch_results):
+def _(batch_results, mo):
     """Display results table."""
     _table_output = mo.md("")
 
@@ -293,23 +317,28 @@ def _(mo, batch_results):
             _p_nom = _get_val("paddleocr", "nom")
             _p_pre = _get_val("paddleocr", "prenom")
             _p_cni = _get_val("paddleocr", "numero_cni")
+            _p_pere = _get_val("paddleocr", "pere")
+            _p_mere = _get_val("paddleocr", "mere")
+            
             _g_nom = _get_val("glm_ocr", "nom")
             _g_pre = _get_val("glm_ocr", "prenom")
             _g_cni = _get_val("glm_ocr", "numero_cni")
+            _g_pere = _get_val("glm_ocr", "pere")
+            _g_mere = _get_val("glm_ocr", "mere")
 
             _p_nom_ok = "✅" if _r.get("paddleocr_match", {}).get("nom") else ("❌" if "paddleocr_match" in _r else "")
             _p_pre_ok = "✅" if _r.get("paddleocr_match", {}).get("prenom") else ("❌" if "paddleocr_match" in _r else "")
             _g_nom_ok = "✅" if _r.get("glm_ocr_match", {}).get("nom") else ("❌" if "glm_ocr_match" in _r else "")
 
             _table_rows.append(
-                f"| `{_img}` | {_p_nom} {_p_nom_ok} | {_p_pre} {_p_pre_ok} | {_p_cni} | "
-                f"{_g_nom} {_g_nom_ok} | {_g_pre} | {_g_cni} |"
+                f"| `{_img}` | {_p_nom} {_p_nom_ok} | {_p_pre} {_p_pre_ok} | {_p_cni} | {_p_pere} | {_p_mere} | "
+                f"{_g_nom} {_g_nom_ok} | {_g_pre} | {_g_cni} | {_g_pere} | {_g_mere} |"
             )
 
         _table_output = mo.md(
             "### 📋 Batch Results\n\n"
-            "| Image | P‑Nom | P‑Prénom | P‑CNI | G‑Nom | G‑Prénom | G‑CNI |\n"
-            "|-------|-------|---------|-------|-------|---------|-------|\n"
+            "| Image | P‑Nom | P‑Prénom | P‑CNI | P-Père | P-Mère | G‑Nom | G‑Prénom | G‑CNI | G-Père | G-Mère |\n"
+            "|-------|-------|---------|-------|--------|--------|-------|---------|-------|--------|--------|\n"
             + "\n".join(_table_rows)
         )
 
@@ -318,7 +347,7 @@ def _(mo, batch_results):
 
 
 @app.cell
-def _(mo, batch_results):
+def _(batch_results, mo):
     """Confidence distribution analysis."""
     _conf_output = mo.md("")
 
@@ -327,7 +356,7 @@ def _(mo, batch_results):
         for _r in batch_results:
             _p = _r.get("paddleocr", {})
             if isinstance(_p, dict):
-                for _ckey in ("nom", "prenom", "numero_cni"):
+                for _ckey in CNI_FIELDS:
                     _cfield = _p.get(_ckey, {})
                     if isinstance(_cfield, dict) and _cfield.get("confidence") is not None:
                         _confidences.append({"field": _ckey, "confidence": _cfield["confidence"], "image": _r["image"]})
@@ -353,7 +382,7 @@ def _(mo, batch_results):
             )
 
             _field_avgs = {}
-            for _fname in ("nom", "prenom", "numero_cni"):
+            for _fname in CNI_FIELDS:
                 _field_confs = [c["confidence"] for c in _confidences if c["field"] == _fname]
                 if _field_confs:
                     _field_avgs[_fname] = sum(_field_confs) / len(_field_confs)
@@ -374,22 +403,22 @@ def _(mo, batch_results):
 
 
 @app.cell
-def _(mo, batch_results):
+def _(batch_results, mo):
     """Accuracy summary when ground truth is available."""
     _acc_output = mo.md("*Provide ground truth JSON above to see accuracy metrics.*")
 
     _has_gt = any("ground_truth" in _r for _r in batch_results)
 
     if _has_gt:
-        _paddle_correct = {"nom": 0, "prenom": 0, "numero_cni": 0}
-        _glm_correct = {"nom": 0, "prenom": 0, "numero_cni": 0}
+        _paddle_correct = {f: 0 for f in CNI_FIELDS}
+        _glm_correct = {f: 0 for f in CNI_FIELDS}
         _total_gt = 0
 
         for _r in batch_results:
             if "ground_truth" not in _r:
                 continue
             _total_gt += 1
-            for _akey in ("nom", "prenom", "numero_cni"):
+            for _akey in CNI_FIELDS:
                 if _r.get("paddleocr_match", {}).get(_akey):
                     _paddle_correct[_akey] += 1
                 if _r.get("glm_ocr_match", {}).get(_akey):

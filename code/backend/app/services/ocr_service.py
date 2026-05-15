@@ -294,7 +294,7 @@ STOP_WORDS = {
 CNI_FIELDS = [
     "nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
     "sexe", "taille", "profession", "date_delivrance", "date_expiration",
-    "adresse", "poste_identification",
+    "adresse", "poste_identification", "pere", "mere",
 ]
 
 CAMEROON_CITIES = [
@@ -970,9 +970,20 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                             if len(b.get("text", "")) > 2:
                                 candidates.append(b)
                 if candidates:
-                    candidates.sort(
-                        key=lambda b: (b["cy"] - block["cy"]) // 10 * 1000 + abs(b.get("cx", 0) - block.get("cx", 0))
-                    )
+                    _addr_keywords = {"QUARTIER", "RUE", "CARREFOUR", "B.P", "BP", "LOT", "ARROND", "MELEN", "BASTOS", "AKWA", "BONABERI", "MAKEPE", "NDOKOTI", "MVOG", "BIYEM", "ESSOS"}
+                    _label_penalty = {"DATE", "BIRTH", "BIRTA", "NAISSANCE", "DELIVRANCE", "EXPIRATION", "IDENTIFIER", "IDENTIFICATION", "UNIQUE"}
+                    def _addr_sort_key(b):
+                        cy_diff = b["cy"] - block["cy"]
+                        cx_diff = abs(b.get("cx", 0) - block.get("cx", 0))
+                        b_upper = b.get("text", "").upper()
+                        quality_bonus = 0
+                        if any(kw in b_upper for kw in _addr_keywords) or any(c.isdigit() for c in b_upper):
+                            quality_bonus = -10000
+                        penalty = 0
+                        if any(kw in b_upper for kw in _label_penalty):
+                            penalty = 10000
+                        return (cy_diff // 10) * 1000 + cx_diff + quality_bonus + penalty
+                    candidates.sort(key=_addr_sort_key)
                     meilleur = candidates[0]
                     parsed_data["adresse"] = {"value": meilleur["text"], "conf": meilleur.get("conf", conf)}
 
@@ -1079,6 +1090,32 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                             "conf": meilleur_candidat.get("conf", conf),
                         }
 
+        # --- Parent names (Pere / Mere) — verso only ---
+        if is_verso:
+            # Pere
+            if re.search(r"(PERE|FATHER)", text_upper) and parsed_data["pere"]["value"] is None:
+                candidates = [
+                    b for b in blocks
+                    if b["cy"] > block["cy"] + 2 and abs(b.get("cx", 0) - block.get("cx", 0)) < 350
+                ]
+                if candidates:
+                    candidates.sort(key=lambda b: b["cy"] - block["cy"])
+                    meilleur = candidates[0]
+                    if not any(sw in meilleur.get("text", "").upper() for sw in STOP_WORDS):
+                        parsed_data["pere"] = {"value": meilleur["text"], "conf": meilleur.get("conf", conf)}
+
+            # Mere
+            if re.search(r"(MERE|MOTHER)", text_upper) and parsed_data["mere"]["value"] is None:
+                candidates = [
+                    b for b in blocks
+                    if b["cy"] > block["cy"] + 2 and abs(b.get("cx", 0) - block.get("cx", 0)) < 350
+                ]
+                if candidates:
+                    candidates.sort(key=lambda b: b["cy"] - block["cy"])
+                    meilleur = candidates[0]
+                    if not any(sw in meilleur.get("text", "").upper() for sw in STOP_WORDS):
+                        parsed_data["mere"] = {"value": meilleur["text"], "conf": meilleur.get("conf", conf)}
+
     # --- MRZ supplement (verso) ---
     mrz_fields: dict[str, Any] = {}
     if is_verso:
@@ -1179,7 +1216,10 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                 parsed_data["methode"] += " + MRZ"
 
     # --- Fallback heuristic for missing nom/prenom ---
-    if parsed_data["nom"]["value"] is None or parsed_data["prenom"]["value"] is None:
+    # On verso without an explicit NOM/SURNAME label, skip the heuristic entirely.
+    # The verso contains parent names (PERE/MERE), not the cardholder's identity.
+    _run_heuristic = not (is_verso and parsed_data["nom"]["value"] is None and parsed_data["prenom"]["value"] is None)
+    if _run_heuristic and (parsed_data["nom"]["value"] is None or parsed_data["prenom"]["value"] is None):
         # Build a set of cy coordinates for parent-label blocks so we can
         # exclude blocks that immediately follow a PERE/MERE label (those are
         # parent name values, not the subject's identity fields).

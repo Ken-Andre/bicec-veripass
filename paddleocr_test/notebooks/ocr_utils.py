@@ -50,63 +50,121 @@ def get_paddle_ocr():
 _glm_ocr_path: str | None = None
 _glm_mtmd_cli_path: str | None = None
 
-# --- GLM-OCR Prompts ---
-
+# ---------------------------------------------------------------------------
+# GLM-OCR Prompts
+# ---------------------------------------------------------------------------
+# Recto-specific prompt — identity fields only, strict negative rules
 DEFAULT_GLM_RECTO_PROMPT = (
-    "Extract Cameroonian CNI front data as JSON. \n"
-    "Keys: 'nom', 'prenom', 'date_naissance', 'lieu_naissance', 'sexe', 'taille', 'profession'.\n"
+    "You are analyzing the FRONT (recto) of a Cameroonian CNI identity card. "
+    "Extract ONLY these identity fields from the FRONT side. "
+    'Return ONLY valid JSON with exactly these keys: '
+    '"nom", "prenom", "date_naissance", "lieu_naissance", '
+    '"sexe", "taille", "profession".\n'
     "Rules:\n"
-    "- 'nom' is below 'NOM / SURNAME'.\n"
-    "- 'prenom' is below 'PRENOMS / GIVEN NAMES'. DO NOT include the label text.\n"
-    "- 'date_naissance' format: DD.MM.YYYY.\n"
-    "- 'sexe' is M or F.\n"
-    "- If a value contains a label (e.g. 'GIVEN NAMES'), set to null.\n"
-    "Output ONLY JSON."
+    "- 'nom' is the surname, located below 'NOM / SURNAME'. "
+    "Do NOT use 'PERE / FATHER' or 'MERE / MOTHER' text.\n"
+    "- 'prenom' is the given name(s), below 'PRENOMS / GIVEN NAMES'.\n"
+    "- 'date_naissance' format: DD.MM.YYYY or DD/MM/YYYY.\n"
+    "- 'lieu_naissance' is the place of birth, below 'LIEU DE NAISSANCE'.\n"
+    "- 'sexe' is 'M' or 'F'.\n"
+    "- 'taille' is height like '1,75' or '1.75'.\n"
+    "- 'profession' is the job title (e.g. INGENIEUR, MENAGERE, ETUDIANT). "
+    "Do NOT use authority names like 'MARTIN MBARGA'.\n"
+    "- DO NOT extract: numero_cni, date_delivrance, date_expiration, "
+    "adresse, poste_identification, pere, mere.\n"
+    "- Use null for any field not visible.\n"
+    "- Output ONLY JSON, no explanation."
 )
 
+# Verso-specific prompt — validity/parent fields only, strict negative rules
 DEFAULT_GLM_VERSO_PROMPT = (
-    "You are a KYC expert. Extract the following fields from the BACK (VERSO) of this "
-    "Cameroonian national identity card. The back contains VALIDITY and IDENTIFICATION info. "
-    "Return ONLY a valid JSON object with EXACTLY these keys (no extras): "
-    '"numero_cni", "date_delivrance", "date_expiration", "adresse", "poste_identification". '
+    "You are analyzing the BACK (verso) of a Cameroonian CNI identity card. "
+    "Extract ONLY the verso fields listed below. "
+    'Return ONLY valid JSON with exactly these keys: '
+    '"numero_cni", "date_delivrance", "date_expiration", '
+    '"adresse", "poste_identification", "pere", "mere", "sp", "autorite_nom".\n'
     "Rules:\n"
-    "- 'numero_cni' is the UNIQUE IDENTIFIER labeled 'IDENTIFIANT UNIQUE / UNIQUE IDENTIFIER'. "
-    "It is a LONG number with AT LEAST 15+ digits (e.g. 20210474231620883). "
-    "It is NOT the short serial number (usually 9 digits) printed alone at the bottom of the card.\n"
-    "- 'date_delivrance' is labeled 'DATE DE DELIVRANCE / DATE OF ISSUE'.\n"
-    "- 'date_expiration' is labeled 'DATE D EXPIRATION / DATE OF EXPIRY'.\n"
-    "- 'adresse': The physical address, below 'ADRESSE / ADDRESS'.\n"
-    "- 'poste_identification': 4 chars (e.g. CE01, LT04) near 'POSTE D'IDENTIFICATION'.\n"
-    "- Dates must be in DD.MM.YYYY format (e.g. 23.06.2021).\n"
-    "- IGNORE names under PERE/FATHER and MERE/MOTHER labels entirely.\n"
-    "- DO NOT include nom, prenom, sexe, taille, or profession.\n"
-    "- Use null for any missing or illegible field.\n"
-    "- DO NOT add any explanation, markdown, or extra text. Output ONLY the JSON object.\n"
+    "- 'pere' (father's name): the text directly below the 'PERE / FATHER' label "
+    "at the top of the card. NOT the label itself.\n"
+    "- 'mere' (mother's name): the text directly below the 'MERE / MOTHER' label. "
+    "NOT the label itself.\n"
+    "- 'sp': the 6-digit number next to the 'SP / S.N.' label "
+    "(e.g. '279093'). NOT the 17-digit unique identifier.\n"
+    "- 'autorite_nom': the issuing authority full name next to "
+    "'AUTORITE / AUTHORITY' (e.g. 'MARTIN MBARGA AGUELE').\n"
+    "- 'numero_cni': the 15-to-17-digit unique identifier labeled "
+    "'IDENTIFIANT UNIQUE / UNIQUE IDENTIFIER'. "
+    "A 6-digit SP number is NOT the NIN. A 9-digit serial is NOT the NIN.\n"
+    "- 'date_delivrance': issue date, format DD.MM.YYYY.\n"
+    "- 'date_expiration': expiry date, format DD.MM.YYYY, "
+    "typically 10 years after issue.\n"
+    "- 'poste_identification': short code like 'EN68' or 'CE01'.\n"
+    "- 'adresse': address below 'ADRESSE / ADDRESS'. "
+    "Do NOT include the authority name in the address.\n"
+    "- DO NOT extract: nom, prenom, date_naissance, lieu_naissance, "
+    "sexe, taille, profession. These are on the FRONT side only.\n"
+    "- Use null for any field not visible.\n"
+    "- Output ONLY JSON, no explanation."
 )
 
-DEFAULT_GLM_AUTO_PROMPT = (
-    "Extract ALL readable fields from this Cameroonian national identity card (front or back). "
-    "Return ONLY a valid JSON object with EXACTLY these keys: "
-    '"nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance", '
-    '"sexe", "taille", "profession", "date_delivrance", "date_expiration", '
-    '"adresse", "poste_identification". '
-    "Rules:\n"
-    "- 'nom' is below 'NOM / SURNAME'. NOT the father's or mother's name.\n"
-    "- 'prenom' is below 'PRENOMS / GIVEN NAMES'. DO NOT include the label text.\n"
-    "- 'numero_cni' is the UNIQUE IDENTIFIER (15+ digits), NOT the short 9-digit serial.\n"
-    "- 'date_naissance' format: DD.MM.YYYY.\n"
-    "- 'sexe' is M or F.\n"
-    "- 'taille' is height like 1.75.\n"
-    "- 'profession' is the job title (e.g. INGENIEUR, MENAGERE).\n"
-    "- 'date_delivrance' is the issue date.\n"
-    "- 'date_expiration' is the expiry date.\n"
-    "- IGNORE names under PERE/FATHER and MERE/MOTHER labels.\n"
-    "- Use null for any field not visible on this side.\n"
-    "- DO NOT add any explanation, markdown, or extra text. Output ONLY the JSON object.\n"
+# Unified reference prompt (for display/info — not used for inference routing)
+DEFAULT_GLM_CNI_PROMPT = DEFAULT_GLM_RECTO_PROMPT + (
+    "\n\n[If the image shows the BACK (verso) of the card, use the verso prompt instead.]"
 )
 
-# Legacy support
+# Backward-compatible alias
 DEFAULT_GLM_KYC_PROMPT = DEFAULT_GLM_RECTO_PROMPT
+DEFAULT_GLM_AUTO_PROMPT = DEFAULT_GLM_CNI_PROMPT
+
+CNI_FIELDS = ["nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
+              "sexe", "taille", "profession", "date_delivrance", "date_expiration",
+              "sp", "adresse", "autorite_nom", "poste_identification", "pere", "mere"]
+
+# ---------------------------------------------------------------------------
+# Field format validators — last-chance gate before returning PaddleOCR data.
+# Each validator returns True if the value matches the expected format for that field.
+# Banking requirement: reject (None) anything that doesn't pass — fail safe.
+# ---------------------------------------------------------------------------
+def _is_alphabetic_text(v: str, min_len: int = 1, reject_numbers: bool = False) -> bool:
+    s = v.strip()
+    if len(s) < min_len:
+        return False
+    if reject_numbers and any(c.isdigit() for c in s):
+        return False
+    return bool(re.match(r"^[A-Za-zÀ-ÖØ-ÿ\d][A-Za-zÀ-ÖØ-ÿ\s\-'\.\d]{0,}$", s))
+
+FIELD_VALIDATORS_PADDLE: dict[str, callable] = {
+    "nom": lambda v: bool(re.match(r"^[A-ZÀ-Ÿ][A-ZÀ-Ÿ\s\-'\.]{1,39}$", v.strip().upper())),
+    "prenom": lambda v: bool(re.match(r"^[A-ZÀ-Ÿ][A-ZÀ-Ÿ\s\-'\.]{1,49}$", v.strip().upper())),
+    "numero_cni": lambda v: len(re.sub(r"\D", "", v)) >= 15,
+    "date_naissance": lambda v: bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", v)),
+    "lieu_naissance": lambda v: _is_alphabetic_text(v, min_len=2),
+    "sexe": lambda v: v.upper().strip() in ("M", "F"),
+    "taille": lambda v: bool(re.search(r"1[.,]\d{2}", v)),
+    "profession": lambda v: _is_alphabetic_text(v, min_len=3, reject_numbers=True),
+    "date_delivrance": lambda v: bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", v)),
+    "date_expiration": lambda v: bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", v)),
+    "adresse": lambda v: any(c.isdigit() for c in v) or any(kw in v.upper() for kw in ["QUARTIER", "RUE", "B.P", "BP", "LOT", "ARROND", "MELEN", "BASTOS", "AKWA"]),
+    "poste_identification": lambda v: bool(re.match(r"^[A-Z]{1,4}\d{2,4}$", v.strip().upper())),
+    "pere": lambda v: _is_alphabetic_text(v, min_len=2),
+    "mere": lambda v: _is_alphabetic_text(v, min_len=2),
+}
+
+
+def _validate_field_value(field_name: str, value: str) -> str | None:
+    """Validate a single field value against its format rules.
+    
+    Args:
+        field_name: CNI field name.
+        value: Extracted value string.
+    
+    Returns:
+        The value unchanged if it passes validation, or None if it doesn't.
+    """
+    validator = FIELD_VALIDATORS_PADDLE.get(field_name)
+    if validator is None:
+        return value
+    return value if validator(value) else None
 
 
 def sanitize_glm_output(data: dict[str, Any], side: str = "recto") -> dict[str, Any]:
@@ -129,7 +187,8 @@ def sanitize_glm_output(data: dict[str, Any], side: str = "recto") -> dict[str, 
     clean_data = data.copy()
     if side.lower() == "verso":
         # Verso should NOT contain identity fields (OLD CNI; new CNI may have them)
-        for field in ["nom", "prenom", "date_naissance", "lieu_naissance", "sexe", "taille", "profession"]:
+        for field in ["nom", "prenom", "date_naissance", "lieu_naissance",
+                      "sexe", "taille", "profession", "signature_present"]:
             clean_data[field] = None
         # Validate NIN: real NIN has 17 digits on Cameroonian CNI; serial number has 9.
         nin = clean_data.get("numero_cni")
@@ -152,7 +211,9 @@ def sanitize_glm_output(data: dict[str, Any], side: str = "recto") -> dict[str, 
                 pass
     elif side.lower() == "recto":
         # Recto should NOT contain validity/verso fields
-        for field in ["numero_cni", "date_delivrance", "date_expiration", "adresse", "poste_identification"]:
+        for field in ["numero_cni", "date_delivrance", "date_expiration",
+                      "adresse", "poste_identification", "pere", "mere",
+                      "sp", "autorite_nom"]:
             clean_data[field] = None
     elif side.lower() == "auto":
         # Auto mode: don't suppress any field, but still validate NIN length
@@ -257,6 +318,18 @@ def _normalize_glm_key(raw_key: str) -> str:
         "surname": "nom",
         "last_name": "nom",
         "occupation": "profession",
+        "pere": "pere",
+        "father": "pere",
+        "mere": "mere",
+        "mother": "mere",
+        "autorite": "autorite_nom",
+        "autorite_nom": "autorite_nom",
+        "authority": "autorite_nom",
+        "autorite_authority": "autorite_nom",
+        "nom_de_l_autorite": "autorite_nom",
+        "sp": "sp",
+        "situation_professionnelle": "sp",
+        "sp_s_n": "sp",
     }
     return _aliases.get(k, k)
 
@@ -378,6 +451,10 @@ def _glm_ocr_extract_via_cli(
         "-p", prompt,
         "-n", str(max_tokens),
         "--temp", str(temperature),
+        "-c", "4096",
+        "-ngl", "0",
+        "-fit", "off",
+        "--chat-template", "chatglm4",
     ]
 
     # Set cwd to the CLI's directory so Windows can find companion DLLs
@@ -414,10 +491,17 @@ def _glm_ocr_extract_via_cli(
             "error": f"Failed to run llama-mtmd-cli: {e}",
         }
 
-    # Canonical field list
+    # Canonical field list — ALL CNI fields (recto + verso)
+    # BUG FIX: old list only had recto fields; verso ones (pere, mere, adresse,
+    # poste_identification, sp, autorite_nom) were silently dropped by the
+    # `if canonical not in _cni_keys: continue` guard below.
     _cni_keys = [
-        "nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
-        "profession", "date_delivrance", "date_expiration", "sexe", "taille",
+        # Recto
+        "nom", "prenom", "date_naissance", "lieu_naissance",
+        "sexe", "taille", "profession",
+        # Verso
+        "numero_cni", "date_delivrance", "date_expiration",
+        "pere", "mere", "sp", "adresse", "autorite_nom", "poste_identification",
     ]
     _date_fields = {"date_naissance", "date_delivrance", "date_expiration"}
     parsed_fields: dict[str, Any] = {k: None for k in _cni_keys}
@@ -435,7 +519,7 @@ def _glm_ocr_extract_via_cli(
             "parsing_mode": "error",
             "model": "glm-ocr",
             "success": False,
-            "error": f"llama-mtmd-cli exited with code {proc.returncode}: {proc.stderr[:500]}",
+            "error": f"llama-mtmd-cli exited with code {proc.returncode}: {proc.stderr[:2000]}",
         }
 
     # Strip markdown code fences if present
@@ -796,19 +880,37 @@ def _parse_mrz_line2(line2: str) -> dict:
 # Sans cette correction, les mots imprimés sur une CNI réelle ne sont pas
 # reconnus comme stop-words et peuvent être pris pour des noms propres.
 STOP_WORDS = {
+    # ----- Identity & document headers -----
     "REPUBLIQUE", "REPUBLIC", "CAMEROON", "CAMEROUN", "NATIONAL", "IDENTITY",
-    "CARD", "CARTE", "NATIONALE", "IDENTITE", "SIGNATURE", "SEXE", "NAME", "NOM",
-    "SURNAME", "GIVEN", "NAMES", "PROFESSION", "OCCUPATION", "MENAGERE", "TRAVAIL",
-    "INGENIEUR", "REPUBLIQUEDUCAMEROUN", "REPUBLICOFCAMEROON", "CARTENATIONALEDIDENTITE",
-    "PERE/FATHER", "MERE/MOTHER", "S.P/S.M", "AUTORITE/AUTHORITY", "DATEDE", "DELIVRANCE",
-    "POSTEDIDENTIFICATION", "DATEOFISSUE", "IDENTIFSCATIONPOSS", "DATEDEXPIRATION/",
-    "DENTIFLANTUNIQUE", "DATEOEEXPIRY", "UNIOUEIDENDFIE", "DENTIFIANURIQUE",
-    "OHOUEIDENTIFIER", "FENO", "PRÉNOMS", "PRENOMS", "PRÉNOM", "PRENOM",
+    "CARD", "CARTE", "NATIONALE", "IDENTITE", "SIGNATURE",
+    # ----- Field labels (never legitimate values) -----
+    "SEXE", "NAME", "NOM", "SURNAME", "GIVEN", "NAMES",
+    "PRÉNOMS", "PRENOMS", "PRÉNOM", "PRENOM",
+    "PROFESSION", "OCCUPATION", "MENAGERE", "TRAVAIL",
+    "INGENIEUR",
+    "HEIGHT", "TAILLE",
+    "ADRESSE", "ADDRESS",
+    "DATE", "BIRTH", "NAISSANCE",
+    "LIEU", "PLACE", "PLACEOFBIRTH", "LIEUDENAISSANCE",
+    "NUMERO", "NUMBER",
+    "IDENTIFIANT", "UNIQUE", "IDENTIFIER",
+    "POSTE", "IDENTIFICATION",
+    "DELIVRANCE", "EXPIRATION",
+    # ----- Garbled OCR variants of common labels -----
+    "REPUBLIQUEDUCAMEROUN", "REPUBLICOFCAMEROON", "CARTENATIONALEDIDENTITE",
+    "NATIONALIDENTITY", "CARTENATIONALED'IDENTITE", "CNI",
+    "CARTENATIONALED", "DIDENTITE", "NATIONALED",
+    "POSTEDIDENTIFICATION", "IDENTIFSCATIONPOSS",
+    "DATEOFISSUE", "DATEDEXPIRATION/", "DATEDE",
+    "DENTIFLANTUNIQUE", "DATEOEEXPIRY",
+    "UNIOUEIDENDFIE", "DENTIFIANURIQUE", "OHOUEIDENTIFIER",
+    "FENO",
+    # ----- Authority / issuing labels -----
+    "AUTORITE", "AUTHORITY", "AUTORITE/AUTHORITY", "AUTORITÉ",
+    "S.P/S.M",
+    # ----- Parent labels (compound + individual) -----
+    "PERE/FATHER", "MERE/MOTHER", "PERE", "FATHER", "MERE", "MOTHER",
 }
-
-CNI_FIELDS = ["nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
-               "sexe", "taille", "profession", "date_delivrance", "date_expiration",
-               "adresse", "poste_identification"]
 
 
 def extract_spatial_data(blocks: list[dict]) -> dict:
@@ -897,7 +999,20 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
                             if len(b_text) > 2:
                                 candidates.append(b)
                 if candidates:
-                    candidates.sort(key=lambda b: (b["cy"] - block["cy"]) // 10 * 1000 + abs(b["cx"] - block["cx"]))
+                    _addr_keywords = {"QUARTIER", "RUE", "CARREFOUR", "B.P", "BP", "LOT", "ARROND", "MELEN", "BASTOS", "AKWA", "BONABERI", "MAKEPE", "NDOKOTI", "MVOG", "BIYEM", "ESSOS"}
+                    _label_penalty = {"DATE", "BIRTH", "BIRTA", "NAISSANCE", "DELIVRANCE", "EXPIRATION", "IDENTIFIER", "IDENTIFICATION", "UNIQUE"}
+                    def _addr_sort_key(b):
+                        cy_diff = b["cy"] - block["cy"]
+                        cx_diff = abs(b["cx"] - block["cx"])
+                        b_upper = b["text"].upper()
+                        quality_bonus = 0
+                        if any(kw in b_upper for kw in _addr_keywords) or any(c.isdigit() for c in b_upper):
+                            quality_bonus = -10000
+                        penalty = 0
+                        if any(kw in b_upper for kw in _label_penalty):
+                            penalty = 10000
+                        return (cy_diff // 10) * 1000 + cx_diff + quality_bonus + penalty
+                    candidates.sort(key=_addr_sort_key)
                     meilleur = candidates[0]
                     parsed_data["adresse"] = {"value": meilleur["text"], "conf": meilleur["conf"]}
 
@@ -915,6 +1030,77 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
                     meilleur = candidates[0]
                     if len(meilleur["text"]) <= 6 and not any(kw in meilleur["text"].upper() for kw in ["POST", "IDENT"]):
                         parsed_data["poste_identification"] = {"value": meilleur["text"].replace(" ", ""), "conf": meilleur["conf"]}
+
+            # SP / S.N. — 6-digit number (situation professionnelle)
+            # The label is often garbled: "5P/5.M.", "SP/SM", etc.
+            if re.search(r"[5S][Pp][/\\.]", text) and parsed_data["sp"]["value"] is None:
+                sp_candidates = [
+                    b for b in blocks
+                    if b["cy"] > block["cy"] + 2 and b["cy"] < block["cy"] + 60
+                    and abs(b["cx"] - block["cx"]) < 150
+                ]
+                if sp_candidates:
+                    sp_candidates.sort(key=lambda b: b["cy"] - block["cy"])
+                    for _sp_b in sp_candidates:
+                        _sp_match = re.search(r"\b(\d{5,7})\b", _sp_b["text"])
+                        if _sp_match:
+                            parsed_data["sp"] = {"value": _sp_match.group(1), "conf": _sp_b["conf"]}
+                            break
+            # Fallback: isolated 6-digit number on the left side of the card
+            if parsed_data["sp"]["value"] is None:
+                _sp_direct = re.search(r"^\s*(\d{6})\s*$", block["text"].strip())
+                if _sp_direct and block["cx"] < 200 and block["cy"] < 500:
+                    parsed_data["sp"] = {"value": _sp_direct.group(1), "conf": block["conf"]}
+
+            # Autorite_nom — name alongside or below AUTORITE/AUTHORITY label
+            if re.search(r"(AUTORIT[EÉ]|AUTHORITY)", text) and parsed_data["autorite_nom"]["value"] is None:
+                # The authority name can be on the same row (new CNI) or
+                # much further below (old CNI, up to ~80-100px away).
+                # Column: authority is always in the middle band (cx ~150-550).
+                # Exclude: date/post/identifier labels, stop-words, short tokens.
+                _auth_candidates = [
+                    b for b in blocks
+                    if (abs(b["cy"] - block["cy"]) < 20 and b["cx"] > block["cx"] + 10)  # same row, right
+                    or (b["cy"] > block["cy"] + 2 and b["cy"] < block["cy"] + 120        # below, same column band
+                        and abs(b["cx"] - block["cx"]) < 350)
+                ]
+                _auth_valid = [
+                    b for b in _auth_candidates
+                    if not any(sw in b["text"].upper() for sw in STOP_WORDS)
+                    and not re.search(r"(AUTORIT[EÉ]|AUTHORITY|DATE|BIRTH|POST|ADRESS|IDENTIF|UNIQUE)", b["text"].upper())
+                    and len(b["text"]) >= 4
+                    and not re.search(r"^\d+$", b["text"].strip())           # skip pure-digit blocks
+                    and not re.search(r"\d{2}[./-]\d{2}[./-]\d{4}", b["text"])  # skip date strings
+                    and not re.match(r"^[A-Z]{1,4}\d{2,4}$", b["text"].strip())  # skip post codes (EN68)
+                ]
+                if _auth_valid:
+                    # Prefer same-row first, then nearest below
+                    _auth_valid.sort(key=lambda b: (abs(b["cy"] - block["cy"]), abs(b["cx"] - block["cx"])))
+                    parsed_data["autorite_nom"] = {"value": _auth_valid[0]["text"], "conf": _auth_valid[0]["conf"]}
+
+            # Pere
+            if re.search(r"(PERE|FATHER)", text) and parsed_data["pere"]["value"] is None:
+                candidates = [
+                    b for b in blocks
+                    if b["cy"] > block["cy"] + 2 and abs(b["cx"] - block["cx"]) < 350
+                ]
+                if candidates:
+                    candidates.sort(key=lambda b: b["cy"] - block["cy"])
+                    meilleur = candidates[0]
+                    if not any(sw in meilleur["text"].upper() for sw in STOP_WORDS):
+                        parsed_data["pere"] = {"value": meilleur["text"], "conf": meilleur["conf"]}
+
+            # Mere
+            if re.search(r"(MERE|MOTHER)", text) and parsed_data["mere"]["value"] is None:
+                candidates = [
+                    b for b in blocks
+                    if b["cy"] > block["cy"] + 2 and abs(b["cx"] - block["cx"]) < 350
+                ]
+                if candidates:
+                    candidates.sort(key=lambda b: b["cy"] - block["cy"])
+                    meilleur = candidates[0]
+                    if not any(sw in meilleur["text"].upper() for sw in STOP_WORDS):
+                        parsed_data["mere"] = {"value": meilleur["text"], "conf": meilleur["conf"]}
 
         # --- Identity fields (extract on BOTH sides) ---
         # Sexe (F / M isolated)
@@ -935,9 +1121,10 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
             parsed_data["profession"] = {"value": text, "conf": block["conf"]}
 
         # Lieu de naissance (Cameroonian city names)
+        # GUARD: verso has no holder place-of-birth; cities there (e.g. LIMBE in
+        # "LIMBE-MELEN") belong to the address — block assignment on verso.
         _city_matches = [c for c in CAMEROON_CITIES if c in text]
-        if _city_matches and parsed_data["lieu_naissance"]["value"] is None:
-            # Verify it's not inside an MRZ line
+        if _city_matches and parsed_data["lieu_naissance"]["value"] is None and not is_verso:
             if "<" not in text:
                 parsed_data["lieu_naissance"] = {"value": _city_matches[0].title(), "conf": block["conf"]}
 
@@ -1104,15 +1291,40 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
                 parsed_data["methode"] += " + MRZ"
 
     # --- Fallback heuristic for missing nom/prenom ---
-    if parsed_data["nom"]["value"] is None or parsed_data["prenom"]["value"] is None:
+    # On verso without an explicit NOM/SURNAME label, skip the heuristic entirely.
+    # The verso contains parent names (PERE/MERE), not the cardholder's identity.
+    # Guessing from arbitrary uppercase blocks picks up garbled labels or parent values.
+    _run_heuristic = not (is_verso and parsed_data["nom"]["value"] is None and parsed_data["prenom"]["value"] is None)
+    if _run_heuristic and (parsed_data["nom"]["value"] is None or parsed_data["prenom"]["value"] is None):
+        # Build a set of cy coordinates for parent-label blocks so we can
+        # exclude blocks that immediately follow a PERE/MERE label (those are
+        # parent name values, not the subject's identity fields).
+        _PARENT_LABEL_KEYWORDS = {"PERE", "FATHER", "MERE", "MOTHER"}
+        _parent_label_cys: list[float] = []
+        for _b in blocks:
+            _b_words = re.findall(r"\b[A-ZÀ-Ÿ]{3,}\b", _b.get("text", "").upper())
+            if any(w in _PARENT_LABEL_KEYWORDS for w in _b_words):
+                _parent_label_cys.append(float(_b.get("cy", 0)))
+
+        _PARENT_PROXIMITY_PX = 60
+
+        def _is_parent_value(block_cy: float) -> bool:
+            return any(
+                label_cy < block_cy <= label_cy + _PARENT_PROXIMITY_PX
+                for label_cy in _parent_label_cys
+            )
+
         caps_blocks = []
         for b in blocks:
             words = re.findall(r"\b[A-Z]{3,}\b", b["text"])
             if not words:
                 continue
             has_stop = any(w.upper() in STOP_WORDS for w in words)
-            if not has_stop:
-                caps_blocks.append(b)
+            if has_stop:
+                continue
+            if _parent_label_cys and _is_parent_value(float(b.get("cy", 0))):
+                continue
+            caps_blocks.append(b)
 
         caps_blocks.sort(key=lambda b: b["cy"])
 
@@ -1127,6 +1339,16 @@ def extract_spatial_data(blocks: list[dict]) -> dict:
                 parsed_data["prenom"] = {"value": second_block["text"], "conf": second_block["conf"]}
                 if "HEURISTIQUE" not in parsed_data["methode"]:
                     parsed_data["methode"] += " + HEURISTIQUE"
+
+    # Last-chance format validation: reject fields that don't match expected format.
+    # Banking requirement: fail safe — never return a value that doesn't pass its
+    # format validator. Downstream (GLM fallback or human review) handles gaps.
+    for _field in CNI_FIELDS:
+        _val = parsed_data[_field]["value"]
+        if _val is not None:
+            _valid = _validate_field_value(_field, str(_val))
+            if _valid is None:
+                parsed_data[_field] = {"value": None, "conf": 0.0}
 
     return parsed_data
 

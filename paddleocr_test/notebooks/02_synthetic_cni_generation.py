@@ -29,6 +29,7 @@ def _():
     from pathlib import Path
 
     import string
+    import re
     import numpy as np
     from PIL import Image, ImageDraw, ImageFont
     from faker import Faker
@@ -102,9 +103,9 @@ def _():
         ImageDraw,
         ImageFont,
         Path,
+        datetime,
         image_to_bytes,
         images_dir,
-        datetime,
         json,
         mo,
         np,
@@ -279,8 +280,8 @@ def _(images_dir, mo):
                     _options[_label] = str(_f)
 
     # 6.png = recto, 3.png = verso (templates vus sur les vraies cartes)
-    _recto_default = next((k for k in _options if k.endswith("6.png")), next(iter(_options), None))
-    _verso_default = next((k for k in _options if k.endswith("3.png")), None)
+    _recto_default = next((k for k in _options if k.endswith("6_New.png")), next(iter(_options), None))
+    _verso_default = next((k for k in _options if k.endswith("3_New.png")), None)
 
     recto_picker = mo.ui.dropdown(
         options=_options,
@@ -640,30 +641,77 @@ def _(
         img_dir = output_dir / "images"
         img_dir.mkdir(exist_ok=True)
 
-        _config = CNI_FIELD_CONFIG[layout_type.value]
-        manifest = []
+        if not recto_img:
+            _export_output = mo.md("❌ **Export aborted** — Recto template is None. Please select a recto template first.")
+        elif not verso_img:
+            _export_output = mo.md("❌ **Export aborted** — Verso template is None. Please select a verso template first.")
+        else:
+            _config = CNI_FIELD_CONFIG[layout_type.value]
+            manifest = []
+            saved_r = 0
+            saved_v = 0
+            errors = []
 
-        for i, record in enumerate(records):
-            _r_img = render_side(recto_img, record, _config["recto"])
-            _v_img = render_side(verso_img, record, _config["verso"])
+            # Scan existing image IDs to avoid overwriting
+            _existing_ids = set()
+            if img_dir.exists():
+                for _f in img_dir.iterdir():
+                    _m = re.match(r"cni_(\d+)_(recto|verso)\.jpg$", _f.name)
+                    if _m:
+                        _existing_ids.add(int(_m.group(1)))
+            _start_id = max(_existing_ids) + 1 if _existing_ids else 0
 
-            r_name = f"cni_{i}_recto.jpg"
-            v_name = f"cni_{i}_verso.jpg"
+            for i, record in enumerate(records):
+                _id = _start_id + i
+                try:
+                    _r_img = render_side(recto_img, record, _config["recto"])
+                except Exception as _e:
+                    _r_img = None
+                    errors.append(f"#{_id} recto render: {_e}")
+                try:
+                    _v_img = render_side(verso_img, record, _config["verso"])
+                except Exception as _e:
+                    _v_img = None
+                    errors.append(f"#{_id} verso render: {_e}")
 
-            if _r_img: _r_img.save(img_dir / r_name, "JPEG", quality=95)
-            if _v_img: _v_img.save(img_dir / v_name, "JPEG", quality=95)
+                r_name = f"cni_{_id}_recto.jpg"
+                v_name = f"cni_{_id}_verso.jpg"
 
-            manifest.append({
-                "id": i,
-                "recto": r_name if _r_img else None,
-                "verso": v_name if _v_img else None,
-                "data": record
-            })
+                if _r_img:
+                    try:
+                        _r_img.save(img_dir / r_name, "JPEG", quality=95)
+                        saved_r += 1
+                    except Exception as _e:
+                        errors.append(f"#{_id} recto save: {_e}")
+                if _v_img:
+                    try:
+                        _v_img.save(img_dir / v_name, "JPEG", quality=95)
+                        saved_v += 1
+                    except Exception as _e:
+                        errors.append(f"#{_id} verso save: {_e}")
 
-        _ts_str = f"_{datetime.now():%Y%m%d_%H%M%S}"
-        _output_path = output_dir / f"dataset_manifest{_ts_str}.json"
-        _output_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-        _export_output = mo.md(f"✅ **Exported {len(records)} image pairs** to `{img_dir}` and manifest to `{_output_path}`")
+                manifest.append({
+                    "id": _id,
+                    "recto": r_name if _r_img else None,
+                    "verso": v_name if _v_img else None,
+                    "data": record
+                })
+
+            _ts_str = f"_{datetime.now():%Y%m%d_%H%M%S}"
+            _output_path = output_dir / f"dataset_manifest{_ts_str}.json"
+            _output_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+
+            _n = len(records)
+            _lines = [f"📦 Manifest written to `{_output_path}`"]
+            _lines.append(f"🖼️  Images: {saved_r}/{_n} recto saved, {saved_v}/{_n} verso saved to `{img_dir}`")
+            if _start_id > 0:
+                _lines.append(f"📌 Appended as IDs {_start_id}–{_start_id + _n - 1} (no overwrite)")
+            if errors:
+                for _e in errors[:5]:
+                    _lines.append(f"⚠️  {_e}")
+                if len(errors) > 5:
+                    _lines.append(f"⚠️  ... and {len(errors) - 5} more errors")
+            _export_output = mo.md("\n\n".join(_lines))
 
     _export_output
     return
