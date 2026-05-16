@@ -77,7 +77,7 @@ const OtpVerifyScreen = () => {
 
       if (mode === 'login') {
         localStorage.removeItem('vp_onboarding_flow');
-        navigate('/auth/pin-login', { replace: true });
+        navigate(userRes.has_pin ? '/auth/pin-login' : '/auth/pin-setup', { replace: true });
       } else {
         localStorage.setItem('vp_onboarding_flow', '1');
         navigate('/auth/email', { state: { mode } });
