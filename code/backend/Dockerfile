@@ -4,7 +4,10 @@ FROM python:3.11-slim-bookworm AS builder
 
 # Install build dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
+    for i in 1 2 3 4 5; do apt-get update && break || sleep 15; done && \
+    apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     libffi-dev \
@@ -23,12 +26,12 @@ COPY pyproject.toml uv.lock ./
 
 
 
-# Install all dependencies via uv (BuildKit cache avoids re-downloading on rebuilds)
-RUN --mount=type=cache,target=/root/.cache/uv \
+# Install all dependencies via uv (BuildKit cache persists pip wheels across rebuilds)
+# id=uv-pip-cache: stable name so BuildKit reuses the same cache across builds/prunes
+RUN --mount=type=cache,id=uv-pip-cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project && \
-    # Clean up to reduce image size
-    find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
-    find /app/.venv -name "wheel*" -exec rm -rf {} + 2>/dev/null || true && \
+    find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null ; \
+    find /app/.venv -name "wheel*" -exec rm -rf {} + 2>/dev/null ; \
     find /app/.venv -name "*.pyc" -delete
 
 # Final stage
@@ -38,7 +41,10 @@ FROM python:3.11-slim-bookworm
 # - OCR: libgl1, libglib2.0-0, libstdc++
 # - PostgreSQL client tools: postgresql-client
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
+    for i in 1 2 3 4 5; do apt-get update && break || sleep 15; done && \
+    apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libstdc++6 \

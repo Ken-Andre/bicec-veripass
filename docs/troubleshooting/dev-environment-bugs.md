@@ -307,6 +307,172 @@ git config --local --list --show-origin
 
 ---
 
+### Docker Build Cache — rebuild sans re-téléchargement
+
+#### Principe
+
+Docker BuildKit a **deux mécanismes de cache indépendants** :
+
+| Mécanisme | Ce qu'il cache | Effacé par |
+|---|---|---|
+| **Layer cache** | Résultat de chaque instruction Dockerfile | `--no-cache`, `docker builder prune` |
+| **Cache mounts** (`--mount=type=cache`) | Dossier persistant entre les builds (ex:uv, bun, apt) | `docker builder prune` uniquement |
+
+`--no-cache` vide la layer cache mais **pas** les cache mounts. Conséquence : on peut faire un rebuild propre ("peau neuve") sans re-télécharger les gros paquets.
+
+#### État des cache mounts dans le projet
+
+| Service | Outil | Cache mount target | Ligne Dockerfile |
+|---|---|---|---|
+| api, celery_* | uv | `/root/.cache/uv` | backend/Dockerfile:27 |
+| pwa | bun | `/root/.bun/install/cache` | mobile/Dockerfile:10 |
+| backoffice | bun | `/root/.bun/install/cache` | backoffice/Dockerfile:10 |
+
+#### Commandes
+
+```bash
+# Rebuild routine (code changé, pas de re-téléchargement)
+docker compose build api pwa backoffice
+
+# Rebuild peau neuve SANS re-télécharger
+docker compose build --no-cache api pwa backoffice
+
+# Rebuild + restart propre
+docker compose down && docker compose up -d --build api
+```
+
+#### Prune sans vider les cache mounts
+
+`docker builder prune` vide les cache mounts. Pour les préserver :
+
+```bash
+# Pruner tout SAUF les cache mounts
+docker builder prune --filter type=exec.cachemount
+
+# Ou conserver au moins X Go de cache
+docker builder prune --keep-storage 10g
+```
+
+#### bun.lock — quel service ?
+
+- `code/mobile/bun.lock` → service **pwa**
+- `code/backoffice/bun.lock` → service **backoffice**
+- `bun.lock` root → **pas utilisé par Docker**
+
+#### uv (Python) — mise à jour des dépendances
+
+```bash
+# 1. Modifier pyproject.toml
+# 2. Recalculer le lockfile
+cd code/backend
+uv lock            # après changements dans pyproject.toml
+uv lock --upgrade  # force la montée de version de toutes les deps
+
+# 3. Rebuild
+docker compose build api celery_ocr celery_notifications celery_beat
+```
+
+#### Alembic — erreurs fréquentes au rebuild
+
+L'entrypoint (`entrypoint.sh`) lance `alembic upgrade head` à chaque démarrage de l'API. Les workers ont `SKIP_MIGRATIONS=1`.
+
+- **Piège** : ancien container encore vivant pendant que le nouveau lance les migrations → conflit de lock sur `alembic_version`
+- **Rebuild safe** : `docker compose down && docker compose up -d --build api`
+- **Diagnostic** : `docker compose logs api | grep -i alembic`
+
+---
+
+### Alembic — mécanisme complet de A à Z
+
+#### Chaîne de migrations (18 fichiers, 1 merge point)
+
+```
+d6e8c2e05497 (initial — crée toutes les tables)
+│
+├─→ 011_address_niu → 012_aml → 013_dwh
+│                       └─→ a1b2c3d4e5f6 (OTP)
+│                           └─→ 014_merge_heads ◄ fusionne les deux branches
+│
+└─→ 015_token_revocations → 016_drop_orphan_consents
+    → 017_drop_orphan_sanctions → 018_agent_lockout_fields
+    → 019_aml_gatekeeper → 50a7fe83564e → 60b8fe84565f
+    → 020_add_client_name → 021_banking → 022_ocr_status
+    → c529536aee7b → 023_ocr_review_confirmed ← HEAD
+```
+
+#### Cycle de démarrage
+
+```
+docker compose up -d
+       │
+       ▼
+PostgreSQL démarre
+  → init.sql : CREATE EXTENSION pg_trgm, uuid-ossp, pgcrypto
+  → init.sql : CREATE FUNCTION trigger_set_updated_at()
+  → healthcheck: pg_isready
+       │ (service_healthy)
+       ▼
+API démarre
+  → entrypoint.sh : alembic upgrade head
+    → vérifie table alembic_version
+    → si DB vide : crée la table, applique les 18 migrations
+    → si DB existe : applique juste les manquantes
+  → uvicorn démarre
+       │ (service_healthy)
+       ▼
+Workers démarrent
+  → SKIP_MIGRATIONS=1 → pas de migration
+```
+
+#### Si la DB est effacée (volume supprimé)
+
+1. PostgreSQL recrée la DB → `init.sql` crée extensions + triggers
+2. API démarre → `alembic upgrade head` détecte DB vide
+3. **Applique les 18 migrations de zéro** dans l'ordre exact
+4. Schéma reconstruit à l'identique
+5. **Données perdues** — les migrations reconstruisent le schéma, pas les données
+
+#### Après reconstruction — re-seed
+
+```bash
+# Le schéma est reconstruit automatiquement
+# Puis seed les données de base :
+docker compose exec api python scripts/seed_dev.py
+docker compose exec api python scripts/seed_banking.py
+```
+
+---
+
+### Protection des volumes — réglementation bancaire (10 ans PII)
+
+#### Quelles commandes détruisent les volumes
+
+| Commande | Volumes détruits ? |
+|---|---|
+| `docker compose down` | **Non** (par défaut) |
+| `docker compose down -v` | **Oui** (-v = --volumes) |
+| `docker system prune` | **Non** (sans --volumes) |
+| `docker system prune --volumes` | **Oui** |
+| `docker system prune -a --volumes` | **Oui** |
+| `docker volume prune` | **Oui** (tous les non-utilisés) |
+
+#### Protections en place
+
+**Labels** (dans `docker-compose.yml`) : les volumes critiques portent `com.bicec.retention: "10y"`.
+
+**Prune filtré** — ne toucher qu'aux volumes sans label :
+```bash
+docker volume prune --filter "label!=com.bicec.retention"
+```
+
+**Règle d'or** : ne JAMAIS utiliser `docker compose down -v`, `docker system prune --volumes`, ou `docker volume prune` sans filtre.
+
+#### Backup DB
+
+Le service `celery_beat` a un cron quotidien qui sauvegarde la DB dans `/backups/db` (volume `db_backups`). Ce volume est séparé de `db_storage` — si la DB est corrompue, les backups restent.
+
+---
+
 ## Notes pour la production
 
 - Le comportement 401 pour OTP expire est correct **cote backend** — le frontend doit juste rediriger vers `/auth/phone` (pas `/auth/login`).

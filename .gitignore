@@ -235,3 +235,8 @@ paddleocr_test/notebooks/output/*/*/*.jpg
 paddleocr_test/notebooks/output/*.png
 paddleocr_test/notebooks/output/*.jpg
 paddleocr_test/notebooks/output/images/*.jpg
+
+# ========================
+# Bicec Veripass Boss
+# ========================
+bicec-veripass-boss/code/

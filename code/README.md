@@ -5,6 +5,16 @@
 **Projet de Fin d'Études (PFE)** — Data/IA Engineering
 **Client :** BICEC (Banque Internationale du Cameroun pour l'Épargne et le Crédit)
 **Stack :** React/TypeScript PWA · FastAPI (Python 3.11) · PostgreSQL 16 · Redis · Celery · Docker Compose
+| Stack | Versions |
+|-------|----------|
+| Frontend mobile | React 18 + TypeScript + Vite (PWA) |
+| Frontend backoffice | React 18 + TypeScript + Vite (SPA) |
+| Backend | Python 3.11 + FastAPI |
+| Base de données | PostgreSQL 17 |
+| Cache / Broker | Redis 7 |
+| OCR | PaddleOCR v3 + GLM-OCR |
+| Biométrie | DeepFace + MiniFASNet |
+| Conteneurisation | Docker Compose + BuildKit |
 
 ---
 
@@ -21,11 +31,15 @@ bicec-veripass/
 └── docs/             # Documentation, diagrammes, ADRs, DDL
 ```
 
-**Personas back-office :**
-- **Jean** — Validateur KYC (Validation Desk)
-- **Thomas** — Superviseur AML/CFT (conformité nationale)
-- **Sylvie** — Directrice opérationnelle (Command Center)
-- **Admin IT** — Administrateur système (lifecycle agents, config)
+1. Créer `%USERPROFILE%\.wslconfig` :
+   ```ini
+   [wsl2]
+   memory=12GB
+   processors=4
+   localhostForwarding=true
+   ```
+2. Redémarrer WSL : `wsl --shutdown` puis relancer Docker Desktop
+3. Vérifier : `wsl --list --verbose` → `Running`
 
 ---
 
@@ -61,13 +75,54 @@ docker compose exec fastapi python scripts/seed_dev.py
 ```
 
 ### URLs (dev)
-| Service | URL |
-|---------|-----|
-| PWA (Marie) | https://localhost:3000 |
-| Back-Office | https://localhost:3001 |
-| API FastAPI | https://localhost:8000/docs |
-| PostgreSQL | localhost:5432 |
-| Redis | localhost:6379 |
+
+| Service | URL | Port host |
+|---------|-----|-----------|
+| **PWA mobile** (Marie) | http://localhost:3000 | 3000 |
+| **Backoffice** (Jean, Thomas, Sylvie, Admin) | http://localhost:3001 | 3001 |
+| **API REST** | http://localhost:8001 | 8001 |
+| **Documentation API** | http://localhost:8001/docs | 8001 |
+| **Flower** (monitoring Celery) | http://localhost:5555 | 5555 |
+| **Mailpit** (emails dev) | http://localhost:8025 | 8025 |
+| **PostgreSQL** | localhost:15432 | 15432 |
+| **Redis** | localhost:16379 | 16379 |
+
+### Comptes de démonstration
+
+| Persona | Email | Rôle | Mot de passe (par défaut) |
+|---------|-------|------|--------------------------|
+| Jean Dupont | jean@bicec.cm | Validateur KYC | `password123` |
+| Thomas Martin | thomas@bicec.cm | Superviseur AML | `password123` |
+| Sylvie Bernard | sylvie@bicec.cm | Directrice Opérations | `password123` |
+| Admin IT | admin@bicec.cm | Administrateur | `admin123` |
+
+---
+
+## Architecture des services
+
+```
+┌─────────┐     ┌──────────┐     ┌────────────┐
+│  nginx  │────▶│   api    │────▶│ postgres   │
+│ (proxy) │     │ (FastAPI)│     │ (DB 17)    │
+└────┬────┘     └────┬─────┘     └────────────┘
+     │               │
+     │         ┌─────▼──────┐     ┌────────────┐
+     │         │ celery_ocr  │────▶│  redis     │
+     │         │ (GLM-OCR)   │     │ (broker)   │
+     │         └────────────┘     └────────────┘
+     │         ┌────────────┐
+     ├────────▶│  pwa       │ (React SPA statique)
+     │         └────────────┘
+     │         ┌────────────┐
+     └────────▶│ backoffice │ (React SPA statique)
+               └────────────┘
+
+Services additionnels :
+• celery_notifications — envoi SMS/email asynchrone
+• celery_beat — tâches planifiées (backup, sync sanctions)
+• flower — monitoring Celery
+• mailpit — capture emails en dev
+```
 
 ---
 
@@ -81,14 +136,12 @@ Copier `.env.example` → `.env` et remplir toutes les valeurs.
 Le projet chiffre tous les fichiers `.env` avec [senv](https://github.com/DannyBen/senv) pour pouvoir versionner les secrets de façon sécurisée.
 
 **Fichiers et leur statut Git :**
-
 | Fichier | Git | Description |
 |---------|-----|-------------|
 | `.env` | ignoré | Secrets en clair — reste local |
 | `.env.enc` | versionné | Version chiffrée — safe à committer |
 | `.env.pass` | ignoré | Clé de chiffrement — jamais committée |
 | `new.env` | ignoré | Sortie du déchiffrement — renommer en `.env` |
-
 **Usage quotidien :**
 ```bash
 # Chiffrer tous les .env du repo -> .env.enc
@@ -134,10 +187,10 @@ alembic downgrade -1
 docker compose exec fastapi pytest --cov=app tests/
 
 # Frontend (vitest)
-cd mobile && npm run test
+cd mobile ; bun run test
 
 # E2E (Playwright)
-cd mobile && npx playwright test
+cd mobile ; bunx playwright test
 ```
 
 ---

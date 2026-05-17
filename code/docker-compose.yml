@@ -10,9 +10,18 @@ networks:
 
 volumes:
   documents_storage:  # /data/documents — Images CNI, selfies, factures — 10 ans COBAC
+    labels:
+      com.bicec.retention: "10y"
+      com.bicec.type: "pii-documents"
   models_storage:     # /data/models   — PaddleOCR, GLM-OCR, MiniFASNet, FaceNet-512
   db_storage:         # /data/db       — PostgreSQL data files
+    labels:
+      com.bicec.retention: "10y"
+      com.bicec.type: "pii-database"
   db_backups:         # /backups/db    — PostgreSQL backups (non-pruned par docker prune)
+    labels:
+      com.bicec.retention: "10y"
+      com.bicec.type: "backup"
   redis_data:
   models_paddlex_storage: # /home/vpuser/.paddlex — Cache for PaddleX models
   nginx_certs:
