@@ -537,7 +537,7 @@ async def verify_pin(
     if not user.pin_hash:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="PIN révoqué. Veuillez vous reconnecter via OTP.",
+            detail="PIN non configuré. Veuillez d'abord configurer votre PIN via OTP.",
         )
 
     if not verify_password(body.pin, user.pin_hash):

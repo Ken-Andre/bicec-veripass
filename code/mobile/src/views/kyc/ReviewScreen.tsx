@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
-import type { KycStepType } from '../../types';
+import type { AccessTier, KycStatus, KycStepType } from '../../types';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { Button } from '../../components/ui/button';
 import { ProgressStepper } from '../../components/ProgressStepper';
@@ -77,6 +77,13 @@ interface ReadinessData {
   required_missing_documents: string[];
 }
 
+interface SubmitResponse {
+  session_id: string;
+  status: KycStatus;
+  access_level: AccessTier;
+  message: string;
+}
+
 /**
  * Resolve a checklist value using backend-first logic:
  * - If backend is loaded and has an explicit flag → use it (true/false)
@@ -97,7 +104,7 @@ function resolveChecklist(
 export default function ReviewScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { address, signatureData, billCapture, completeStep, setEditStep } = useKyc();
+  const { address, signatureData, billCapture, completeStep, setEditStep, setStatus, setAccessLevel } = useKyc();
   const [session, setSession] = useState<SessionData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -203,7 +210,10 @@ export default function ReviewScreen() {
       });
 
       if (res.ok) {
+        const body = await res.json() as SubmitResponse;
         completeStep('submission');
+        setStatus(body.status);
+        setAccessLevel(body.access_level);
         setEditStep(null);
         navigate('/kyc/submit-success');
       } else {

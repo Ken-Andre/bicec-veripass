@@ -20,6 +20,7 @@ interface AuthContextType {
   biometricEnabled: boolean;
   isPasskeySupported: boolean;
   login: (token: string, user: User) => void;
+  refreshUser: () => Promise<User | null>;
   logout: () => void;
   lock: () => void;
   unlock: () => void;
@@ -192,6 +193,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pollPauseUntilRef.current = 0;
   }, []);
 
+  const refreshUser = useCallback(async (): Promise<User | null> => {
+    try {
+      const freshUser = await apiClient.get<User>('/auth/me');
+      localStorage.setItem('vp_user', JSON.stringify(freshUser));
+      setUser(freshUser);
+      return freshUser;
+    } catch (err) {
+      console.warn('Failed to refresh authenticated user', err);
+      return null;
+    }
+  }, []);
+
   const setPinSetupCompleted = useCallback(() => {
     setUser(prev => {
       if (!prev) return null;
@@ -259,6 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       biometricEnabled,
       isPasskeySupported: isPasskeySupported(),
       login,
+      refreshUser,
       logout,
       lock,
       unlock,

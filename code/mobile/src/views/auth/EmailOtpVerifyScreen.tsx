@@ -10,7 +10,7 @@ import { MailCheck } from 'lucide-react';
 const EmailOtpVerifyScreen = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const state = location.state as { email?: string } | null;
   const email = state?.email || user?.email;
 
@@ -69,9 +69,10 @@ const EmailOtpVerifyScreen = () => {
     setError('');
     try {
       await apiClient.post('/auth/email/verify', { otp: fullCode });
+      const freshUser = await refreshUser();
 
       // Email verified, proceed to PIN setup
-      if (!user?.has_pin) {
+      if (!(freshUser ?? user)?.has_pin) {
         navigate('/auth/pin-setup', { state: { onboarding: true } });
       } else {
         navigate('/dashboard');

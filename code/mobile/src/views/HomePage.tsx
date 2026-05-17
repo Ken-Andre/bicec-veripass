@@ -79,18 +79,6 @@ export function HomePage() {
       navigate(user && !user.has_pin ? '/auth/pin-setup' : '/dashboard', { replace: true });
       return;
     }
-    const saved = localStorage.getItem('vp_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.has_pin) {
-          navigate('/auth/pin-login', { replace: true });
-          return;
-        }
-      } catch {
-        localStorage.removeItem('vp_user');
-      }
-    }
     const timer = setTimeout(() => setShowOnboarding(true), SPLASH_DURATION);
     return () => clearTimeout(timer);
   }, [loading, isAuthenticated, user, navigate]);

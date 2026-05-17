@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
-import { apiClient } from '../../services/apiClient';
+import { apiClient, type ApiError } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { Delete, Lock } from 'lucide-react';
 
@@ -47,10 +47,22 @@ const LockScreen = () => {
       const cleanRoute = lastRoute.replace(/^\/mobile/, '') || '/dashboard';
       navigate(cleanRoute, { replace: true });
     } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      const detail = typeof apiErr.response?.data === 'object' && apiErr.response?.data !== null
+        ? (apiErr.response.data as { detail?: string }).detail
+        : undefined;
+      if (apiErr.status === 403 && typeof detail === 'string' && detail.toLowerCase().includes('otp')) {
+        setError('Reconnexion OTP requise. Redirection...');
+        setTimeout(() => {
+          navigate('/auth/phone', { replace: true });
+        }, 1500);
+        return;
+      }
+
       // Distinguish a real PIN failure from a backend server error.
       // apiClient surfaces the HTTP status in the message as "HTTP 5xx"
       // or via the standard status text ("Internal Server Error", etc.).
-      const message = err instanceof Error ? err.message : String(err);
+      const message = apiErr.message || String(err);
       const isServerError =
         /^HTTP 5\d\d$/.test(message) ||
         message === 'Internal Server Error' ||

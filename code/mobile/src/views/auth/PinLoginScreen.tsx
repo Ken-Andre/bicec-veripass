@@ -3,13 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { Button } from '../../components/ui/button';
-import { apiClient } from '../../services/apiClient';
+import { apiClient, type ApiError } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { Fingerprint, Delete, ShieldCheck, HelpCircle } from 'lucide-react';
+import type { User } from '../../types';
 
 const PinLoginScreen = () => {
   const navigate = useNavigate();
   const { login, user, biometricEnabled, isPasskeySupported, authenticateWithPasskey } = useAuth();
+
+  // Guard: redirect to pin-setup if user has no PIN configured
+  useEffect(() => {
+    if (user && !user.has_pin) {
+      navigate('/auth/pin-setup', { replace: true });
+    }
+  }, [user, navigate]);
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -26,22 +34,7 @@ const PinLoginScreen = () => {
     const tryBiometric = async () => {
       const success = await authenticateWithPasskey();
       if (success && user) {
-        try {
-          const res = await apiClient.post<{ access_token: string }, { phone: string; pin: string }>('/auth/pin/verify', {
-            phone: user.phone || '',
-            pin: 'biometric'
-          });
-          login(res.access_token, {
-            id: user.id,
-            phone: user.phone,
-            email: user.email || '',
-            role: user.role,
-            has_pin: true
-          });
-          navigate('/dashboard');
-        } catch {
-          setError('Connectez-vous avec votre PIN');
-        }
+        setError('Connexion biométrique indisponible pour le moment. Utilisez votre PIN.');
       }
     };
 
@@ -71,20 +64,23 @@ const PinLoginScreen = () => {
         phone: user.phone,
         pin: code
       });
-
-      login(res.access_token, {
-        id: user.id,
-        phone: user.phone,
-        email: user.email || '',
-        role: user.role,
-        has_pin: true
+      const freshUser = await apiClient.get<User>('/auth/me', {
+        headers: {
+          Authorization: `Bearer ${res.access_token}`,
+        },
       });
+
+      login(res.access_token, freshUser);
 
       navigate('/dashboard');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('OTP')) {
-        setError('Session expirée. Redirection vers OTP...');
+      const apiErr = err as ApiError;
+      const detail = typeof apiErr.response?.data === 'object' && apiErr.response?.data !== null
+        ? (apiErr.response.data as { detail?: string }).detail
+        : undefined;
+      const message = apiErr.message || String(err);
+      if (apiErr.status === 403 && typeof detail === 'string' && detail.toLowerCase().includes('otp')) {
+        setError('Session PIN invalide. Redirection vers OTP...');
         setTimeout(() => navigate('/auth/phone'), 1500);
         return;
       }
@@ -135,22 +131,7 @@ const PinLoginScreen = () => {
     try {
       const success = await authenticateWithPasskey();
       if (success && user) {
-        try {
-          const res = await apiClient.post<{ access_token: string }, { phone: string; pin: string }>('/auth/pin/verify', {
-            phone: user.phone || '',
-            pin: 'biometric'
-          });
-          login(res.access_token, {
-            id: user.id,
-            phone: user.phone,
-            email: user.email || '',
-            role: user.role,
-            has_pin: true
-          });
-          navigate('/dashboard');
-        } catch {
-          setError('Utilisez votre PIN pour vous connecter');
-        }
+        setError('Connexion biométrique indisponible pour le moment. Utilisez votre PIN.');
       } else {
         setError('Biométrie échouée. Utilisez votre PIN.');
       }

@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { Delete, Lock, MessageSquareCheck, Mail } from 'lucide-react';
+import type { User } from '../../types';
 
 type Step = 'otp-phone' | 'otp-email' | 'pin';
 
@@ -318,20 +319,8 @@ const ForgotPinScreen = () => {
     try {
       const headers = authHeaders();
       await apiClient.post('/auth/pin/setup', { pin }, { headers });
-      const userRes = await apiClient.get<unknown>('/auth/me', { headers }) as unknown as {
-        id?: string;
-        phone?: string;
-        email?: string;
-        role?: string;
-        access_token?: string;
-      };
-      login(userRes.access_token || recoveryToken || '', {
-        id: userRes.id || '',
-        phone: userRes.phone || user?.phone || '',
-        email: userRes.email || user?.email || '',
-        role: userRes.role || 'CLIENT',
-        has_pin: true
-      });
+      const userRes = await apiClient.get<User>('/auth/me', { headers });
+      login(recoveryToken || '', userRes);
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       const apiErr = err as { response?: { data?: { detail?: string } } };

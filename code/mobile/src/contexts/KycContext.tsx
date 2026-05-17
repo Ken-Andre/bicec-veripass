@@ -64,6 +64,14 @@ export interface ReviewStatus {
   unreadNotifications: ReviewStatusNotification[];
 }
 
+const REVIEW_POLLABLE_STATUSES: KycStatus[] = [
+  'SUBMITTED',
+  'PENDING',
+  'PENDING_AGENT_REVIEW',
+  'PENDING_KYC',
+  'PENDING_INFO',
+];
+
 interface KycState {
   sessionId: string | null;
   status: KycStatus;
@@ -227,6 +235,19 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetchWithCorrelation('/api/v1/kyc/session/current');
         if (!active) { console.log(`[KYC:AR] ts=${Date.now()} ABORTED`); return; }
+        if (res.status === 401) {
+          console.log(`[KYC:AR] ts=${Date.now()} DECISION auth-expired keep-local`);
+          localStorage.removeItem('vp_token');
+          window.location.href = '/mobile/auth/phone';
+          return;
+        }
+        if (res.status === 403) {
+          console.log(`[KYC:AR] ts=${Date.now()} DECISION forbidden keep-local`);
+          if (active) {
+            setReconciliationStatus('skipped');
+          }
+          return;
+        }
         if (res.ok) {
           const session = await res.json() as BackendSessionData;
           console.log(`[KYC:AR] ts=${Date.now()} FETCH /session/current status=${res.status} id=${session.id || 'null'} isFreshDraft=${session.status === 'DRAFT' && (session.documents?.length ?? 0) === 0}`);
@@ -263,7 +284,7 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
 
   // ADR-001: Poll review status if PENDING or SUBMITTED
   useEffect(() => {
-    if (state.status !== 'PENDING' && state.status !== 'SUBMITTED') return;
+    if (!REVIEW_POLLABLE_STATUSES.includes(state.status)) return;
     if (!state.sessionId) return;
 
     let active = true;

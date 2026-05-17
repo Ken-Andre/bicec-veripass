@@ -473,6 +473,84 @@ Le service `celery_beat` a un cron quotidien qui sauvegarde la DB dans `/backups
 
 ---
 
+### Erreur 6 — Redirection vers pin-login au lieu de pin-setup après OTP login
+
+**Symptome :**
+```
+POST /auth/pin/verify  →  403 {"detail":"PIN non configuré. Veuillez d'abord configurer votre PIN via OTP."}
+```
+- L'utilisateur a `has_pin: false` dans `/auth/me`
+- Après OTP, l'app redirige vers pin-login au lieu de pin-setup
+- L'API retourne "PIN non configuré" (anciennement "PIN révoqué")
+
+**Causes (3 bugs distincts) :**
+
+**1. Routing OTP incorrect (committed fix) — `OtpVerifyScreen.tsx` commit b4c34c6:**
+```diff
+- navigate('/auth/pin-login', { replace: true });
++ navigate(userRes.has_pin ? '/auth/pin-login' : '/auth/pin-setup', { replace: true });
+```
+Le routing après OTP ne vérifiait pas `has_pin` et envoyait tout le monde vers pin-login.
+
+**2. Stale `vp_user` localStorage (unstaged fix) — `HomePage.tsx`:**
+Lecture du `vp_user.has_pin` du cache local sans validation serveur, redirigeant vers pin-login même si le PIN a été révoqué côté serveur.
+
+**3. Message backend trompeur — `backend/router.py:540`:**
+```diff
+- detail="PIN révoqué. Veuillez vous reconnecter via OTP.",
++ detail="PIN non configuré. Veuillez d'abord configurer votre PIN via OTP.",
+```
+"PIN révoqué" suggérait une révocation active alors que le PIN n'était simplement pas défini.
+
+**Solution appliquée :**
+- `OtpVerifyScreen.tsx` : vérifie `userRes.has_pin` avant de router
+- `HomePage.tsx` : supprime l'utilisation du stale `vp_user` localStorage
+- `PinLoginScreen.tsx` : ajout d'un guard `useEffect` → redirige vers pin-setup si `!user?.has_pin`
+- `router.py` : message précis "PIN non configuré" au lieu de "PIN révoqué"
+
+**Tests de régression :**
+- `PinLoginScreen.test.tsx` : vérifie le rechargement de `/auth/me` + redirection OTP
+- `OtpVerifyScreen.test.tsx` : vérifie le routing vers pin-setup quand `has_pin: false`
+- `LockScreen.test.tsx` : vérifie la redirection OTP sur 403
+
+---
+
+### Erreur 7 — Polling KYC review status ne démarre jamais après soumission
+
+**Symptome :**
+- L'utilisateur soumet son dossier KYC
+- Le backend transitionne `DRAFT → PENDING_AGENT_REVIEW` 
+- Le mobile reste sur `state.status = 'DRAFT'` localement
+- Le polling `/review-status` ne démarre jamais
+- Le dashboard n'affiche jamais l'évolution du statut
+
+**Causes :**
+
+**1. `ReviewScreen.tsx` n'applique pas le statut retourné par `/kyc/submit`:**
+```diff
++ const body = await res.json() as SubmitResponse;
+  completeStep('submission');
++ setStatus(body.status);
++ setAccessLevel(body.access_level);
+```
+
+**2. `KycContext.tsx` gate de polling trop étroite :**
+```diff
+- if (state.status !== 'PENDING' && state.status !== 'SUBMITTED') return;
++ if (!REVIEW_POLLABLE_STATUSES.includes(state.status)) return;
+```
+La gate ne couvrait que `PENDING` et `SUBMITTED` (jamais utilisés par le backend), au lieu de `SUBMITTED, PENDING, PENDING_AGENT_REVIEW, PENDING_KYC, PENDING_INFO`.
+
+**Solution appliquée :**
+- `ReviewScreen.tsx` : appelle `setStatus()` et `setAccessLevel()` avec la réponse du submit
+- `KycContext.tsx` : élargit les statuts pollables avec `REVIEW_POLLABLE_STATUSES`
+- `KycContext.tsx` : ajoute la gestion 401/403 sur `/session/current`
+
+**Tests de régression :**
+- `ReviewScreen.test.tsx` : vérifie l'application immédiate du statut backend
+
+---
+
 ## Notes pour la production
 
 - Le comportement 401 pour OTP expire est correct **cote backend** — le frontend doit juste rediriger vers `/auth/phone` (pas `/auth/login`).

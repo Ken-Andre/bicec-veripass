@@ -177,7 +177,15 @@ export function fetchWithCorrelation(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  return fetch(url, { ...init, headers });
+  return fetch(url, { ...init, headers }).then((response) => {
+    if (response.status === 401) {
+      localStorage.removeItem('vp_token');
+      if (_onSessionExpired) {
+        _onSessionExpired();
+      }
+    }
+    return response;
+  });
 }
 
 export const apiClient = createApiClient('/api/v1');
