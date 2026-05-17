@@ -1,4 +1,7 @@
-# BICEC VeriPass — Plateforme KYC Souveraine
+# BICEC VeriPass
+
+> **KYC souverain** — Transforme 14 jours d'onboarding manuel en 15 minutes de parcours numérique.
+> 100% on-premise, zéro appel cloud, conforme COBAC (R-2019/01, R-2023/01).
 
 > Transforme 14 jours d'onboarding KYC manuel en 15 minutes de parcours numérique souverain.
 
@@ -206,3 +209,64 @@ Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour les conventions de commits, branche
 - **COBAC R-2019/01, R-2023/01** — KYC/AML banques CEMAC
 - **Loi 2024-017** — Protection des données personnelles (Cameroun)
 - **Souveraineté totale** — 100% on-premise, aucun appel IA externe
+
+---
+
+## Déploiement avec images pré-buildées
+
+Si vous disposez de l'archive `veripass-images.tar` fournie par un membre de l'équipe (images Docker déjà buildées pour éviter de tout recompiler) :
+
+```bash
+# 1. Charger toutes les images
+docker load -i veripass-images.tar
+
+# 2. Configurer l'environnement
+cp .env.example .env
+# Éditer .env — changer DB_PASSWORD, JWT_SECRET, AES_SECRET_KEY...
+
+# 3. Lancer la stack
+docker compose up -d
+
+# 4. Vérifier
+docker compose ps
+# Attendre que tous les services soient "healthy"
+```
+
+> **Note :** Les images pré-buildées contiennent : `code-api`, `code-pwa`, `code-backoffice`, `code-nginx`, `postgres:17-bookworm`, `redis:7-bookworm`, `mher/flower:2.0`, `axllent/mailpit:latest`, `nginxinc/nginx-unprivileged:1.27-alpine`.  
+> Les migrations Alembic et les seed data s'appliquent automatiquement au démarrage.
+
+---
+
+## Backup mensuel des images Docker
+
+Un script est disponible pour sauvegarder toutes les images Docker du projet :
+
+```bash
+# Linux / macOS / WSL
+bash code/scripts/backup-docker-images.sh
+
+# Windows PowerShell
+powershell -File code/scripts/backup-docker-images.ps1
+```
+
+Le script :
+- Sauvegarde toutes les images du `docker-compose.yml` dans `backups/docker-images/`
+- Nomme le fichier avec la date : `veripass-images-2026-05-17.tar.gz`
+- Supprime automatiquement les backups de plus de 90 jours
+
+### Automatisation mensuelle
+
+**Linux / WSL (cron) :**
+```bash
+crontab -e
+# Ajouter (1er jour du mois à 2h du matin) :
+0 2 1 * * /chemin/vers/code/scripts/backup-docker-images.sh
+```
+
+**Windows (Task Scheduler) :**
+```
+1. Ouvrir "Task Scheduler"
+2. Créer une tâche → Déclencheur : mensuel, 1er jour
+3. Action : démarrer powershell.exe
+4. Argument : -File "C:\chemin\vers\code\scripts\backup-docker-images.ps1"
+```

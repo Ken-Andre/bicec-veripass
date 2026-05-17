@@ -157,6 +157,12 @@ GEMINI.md
 QWEN.md
 
 # ========================
+# Clés SSH infrastructure cloud
+# ========================
+code/infra/keys/*
+!code/infra/keys/.gitkeep
+
+# ========================
 # Windows Shortcuts
 # ========================
 *.lnk
