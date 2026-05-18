@@ -23,14 +23,25 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.modules.kyc.models import Document, OCRField
 from app.modules.kyc.storage import document_storage
+from app.services.glm_utils import (
+    DEFAULT_GLM_RECTO_PROMPT,
+    DEFAULT_GLM_VERSO_PROMPT,
+    normalize_glm_key,
+    calculate_glm_confidence,
+    parse_plaintext_fields,
+    sanitize_glm_output,
+    _sanitize_date,
+)
 
 DATE_REGEX = re.compile(r"\b([0-3]?\d[./-][01]?\d[./-](?:19|20)\d{2})\b")
 CNI_NUMBER_REGEX = re.compile(r"\b\d{8,12}\b")
 SEX_REGEX = re.compile(r"\b([MF])\b")
 
 DEFAULT_REQUIRED_FIELDS: dict[str, list[str]] = {
-    "CNI_RECTO": ["nom", "prenoms", "date_naissance", "numero_cni"],
-    "CNI_VERSO": ["date_expiration"],
+    # FIX-1 (Cause 1): clé canonique 'prenom' (sans s) alignée avec GLM/frontend
+    "CNI_RECTO": ["nom", "prenom", "date_naissance", "numero_cni"],
+    # FIX-3 (Cause 3): verso exige désormais les champs critiques pour déclencher GLM si absent
+    "CNI_VERSO": ["date_expiration", "adresse", "poste_identification"],
     "BILL_ENEO": ["contrat_number", "date_facturation", "total_ttc"],
     "BILL_CAMWATER": ["contrat_number", "date_facturation", "total_ttc"],
 }
@@ -133,7 +144,7 @@ def get_shared_paddle_ocr() -> Any | None:
         "lang": _paddle_lang(),
         "use_doc_orientation_classify": False,
         "use_doc_unwarping": False,
-        "use_textline_orientation": True,
+        "use_textline_orientation": False,
         "enable_mkldnn": False,
     }
     if det_model_dir:
@@ -196,8 +207,9 @@ def _extract_fields_from_lines(lines: list[tuple[str, float]]) -> tuple[dict[str
         if "prenom" in text.lower():
             value = text.split(":")[-1].strip()
             if value and len(value) > 1:
-                fields.setdefault("prenoms", value)
-                confidences.setdefault("prenoms", score)
+                # FIX-1 (Cause 1): clé canonique 'prenom' (sans s) pour cohérence pipeline
+                fields.setdefault("prenom", value)
+                confidences.setdefault("prenom", score)
 
         date_match = DATE_REGEX.search(text)
         if date_match:
@@ -275,7 +287,7 @@ def _extract_json_blob(value: str) -> dict[str, Any]:
         return {}
 
 
-def _run_glm_cli(image_path: Path, doc_type: str) -> OCRExtractionResult:
+def _run_glm_cli(image_path: Path, doc_type: str, detected_side: str = "recto") -> OCRExtractionResult:
     if not settings.GLM_OCR_ENABLED:
         return OCRExtractionResult(
             engine="GLM_DISABLED",
@@ -292,31 +304,39 @@ def _run_glm_cli(image_path: Path, doc_type: str) -> OCRExtractionResult:
             confidences={},
         )
 
-    prompt = (
-        "Extract identity fields from this document image as strict JSON. "
-        "Use keys: nom, prenoms, date_naissance, date_expiration, numero_cni, sexe. "
-        "Also provide confidences object with 0..1 float per field. "
-        f"Document type: {doc_type}."
-    )
+    # Side-specific prompt selection
+    if detected_side == "verso":
+        prompt = DEFAULT_GLM_VERSO_PROMPT
+    else:
+        prompt = DEFAULT_GLM_RECTO_PROMPT
 
     cmd = [
         settings.GLM_OCR_CLI_PATH,
-        "--model",
-        settings.GLM_OCR_MODEL_PATH,
-        "--mmproj",
-        settings.GLM_OCR_MMPROJ_PATH,
-        "--image",
-        str(image_path),
-        "--prompt",
-        prompt,
+        "-m", settings.GLM_OCR_MODEL_PATH,
+        "--mmproj", settings.GLM_OCR_MMPROJ_PATH,
+        "--image", str(image_path),
+        "-p", prompt,
+        "-n", "2048",
+        "--temp", "0.1",
+        "-c", "4096",
+        "-ngl", "0",
+        "-fit", "off",
+        "--chat-template", "chatglm4",
     ]
+
+    # Set cwd to CLI's directory so Windows can find companion DLLs
+    cli_dir = settings.GLM_OCR_CLI_PATH.parent if hasattr(settings.GLM_OCR_CLI_PATH, 'parent') else None
+
     try:
         proc = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=settings.GLM_OCR_TIMEOUT_SECONDS,
             check=False,
+            cwd=str(cli_dir) if cli_dir else None,
         )
     except Exception as exc:
         logger.error("GLM CLI invocation failed: %s", exc, exc_info=True)
@@ -328,24 +348,48 @@ def _run_glm_cli(image_path: Path, doc_type: str) -> OCRExtractionResult:
         )
 
     combined_output = f"{proc.stdout}\n{proc.stderr}".strip()
-    parsed = _extract_json_blob(combined_output)
 
-    fields = parsed.get("fields", parsed if isinstance(parsed, dict) else {})
-    if not isinstance(fields, dict):
-        fields = {}
-    fields = {str(k): str(v) for k, v in fields.items() if v not in (None, "")}
+    # Canonical field list
+    _cni_keys = [
+        "nom", "prenom", "date_naissance", "lieu_naissance",
+        "sexe", "taille", "profession",
+        "numero_cni", "date_delivrance", "date_expiration",
+        "pere", "mere", "sp", "adresse", "autorite_nom", "poste_identification",
+    ]
+    _date_fields = {"date_naissance", "date_delivrance", "date_expiration"}
 
-    confidences_obj = parsed.get("confidences", {})
+    # Strip markdown code fences if present
+    _clean = re.sub(r"```(?:json)?", "", combined_output, flags=re.IGNORECASE).replace("```", "").strip()
+    _json_match = re.search(r"\{[\s\S]*?\}", _clean)
+
+    fields: dict[str, str] = {}
     confidences: dict[str, float] = {}
-    if isinstance(confidences_obj, dict):
-        for key, value in confidences_obj.items():
-            try:
-                confidences[str(key)] = max(0.0, min(1.0, float(value)))
-            except Exception:
-                continue
 
-    for key in fields:
-        confidences.setdefault(key, 0.75)
+    if _json_match:
+        try:
+            import json
+            _data = json.loads(_json_match.group())
+            for raw_key, val in _data.items():
+                canonical = normalize_glm_key(raw_key)
+                if canonical not in _cni_keys:
+                    continue
+                if val in ("", "null", "NULL", "N/A", "n/a", None):
+                    val = None
+                if canonical in _date_fields and val is not None:
+                    val = _sanitize_date(str(val))
+                if val is not None:
+                    fields[canonical] = str(val)
+                confidences[canonical] = calculate_glm_confidence(canonical, val)
+        except (json.JSONDecodeError, ValueError):
+            # Plaintext fallback
+            parse_plaintext_fields(combined_output, _cni_keys, _date_fields, fields, confidences)
+    else:
+        # Plaintext fallback
+        parse_plaintext_fields(combined_output, _cni_keys, _date_fields, fields, confidences)
+
+    # Fill missing confidences with default
+    for key in _cni_keys:
+        confidences.setdefault(key, 0.0)
 
     return OCRExtractionResult(
         engine="GLM",
@@ -472,8 +516,41 @@ async def process_glm_fallback(
         raise ValueError(f"Document {document_id} not found")
 
     image_path = _resolve_document_path(document)
-    glm_result = _run_glm_cli(image_path, document.doc_type)
-    await _upsert_ocr_fields(db, document, glm_result.fields, glm_result.confidences)
+
+    # Detect side from doc_type
+    detected_side = "verso" if "VERSO" in (document.doc_type or "").upper() else "recto"
+
+    glm_result = _run_glm_cli(image_path, document.doc_type, detected_side=detected_side)
+
+    # Sanitize GLM output — nullify wrong-side fields, validate NIN length
+    glm_fields_clean = sanitize_glm_output(
+        {k: v for k, v in glm_result.fields.items()},
+        side=detected_side,
+    )
+    glm_conf_clean = {k: v for k, v in glm_result.confidences.items() if glm_fields_clean.get(k) is not None}
+
+    # Confidence-based merge: only overwrite PaddleOCR fields if GLM has higher confidence
+    existing_by_name = {field.field_name: field for field in document.ocr_fields}
+    for field_name, extracted_value in glm_fields_clean.items():
+        if extracted_value is None:
+            continue
+        glm_conf = float(glm_conf_clean.get(field_name, 0.0))
+        existing = existing_by_name.get(field_name)
+        if existing:
+            # Keep existing if it has higher confidence
+            if existing.confidence_score is not None and existing.confidence_score >= glm_conf:
+                continue
+            existing.extracted_value = extracted_value
+            existing.confidence_score = glm_conf
+        else:
+            db.add(
+                OCRField(
+                    document_id=document.id,
+                    field_name=field_name,
+                    extracted_value=extracted_value,
+                    confidence_score=glm_conf,
+                )
+            )
 
     previous_engine = document.ocr_engine or ""
     if previous_engine.startswith("PADDLE"):
@@ -481,8 +558,11 @@ async def process_glm_fallback(
     else:
         document.ocr_engine = glm_result.engine
 
+    # Merge confidences — keep existing higher values
     merged_conf = dict(document.confidence_per_field or {})
-    merged_conf.update(glm_result.confidences)
+    for k, v in glm_conf_clean.items():
+        if k not in merged_conf or v > merged_conf[k]:
+            merged_conf[k] = v
     document.confidence_per_field = merged_conf
     document.ocr_raw_json = {
         "previous": document.ocr_raw_json,

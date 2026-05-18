@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient, setSessionExpiredHandler } from '../services/apiClient';
 import { isPasskeySupported, registerPasskey, authenticatePasskey, removePasskey } from '../services/passkeyService';
 import { clearPersistedKycState } from '../services/kycOfflineStore';
@@ -38,12 +39,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const INACTIVITY_TIMEOUT = import.meta.env.PROD ? 5 * 60 * 1000 : 25 * 1000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(() => 
+  const [biometricEnabled, setBiometricEnabled] = useState(() =>
     localStorage.getItem('vp_biometric') === 'true'
   );
 
@@ -94,13 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSessionExpiredHandler(() => {
       logout();
-      // If on lock screen, stay there; otherwise navigate to login
-      const onLock = window.location.pathname.includes('/auth/lock');
-      if (!onLock) {
-        window.location.href = '/mobile/auth/phone';
-      }
+      const currentPath = window.location.pathname;
+      // Stay on lock screen or any auth page to avoid redirect loops
+      if (currentPath.includes('/auth/')) return;
+      navigate('/auth/phone', { replace: true });
     });
-  }, [logout]);
+  }, [logout, navigate]);
 
   // Reset the inactivity timer on user activity
   const resetTimer = useCallback(() => {

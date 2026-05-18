@@ -6,7 +6,9 @@ interface ConfidenceBadgeProps {
 }
 
 export function ConfidenceBadge({ confidence, className }: ConfidenceBadgeProps) {
-  const level = confidence >= 0.85 ? 'high' : confidence >= 0.5 ? 'medium' : 'low';
+  // FIX-4 (Cause 4): Seuils alignés avec le backend (settings.OCR_CONFIDENCE_THRESHOLD=0.90,
+  // OCR_USER_EDIT_THRESHOLD=0.95). Avant: high≥0.85/medium≥0.50 — induisait en erreur.
+  const level = confidence >= 0.90 ? 'high' : confidence >= 0.70 ? 'medium' : 'low';
   const percent = Math.round(confidence * 100);
 
   return (

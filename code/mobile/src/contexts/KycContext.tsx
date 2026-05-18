@@ -237,8 +237,8 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
         if (!active) { console.log(`[KYC:AR] ts=${Date.now()} ABORTED`); return; }
         if (res.status === 401) {
           console.log(`[KYC:AR] ts=${Date.now()} DECISION auth-expired keep-local`);
-          localStorage.removeItem('vp_token');
-          window.location.href = '/mobile/auth/phone';
+          // Token removal and redirect are handled centrally by apiClient / AuthContext.
+          // Avoid duplicate redirects or full page reloads.
           return;
         }
         if (res.status === 403) {

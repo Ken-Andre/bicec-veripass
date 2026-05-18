@@ -204,6 +204,11 @@ class OCRConfirmSubmitRequest(BaseModel):
     )
 
 
+class MergeOCRResponse(BaseModel):
+    fields: dict = Field(..., description="Merged field name → {value, conf, source}")
+    sources: list = Field(default_factory=list, description="Which sides contributed data")
+
+
 # === NIU ===
 class NIUSubmitRequest(BaseModel):
     niu_type: str = Field(..., description="DECLARATIVE, UPLOADED")

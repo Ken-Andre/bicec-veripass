@@ -50,6 +50,14 @@ export default function OcrReviewScreen() {
   const [retryCount, setRetryCount] = useState(0);
   const [docStatuses, setDocStatuses] = useState<Record<string, string>>({});
 
+  // FIX-6 (Cause 6): État local isolé du KycContext pour protéger les corrections
+  // manuelles de l'utilisateur contre les re-renders/réconciliations du contexte.
+  // setOcrFields n'est appelé QU'au moment du submit final, pas au chargement.
+
+  // FIX-5 (Cause 5): Liste des champs critiques nécessaires pour valider le bouton Continuer
+  const CRITICAL_FIELDS = ['nom', 'prenom', 'date_naissance'];
+  const MIN_CONFIDENCE_TO_ACCEPT = 0.70;
+
   const mountedRef = useRef(true);
 
   const getFieldLabel = (fieldName: string) => {
@@ -128,21 +136,64 @@ export default function OcrReviewScreen() {
         }))
       );
 
-      // Build OCR fields from selected documents only — no global field_name dedup
-      const allOcrFields: Record<string, unknown>[] = [];
+      // ── FIX DOUBLON ─────────────────────────────────────────────────────────
+      // Ordre canonique fixe : recto en premier, puis les champs verso-only.
+      // Chaque field_name n'apparaît QU'UNE FOIS — on fusionne recto+verso en
+      // gardant la valeur avec la confiance la plus haute (non-null prioritaire).
+      const CANONICAL_FIELD_ORDER = [
+        'nom', 'prenom', 'date_naissance', 'lieu_naissance',
+        'sexe', 'taille', 'profession',
+        'numero_cni', 'date_delivrance', 'date_expiration',
+        'pere', 'mere',
+        'sp', 'adresse', 'autorite_nom', 'poste_identification',
+      ];
+
+      // Accumuler le meilleur champ par field_name sur tous les documents
       const docStatusMap: Record<string, string> = {};
+      const bestByField = new Map<string, Record<string, unknown>>();
 
       for (const [dtype, doc] of bestByType.entries()) {
         docStatusMap[dtype] = (doc.ocr_status as string) || 'PENDING';
         const isCni = dtype === 'CNI_RECTO' || dtype === 'CNI_VERSO';
         const isBill = dtype === 'BILL_ENEO' || dtype === 'BILL_CAMWATER';
-        if (isCni || isBill) {
-          const docFields = (doc.ocr_fields || []) as Record<string, unknown>[];
-          for (const f of docFields) {
-            allOcrFields.push({ ...f, _docType: dtype, _ocrStatus: doc.ocr_status });
+        if (!isCni && !isBill) continue;
+
+        const docFields = (doc.ocr_fields || []) as Record<string, unknown>[];
+        for (const f of docFields) {
+          const fname = f.field_name as string;
+          const score = (f.confidence_score as number) ?? 0;
+          const existing = bestByField.get(fname);
+          const existingScore = existing ? ((existing.confidence_score as number) ?? 0) : -1;
+
+          // On garde la valeur avec la confiance la plus haute.
+          // En cas d'égalité, on préfère une valeur non-nulle.
+          const existingHasValue = existing && (existing.extracted_value || existing.corrected_value);
+          const candidateHasValue = !!(f.extracted_value || f.corrected_value);
+          if (
+            !existing ||
+            score > existingScore ||
+            (score === existingScore && candidateHasValue && !existingHasValue)
+          ) {
+            bestByField.set(fname, { ...f, _docType: dtype, _ocrStatus: doc.ocr_status });
           }
         }
       }
+
+      // Construire allOcrFields dans l'ordre canonique
+      const allOcrFields: Record<string, unknown>[] = [];
+      for (const fname of CANONICAL_FIELD_ORDER) {
+        const best = bestByField.get(fname);
+        if (best !== undefined) {
+          allOcrFields.push(best);
+        }
+      }
+      // Champs hors ordre canonique (extensions futures) ajoutés à la fin
+      for (const [fname, f] of bestByField.entries()) {
+        if (!CANONICAL_FIELD_ORDER.includes(fname)) {
+          allOcrFields.push(f);
+        }
+      }
+      // ── FIN FIX DOUBLON ──────────────────────────────────────────────────────
 
       if (allOcrFields.length === 0) {
         setStatusMessage(null);
@@ -164,7 +215,8 @@ export default function OcrReviewScreen() {
       setFields(extractedFields);
       setFetchState('success');
       setDocStatuses(docStatusMap);
-      setOcrFields(extractedFields);
+      // FIX-6 (Cause 6): PAS d'appel à setOcrFields ici — on protège l'état local
+      // des corrections utilisateur contre les synchros intempestives du KycContext.
     } catch (err: unknown) {
       if (!mountedRef.current) return;
 
@@ -245,6 +297,25 @@ export default function OcrReviewScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setCurrentStep, t, sessionId]);
 
+  // FIX-5 (Cause 5): Calcul de la validité des champs critiques pour activer le bouton
+  const isContinueAllowed = (): boolean => {
+    // En mode fallback (fetchState error), l'utilisateur saisit manuellement → on laisse passer
+    if (fetchState === 'error') return true;
+    // Si aucun champ n'est chargé, on laisse continuer (état vide géré ailleurs)
+    if (fields.length === 0) return true;
+    return CRITICAL_FIELDS.every((criticalField) => {
+      const field = fields.find((f) => f.field_name === criticalField);
+      if (!field) return false;
+      const currentValue = editedValues[criticalField] ?? field.value;
+      if (!currentValue || !currentValue.trim()) return false;
+      // Un champ corrigé manuellement est toujours valide
+      const isManuallyCorrected = editedValues[criticalField] !== undefined;
+      if (isManuallyCorrected) return true;
+      // Un champ OCR doit avoir une confiance minimale
+      return field.confidence >= MIN_CONFIDENCE_TO_ACCEPT;
+    });
+  };
+
   const handleSubmit = async () => {
     try {
       const corrections: Record<string, string> = {};
@@ -262,7 +333,7 @@ export default function OcrReviewScreen() {
         await apiClient.post('/kyc/ocr/confirm', { corrected_fields: corrections });
       }
 
-      setOcrFields(updatedFields);
+      setOcrFields(updatedFields); // FIX-6: appel unique au submit, pas au polling
       completeStep('ocr_review');
       navigate('/kyc/biometric-consent');
     } catch (err) {
@@ -436,9 +507,19 @@ export default function OcrReviewScreen() {
         </div>
 
         <div className="pt-4 pb-10">
-          <Button onClick={handleSubmit}>
+          {/* FIX-5 (Cause 5): Bouton désactivé si champs critiques invalides */}
+          <Button
+            onClick={handleSubmit}
+            disabled={!isContinueAllowed()}
+            className={!isContinueAllowed() ? 'opacity-50 cursor-not-allowed' : ''}
+          >
             {t('common.continue')}
           </Button>
+          {!isContinueAllowed() && (
+            <p className="text-[11px] text-center text-destructive mt-2 px-6 font-medium">
+              Veuillez compléter ou corriger les champs NOM, PRÉNOM et DATE DE NAISSANCE.
+            </p>
+          )}
           <p className="text-[11px] text-center text-muted-foreground mt-4 px-6">
             En continuant, vous confirmez que les informations ci-dessus
             correspondent exactement à votre pièce d'identité officielle.

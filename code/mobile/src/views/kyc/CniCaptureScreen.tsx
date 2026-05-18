@@ -204,17 +204,58 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d')!;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    const cw = video.clientWidth || vw;
+    const ch = video.clientHeight || vh;
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    setCniCapture(side, dataUrl);
-    setCapturedImage(dataUrl);
+    // Capture de la frame complète
+    canvas.width = vw;
+    canvas.height = vh;
+    ctx.drawImage(video, 0, 0, vw, vh);
 
+    // --- FIX MOBILE: Recadrage exact sur le rectangle vert de l'UI ---
+    // La vidéo est affichée en 'object-cover', donc elle est redimensionnée 
+    // et coupée par le navigateur pour remplir l'écran. 
+    // Il faut retrouver les coordonnées du rectangle vert dans la vidéo ORIGINALE.
+    const scale = Math.max(cw / vw, ch / vh);
+    const dw = vw * scale; // Largeur vidéo affichée
+    const dh = vh * scale; // Hauteur vidéo affichée
+    const ox = (cw - dw) / 2; // Décalage (négatif) dû au cover
+    const oy = (ch - dh) / 2;
+
+    // Le rectangle vert à l'écran (85% largeur, ratio 1.586)
+    const rectW = cw * 0.85;
+    const rectH = rectW / 1.586;
+    const rectX = (cw - rectW) / 2;
+    const rectY = (ch - rectH) / 2;
+
+    // Mapping exact vers les coordonnées de la vidéo d'origine (intrinsèques)
+    const cropX = Math.round((rectX - ox) / scale);
+    const cropY = Math.round((rectY - oy) / scale);
+    const cropW = Math.round(rectW / scale);
+    const cropH = Math.round(rectH / scale);
+
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = cropW;
+    cropCanvas.height = cropH;
+    const cropCtx = cropCanvas.getContext('2d')!;
+    // Extraction précise de la zone délimitée
+    cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    const croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.90);
+
+    // Mettre à jour la preview et l'état
+    setCniCapture(side, croppedDataUrl);
+    setCapturedImage(croppedDataUrl);
+
+    // Préparer le Blob pour l'upload
     const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85);
+      cropCanvas.toBlob((b) => resolve(b), 'image/jpeg', 0.90);
     });
+    // --- FIN FIX MOBILE ---
+
 
     if (!blob) {
       captureKycMessage('Failed to create image blob from CNI capture canvas', 'upload_failure', {

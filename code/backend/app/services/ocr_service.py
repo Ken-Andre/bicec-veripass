@@ -294,7 +294,7 @@ STOP_WORDS = {
 CNI_FIELDS = [
     "nom", "prenom", "numero_cni", "date_naissance", "lieu_naissance",
     "sexe", "taille", "profession", "date_delivrance", "date_expiration",
-    "adresse", "poste_identification", "pere", "mere",
+    "sp", "adresse", "autorite_nom", "poste_identification", "pere", "mere",
 ]
 
 CAMEROON_CITIES = [
@@ -411,7 +411,9 @@ CNI_VERSO_ZONES = [
     # On the Cameroonian CNI verso, the top section contains PARENT names
     # (NOM DU PERE / NOM DE LA MERE), not the cardholder's own name.
     # The cardholder's nom/prenom must come from the recto side only.
+    ("sp",               0.33,   0.42,   0.02,   0.25, "is_sp"),
     ("lieu_naissance",  0.38,   0.55,   0.02,   0.25, "is_place"),
+    ("autorite_nom",     0.42,   0.56,   0.20,   0.55, "is_name"),
     ("date_delivrance", 0.33,   0.48,   0.40,   0.75, "is_date"),
     ("date_expiration", 0.46,   0.58,   0.40,   0.75, "is_date"),
     ("numero_cni",      0.48,   0.60,   0.60,   0.95, "is_nin"),
@@ -562,6 +564,12 @@ def _is_poste_text(text: str) -> bool:
     return bool(re.match(r'^[A-Z]{1,4}[0-9]{2,4}$', t)) or (len(t) <= 6 and len(re.sub(r'\D', '', t)) >= 2 and len(re.sub(r'[^A-Z]', '', t)) >= 1)
 
 
+def _is_sp_text(text: str) -> bool:
+    """Check if text looks like an SP (situation professionnelle) number — 6 digits."""
+    cleaned = re.sub(r"\D", "", text)
+    return len(cleaned) == 6
+
+
 # ---------------------------------------------------------------------------
 # Bill-specific validators (ENEO / CAMWATER)
 # ---------------------------------------------------------------------------
@@ -631,6 +639,7 @@ _VALIDATORS = {
     "is_profession": _is_profession_text,
     "is_address": _is_address_text,
     "is_poste": _is_poste_text,
+    "is_sp": _is_sp_text,
     "is_contract_number": _is_contract_number_text,
     "is_meter_number": _is_meter_number_text,
     "is_bill_amount": _is_bill_amount_text,
@@ -639,6 +648,55 @@ _VALIDATORS = {
     "is_bill_place": _is_bill_place_text,
     "is_bill_category": _is_bill_category_text,
 }
+
+
+# ---------------------------------------------------------------------------
+# Field format validators — last-chance gate before returning PaddleOCR data.
+# Each validator returns True if the value matches the expected format.
+# Banking requirement: reject (None) anything that doesn't pass — fail safe.
+# ---------------------------------------------------------------------------
+FIELD_VALIDATORS_PADDLE: dict[str, callable] = {
+    "nom": lambda v: bool(re.match(r"^[A-ZÀ-Ÿ][A-ZÀ-Ÿ\s\-'\.]{1,39}$", v.strip().upper())),
+    "prenom": lambda v: bool(re.match(r"^[A-ZÀ-Ÿ][A-ZÀ-Ÿ\s\-'\.]{1,49}$", v.strip().upper())),
+    "numero_cni": lambda v: len(re.sub(r"\D", "", v)) >= 15,
+    "date_naissance": lambda v: bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", v)),
+    "lieu_naissance": lambda v: _is_alphabetic_text(v, min_len=2),
+    "sexe": lambda v: v.upper().strip() in ("M", "F"),
+    "taille": lambda v: bool(re.search(r"1[.,]\d{2}", v)),
+    "profession": lambda v: _is_alphabetic_text(v, min_len=3, reject_numbers=True),
+    "date_delivrance": lambda v: bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", v)),
+    "date_expiration": lambda v: bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", v)),
+    "sp": lambda v: len(re.sub(r"\D", "", v)) == 6,
+    "adresse": lambda v: any(c.isdigit() for c in v) or any(kw in v.upper() for kw in ["QUARTIER", "RUE", "B.P", "BP", "LOT", "ARROND", "MELEN", "BASTOS", "AKWA"]),
+    "autorite_nom": lambda v: _is_alphabetic_text(v, min_len=3),
+    "poste_identification": lambda v: bool(re.match(r"^[A-Z]{1,4}\d{2,4}$", v.strip().upper())),
+    "pere": lambda v: _is_alphabetic_text(v, min_len=2),
+    "mere": lambda v: _is_alphabetic_text(v, min_len=2),
+}
+
+
+def _validate_field_value(field_name: str, value: str) -> str | None:
+    """Validate a single field value against its format rules.
+
+    Returns the value unchanged if it passes validation, or None if it doesn't.
+    """
+    validator = FIELD_VALIDATORS_PADDLE.get(field_name)
+    if validator is None:
+        return value
+    return value if validator(value) else None
+
+
+# ---------------------------------------------------------------------------
+# GLM-OCR utilities (re-exported from glm_utils to avoid circular imports)
+# ---------------------------------------------------------------------------
+from app.services.glm_utils import (  # noqa: E402, F401
+    DEFAULT_GLM_RECTO_PROMPT,
+    DEFAULT_GLM_VERSO_PROMPT,
+    normalize_glm_key as _normalize_glm_key,
+    calculate_glm_confidence as _calculate_glm_confidence,
+    parse_plaintext_fields as _parse_plaintext_fields,
+    sanitize_glm_output,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -704,6 +762,14 @@ def _extract_poste_value(text: str) -> str | None:
     t = text.strip().replace(" ", "")
     if len(t) <= 6 and len(re.sub(r'\D', '', t)) >= 2:
         return t
+    return None
+
+
+def _extract_sp_value(text: str) -> str | None:
+    """Extract SP (situation professionnelle) — 6-digit number."""
+    cleaned = re.sub(r"\D", "", text)
+    if len(cleaned) == 6:
+        return cleaned
     return None
 
 
@@ -794,6 +860,10 @@ def _extract_by_template(
                 continue
         elif field_name == "poste_identification":
             value = _extract_poste_value(best_text)
+            if value is None:
+                continue
+        elif field_name == "sp":
+            value = _extract_sp_value(best_text)
             if value is None:
                 continue
 
@@ -1002,6 +1072,48 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                     if len(meilleur.get("text", "")) <= 6 and not any(kw in meilleur.get("text", "").upper() for kw in ["POST", "IDENT"]):
                         parsed_data["poste_identification"] = {"value": meilleur["text"].replace(" ", ""), "conf": meilleur.get("conf", conf)}
 
+            # SP / S.N. — 6-digit number (situation professionnelle)
+            # The label is often garbled: "5P/5.M.", "SP/SM", etc.
+            if re.search(r"[5S][Pp][/\\.]", text) and parsed_data["sp"]["value"] is None:
+                sp_candidates = [
+                    b for b in blocks
+                    if b["cy"] > block["cy"] + 2 and b["cy"] < block["cy"] + 60
+                    and abs(b.get("cx", 0) - block.get("cx", 0)) < 150
+                ]
+                if sp_candidates:
+                    sp_candidates.sort(key=lambda b: b["cy"] - block["cy"])
+                    for _sp_b in sp_candidates:
+                        _sp_match = re.search(r"\b(\d{5,7})\b", _sp_b["text"])
+                        if _sp_match:
+                            parsed_data["sp"] = {"value": _sp_match.group(1), "conf": _sp_b.get("conf", conf)}
+                            break
+            # Fallback: isolated 6-digit number on the left side of the card
+            if parsed_data["sp"]["value"] is None:
+                _sp_direct = re.search(r"^\s*(\d{6})\s*$", text.strip())
+                if _sp_direct and block.get("cx", 999) < 200 and block.get("cy", 999) < 500:
+                    parsed_data["sp"] = {"value": _sp_direct.group(1), "conf": conf}
+
+            # Autorite_nom — name alongside or below AUTORITE/AUTHORITY label
+            if re.search(r"(AUTORIT[EÉ]|AUTHORITY)", text) and parsed_data["autorite_nom"]["value"] is None:
+                _auth_candidates = [
+                    b for b in blocks
+                    if (abs(b.get("cy", 0) - block.get("cy", 0)) < 20 and b.get("cx", 0) > block.get("cx", 0) + 10)
+                    or (b.get("cy", 0) > block.get("cy", 0) + 2 and b.get("cy", 0) < block.get("cy", 0) + 120
+                        and abs(b.get("cx", 0) - block.get("cx", 0)) < 350)
+                ]
+                _auth_valid = [
+                    b for b in _auth_candidates
+                    if not _is_stop_word(b.get("text", ""))
+                    and not re.search(r"(AUTORIT[EÉ]|AUTHORITY|DATE|BIRTH|POST|ADRESS|IDENTIF|UNIQUE)", b.get("text", "").upper())
+                    and len(b.get("text", "")) >= 4
+                    and not re.search(r"^\d+$", b.get("text", "").strip())
+                    and not re.search(r"\d{2}[./-]\d{2}[./-]\d{4}", b.get("text", ""))
+                    and not re.match(r"^[A-Z]{1,4}\d{2,4}$", b.get("text", "").strip())
+                ]
+                if _auth_valid:
+                    _auth_valid.sort(key=lambda b: (abs(b.get("cy", 0) - block.get("cy", 0)), abs(b.get("cx", 0) - block.get("cx", 0))))
+                    parsed_data["autorite_nom"] = {"value": _auth_valid[0]["text"], "conf": _auth_valid[0].get("conf", conf)}
+
         # --- Identity fields (extract on BOTH sides) ---
         # Sexe (F / M isolated or embedded in noisy OCR text)
         # PaddleOCR v3 sometimes merges small characters with adjacent text,
@@ -1028,8 +1140,10 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
         # Lieu de naissance (Cameroonian city names)
         # NOTE: Déduplication with nom is done centrally in
         # _extract_from_array() after the template/legacy merge, not here.
+        # GUARD: verso has no holder place-of-birth; cities there (e.g. LIMBE in
+        # "LIMBE-MELEN") belong to the address — block assignment on verso.
         _city_matches = [c for c in CAMEROON_CITIES if c in text_upper]
-        if _city_matches and parsed_data["lieu_naissance"]["value"] is None:
+        if _city_matches and parsed_data["lieu_naissance"]["value"] is None and not is_verso:
             # Verify it's not inside an MRZ line
             if "<" not in text:
                 parsed_data["lieu_naissance"] = {"value": _city_matches[0].title(), "conf": conf}
@@ -1311,6 +1425,73 @@ def _enhance_for_ocr(img: np.ndarray) -> np.ndarray:
     l_enhanced = clahe.apply(l_channel)
     lab_enhanced = cv2.merge([l_enhanced, a_channel, b_channel])
     return cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
+
+
+# ---------------------------------------------------------------------------
+# Recto + Verso merge
+# ---------------------------------------------------------------------------
+def combine_extractions(
+    recto_fields: dict[str, dict[str, Any]],
+    verso_fields: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Merge recto and verso extraction results into a single complete record.
+
+    Strategy: prefer higher-confidence values. For each field:
+    - If only one side provides a value, use it.
+    - If both sides provide a value, prefer the one with higher confidence.
+    - Special handling for numero_cni: prefer the longer (NIN) value.
+    """
+    combined = {
+        field: {"value": None, "conf": 0.0, "source": None}
+        for field in CNI_FIELDS
+    }
+
+    for field in CNI_FIELDS:
+        r_val = recto_fields.get(field, {})
+        v_val = verso_fields.get(field, {})
+        r_v = r_val.get("value") if isinstance(r_val, dict) else r_val
+        r_c = r_val.get("conf", 0.0) if isinstance(r_val, dict) else 0.0
+        v_v = v_val.get("value") if isinstance(v_val, dict) else v_val
+        v_c = v_val.get("conf", 0.0) if isinstance(v_val, dict) else 0.0
+
+        if r_v is None and v_v is None:
+            continue
+        if r_v is None and v_v is not None:
+            combined[field] = {"value": v_v, "conf": v_c, "source": "verso"}
+            continue
+        if r_v is not None and v_v is None:
+            combined[field] = {"value": r_v, "conf": r_c, "source": "recto"}
+            continue
+
+        # Both have values — pick best
+        if field == "numero_cni" and isinstance(r_v, str) and isinstance(v_v, str):
+            r_digits = len(re.sub(r"\D", "", r_v))
+            v_digits = len(re.sub(r"\D", "", v_v))
+            if v_digits > r_digits:
+                combined[field] = {"value": v_v, "conf": v_c, "source": "verso"}
+                continue
+            elif r_digits > v_digits:
+                combined[field] = {"value": r_v, "conf": r_c, "source": "recto"}
+                continue
+
+        # Prefer longer/more-complete value
+        if isinstance(r_v, str) and isinstance(v_v, str):
+            r_strip = r_v.strip()
+            v_strip = v_v.strip()
+            if v_strip.startswith(r_strip) and len(v_strip) > len(r_strip):
+                combined[field] = {"value": v_strip, "conf": max(v_c, r_c), "source": "verso"}
+                continue
+            elif r_strip.startswith(v_strip) and len(r_strip) > len(v_strip):
+                combined[field] = {"value": r_strip, "conf": max(r_c, v_c), "source": "recto"}
+                continue
+
+        # General: prefer higher confidence
+        if v_c > r_c:
+            combined[field] = {"value": v_v, "conf": v_c, "source": "verso"}
+        else:
+            combined[field] = {"value": r_v, "conf": r_c, "source": "recto"}
+
+    return combined
 
 
 class OCRService:
@@ -1661,6 +1842,18 @@ class OCRService:
                 fields[field_name] = spatial_data[field_name]
             else:
                 fields[field_name] = {"value": None, "conf": 0.0}
+
+        # Last-chance format validation gate (CNI only)
+        # Banking requirement: fail safe — never return a value that doesn't pass
+        # its format validator. Downstream (GLM fallback or human review) handles gaps.
+        if not is_bill:
+            for _field in CNI_FIELDS:
+                _val = fields.get(_field, {}).get("value")
+                if _val is not None:
+                    _valid = _validate_field_value(_field, str(_val))
+                    if _valid is None:
+                        logger.debug(f"Field {_field} rejected by format validator: '{_val}'")
+                        fields[_field] = {"value": None, "conf": 0.0}
 
         # Calculate average confidence — only over fields that have a value
         filled_confidences = [

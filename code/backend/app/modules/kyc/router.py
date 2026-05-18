@@ -1,6 +1,7 @@
 """KYC Module Routes."""
 
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone, timedelta
 import re
 from statistics import mean
@@ -52,6 +53,7 @@ from app.modules.kyc.schemas import (
     LivenessResultResponse,
     OCRReviewSubmitRequest,
     OCRConfirmSubmitRequest,
+    MergeOCRResponse,
     OCRFieldResponse,
     NIUSubmitRequest,
     SignatureSubmitRequest,
@@ -660,6 +662,100 @@ async def confirm_ocr_review(
         body=OCRReviewSubmitRequest(fields=body.corrected_fields),
         current_user=current_user,
         db=db,
+    )
+
+
+@router.post("/ocr/merge", response_model=MergeOCRResponse)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def merge_ocr_fields(
+    request: Request,
+    session_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Merge recto + verso OCR extractions into a unified identity record.
+
+    Finds both CNI documents for the session, runs confidence-based merge,
+    and uperts the combined fields into both documents.
+    """
+    from app.services.ocr_service import combine_extractions
+
+    result = await db.execute(
+        select(KYCSession).where(KYCSession.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="KYC session not found")
+
+    # Find recto and verso CNI documents
+    docs_result = await db.execute(
+        select(Document)
+        .options(selectinload(Document.ocr_fields))
+        .where(Document.session_id == session_id)
+        .where(Document.doc_type.in_(["CNI_RECTO", "CNI_VERSO"]))
+    )
+    documents = docs_result.scalars().all()
+
+    recto_doc = next((d for d in documents if d.doc_type == "CNI_RECTO"), None)
+    verso_doc = next((d for d in documents if d.doc_type == "CNI_VERSO"), None)
+
+    if not recto_doc and not verso_doc:
+        raise HTTPException(status_code=404, detail="No CNI documents found for this session")
+
+    # Build field dicts from existing OCR fields
+    def _fields_dict(doc):
+        if not doc:
+            return {}
+        return {
+            f.field_name: {"value": f.extracted_value, "conf": f.confidence_score or 0.0}
+            for f in doc.ocr_fields
+        }
+
+    recto_fields = _fields_dict(recto_doc)
+    verso_fields = _fields_dict(verso_doc)
+
+    merged = combine_extractions(recto_fields, verso_fields)
+
+    # FIX-2 (Cause 2): Route chaque champ vers le document d'ORIGINE correct.
+    # Avant ce fix, tout était écrit dans recto_doc, effaçant les données verso.
+    # On distingue les champs natifs verso des champs natifs recto.
+    VERSO_CANONICAL_FIELDS = {
+        "pere", "mere", "sp", "adresse", "autorite_nom", "poste_identification",
+    }
+
+    sources = set()
+    for field_name, data in merged.items():
+        if data["value"] is None:
+            continue
+        source = data.get("source")
+        if source:
+            sources.add(source)
+
+        # Déterminer le document cible selon la source confirmée ou l'appartenance naturelle
+        if source == "verso" or (source is None and field_name in VERSO_CANONICAL_FIELDS):
+            target_doc = verso_doc or recto_doc
+        else:
+            target_doc = recto_doc or verso_doc
+
+        if target_doc:
+            existing_by_name = {f.field_name: f for f in target_doc.ocr_fields}
+            existing = existing_by_name.get(field_name)
+            if existing:
+                existing.extracted_value = data["value"]
+                existing.confidence_score = data["conf"]
+            else:
+                db.add(OCRField(
+                    document_id=target_doc.id,
+                    field_name=field_name,
+                    extracted_value=data["value"],
+                    confidence_score=data["conf"],
+                ))
+
+    await db.commit()
+
+    return MergeOCRResponse(
+        fields={k: v for k, v in merged.items() if v["value"] is not None},
+        sources=sorted(sources),
     )
 
 
