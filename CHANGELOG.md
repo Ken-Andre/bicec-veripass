@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Weekly recap (2026-05-11 to 2026-05-17)
+
+- Fixed authentication routing for users without a configured PIN, refreshed user state after OTP/PIN flows, and widened KYC review polling coverage to reduce stalled client states.
+- Added OCR improvements for CNI processing, including parent-name extraction from card verso and stronger address-detection heuristics.
+- Added sanctions staleness monitoring scaffolding and runtime configuration updates for OTP fallback email and service healthcheck compatibility.
+- Added Oracle Cloud GLM-OCR deployment planning docs, backup automation scripts (Bash/PowerShell), and related environment configuration entries.
+- Improved infrastructure build reliability and speed with apt retry logic, stable cache usage, bun cache mounts, and storage labeling/path updates.
+- PR references: none recorded in commit history for this period.
+
 ### Weekly recap (2026-04-07 to 2026-04-13)
 
 - Closed multiple security findings from PR checks and code review, including clear-text data handling risks, sensitive logging exposure, and fragile JWT decoding logic.

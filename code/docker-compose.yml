@@ -175,6 +175,7 @@ services:
       - models_paddlex_storage:/home/vpuser/.paddlex
       - ${OFFLINE_MODELS_DIR:-./infra/models-offline}:/opt/models-offline:ro
       - ../paddleocr_test/images:/tmp/test-images:ro  # CNI test images for /test/extract endpoint
+      - ./backend/alembic/versions:/app/alembic/versions:ro  # Bind mount pour migrations sans rebuild
     depends_on:
       storage_init:
         condition: service_completed_successfully
@@ -278,6 +279,10 @@ services:
       - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/opt/models-offline/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
       - GLM_OCR_QUEUE=${GLM_OCR_QUEUE:-glm_ocr_jobs}
       - GLM_OCR_TIMEOUT_SECONDS=${GLM_OCR_TIMEOUT_SECONDS:-90}
+      - OCR_ONLINE=${OCR_ONLINE:-false}
+      - OCR_CLOUD_URL=${OCR_CLOUD_URL}
+      - OCR_CLOUD_API_KEY=${OCR_CLOUD_API_KEY}
+      - OCR_CLOUD_KEY=${OCR_CLOUD_KEY}
       - SKIP_MIGRATIONS=1
       - SENTRY_DSN=${SENTRY_DSN_BACKEND}
       - PADDLEX_HOME=/home/vpuser/.paddlex

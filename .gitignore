@@ -246,3 +246,28 @@ paddleocr_test/notebooks/output/images/*.jpg
 # Bicec Veripass Boss
 # ========================
 bicec-veripass-boss/code/
+
+# ========================
+# IDE / Agents
+# ========================
+.openclaude/
+
+# ========================
+# Mobile test artifacts
+# ========================
+code/mobile/playwright-report/
+code/mobile/test-results/
+
+# ========================
+# PaddleOCR scratch
+# ========================
+paddleocr_test/scratch/
+paddleocr_test/notebooks/scratch/
+paddleocr_test/notebooks/output/
+
+# ========================
+# Preview images & archives
+# ========================
+preview_recto.png
+preview_verso.png
+veripass-images.tar

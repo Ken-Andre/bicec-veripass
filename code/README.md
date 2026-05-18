@@ -1,7 +1,4 @@
-# BICEC VeriPass
-
-> **KYC souverain** — Transforme 14 jours d'onboarding manuel en 15 minutes de parcours numérique.
-> 100% on-premise, zéro appel cloud, conforme COBAC (R-2019/01, R-2023/01).
+# BICEC VeriPass — Plateforme KYC Souveraine
 
 > Transforme 14 jours d'onboarding KYC manuel en 15 minutes de parcours numérique souverain.
 
