@@ -253,6 +253,11 @@ bicec-veripass-boss/code/
 .openclaude/
 
 # ========================
+# Claude skills directory
+# ========================
+.claude/
+
+# ========================
 # Mobile test artifacts
 # ========================
 code/mobile/playwright-report/
