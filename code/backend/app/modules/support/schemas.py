@@ -20,6 +20,8 @@ class SupportMessageResponse(BaseModel):
     content: str
     attachment_path: str | None = None
     attachment_sha256: str | None = None
+    attachment_filename: str | None = None
+    attachment_document_id: UUID | None = None
     created_at: datetime
 
 
@@ -35,3 +37,14 @@ class SupportAttachmentResponse(BaseModel):
     sha256: str
     content_type: str
     path: str
+
+
+class SupportAttachmentLimitsResponse(BaseModel):
+    max_size_mb: int
+    hard_max_size_mb: int
+    image_max_size_mb: int
+    pdf_max_size_mb: int
+    pdf_max_pages: int
+    max_message_chars: int
+    allowed_content_types: list[str]
+    allowed_extensions: list[str]
