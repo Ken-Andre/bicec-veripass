@@ -4,6 +4,7 @@ import * as path from 'path';
 
 const screenshotDir = path.resolve(process.cwd(), '../../docs/test-evidence/latest/mobile/screens');
 const threadId = '11111111-1111-4111-8111-111111111111';
+const onePagePdf = '%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n%%EOF';
 
 function ensureEvidenceDir() {
   fs.mkdirSync(screenshotDir, { recursive: true });
@@ -64,6 +65,24 @@ async function mockAuthenticatedApis(page: Page) {
           created_at: '2026-05-22T07:31:00Z',
         },
       ]),
+    });
+  });
+  await page.route(`**/api/v1/support/threads/${threadId}/attachments`, async (route) => {
+    const body = route.request().postDataBuffer();
+    expect(body?.toString('utf8')).toContain('justificatif.pdf');
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'msg-user-attachment',
+        thread_id: threadId,
+        sender: 'user',
+        content: 'Justificatif joint',
+        attachment_filename: 'justificatif.pdf',
+        attachment_sha256: 'evidence-sha256',
+        attachment_path: '/data/documents/support/evidence/justificatif.pdf',
+        created_at: '2026-05-22T07:33:00Z',
+      }),
     });
   });
   await page.route('**/api/v1/notifications', async (route) => {
@@ -128,6 +147,19 @@ test.describe('Day 1 mobile evidence', () => {
     await page.screenshot({ path: path.join(screenshotDir, 'protected-route-auth-redirect.png'), fullPage: true });
   });
 
+  test('service worker update banner is visible and actionable', async ({ page }) => {
+    await clearBrowserState(page);
+
+    await page.goto('/mobile/auth');
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('vp:service-worker-update-available'));
+    });
+    await expect(page.getByText(/Nouvelle version disponible/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Recharger/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Plus tard/i })).toBeVisible();
+    await page.screenshot({ path: path.join(screenshotDir, 'service-worker-update-banner.png'), fullPage: true });
+  });
+
   test('support and notifications screens render without 5xx responses', async ({ page }) => {
     const badResponses = collectBadResponses(page);
     await installAuthenticatedState(page);
@@ -135,8 +167,24 @@ test.describe('Day 1 mobile evidence', () => {
 
     await page.goto('/mobile/support');
     await expect(page.getByText(/justificatif complementaire/i)).toBeVisible();
+    await expect(page.getByText(/JPG\/PNG 4 Mo max - PDF 6 Mo, 5 pages max/i)).toBeVisible();
+    await expect(page.getByText(/0\/4000/i)).toBeVisible();
     await expect(page.getByPlaceholder(/Tapez votre message/i)).toBeEnabled();
     await page.screenshot({ path: path.join(screenshotDir, 'support-screen.png'), fullPage: true });
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'justificatif.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from(onePagePdf),
+    });
+    await expect(page.getByText('justificatif.pdf')).toBeVisible();
+    await expect(page.getByPlaceholder(/Ajouter un message optionnel/i)).toBeVisible();
+    await page.screenshot({ path: path.join(screenshotDir, 'support-attachment-selected.png'), fullPage: true });
+
+    await page.getByPlaceholder(/Ajouter un message optionnel/i).fill('Justificatif joint');
+    await page.getByRole('button', { name: /Envoyer le message/i }).click();
+    await expect(page.getByText(/evidence-sha256|Justificatif joint|justificatif.pdf/i).first()).toBeVisible();
+    await page.screenshot({ path: path.join(screenshotDir, 'support-attachment-sent.png'), fullPage: true });
 
     await page.goto('/mobile/notifications');
     await expect(page.getByText(/Document complementaire requis/i)).toBeVisible();

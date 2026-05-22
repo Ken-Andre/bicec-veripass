@@ -53,6 +53,17 @@ export function useServiceWorker(): ServiceWorkerState {
     }, 0);
   }, []);
 
+  useEffect(() => {
+    const handleUpdateAvailable = () => {
+      setNeedsRefresh(true);
+    };
+
+    window.addEventListener('vp:service-worker-update-available', handleUpdateAvailable);
+    return () => {
+      window.removeEventListener('vp:service-worker-update-available', handleUpdateAvailable);
+    };
+  }, []);
+
   const updateSW = useCallback(() => {
     updateFn?.(true);
   }, [updateFn]);
