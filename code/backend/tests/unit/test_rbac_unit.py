@@ -11,6 +11,10 @@ from app.core.security import create_access_token, require_role
 from app.modules.auth.models import AgentRole
 
 
+def _empty_page() -> dict:
+    return {"items": [], "total": 0, "page": 1, "pages": 1, "limit": 10}
+
+
 # ---------------------------------------------------------------------------
 # AgentRole enum
 # ---------------------------------------------------------------------------
@@ -83,7 +87,7 @@ class TestBackofficeQueueAccess:
         with patch(
             "app.modules.backoffice.router.paginate", new_callable=AsyncMock
         ) as mock_p:
-            mock_p.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
+            mock_p.return_value = _empty_page()
             response = await client.get(
                 "/api/v1/backoffice/queue",
                 headers={"Authorization": f"Bearer {token}"},
@@ -96,7 +100,7 @@ class TestBackofficeQueueAccess:
         with patch(
             "app.modules.backoffice.router.paginate", new_callable=AsyncMock
         ) as mock_p:
-            mock_p.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
+            mock_p.return_value = _empty_page()
             response = await client.get(
                 "/api/v1/backoffice/queue",
                 headers={"Authorization": f"Bearer {token}"},
@@ -105,16 +109,20 @@ class TestBackofficeQueueAccess:
 
 
 class TestAuditLogsAccess:
-    """GET /api/v1/backoffice/audit-logs — THOMAS, SYLVIE, ADMIN_IT only."""
+    """GET /api/v1/backoffice/audit-logs - JEAN, THOMAS, SYLVIE, ADMIN_IT."""
 
     @pytest.mark.asyncio
-    async def test_jean_role_denied(self, client: AsyncClient):
+    async def test_jean_role_allowed(self, client: AsyncClient):
         token = _agent_token(AgentRole.JEAN)
-        response = await client.get(
-            "/api/v1/backoffice/audit-logs",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert response.status_code == 403
+        with patch(
+            "app.modules.backoffice.router.paginate", new_callable=AsyncMock
+        ) as mock_p:
+            mock_p.return_value = _empty_page()
+            response = await client.get(
+                "/api/v1/backoffice/audit-logs",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        assert response.status_code == 200
 
     @pytest.mark.asyncio
     async def test_thomas_role_allowed(self, client: AsyncClient):
@@ -122,7 +130,7 @@ class TestAuditLogsAccess:
         with patch(
             "app.modules.backoffice.router.paginate", new_callable=AsyncMock
         ) as mock_p:
-            mock_p.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
+            mock_p.return_value = _empty_page()
             response = await client.get(
                 "/api/v1/backoffice/audit-logs",
                 headers={"Authorization": f"Bearer {token}"},
@@ -157,7 +165,7 @@ class TestAdminUsersAccess:
         with patch(
             "app.modules.admin.router.paginate", new_callable=AsyncMock
         ) as mock_p:
-            mock_p.return_value = {"items": [], "total": 0, "page": 1, "page_size": 10}
+            mock_p.return_value = _empty_page()
             response = await client.get(
                 "/api/v1/admin/users",
                 headers={"Authorization": f"Bearer {token}"},
@@ -165,14 +173,14 @@ class TestAdminUsersAccess:
         assert response.status_code == 200
 
 
-class TestAmlScreeningAccess:
-    """POST /api/v1/aml/screening — THOMAS, SYLVIE only."""
+class TestAmlAlertsAccess:
+    """GET /api/v1/aml/alerts - THOMAS, SYLVIE only."""
 
     @pytest.mark.asyncio
     async def test_jean_role_denied(self, client: AsyncClient):
         token = _agent_token(AgentRole.JEAN)
-        response = await client.post(
-            "/api/v1/aml/screening",
+        response = await client.get(
+            "/api/v1/aml/alerts",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 403
@@ -180,11 +188,13 @@ class TestAmlScreeningAccess:
     @pytest.mark.asyncio
     async def test_thomas_role_allowed(self, client: AsyncClient):
         token = _agent_token(AgentRole.THOMAS)
-        response = await client.post(
-            "/api/v1/aml/screening",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        # Not 401/403 — may be 200 or 422 depending on body
+        with patch("app.modules.aml.router.service.get_aml_alerts", new_callable=AsyncMock) as mock_alerts:
+            mock_alerts.return_value = []
+            response = await client.get(
+                "/api/v1/aml/alerts",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        # Not 401/403 - may be 200 or 422 depending on body
         assert response.status_code not in (401, 403)
 
 

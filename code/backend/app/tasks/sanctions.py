@@ -65,10 +65,9 @@ async def check_staleness(self):
     Si oui, déclenche une synchronisation immédiate.
     """
     logger.info("[sanctions-staleness] Checking sanctions data staleness...")
-    async with AsyncSessionLocal() as db:
-        # TODO: Implement actual staleness check logic
-        # For now, just log and potentially trigger sync
-        logger.info("[sanctions-staleness] Data is currently up to date (placeholder).")
+    # TODO: Implement actual staleness check logic.
+    # For now, just log and potentially trigger sync.
+    logger.info("[sanctions-staleness] Data is currently up to date (placeholder).")
 
 
 async def _download_and_upsert(db: AsyncSession) -> int:

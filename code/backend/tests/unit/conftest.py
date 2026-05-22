@@ -31,10 +31,13 @@ async def client():
     from app.modules.auth.models import User, Agent, AgentRole
 
     async def _mock_get_db():
+        result = MagicMock()
+        result.scalar.return_value = 0
+        result.scalar_one_or_none.return_value = None
+        result.scalars.return_value.unique.return_value.all.return_value = []
+        result.scalars.return_value.all.return_value = []
         db = AsyncMock()
-        db.execute = AsyncMock(
-            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
-        )
+        db.execute = AsyncMock(return_value=result)
         db.commit = AsyncMock()
         db.rollback = AsyncMock()
         db.close = AsyncMock()

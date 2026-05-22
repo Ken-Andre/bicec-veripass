@@ -55,13 +55,16 @@ if TEST_DATABASE_URL is None:
     else:
         # No credentials available - tests will skip
         TEST_DATABASE_URL = None
-os.environ["DATABASE_URL"] = TEST_DATABASE_URL
-# Also set TEST_DATABASE_URL for tests that use it directly
-os.environ.setdefault("TEST_DATABASE_URL", TEST_DATABASE_URL)
+if TEST_DATABASE_URL is not None:
+    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+    # Also set TEST_DATABASE_URL for tests that use it directly
+    os.environ.setdefault("TEST_DATABASE_URL", TEST_DATABASE_URL)
 
 # Skip Sentry initialization in tests (langchain incompatible with Python 3.14)
 os.environ["SENTRY_DSN"] = ""
 os.environ["SKIP_SENTRY"] = "1"
+os.environ.setdefault("STORAGE_PATH", os.path.abspath(".test-data/documents"))
+os.environ.setdefault("MODELS_PATH", os.path.abspath(".test-data/models"))
 
 # Patch sentry_sdk.init to be a no-op before importing app.main
 import sentry_sdk  # noqa: E402
@@ -77,6 +80,7 @@ sentry_sdk.init = _mock_init
 from app.main import app  # noqa: E402 — must be after env override
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
+from app.core.rate_limit import limiter  # noqa: E402
 
 # Engine dédié aux tests (created lazily)
 _test_engine = None
@@ -119,6 +123,14 @@ pytest_plugins = ('pytest_asyncio',)
 # Override pytest-asyncio's loop scope for function-scoped fixtures
 def pytest_configure(config):
     config.option.asyncio_default_fixture_loop_scope = "function"
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Keep SlowAPI's in-memory counters isolated between tests."""
+    limiter.reset()
+    yield
+    limiter.reset()
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)

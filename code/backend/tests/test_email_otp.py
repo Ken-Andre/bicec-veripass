@@ -3,8 +3,12 @@
 import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock, MagicMock
+from uuid import UUID
 
+from app.main import app
 from app.core.security import create_access_token
+from app.core.security import get_current_user
+from app.db.session import get_db
 
 
 # ============================================================
@@ -12,13 +16,51 @@ from app.core.security import create_access_token
 # ============================================================
 
 
-def _auth_header(user_id: str = "test-user-id") -> dict:
+def _auth_header(user_id: str = "11111111-1111-1111-1111-111111111111") -> dict:
     """Génère un header Authorization JWT pour un utilisateur."""
     token = create_access_token(
         subject=user_id,
         additional_claims={"role": "CLIENT", "user_type": "mobile"},
     )
     return {"Authorization": f"Bearer {token}"}
+
+
+def _set_current_user(user):
+    async def override_get_current_user():
+        return user
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+
+@pytest.fixture(autouse=True)
+def _test_overrides():
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    result.scalars.return_value.first.return_value = None
+
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=result)
+    db.add = MagicMock()
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+    db.refresh = AsyncMock()
+
+    async def override_get_db():
+        yield db
+
+    app.dependency_overrides[get_db] = override_get_db
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_db, None)
+
+
+def _mock_current_user(email=None):
+    user = MagicMock()
+    user.id = UUID("11111111-1111-1111-1111-111111111111")
+    user.phone = "+237600000000"
+    user.email = email
+    _set_current_user(user)
+    return user
 
 
 # ============================================================
@@ -88,6 +130,7 @@ class TestEmailOtpSendEndpoint:
     @pytest.mark.asyncio
     async def test_send_email_otp_invalid_email_returns_422(self, client: AsyncClient):
         """Un email invalide doit retourner 422."""
+        _mock_current_user()
         response = await client.post(
             "/api/v1/auth/email/send",
             headers=_auth_header(),
@@ -98,19 +141,17 @@ class TestEmailOtpSendEndpoint:
     @pytest.mark.asyncio
     async def test_send_email_otp_success(self, client: AsyncClient):
         """Avec un JWT valide et un email valide, la tâche doit être mise en queue."""
-        mock_user = MagicMock()
-        mock_user.id = "test-user-id"
-        mock_user.email = None
+        mock_user = _mock_current_user()
 
         with (
-            patch("app.modules.auth.router.get_current_user", return_value=mock_user),
             patch(
                 "app.modules.auth.router.store_otp",
                 new_callable=AsyncMock,
                 return_value=True,
             ),
-            patch("app.modules.auth.router.send_only_email_otp_task") as mock_task,
+            patch("app.modules.auth.tasks.send_only_email_otp_task") as mock_task,
         ):
+            _set_current_user(mock_user)
             mock_task.delay = MagicMock()
             response = await client.post(
                 "/api/v1/auth/email/send",
@@ -126,12 +167,9 @@ class TestEmailOtpSendEndpoint:
     @pytest.mark.asyncio
     async def test_send_email_otp_store_failure_returns_500(self, client: AsyncClient):
         """Si le store Redis échoue, l'endpoint doit retourner 500."""
-        mock_user = MagicMock()
-        mock_user.id = "test-user-id"
-        mock_user.email = None
+        _mock_current_user()
 
         with (
-            patch("app.modules.auth.router.get_current_user", return_value=mock_user),
             patch(
                 "app.modules.auth.router.store_otp",
                 new_callable=AsyncMock,
@@ -149,18 +187,15 @@ class TestEmailOtpSendEndpoint:
     @pytest.mark.asyncio
     async def test_send_email_otp_rate_limiting(self, client: AsyncClient):
         """Vérifie que l'envoi répété d'OTP déclenche le rate limit (429)."""
-        mock_user = MagicMock()
-        mock_user.id = "test-user-id"
-        mock_user.email = None
+        _mock_current_user()
 
         with (
-            patch("app.modules.auth.router.get_current_user", return_value=mock_user),
             patch(
                 "app.modules.auth.router.store_otp",
                 new_callable=AsyncMock,
                 return_value=True,
             ),
-            patch("app.modules.auth.router.send_only_email_otp_task") as mock_task,
+            patch("app.modules.auth.tasks.send_only_email_otp_task") as mock_task,
         ):
             mock_task.delay = MagicMock()
 
@@ -205,6 +240,7 @@ class TestEmailOtpVerifyEndpoint:
     @pytest.mark.asyncio
     async def test_verify_email_otp_invalid_otp_returns_422(self, client: AsyncClient):
         """Un OTP invalide (non numérique) doit retourner 422."""
+        _mock_current_user(email="marie@example.com")
         response = await client.post(
             "/api/v1/auth/email/verify",
             headers=_auth_header(),
@@ -217,28 +253,23 @@ class TestEmailOtpVerifyEndpoint:
         self, client: AsyncClient
     ):
         """Si l'utilisateur n'a pas d'email enregistré, retourner 400."""
-        mock_user = MagicMock()
-        mock_user.email = None  # Pas d'email
-
-        with patch("app.modules.auth.router.get_current_user", return_value=mock_user):
-            response = await client.post(
-                "/api/v1/auth/email/verify",
-                headers=_auth_header(),
-                json={"otp": "123456"},
-            )
+        _mock_current_user(email=None)
+        response = await client.post(
+            "/api/v1/auth/email/verify",
+            headers=_auth_header(),
+            json={"otp": "123456"},
+        )
 
         assert response.status_code == 400
 
     @pytest.mark.asyncio
     async def test_verify_email_otp_wrong_otp_returns_401(self, client: AsyncClient):
         """Un OTP incorrect doit retourner 401."""
-        mock_user = MagicMock()
-        mock_user.email = "marie@example.com"
+        _mock_current_user(email="marie@example.com")
 
         with (
-            patch("app.modules.auth.router.get_current_user", return_value=mock_user),
             patch(
-                "app.modules.auth.router.verify_otp",
+                "app.modules.auth.router.verify_otp_atomic",
                 new_callable=AsyncMock,
                 return_value=False,
             ),
@@ -254,17 +285,14 @@ class TestEmailOtpVerifyEndpoint:
     @pytest.mark.asyncio
     async def test_verify_email_otp_correct_otp_returns_200(self, client: AsyncClient):
         """Un OTP correct doit retourner 200 avec un message de succès."""
-        mock_user = MagicMock()
-        mock_user.email = "marie@example.com"
+        _mock_current_user(email="marie@example.com")
 
         with (
-            patch("app.modules.auth.router.get_current_user", return_value=mock_user),
             patch(
-                "app.modules.auth.router.verify_otp",
+                "app.modules.auth.router.verify_otp_atomic",
                 new_callable=AsyncMock,
                 return_value=True,
             ),
-            patch("app.modules.auth.router.delete_otp", new_callable=AsyncMock),
         ):
             response = await client.post(
                 "/api/v1/auth/email/verify",
@@ -318,8 +346,8 @@ class TestEmailOtpTask:
         assert "marie@example.com" in str(call_kwargs)
 
     @pytest.mark.asyncio
-    async def test_email_failure_returns_false(self):
-        """Si l'email échoue, la tâche doit retourner False."""
+    async def test_email_failure_raises(self):
+        """Si l'email échoue, la tâche doit lever une erreur retryable."""
         from app.modules.auth.tasks import _send_only_email_flow
 
         with (
@@ -330,9 +358,8 @@ class TestEmailOtpTask:
             mock_settings.OTP_EXPIRY_MINUTES = 5
             mock_email.send_email = AsyncMock(return_value=False)
 
-            result = await _send_only_email_flow("marie@example.com", "654321")
-
-        assert result is False
+            with pytest.raises(RuntimeError):
+                await _send_only_email_flow("marie@example.com", "654321")
 
     @pytest.mark.asyncio
     async def test_fallback_to_email_on_sms_failure(self):
