@@ -5,3 +5,31 @@ repos:
       - id: ggshield
         language: python
         stages: [pre-commit]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        name: backend ruff
+        args: [--config, code/backend/pyproject.toml, code/backend]
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+  - repo: local
+    hooks:
+      - id: mobile-eslint
+        name: mobile eslint
+        entry: npm --prefix code/mobile run lint
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+      - id: backend-pytest
+        name: backend pytest
+        entry: python -m uv --project code/backend run pytest -v
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+      - id: mobile-build
+        name: mobile build
+        entry: npm --prefix code/mobile run build
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

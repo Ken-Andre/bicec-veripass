@@ -19,7 +19,7 @@ jobs:
         run: |
           cd code/backend
           python -m pip install --upgrade pip
-          pip install ruff
+          pip install ruff==0.8.6
       - name: Lint with ruff
         run: |
           cd code/backend
@@ -84,7 +84,8 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET || format('test-secret-{0}', github.run_id) }}
           ENVIRONMENT: testing
           OTP_MODE: dev_local
-          PYTHONPATH: .
+          STORAGE_PATH: ${{ runner.temp }}/veripass-documents
+          MODELS_PATH: ${{ runner.temp }}/veripass-models
         run: cd code/backend && uv run pytest -v
 
   build-mobile:

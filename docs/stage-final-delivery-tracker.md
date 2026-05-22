@@ -1,6 +1,6 @@
 # Stage Final Delivery Tracker
 
-Last updated: 2026-05-22 15:39 +02:00
+Last updated: 2026-05-22 22:59 +02:00
 
 ## Proof Status Model
 
@@ -17,17 +17,20 @@ Last updated: 2026-05-22 15:39 +02:00
 
 | Area | Command | Result |
 | --- | --- | --- |
-| Mobile unit tests | `bun run test` from `code/mobile` | `26 passed`, `172 passed` at 15:28 +02:00 |
-| Mobile typecheck | `bunx tsc -b --noEmit` from `code/mobile` | Passed at 15:29 +02:00 |
+| Mobile unit tests | `bun run test` from `code/mobile` | `29 passed`, `180 passed` at 22:46 +02:00 |
+| Mobile typecheck | `bunx tsc -b --noEmit` from `code/mobile` | Passed at 22:46 +02:00 |
 | OpenAPI JSON validation | `python -m json.tool openapi-spec.json > $null` | Passed |
-| Backend contract/support tests | `docker compose -f code/docker-compose.yml -f code/docker-compose.test.yml run --rm --no-deps --entrypoint /app/.venv/bin/python api -m pytest tests/unit/test_contract_foundation_schemas.py tests/unit/test_support_compat_contract.py tests/unit/test_support_attachment_contract.py -q` | `9 passed, 1 warning in 0.10s` after OpenAPI update |
+| Backend contract/support/preferences tests | `docker compose -f code/docker-compose.yml -f code/docker-compose.test.yml run --rm --no-deps --entrypoint /app/.venv/bin/python api -m pytest tests/unit/test_notification_preferences_contract.py tests/unit/test_contract_foundation_schemas.py tests/unit/test_support_compat_contract.py tests/unit/test_support_attachment_contract.py -q` | `16 passed, 1 warning in 1.41s` |
 | Backoffice typecheck | `bunx tsc --noEmit` from `code/backoffice` | Passed |
 | Backoffice E2E | `bunx playwright test --reporter=line` from `code/backoffice` | `13 passed (43.0s)` |
-| Mobile live rebuild | `docker compose -f code/docker-compose.yml build pwa`; `docker compose -f code/docker-compose.yml up -d pwa nginx`; `docker compose -f code/docker-compose.yml restart nginx` | `vp_pwa` recreated and healthy; `vp_nginx` restarted at 15:31 +02:00 |
-| Mobile evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/mobile` | `4 passed (12.2s)` |
+| API/PWA live rebuild | `docker compose -f code/docker-compose.yml build api pwa`; `docker compose -f code/docker-compose.yml up -d api pwa nginx`; `docker compose -f code/docker-compose.yml restart nginx`; final `docker compose -f code/docker-compose.yml build pwa` after Day 3 push/device client fixes | `vp_api` healthy; `vp_pwa` recreated and healthy; `vp_nginx` restarted after final PWA recreate at 22:57 +02:00 |
+| Alembic linear head/live DB | `docker compose -f code/docker-compose.yml exec -T api /app/.venv/bin/alembic heads`; `docker compose -f code/docker-compose.yml exec -T api /app/.venv/bin/alembic current` | Both returned `026_notification_preferences (head)` |
+| Mobile evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/mobile` | `4 passed (26.7s)` after final PWA rebuild |
 | Backoffice evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/backoffice` | `1 passed (14.9s)` |
 | Live public API smoke | `curl.exe -k` status checks against `https://localhost` | health `200`, support limits/current/compat unauth `401`, `/mobile/auth` `200`, `/mobile/support` `200`, `/back-office/login` `200`, logo `200`, Sentry health `200` |
-| Live authenticated support upload | OTP signup/login via `Invoke-RestMethod`, then multipart `curl.exe -k -F` to `/api/v1/support/threads/{thread_id}/attachments` | `HTTP_STATUS:201`, `attachment_document_id=3701da4e-0daf-41ee-9142-1fbc3f5ec630`, SHA-256 returned |
+| Live support limits/preference API | OTP signup/login via `Invoke-RestMethod`; live GET/PUT through `https://localhost/api/v1` | Support limits returned image `4 Mo`, PDF `6 Mo`, PDF pages `5`, message `4000`; preferences default `sms`, SMS update `200`, email without email `400` |
+| Live Day 3 device/push API | OTP signup/login via `Invoke-RestMethod`; device registration; push create/list/delete through `https://localhost/api/v1` | Device tag `vp_dev_865d59e41f9942595733b6c561aadee9cecfa929c11aad56`; push subscription `1614bb99-f801-4dc8-aa4b-b304f3f45b02`; list before delete `1`, after delete `0` |
+| Live authenticated support upload | OTP signup/login via `Invoke-RestMethod`, then multipart `curl.exe -k -F` to `/api/v1/support/threads/{thread_id}/attachments` after the 17:09 rebuild | `HTTP_STATUS:201`, `attachment_document_id=c41ce1ca-47fc-4844-885a-32ddc58ce100`, SHA-256 `743815b19badc9de3f2dcadd0539cb037319cf66a114f5f33da0de4f25c832be` |
 
 ## Day 1 Stabilization
 
@@ -40,12 +43,28 @@ Last updated: 2026-05-22 15:39 +02:00
 | OpenAPI support contract matches implemented routes | DONE | Senior reviewer | `openapi-spec.json` documents `/support/attachment-limits`, `/support/threads/{thread_id}/attachments`, `attachment_filename`, and `attachment_document_id`; JSON validation passed | `openapi-spec.json`; backend contract tests `9 passed` |
 | PWA support screen uses canonical current-thread endpoint | DONE | Senior reviewer | Rebuilt PWA support flow loads `/support/threads/current` then `/support/threads/{thread_id}/messages`; evidence run has zero 5xx responses | `docs/test-evidence/latest/mobile/screens/support-screen.png` |
 | Client can send requested supporting file from support chat | DONE | Dev C / Senior reviewer | Mobile UI supports PDF/JPG/PNG attachment, optional message, optimistic send, file chip, and backend multipart endpoint creates support message + `Document(COMPLEMENTARY)` + notification | `docs/test-evidence/latest/mobile/screens/support-attachment-selected.png`, `docs/test-evidence/latest/mobile/screens/support-attachment-sent.png`; live API proof `HTTP_STATUS:201` |
-| Attachment limits are visible and enforced | DONE | Dev C / Senior reviewer | UI shows `JPG, PNG ou PDF - 10 Mo max` and `0/4000`; client rejects bad type/oversize; backend rejects bad type `415`, hash mismatch `409`, size over `MAX_DOCUMENT_SIZE_MB` | `code/mobile/src/views/dashboard/SupportScreen.test.tsx`; `code/backend/tests/unit/test_support_attachment_contract.py`; support screenshots |
+| Attachment limits are visible and enforced | DONE | Dev C / Senior reviewer | UI shows `JPG/PNG 4 Mo max - PDF 6 Mo, 5 pages max` and `0/4000`; client rejects bad type, image over 4 Mo, PDF over 6 Mo, PDF over 5 pages; backend enforces the same plus hard API cap `10 Mo`, bad type `415`, hash mismatch `409` | `code/mobile/src/views/dashboard/SupportScreen.test.tsx`; `code/backend/tests/unit/test_support_attachment_contract.py`; support screenshots; live support limits API |
 | Backoffice can see support attachment metadata | DONE | Dev C / Senior reviewer | Backoffice support message schema/router expose attachment path/SHA-256; evidence viewer renders attached client file metadata | `bunx tsc --noEmit`; `bunx playwright test --reporter=line` |
 | Service worker stale-client handling is visible | DONE | Senior reviewer | `useServiceWorker` exposes update state and evidence trigger; banner has `Nouvelle version disponible`, `Plus tard`, and `Recharger`; PWA rebuilt and served live | `docs/test-evidence/latest/mobile/screens/service-worker-update-banner.png`; mobile evidence `4 passed` |
 | Browser 502 cleanup through public nginx | DONE | Senior reviewer | After rebuild/restart, public checks return `200/401` instead of `502`; nginx restarted after PWA recreate | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
 | Visual evidence config produces real artifacts | DONE | Senior reviewer | Evidence configs run only `*.evidence.ts`, one worker, video/screenshot/trace enabled; both `.last-run.json` files show `status: passed` | `docs/test-evidence/latest/mobile/`, `docs/test-evidence/latest/backoffice/` |
 | Backoffice validation path remains truthful | DONE | Senior reviewer | No fake unit coverage claimed; `bunx tsc --noEmit` passed; `bunx playwright test --reporter=line` -> `13 passed` | `docs/test-evidence/latest/backoffice/screens/login.png`, `docs/test-evidence/latest/backoffice/screens/dashboard.png` |
+
+## Day 2 Started
+
+| Requirement | Status | Owner | Proof | Evidence |
+| --- | --- | --- | --- | --- |
+| Client chooses official communication channel in settings | DONE | Dev B / Senior reviewer | Backend `GET/PUT /api/v1/notifications/preferences`, migration `026_notification_preferences`, mobile Settings UI SMS/Email selector, full mobile suite passed, backend contract tests passed, live API proof default/update/reject cases passed | `docs/test-evidence/latest/mobile/screens/settings-official-channel.png`, `docs/test-evidence/latest/mobile/screens/settings-official-channel-email.png`, `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
+| Dashboard bottom navigation does not visually overlap settings content | DONE | Senior reviewer | BottomNav is opaque and Settings has bottom padding; focused Settings test passed; final PWA evidence regenerated after rebuild | `docs/test-evidence/latest/mobile/screens/settings-official-channel.png` |
+| Push preference persists with notification preferences | DONE | Dev B / Senior reviewer | Settings push toggle persists `push_enabled`; client disables browser subscription, deactivates matching backend subscription, and does not hang if service worker readiness stalls; full mobile suite/evidence passed; live push lifecycle create/list/delete passed | `docs/test-evidence/latest/mobile/screens/settings-push-disabled.png`; `docs/test-evidence/latest/api/day3-live-api-proof-2026-05-22.md` |
+
+## Day 3 Started
+
+| Requirement | Status | Owner | Proof | Evidence |
+| --- | --- | --- | --- | --- |
+| Mobile registers privacy-reduced device tag and sends it on API calls | DONE | Dev D / Senior reviewer | Mobile builds a local seed + reduced metadata hash, registers `/devices/register` with `X-Device-Fingerprint`, stores returned `vp_device_tag`, and `apiClient`/multipart fetch include `X-Device-Tag`; live API proof returned a deterministic `vp_dev_...` tag | `code/mobile/src/services/deviceRegistrationService.test.ts`; `docs/test-evidence/latest/api/day3-live-api-proof-2026-05-22.md` |
+| Push subscription lifecycle is linked to device tag | DONE | Dev B / Senior reviewer | Mobile stores server subscription id on enable, lists/deletes the matching active subscription on disable, and sends `device_tag`; live API proof create/list/delete passed | `code/mobile/src/services/pushNotificationService.test.ts`; `docs/test-evidence/latest/api/day3-live-api-proof-2026-05-22.md` |
+| Server-side device-tag enforcement on high-risk routes | SOURCE_READY | Dev D / Senior reviewer | Device registration table/router exists and clients now send `X-Device-Tag`; enforcement policy is not yet applied to KYC/banking routes, so this is not DONE | Pending |
 
 ## Current Evidence Artifacts
 
@@ -59,8 +78,12 @@ Last updated: 2026-05-22 15:39 +02:00
 | Mobile support file selected screenshot | `docs/test-evidence/latest/mobile/screens/support-attachment-selected.png` |
 | Mobile support file sent screenshot | `docs/test-evidence/latest/mobile/screens/support-attachment-sent.png` |
 | Mobile notifications screenshot | `docs/test-evidence/latest/mobile/screens/notifications-screen.png` |
+| Mobile official channel settings screenshot | `docs/test-evidence/latest/mobile/screens/settings-official-channel.png` |
+| Mobile official channel email selected screenshot | `docs/test-evidence/latest/mobile/screens/settings-official-channel-email.png` |
+| Mobile push disabled screenshot | `docs/test-evidence/latest/mobile/screens/settings-push-disabled.png` |
 | Mobile traces/videos/report | `docs/test-evidence/latest/mobile/`, `docs/test-evidence/latest/mobile-html-report/index.html` |
 | Live API proof | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
+| Day 3 live API proof | `docs/test-evidence/latest/api/day3-live-api-proof-2026-05-22.md` |
 | Backoffice login screenshot | `docs/test-evidence/latest/backoffice/screens/login.png` |
 | Backoffice dashboard screenshot | `docs/test-evidence/latest/backoffice/screens/dashboard.png` |
 | Backoffice traces/videos/report | `docs/test-evidence/latest/backoffice/`, `docs/test-evidence/latest/backoffice-html-report/index.html` |

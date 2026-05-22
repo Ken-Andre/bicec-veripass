@@ -1,6 +1,6 @@
 # Day 1 Live API Proof
 
-Timestamp: 2026-05-22 15:32 +02:00
+Timestamp: 2026-05-22 18:57 +02:00
 
 Commands:
 
@@ -13,14 +13,23 @@ Commands:
 - `docker compose -f code/docker-compose.yml build pwa`
 - `docker compose -f code/docker-compose.yml up -d pwa nginx`
 - `docker compose -f code/docker-compose.yml restart nginx`
+- `docker compose -f code/docker-compose.yml build pwa`
+- `docker compose -f code/docker-compose.yml up -d pwa nginx`
+- `docker compose -f code/docker-compose.yml restart nginx`
+- `docker compose -f code/docker-compose.yml build api pwa`
+- `docker compose -f code/docker-compose.yml up -d api pwa nginx`
+- `docker compose -f code/docker-compose.yml restart nginx`
+- `docker compose -f code/docker-compose.yml exec -T api /app/.venv/bin/alembic heads`
+- `docker compose -f code/docker-compose.yml exec -T api /app/.venv/bin/alembic current`
 - Python `urllib.request` live checks against `https://localhost` with TLS verification disabled for the local mkcert certificate.
 - PowerShell `Invoke-RestMethod` + `curl.exe -k -F` authenticated support attachment upload through `https://localhost`.
 
 Container state:
 
-- `vp_api`: recreated 2026-05-22, healthy, image `code-api`
-- `vp_pwa`: rebuilt/recreated again at 2026-05-22 15:30 +02:00 after support attachment UI and service-worker update evidence hook, healthy, image `code-pwa`
+- `vp_api`: rebuilt/recreated again at 2026-05-22 17:08 +02:00 after notification preferences and support attachment limit changes, healthy, image `code-api`
+- `vp_pwa`: rebuilt/recreated again at 2026-05-22 18:55 +02:00 after Settings and BottomNav visual fixes, healthy, image `code-pwa`
 - `vp_nginx`: restarted after API/PWA recreate to clear stale upstream `502`
+- Alembic: `heads` and `current` both returned `026_notification_preferences (head)`
 
 Live responses after nginx restart:
 
@@ -39,9 +48,24 @@ Live responses after nginx restart:
 Authenticated support attachment upload:
 
 - Signup/login proof: `POST /api/v1/auth/otp/send` returned `otp_debug`; `POST /api/v1/auth/otp/verify` returned a JWT access token.
-- Thread proof: `GET /api/v1/support/threads/current` with JWT returned `ed63bacb-fc1d-4934-bf55-970d34bcd1e4`.
-- Upload proof: `POST /api/v1/support/threads/ed63bacb-fc1d-4934-bf55-970d34bcd1e4/attachments` with multipart PDF, content `Live justificatif proof`, and client SHA-256 returned `HTTP_STATUS:201`.
-- Returned attachment: `attachment_filename=veripass-support-proof.pdf`, `attachment_document_id=3701da4e-0daf-41ee-9142-1fbc3f5ec630`, `attachment_sha256=f4d4cd420198e71b4150c817726c69adee428cfc90066ecb3a477b83eacc926a`.
+- Thread proof after latest rebuild: `GET /api/v1/support/threads/current` with JWT returned `4ce77b59-094a-4063-ac50-9f43704856d5`.
+- Upload proof after latest rebuild: `POST /api/v1/support/threads/4ce77b59-094a-4063-ac50-9f43704856d5/attachments` with one-page PDF, content `Live justificatif proof after Day 2 rebuild`, and client SHA-256 returned `HTTP_STATUS:201`.
+- Returned attachment: `attachment_filename=veripass-support-proof-day2.pdf`, `attachment_document_id=c41ce1ca-47fc-4844-885a-32ddc58ce100`, `attachment_sha256=743815b19badc9de3f2dcadd0539cb037319cf66a114f5f33da0de4f25c832be`.
+
+Authenticated support attachment limits:
+
+- `GET /api/v1/support/attachment-limits` returned:
+  - `image_max_size_mb=4`
+  - `pdf_max_size_mb=6`
+  - `pdf_max_pages=5`
+  - `max_message_chars=4000`
+  - `hard_max_size_mb=10`
+
+Authenticated notification preferences:
+
+- `GET /api/v1/notifications/preferences` for a phone-only test user returned `official_channel=sms`, `push_enabled=true`, `in_app_enabled=true`, `updated_at=null`.
+- `PUT /api/v1/notifications/preferences` with `official_channel=sms` returned `200` and persisted `official_channel=sms`.
+- `PUT /api/v1/notifications/preferences` with `official_channel=email` for the same phone-only user returned `400`, as expected because no verified email exists for that user.
 
 PWA chunk check:
 
