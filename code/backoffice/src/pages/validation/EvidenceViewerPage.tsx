@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Badge } from '@/components/ui/Badge';
 import { ImageViewer } from '@/components/shared/ImageViewer';
@@ -13,7 +14,7 @@ import { DossierTimeline } from '@/components/shared/DossierTimeline';
 import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
 import { FaceComparisonCard } from '@/components/shared/FaceComparisonCard';
 import { AddressCoherencePanel } from '@/components/shared/AddressCoherencePanel';
-import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck, Pencil, Save } from 'lucide-react';
+import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck, Pencil, Save, Tags } from 'lucide-react';
 import { reviewDossier, assignDossier, autoAssignDossier } from '@/services/dossier-service';
 import { apiGet, apiPost } from '@/services/api-client';
 
@@ -190,10 +191,20 @@ export default function EvidenceViewerPage() {
   const [ocrEditMode, setOcrEditMode] = useState(false);
   const [ocrEditedFields, setOcrEditedFields] = useState<Record<string, string>>({});
   const [ocrSaving, setOcrSaving] = useState(false);
+  const [classifyDocType, setClassifyDocType] = useState('CNI_RECTO');
+  const [classifyCategories, setClassifyCategories] = useState('CNI_RECTO');
+  const [classifyReason, setClassifyReason] = useState('');
+  const [classifySaving, setClassifySaving] = useState(false);
 
   const documents = dossier?.documents || [];
   const currentDoc = documents[activeDocIndex];
   const imageUrl = useAuthenticatedImage(id, currentDoc?.id);
+
+  useEffect(() => {
+    if (!currentDoc?.doc_type) return;
+    setClassifyDocType(currentDoc.doc_type);
+    setClassifyCategories(currentDoc.doc_type);
+  }, [currentDoc?.doc_type]);
 
   const handleSelfAssign = async () => {
     if (!id) return;
@@ -267,6 +278,28 @@ export default function EvidenceViewerPage() {
       setOcrEditedFields({});
     } catch {}
     setOcrSaving(false);
+  };
+
+  const handleClassifyDocument = async () => {
+    if (!id || !currentDoc || !classifyReason.trim()) return;
+    const categories = classifyCategories
+      .split(',')
+      .map((item) => item.trim().toUpperCase())
+      .filter(Boolean);
+    if (categories.length === 0) return;
+
+    setClassifySaving(true);
+    try {
+      await apiPost(`/backoffice/dossier/${id}/documents/${currentDoc.id}/classify`, {
+        categories,
+        primary_doc_type: classifyDocType,
+        reason: classifyReason.trim(),
+      });
+      queryClient.invalidateQueries({ queryKey: ['dossier', id] });
+      queryClient.invalidateQueries({ queryKey: ['audit', id] });
+      setClassifyReason('');
+    } catch {}
+    setClassifySaving(false);
   };
 
   const startOcrEdit = () => {
@@ -365,6 +398,46 @@ export default function EvidenceViewerPage() {
               />
             </CardContent>
           </Card>
+
+          {currentDoc && (
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Tags className="h-4 w-4" /> Classification du document</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">Type principal</p>
+                    <Select value={classifyDocType} onValueChange={setClassifyDocType}>
+                      <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                      <SelectContent>
+                        {['CNI_RECTO', 'CNI_VERSO', 'BILL_ENEO', 'BILL_CAMWATER', 'NIU', 'SELFIE', 'ADDRESS_PROOF', 'OTHER'].map((type) => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">Categories</p>
+                    <input
+                      value={classifyCategories}
+                      onChange={(e) => setClassifyCategories(e.target.value)}
+                      className="h-10 w-full rounded-md border px-3 text-sm"
+                      placeholder="CNI_RECTO, ADDRESS_PROOF"
+                    />
+                  </div>
+                </div>
+                <Textarea
+                  value={classifyReason}
+                  onChange={(e) => setClassifyReason(e.target.value)}
+                  placeholder="Pourquoi ce document couvre ces categories ?"
+                  className="min-h-[72px]"
+                />
+                <Button size="sm" onClick={handleClassifyDocument} disabled={classifySaving || !classifyReason.trim()}>
+                  {classifySaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+                  Assigner le document
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Face Comparison: Selfie vs CNI Recto */}
           {(() => {

@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview --port 3001",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:evidence": "playwright test -c playwright.evidence.config.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.2",

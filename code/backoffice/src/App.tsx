@@ -17,6 +17,8 @@ const AmlAlertDetailPage = lazy(() => import('./pages/compliance/AmlAlertDetailP
 const ConflictResolverPage = lazy(() => import('./pages/compliance/ConflictResolverPage'))
 const AdminPage = lazy(() => import('@/pages/admin/AdminPage'))
 const CommandCenterPage = lazy(() => import('@/pages/command-center/CommandCenterPage'))
+const AnalyticsPage = lazy(() => import('@/pages/analytics/AnalyticsPage'))
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
 const UnauthorizedPage = lazy(() => import('@/pages/UnauthorizedPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 
@@ -90,6 +92,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="analytics"
+              element={
+                <ProtectedRoute allowedRoles={['SYLVIE', 'THOMAS']}>
+                  <AnalyticsPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="admin"
@@ -99,6 +109,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            <Route path="profile" element={<ProfilePage />} />
           </Route>
 
           <Route path="/unauthorized" element={<UnauthorizedPage />} />

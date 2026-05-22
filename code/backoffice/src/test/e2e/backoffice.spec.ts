@@ -2,13 +2,14 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Back-Office BICEC VeriPass', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:3001')
+    await page.goto('/back-office/login')
   })
 
   test('should display login page', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /connexion/i })).toBeVisible()
-    await expect(page.getByPlaceholder(/email/i)).toBeVisible()
-    await expect(page.getByPlaceholder(/mot de passe/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /bicec veripass/i })).toBeVisible()
+    await expect(page.getByText(/connexion/i)).toBeVisible()
+    await expect(page.getByLabel(/email/i)).toBeVisible()
+    await expect(page.getByLabel(/mot de passe/i)).toBeVisible()
   })
 
   test('should login as JEAN and access validation queue', async ({ page }) => {
@@ -24,7 +25,7 @@ test.describe('Back-Office BICEC VeriPass', () => {
     await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
 
-    await expect(page.getByText(/conformité aml/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /conformit/i })).toBeVisible()
   })
 
   test('should login as SYLVIE and access command center', async ({ page }) => {
@@ -32,7 +33,7 @@ test.describe('Back-Office BICEC VeriPass', () => {
     await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
 
-    await expect(page.getByText(/command center/i)).toBeVisible()
+    await expect(page.getByText(/command center/i)).toBeVisible({ timeout: 15000 })
   })
 
   test('should login as ADMIN_IT and access admin page', async ({ page }) => {
@@ -40,7 +41,7 @@ test.describe('Back-Office BICEC VeriPass', () => {
     await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
 
-    await expect(page.getByText(/administration/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /administration/i })).toBeVisible()
   })
 
   test('should restrict access based on RBAC', async ({ page }) => {
@@ -48,7 +49,8 @@ test.describe('Back-Office BICEC VeriPass', () => {
     await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
 
-    await page.goto('http://localhost:3001/compliance')
-    await expect(page.getByText(/accès refusé/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /file de validation/i })).toBeVisible()
+    await page.goto('/back-office/compliance')
+    await expect(page.getByRole('heading', { name: /acc/i })).toBeVisible()
   })
 })

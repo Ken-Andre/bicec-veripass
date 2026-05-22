@@ -245,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!hasLoggedOutRef.current) {
         hasLoggedOutRef.current = true
         logout()
-        window.location.href = '/login'
+        window.location.href = '/back-office/login'
       }
       return
     }
@@ -254,7 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!hasLoggedOutRef.current) {
         hasLoggedOutRef.current = true
         logout()
-        window.location.href = '/login'
+        window.location.href = '/back-office/login'
       }
     }, delay)
 
@@ -295,7 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (response.status === 401) {
             globalShowToast('Session expirée — redirection vers la connexion', 'error')
             logout()
-            window.location.href = '/login'
+            window.location.href = '/back-office/login'
           }
           return response
         }

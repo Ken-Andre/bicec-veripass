@@ -77,7 +77,7 @@ export default function SessionWarningBanner() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { logout(); window.location.href = '/login' }}
+              onClick={() => { logout(); window.location.href = '/back-office/login' }}
               className="border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200"
             >
               <LogOut className="mr-1.5 h-3.5 w-3.5" />

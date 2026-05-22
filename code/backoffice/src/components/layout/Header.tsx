@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Bell, User } from 'lucide-react'
 
@@ -18,14 +19,14 @@ export default function Header() {
             <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500" />
           )}
         </button>
-        <div className="flex items-center gap-2">
+        <Link to="/profile" aria-label="Profil" className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-gray-50">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200">
             <User className="h-5 w-5 text-gray-600" />
           </div>
           <span className="hidden text-sm font-medium text-gray-700 sm:block">
             {user?.name}
           </span>
-        </div>
+        </Link>
       </div>
     </header>
   )
