@@ -28,6 +28,7 @@ export function useServiceWorker(): ServiceWorkerState {
 
   useEffect(() => {
     const update = registerSW({
+      immediate: true,
       onNeedRefresh() {
         setNeedsRefresh(true);
       },
@@ -37,6 +38,9 @@ export function useServiceWorker(): ServiceWorkerState {
       onRegistered(registration) {
         if (import.meta.env.DEV) {
           console.log('[SW] Registered:', registration);
+        }
+        if (registration) {
+          setInterval(() => registration.update(), 60 * 60 * 1000);
         }
       },
       onRegisterError(error) {

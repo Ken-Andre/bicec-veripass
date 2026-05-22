@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentPath = window.location.pathname;
       // Stay on lock screen or any auth page to avoid redirect loops
       if (currentPath.includes('/auth/')) return;
-      navigate('/auth/phone', { replace: true });
+      navigate('/auth', { replace: true });
     });
   }, [logout, navigate]);
 

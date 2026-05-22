@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -18,6 +18,9 @@ const queryClient = new QueryClient();
 // --- Auth screens ---
 const PhoneEntryScreen = lazy(() =>
   import("./views/auth/PhoneEntryScreen").then((m) => ({ default: m.default })),
+);
+const AuthEntryScreen = lazy(() =>
+  import("./views/auth/AuthEntryScreen").then((m) => ({ default: m.default })),
 );
 const OtpVerifyScreen = lazy(() =>
   import("./views/auth/OtpVerifyScreen").then((m) => ({ default: m.default })),
@@ -180,10 +183,23 @@ function AuthenticatedKycProvider({ children }: { children: ReactNode }) {
   return <KycProvider>{children}</KycProvider>;
 }
 
+function AuthenticatedKycResumeBanner() {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return null;
+  return <KycResumeBanner />;
+}
+
 function LockGuard({ children }: { children: React.ReactNode }) {
   const { isLocked } = useAuth();
   if (isLocked) return <Navigate to="/auth/lock" replace />;
   return <>{children}</>;
+}
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (!isAuthenticated) return <Navigate to="/auth" replace />;
+  return <LockGuard>{children}</LockGuard>;
 }
 
 function CniRectoCapture() {
@@ -195,14 +211,7 @@ function CniVersoCapture() {
 }
 
 function App() {
-  const { needsRefresh, updateSW } = useServiceWorker();
-
-  // Auto-apply SW updates to prevent stale cached code loops
-  useEffect(() => {
-    if (needsRefresh) {
-      updateSW();
-    }
-  }, [needsRefresh, updateSW]);
+  const { needsRefresh, updateSW, dismiss } = useServiceWorker();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -211,11 +220,25 @@ function App() {
           <AuthProvider>
             <AuthenticatedKycProvider>
               <OfflineBanner />
-              <KycResumeBanner />
+              {needsRefresh && (
+                <div className="fixed inset-x-4 top-4 z-[100] mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-white px-4 py-3 text-sm shadow-xl">
+                  <span className="font-semibold text-foreground">Nouvelle version disponible</span>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={dismiss} className="text-xs font-bold text-muted-foreground">
+                      Plus tard
+                    </button>
+                    <button type="button" onClick={() => updateSW()} className="rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">
+                      Recharger
+                    </button>
+                  </div>
+                </div>
+              )}
+              <AuthenticatedKycResumeBanner />
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<HomePage />} />
+                    <Route path="/auth" element={<AuthEntryScreen />} />
                     <Route path="/auth/phone" element={<PhoneEntryScreen />} />
                     <Route path="/auth/otp" element={<OtpVerifyScreen />} />
                     <Route path="/auth/email" element={<EmailEntryScreen />} />
@@ -247,9 +270,9 @@ function App() {
                     {/* Dashboard routes with global BottomNav */}
                     <Route
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <DashboardLayout />
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     >
                       <Route path="/dashboard" element={<DashboardPage />} />
@@ -284,300 +307,300 @@ function App() {
                     <Route
                       path="/kyc/basic-profile"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <BasicProfileScreen />
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/document-choice"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <DocumentChoiceScreen />
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     {/* === Marie Journey: KYC Flow === */}
                     <Route
                       path="/kyc/intro"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycIntroScreen />
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/cni-intro"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <CniIntroScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/cni-recto-guide"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <CniRectoGuideScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/cni-recto-capture"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <CniRectoCapture />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/cni-verso-guide"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <CniVersoGuideScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/cni-verso-capture"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <CniVersoCapture />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/ocr-processing"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <OcrProcessingScreen />
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/liveness-intro"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <LivenessIntroScreen />
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/cni-recto"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <CniRectoGuideScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/cni-verso"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <CniVersoGuideScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     {/* OCR Review → Liveness */}
                     <Route
                       path="/kyc/ocr-review"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <OcrReviewScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/biometric-consent"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <BiometricConsentScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/liveness"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <LivenessScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     {/* Bill type select → Capture or Upload → Address → NIU → ... */}
                     <Route
                       path="/kyc/bill-select"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <BillTypeSelectScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/bill-capture"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <BillCaptureScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/bill-upload"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <BillUploadScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/address"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <AddressScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/niu"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <NiuScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/consent"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <ConsentScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/signature"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <SignatureScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/review"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <KycStepGuard>
                               <ReviewScreen />
                             </KycStepGuard>
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/submit-success"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <SubmitSuccessScreen />
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/rejected"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <RejectionScreen />
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route
                       path="/kyc/info-requested"
                       element={
-                        <LockGuard>
+                        <AuthGuard>
                           <KycHydrationGate>
                             <InfoRequestedScreen />
                           </KycHydrationGate>
-                        </LockGuard>
+                        </AuthGuard>
                       }
                     />
                     <Route path="*" element={<NotFoundPage />} />
