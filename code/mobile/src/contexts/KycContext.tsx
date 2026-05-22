@@ -291,6 +291,8 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { active = false; };
+    // hydrateKycFromBackend is declared below and memoized with mapSessionToCompletedSteps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
   // ─── END AUTO-RECONCILIATION ───────────────────────────────────────────────
 

@@ -16,7 +16,7 @@ export const BottomNav = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 glass-strong safe-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 safe-bottom border-t border-border bg-background shadow-[0_-8px_24px_rgba(0,0,0,0.08)]">
       <div className="flex items-center justify-around h-16 px-2">
         {items.map(({ icon: Icon, label, path }) => {
           const active = location.pathname === path || location.pathname.startsWith(path + '/');

@@ -17,6 +17,7 @@ export const OfflineBanner = () => {
     prevIsOnline.current = isOnline;
 
     if (cameOnline && !dismissed) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setJustCameOnline(true);
       const hideTimer = window.setTimeout(() => setJustCameOnline(false), 4000);
       return () => clearTimeout(hideTimer);
@@ -31,6 +32,7 @@ export const OfflineBanner = () => {
     const wentOffline = !isOnline && prevOnlineForDismiss.current;
     prevOnlineForDismiss.current = isOnline;
     if (wentOffline && dismissed) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDismissed(false);
     }
   }, [isOnline, dismissed]);

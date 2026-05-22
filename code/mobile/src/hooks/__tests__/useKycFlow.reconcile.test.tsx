@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { KycStepGuard } from '../useKycFlow';
 
 // ── Mocks ────────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ describe('KycStepGuard — reconciliation status scenarios', () => {
   // ══════════════════════════════════════════════════════════════════════
   it('SCENARIO B: Dashboard→/kyc/intro→done, /kyc/cni-intro redirects to cni-recto-capture', () => {
     console.log('[KYC:test] === SCENARIO B: reconcStatus=done, completedSteps=[] ===');
-    const { container } = renderGuard('/kyc/cni-intro', {
+    renderGuard('/kyc/cni-intro', {
       reconciliationStatus: 'done',
       completedSteps: [],
     });
@@ -114,7 +114,7 @@ describe('KycStepGuard — reconciliation status scenarios', () => {
   // ══════════════════════════════════════════════════════════════════════
   it('SCENARIO skipped: reconcStatus=skipped passes Phase 2, enters Phase 4', () => {
     console.log('[KYC:test] === SCENARIO skipped: reconcStatus=skipped, completedSteps=[] ===');
-    const { container } = renderGuard('/kyc/cni-intro', {
+    renderGuard('/kyc/cni-intro', {
       reconciliationStatus: 'skipped',
       completedSteps: [],
     });

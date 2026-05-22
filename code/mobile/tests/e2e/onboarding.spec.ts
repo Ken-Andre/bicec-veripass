@@ -2,6 +2,12 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
+declare global {
+  interface Window {
+    injectCniImage?: (base64: string) => void;
+  }
+}
+
 test.describe('Onboarding Flow', () => {
   const phoneNumber = '69' + Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
   const pin = '111111';
@@ -84,7 +90,7 @@ test.describe('Onboarding Flow', () => {
       const ctx = canvas.getContext('2d');
       const img = new Image();
 
-      (window as any).injectCniImage = (base64: string) => {
+      window.injectCniImage = (base64: string) => {
         img.src = base64;
         img.onload = () => {
           canvas.width = img.width;
@@ -173,7 +179,7 @@ test.describe('Onboarding Flow', () => {
     
     // Inject Recto Image
     const rectoBase64 = fs.readFileSync(rectoPath, { encoding: 'base64' });
-    await page.evaluate((b64) => (window as any).injectCniImage(`data:image/png;base64,${b64}`), rectoBase64);
+    await page.evaluate((b64) => window.injectCniImage?.(`data:image/png;base64,${b64}`), rectoBase64);
     
     await page.getByRole('button', { name: /Ouvrir la caméra/i }).click();
     
@@ -186,7 +192,7 @@ test.describe('Onboarding Flow', () => {
     
     // Inject Verso Image
     const versoBase64 = fs.readFileSync(versoPath, { encoding: 'base64' });
-    await page.evaluate((b64) => (window as any).injectCniImage(`data:image/png;base64,${b64}`), versoBase64);
+    await page.evaluate((b64) => window.injectCniImage?.(`data:image/png;base64,${b64}`), versoBase64);
     
     await page.getByRole('button', { name: /Ouvrir la caméra/i }).click();
     

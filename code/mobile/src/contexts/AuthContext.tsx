@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient, setSessionExpiredHandler } from '../services/apiClient';
 import { isPasskeySupported, registerPasskey, authenticatePasskey, removePasskey, type PasskeyAuthResult } from '../services/passkeyService';
 import { clearPersistedKycState } from '../services/kycOfflineStore';
+import { ensureDeviceRegistered } from '../services/deviceRegistrationService';
 
 interface User {
   id: string;
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem('vp_token');
     localStorage.removeItem('vp_user');
+    localStorage.removeItem('vp_device_tag');
     setUser(null);
     setIsAuthenticated(false);
     setIsLocked(false);
@@ -193,6 +195,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
     consecutiveErrorsRef.current = 0;
     pollPauseUntilRef.current = 0;
+    void ensureDeviceRegistered().catch((err) => {
+      console.warn('Device registration failed', err);
+    });
   }, []);
 
   const refreshUser = useCallback(async (): Promise<User | null> => {
@@ -219,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetAccount = useCallback(() => {
     localStorage.removeItem('vp_token');
     localStorage.removeItem('vp_user');
+    localStorage.removeItem('vp_device_tag');
     removePasskey();
     setIsAuthenticated(false);
     setUser(null);
@@ -247,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authenticateWithPasskey = useCallback(async (): Promise<PasskeyAuthResult | null> => {
     if (!biometricEnabled || !user?.phone) return null;
     return authenticatePasskey(user.phone);
-  }, [biometricEnabled, user?.phone]);
+  }, [biometricEnabled, user]);
 
   const deleteAccount = async () => {
     try {
@@ -257,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.removeItem('vp_token');
     localStorage.removeItem('vp_user');
+    localStorage.removeItem('vp_device_tag');
     setIsAuthenticated(false);
     setUser(null);
     setIsLocked(false);

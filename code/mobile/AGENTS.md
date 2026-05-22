@@ -122,6 +122,12 @@ L'application mobile est structurée en **3 zones distinctes** :
 6. **Safe areas** — utiliser `.safe-top` et `.safe-bottom` sur les éléments fixed/sticky.
 7. **Pas de composants définis à l'intérieur d'autres composants** — extraire les sous-composants au niveau du module pour éviter les remontages React (ex: `ConsentRow` extrait de `ConsentScreen`).
 
+## Gate qualite local
+
+- Avant tout commit ou push, verifier que les hooks locaux sont actifs et non contournes. Si `core.hooksPath` vaut `/dev/null`, le signaler et ne pas supposer que les hooks tourneront.
+- Avant de rendre un changement mobile, lancer au minimum `npm --prefix code/mobile run lint` et `npm --prefix code/mobile run build`, ou expliquer clairement pourquoi ce n'etait pas possible.
+- Si le changement touche aussi le backend ou la CI, lancer les checks backend equivalents avant push afin d'eviter de consommer inutilement des minutes GitHub Actions.
+
 ## Endpoints backend utilisés par le mobile
 
 | Endpoint | Utilisé dans | Description |

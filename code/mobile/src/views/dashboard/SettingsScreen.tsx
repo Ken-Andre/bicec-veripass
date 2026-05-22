@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,6 +7,9 @@ import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { ChevronRight, Lock, Fingerprint, Bell, Moon, Shield, Wrench } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { disablePushNotifications, enablePushNotifications } from '../../services/pushNotificationService';
+import { apiClient } from '../../services/apiClient';
+
+type OfficialChannel = 'sms' | 'email';
 
 export function SettingsScreen() {
   const navigate = useNavigate();
@@ -16,7 +19,26 @@ export function SettingsScreen() {
   const [pushEnabled, setPushEnabled] = useState(() => localStorage.getItem('vp_push_enabled') === 'true');
   const [pushLoading, setPushLoading] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [officialChannel, setOfficialChannel] = useState<OfficialChannel>('sms');
+  const [officialChannelLoading, setOfficialChannelLoading] = useState(false);
+  const [officialChannelError, setOfficialChannelError] = useState('');
   const isDev = import.meta.env.DEV;
+
+  useEffect(() => {
+    let active = true;
+    async function loadPreferences() {
+      try {
+        const prefs = await apiClient.get<{ official_channel: OfficialChannel; push_enabled: boolean }>('/notifications/preferences');
+        if (!active) return;
+        setOfficialChannel(prefs.official_channel);
+        setPushEnabled(prefs.push_enabled);
+      } catch {
+        // Keep local defaults when the preference endpoint is unavailable.
+      }
+    }
+    void loadPreferences();
+    return () => { active = false; };
+  }, []);
 
   const handleBiometricToggle = async (v: boolean) => {
     setBiometricLoading(true);
@@ -28,9 +50,14 @@ export function SettingsScreen() {
     setPushLoading(true);
     try {
       if (v) {
-        setPushEnabled(await enablePushNotifications());
+        const enabled = await enablePushNotifications();
+        if (enabled) {
+          await apiClient.put('/notifications/preferences', { push_enabled: true });
+        }
+        setPushEnabled(enabled);
       } else {
         await disablePushNotifications();
+        await apiClient.put('/notifications/preferences', { push_enabled: false });
         setPushEnabled(false);
       }
     } finally {
@@ -38,8 +65,28 @@ export function SettingsScreen() {
     }
   };
 
+  const handleOfficialChannelChange = async (channel: OfficialChannel) => {
+    if (channel === officialChannel || officialChannelLoading) return;
+    const previous = officialChannel;
+    setOfficialChannel(channel);
+    setOfficialChannelLoading(true);
+    setOfficialChannelError('');
+    try {
+      const prefs = await apiClient.put<{ official_channel: OfficialChannel }, { official_channel: OfficialChannel }>(
+        '/notifications/preferences',
+        { official_channel: channel },
+      );
+      setOfficialChannel(prefs.official_channel);
+    } catch (err) {
+      setOfficialChannel(previous);
+      setOfficialChannelError(err instanceof Error ? err.message : t('settings.officialChannelError'));
+    } finally {
+      setOfficialChannelLoading(false);
+    }
+  };
+
   return (
-    <ScreenLayoutV2 showBack title={t('settings.title')}>
+    <ScreenLayoutV2 showBack title={t('settings.title')} contentClassName="pb-40">
       <div className="space-y-6 pt-2">
         {/* Language */}
         <div>
@@ -53,6 +100,35 @@ export function SettingsScreen() {
                 {lang === 'fr' ? '🇫🇷 Français' : '🇬🇧 English'}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t('settings.officialChannel')}</h3>
+          <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+            <p className="text-xs text-muted-foreground">{t('settings.officialChannelHelp')}</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(['sms', 'email'] as const).map((channel) => (
+                <button
+                  key={channel}
+                  type="button"
+                  disabled={officialChannelLoading}
+                  onClick={() => void handleOfficialChannelChange(channel)}
+                  className={cn(
+                    'h-11 rounded-xl border text-sm font-semibold transition-all',
+                    officialChannel === channel
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-foreground',
+                    officialChannelLoading && 'opacity-60',
+                  )}
+                >
+                  {channel === 'sms' ? 'SMS' : 'Email'}
+                </button>
+              ))}
+            </div>
+            {officialChannelError && (
+              <p className="text-xs font-medium text-destructive">{officialChannelError}</p>
+            )}
           </div>
         </div>
 
@@ -72,6 +148,7 @@ export function SettingsScreen() {
                     <span className="text-sm font-medium text-foreground">{item.label}</span>
                   </div>
                   <button
+                    aria-label={item.label}
                     onClick={() => !item.disabled && item.onChange(!item.value)}
                     disabled={item.disabled}
                     className={cn(
