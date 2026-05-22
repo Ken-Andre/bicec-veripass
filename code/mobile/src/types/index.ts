@@ -299,6 +299,9 @@ export interface SupportMessage {
   sender: 'user' | 'agent';
   content: string;
   attachments?: string[];
+  attachment_path?: string | null;
+  attachment_sha256?: string | null;
+  attachment_filename?: string | null;
   created_at: string;
 }
 

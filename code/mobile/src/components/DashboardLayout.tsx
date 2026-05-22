@@ -12,7 +12,7 @@ export const DashboardLayout: React.FC = () => {
   const location = useLocation();
 
   // Routes that should NOT show the BottomNav (e.g. sub-flows)
-  const hiddenNavPaths = ['/transfers/send', '/transfers/receive', '/settings/delete-account'];
+  const hiddenNavPaths = ['/transfers/send', '/transfers/receive', '/settings/delete-account', '/support'];
   const showNav = !hiddenNavPaths.some((p) => location.pathname.startsWith(p));
 
   return (
