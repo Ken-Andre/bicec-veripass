@@ -13,9 +13,11 @@ from app.core.security import get_current_user
 from app.db.session import get_db
 from app.modules.auth.models import User
 from app.modules.kyc.models import Notification
-from app.modules.notifications.models import PushSubscription
+from app.modules.notifications.models import NotificationPreference, PushSubscription
 from app.modules.notifications.schemas import (
     NotificationListResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
     NotificationReadRequest,
     NotificationResponse,
     PushSubscriptionCreate,
@@ -45,6 +47,29 @@ def _to_notification_response(notification: Notification) -> NotificationRespons
         read=bool(notification.is_read),
         created_at=notification.sent_at,
         metadata=notification.payload,
+    )
+
+
+def _default_official_channel(user: User) -> str:
+    return "email" if user.email else "sms"
+
+
+def _to_preference_response(
+    preference: NotificationPreference | None,
+    current_user: User,
+) -> NotificationPreferenceResponse:
+    if preference is None:
+        return NotificationPreferenceResponse(
+            official_channel=_default_official_channel(current_user),
+            push_enabled=True,
+            in_app_enabled=True,
+            updated_at=None,
+        )
+    return NotificationPreferenceResponse(
+        official_channel=preference.official_channel,
+        push_enabled=preference.push_enabled,
+        in_app_enabled=preference.in_app_enabled,
+        updated_at=preference.updated_at,
     )
 
 
@@ -113,6 +138,68 @@ async def mark_notifications_read(
     result = await db.execute(stmt)
     await db.commit()
     return {"status": "success", "marked_read": result.rowcount or 0}
+
+
+@router.get("/preferences", response_model=NotificationPreferenceResponse)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def get_notification_preferences(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get persisted official communication preferences for the mobile user."""
+    result = await db.execute(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    )
+    return _to_preference_response(result.scalar_one_or_none(), current_user)
+
+
+@router.put("/preferences", response_model=NotificationPreferenceResponse)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def update_notification_preferences(
+    request: Request,
+    body: NotificationPreferenceUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist official communication preferences.
+
+    `official_channel` is the user's chosen channel for official operational
+    messages such as card pickup, agency visit requests, or policy updates.
+    """
+    result = await db.execute(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    )
+    preference = result.scalar_one_or_none()
+    if preference is None:
+        preference = NotificationPreference(
+            user_id=current_user.id,
+            official_channel=_default_official_channel(current_user),
+            push_enabled=True,
+            in_app_enabled=True,
+        )
+        db.add(preference)
+
+    if body.official_channel is not None:
+        if body.official_channel == "email" and not current_user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ajoutez et verifiez un email avant de choisir le canal email.",
+            )
+        if body.official_channel == "sms" and not current_user.phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ajoutez et verifiez un numero de telephone avant de choisir le canal SMS.",
+            )
+        preference.official_channel = body.official_channel
+    if body.push_enabled is not None:
+        preference.push_enabled = body.push_enabled
+    if body.in_app_enabled is not None:
+        preference.in_app_enabled = body.in_app_enabled
+
+    await db.commit()
+    await db.refresh(preference)
+    return _to_preference_response(preference, current_user)
 
 
 @router.get("/subscriptions", response_model=list[PushSubscriptionResponse])

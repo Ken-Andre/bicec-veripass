@@ -35,3 +35,22 @@ class PushSubscription(Base):
     subscription_metadata = Column(JSONB, nullable=True)
 
     user = relationship("User")
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    official_channel = Column(String(16), nullable=False, default="sms")
+    push_enabled = Column(Boolean, nullable=False, default=True)
+    in_app_enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    user = relationship("User")

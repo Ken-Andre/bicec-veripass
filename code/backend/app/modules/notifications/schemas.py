@@ -1,7 +1,7 @@
 """Notification API schemas."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -46,3 +46,16 @@ class PushSubscriptionResponse(BaseModel):
     device_tag: str | None = None
     is_active: bool
     created_at: datetime
+
+
+class NotificationPreferenceResponse(BaseModel):
+    official_channel: Literal["sms", "email"]
+    push_enabled: bool
+    in_app_enabled: bool
+    updated_at: datetime | None = None
+
+
+class NotificationPreferenceUpdate(BaseModel):
+    official_channel: Literal["sms", "email"] | None = None
+    push_enabled: bool | None = None
+    in_app_enabled: bool | None = None
