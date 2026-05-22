@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Weekly recap (2026-05-18 to 2026-05-24)
+
+- Added KYC image-processing and encryption-related utilities, plus OCR merge logic to improve document processing consistency.
+- Updated backend startup/dependencies and gitignore hygiene to stabilize runtime and local development behavior.
+- PR references: none recorded in commit history for this period.
+
 ### Weekly recap (2026-05-11 to 2026-05-17)
 
 - Fixed authentication routing for users without a configured PIN, refreshed user state after OTP/PIN flows, and widened KYC review polling coverage to reduce stalled client states.
@@ -10,6 +16,38 @@
 - Added Oracle Cloud GLM-OCR deployment planning docs, backup automation scripts (Bash/PowerShell), and related environment configuration entries.
 - Improved infrastructure build reliability and speed with apt retry logic, stable cache usage, bun cache mounts, and storage labeling/path updates.
 - PR references: none recorded in commit history for this period.
+
+### Weekly recap (2026-05-04 to 2026-05-10)
+
+- Improved OCR and synthetic CNI generation quality with multiple coordinate/layout adjustments and extraction fixes (including reduced parent-name confusion).
+- Added camera capture support and dataset-export updates for OCR workflows.
+- Added KYC-side improvements for OCR document selection, extracted field handling, and session progression tracking (`ocr_review_confirmed`).
+- Strengthened mobile update behavior by improving service-worker refresh/caching strategy to reduce stale frontend builds.
+- Added troubleshooting documentation for Git worktree config issues.
+- PR references: none recorded in commit history for this period.
+
+### Weekly recap (2026-04-27 to 2026-05-03)
+
+- Delivered major mobile UX and architecture upgrades: ScreenLayoutV2 rollout, dashboard/auth/KYC flow refactors, global layout integration, and performance code-splitting.
+- Closed many blocking KYC/backoffice defects (routing, queue visibility, duplicate-session handling, OCR field population, timeline/status mapping, logging and API status propagation).
+- Added OCR bill-processing templates, error-tracking hooks, and agent correction UI, while also introducing a banking module foundation (cards, transfers, transactions, savings).
+- Expanded platform tooling with CI workflow automation and infrastructure/linting refreshes.
+- PR references: none recorded in commit history for this period.
+
+### Weekly recap (2026-04-20 to 2026-04-26)
+
+- Advanced OCR/KYC core pipeline with PaddleX runtime support, positional parsing, HMAC document handles, extraction sanitization/enhancement, and threaded OCR execution.
+- Expanded mobile capabilities with offline KYC synchronization, new KYC capture/review screens, dashboard updates, and stronger test coverage/mocks.
+- Extended backoffice and backend features: live dashboard stats, support chat/file access, analytics service wiring, auth/session UX hardening, and soft-delete compliance support for users.
+- Improved observability and operations with Sentry proxying, encrypted env tooling/scripts, and infrastructure configuration updates.
+- PR references: none recorded in commit history for this period.
+
+### Weekly recap (2026-04-14 to 2026-04-19)
+
+- Built out the initial OCR stack and experimentation toolkit: OCR utilities, GLM-OCR migration to CLI subprocess flow, Marimo notebooks, and expanded OCR extraction fields for ID processing.
+- Delivered foundational KYC/auth platform increments across backend and PWA/backoffice flows, including capture screens, processing modules, and supporting infra/services/tests.
+- Added OCR endpoint and testing-path adjustments (including auth handling changes for upload testing) plus dependency/ignore updates.
+- PR references: [#322](https://github.com/Ken-Andre/bicec-veripass/pull/322).
 
 ### Weekly recap (2026-04-07 to 2026-04-13)
 

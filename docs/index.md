@@ -4,6 +4,8 @@
 **Project Type:** Multi-part application (Web + Mobile + Backend)  
 **Repository:** [BICEC/bicec-veripass](https://github.com/BICEC/bicec-veripass)
 
+**MVP delivery docs:** [`mvp-delivery-runbook-2026-05-20.md`](mvp-delivery-runbook-2026-05-20.md) and [`demo-scenario-mvp-2026-05-20.md`](demo-scenario-mvp-2026-05-20.md)
+
 ---
 
 ## Project Overview
