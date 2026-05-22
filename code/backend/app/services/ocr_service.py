@@ -412,7 +412,6 @@ CNI_VERSO_ZONES = [
     # (NOM DU PERE / NOM DE LA MERE), not the cardholder's own name.
     # The cardholder's nom/prenom must come from the recto side only.
     ("sp",               0.33,   0.42,   0.02,   0.25, "is_sp"),
-    ("lieu_naissance",  0.38,   0.55,   0.02,   0.25, "is_place"),
     ("autorite_nom",     0.42,   0.56,   0.20,   0.55, "is_name"),
     ("date_delivrance", 0.33,   0.48,   0.40,   0.75, "is_date"),
     ("date_expiration", 0.46,   0.58,   0.40,   0.75, "is_date"),

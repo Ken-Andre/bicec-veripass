@@ -1,6 +1,6 @@
 """Auth module Pydantic schemas."""
 
-from typing import Optional, Annotated
+from typing import Optional, Annotated, Any
 from pydantic import BaseModel, Field, EmailStr, StringConstraints
 
 
@@ -91,6 +91,42 @@ class PinVerifyRequest(BaseModel):
 
     phone: ConstrainedPhone
     pin: ConstrainedPin
+
+
+class WebAuthnRegisterOptionsResponse(BaseModel):
+    challenge: str
+    rp_id: str
+    rp_name: str
+    user_id: str
+    user_name: str
+    timeout: int = 60000
+
+
+class WebAuthnRegisterVerifyRequest(BaseModel):
+    challenge: str = Field(..., min_length=16, max_length=128)
+    credential_id: str = Field(..., min_length=1, max_length=2048)
+    public_key: Optional[str] = Field(None, max_length=20000)
+    transports: Optional[list[str]] = None
+    device_tag: Optional[str] = Field(None, max_length=128)
+    raw_response: Optional[dict[str, Any]] = None
+
+
+class WebAuthnAuthOptionsRequest(BaseModel):
+    phone: ConstrainedPhone
+
+
+class WebAuthnAuthOptionsResponse(BaseModel):
+    challenge: str
+    rp_id: str
+    allow_credentials: list[str]
+    timeout: int = 60000
+
+
+class WebAuthnAuthVerifyRequest(BaseModel):
+    phone: ConstrainedPhone
+    challenge: str = Field(..., min_length=16, max_length=128)
+    credential_id: str = Field(..., min_length=1, max_length=2048)
+    raw_response: Optional[dict[str, Any]] = None
 
 
 class OtpSendRequest(BaseModel):

@@ -1,7 +1,14 @@
 # Import all models here for Alembic detected
 # This file is what Alembic env.py should target for target_metadata
 from app.db.base_class import Base  # noqa
-from app.modules.auth.models import User, Agent, OTPSession, TokenRevocation  # noqa
+from app.modules.auth.models import (  # noqa
+    User,
+    Agent,
+    OTPSession,
+    TokenRevocation,
+    WebAuthnCredential,
+    WebAuthnChallenge,
+)
 from app.modules.kyc.models import (  # noqa
     KYCSession,
     Document,
@@ -21,3 +28,5 @@ from app.modules.admin.models import Agency, ProvisioningBatch, ProvisioningBatc
 from app.modules.audit.models import AuditLog  # noqa
 from app.modules.aml.models import BatchJob  # noqa
 from app.modules.banking.models import BankCard, Transfer, Transaction, SavingsPocket  # noqa
+from app.modules.devices.models import DeviceRegistration  # noqa
+from app.modules.notifications.models import PushSubscription  # noqa

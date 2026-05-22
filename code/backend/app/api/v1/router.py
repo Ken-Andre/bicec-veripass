@@ -6,6 +6,8 @@ from app.modules.admin.router import router as admin_router
 from app.modules.aml.router import router as aml_router
 from app.modules.analytics.router import router as analytics_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.devices.router import router as devices_router
+from app.modules.support.router import router as support_router
 from app.modules.audit.router import router as audit_router
 from app.modules.banking.router import router as banking_router
 from app.api.v1.ocr import router as ocr_router
@@ -23,6 +25,8 @@ api_router.include_router(analytics_router, prefix="/analytics", tags=["analytic
 api_router.include_router(
     notifications_router, prefix="/notifications", tags=["notifications"]
 )
+api_router.include_router(devices_router, prefix="/devices", tags=["devices"])
+api_router.include_router(support_router, prefix="/support", tags=["support"])
 api_router.include_router(audit_router, prefix="/audit", tags=["audit"])
 api_router.include_router(ocr_router, tags=["ocr"])
 api_router.include_router(sentry_proxy_router, tags=["sentry"])

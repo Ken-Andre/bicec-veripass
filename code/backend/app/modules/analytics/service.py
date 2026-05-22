@@ -7,14 +7,16 @@ from app.modules.kyc.models import KYCSession, AmlAlert, ValidationDecision
 
 async def get_dashboard_stats(db: AsyncSession):
     # 1. Dossiers en attente (SUBMITTED, PENDING)
-    pending_query = select(func.count(KYCSession.id)).where(KYCSession.status.in_(["SUBMITTED", "PENDING"]))
+    pending_query = select(func.count(KYCSession.id)).where(
+        KYCSession.status.in_(["PENDING_AGENT_REVIEW", "PENDING_KYC", "PENDING_INFO"])
+    )
     pending_count = (await db.execute(pending_query)).scalar() or 0
 
     # 2. Validés aujourd'hui (COMPLETED with completed_at >= today)
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     validated_query = select(func.count(KYCSession.id)).where(
         and_(
-            KYCSession.status == "COMPLETED",
+            KYCSession.status == "APPROVED",
             KYCSession.completed_at >= today_start
         )
     )
@@ -25,7 +27,7 @@ async def get_dashboard_stats(db: AsyncSession):
     aml_alerts = (await db.execute(aml_query)).scalar() or 0
 
     # 4. À traiter (SUBMITTED - ready for review)
-    todo_query = select(func.count(KYCSession.id)).where(KYCSession.status == "SUBMITTED")
+    todo_query = select(func.count(KYCSession.id)).where(KYCSession.status == "PENDING_AGENT_REVIEW")
     to_treat = (await db.execute(todo_query)).scalar() or 0
 
     # 5. Recent Activity (last 5 decisions joined with Agent)

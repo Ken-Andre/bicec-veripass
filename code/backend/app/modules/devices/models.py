@@ -1,4 +1,4 @@
-"""Notification module SQLAlchemy models."""
+"""Device registration models."""
 
 import uuid
 from datetime import datetime, timezone
@@ -10,28 +10,20 @@ from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 
 
-class PushSubscription(Base):
-    __tablename__ = "push_subscriptions"
+class DeviceRegistration(Base):
+    __tablename__ = "device_registrations"
     __table_args__ = (
-        UniqueConstraint("user_id", "endpoint", name="uq_push_subscription_user_endpoint"),
+        UniqueConstraint("user_id", "fingerprint_hash", name="uq_device_user_fingerprint"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    endpoint = Column(Text, nullable=False)
-    p256dh = Column(Text, nullable=False)
-    auth = Column(Text, nullable=False)
+    device_tag = Column(String(128), nullable=False, unique=True, index=True)
+    fingerprint_hash = Column(String(128), nullable=False, index=True)
+    metadata_json = Column(JSONB, nullable=True)
     user_agent = Column(Text, nullable=True)
-    device_tag = Column(String(128), nullable=True, index=True)
     is_active = Column(Boolean, nullable=False, default=True)
-    last_error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False,
-    )
-    subscription_metadata = Column(JSONB, nullable=True)
+    last_seen_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user = relationship("User")

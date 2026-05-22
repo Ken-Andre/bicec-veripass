@@ -3,10 +3,12 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.modules.auth.models import User
+from app.modules.kyc.models import KYCSession
 from app.modules.banking import service
 from app.modules.banking.schemas import (
     AccountInfoResponse,
@@ -25,6 +27,26 @@ from app.modules.banking.schemas import (
 )
 
 router = APIRouter()
+
+
+async def require_banking_write_access(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Require an approved KYC access tier before money-moving actions."""
+    result = await db.execute(
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id)
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
+    )
+    session = result.scalar_one_or_none()
+    if not session or session.access_level not in {"LIMITED_ACCESS", "FULL_ACCESS"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Votre dossier doit etre valide avant cette operation.",
+        )
+    return current_user
 
 
 # ── Account ──
@@ -68,7 +90,7 @@ async def freeze_card(
     card_id: UUID,
     body: CardFreezeRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_banking_write_access),
 ):
     """Freeze or unfreeze a card."""
     card = await service.toggle_card_freeze(db, card_id, current_user.id, body.frozen)
@@ -93,7 +115,7 @@ async def freeze_card(
 async def send_transfer(
     body: TransferSendRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_banking_write_access),
 ):
     """Send a bank or mobile transfer with ISO 20022 generation."""
     transfer = await service.create_transfer(
@@ -221,7 +243,7 @@ async def list_savings_pockets(
 async def create_savings_pocket(
     body: SavingsPocketCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_banking_write_access),
 ):
     """Create a new savings pocket."""
     pocket = await service.create_savings_pocket(
@@ -249,7 +271,7 @@ async def update_savings_pocket(
     pocket_id: UUID,
     body: SavingsPocketUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_banking_write_access),
 ):
     """Update a savings pocket."""
     pocket = await service.update_savings_pocket(

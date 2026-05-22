@@ -1,7 +1,8 @@
 """Auth router: OTP, PIN, Agent login, Token refresh."""
 
+import secrets
 import uuid as _uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Request, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +24,7 @@ from app.core.security import (
 )
 from app.core.logging import logger
 from app.db.session import get_db
-from app.modules.auth.models import User, Agent, OTPSession
+from app.modules.auth.models import User, Agent, OTPSession, WebAuthnChallenge, WebAuthnCredential
 from app.modules.kyc.models import KYCSession
 from app.modules.auth.utils import (
     generate_otp,
@@ -45,6 +46,11 @@ from app.modules.auth.schemas import (
     AgentResponse,
     PinSetupRequest,
     PinVerifyRequest,
+    WebAuthnRegisterOptionsResponse,
+    WebAuthnRegisterVerifyRequest,
+    WebAuthnAuthOptionsRequest,
+    WebAuthnAuthOptionsResponse,
+    WebAuthnAuthVerifyRequest,
     OtpSendRequest,
     OtpVerifyRequest,
     EmailOtpSendRequest,
@@ -53,6 +59,49 @@ from app.modules.auth.schemas import (
 )
 
 router = APIRouter()
+
+
+def _active_mobile_statuses() -> list[str]:
+    return ["DRAFT", "PENDING_INFO"]
+
+
+async def _get_or_create_mobile_session(db: AsyncSession, user: User) -> KYCSession:
+    result = await db.execute(
+        select(KYCSession)
+        .where(KYCSession.user_id == user.id, KYCSession.status.in_(_active_mobile_statuses()))
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
+    )
+    kyc_session = result.scalar_one_or_none()
+    if kyc_session is None:
+        kyc_session = KYCSession(
+            user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
+        )
+        db.add(kyc_session)
+        await db.flush()
+    return kyc_session
+
+
+async def _issue_mobile_tokens(db: AsyncSession, user: User) -> TokenResponse:
+    kyc_session = await _get_or_create_mobile_session(db, user)
+    await db.commit()
+    await db.refresh(kyc_session)
+    session_handle = make_session_handle(str(kyc_session.id))
+    access_token = create_access_token(
+        subject=str(user.id),
+        additional_claims={
+            "role": user.role,
+            "user_type": "mobile",
+            "sid": session_handle,
+        },
+    )
+    refresh_token = create_refresh_token(subject=str(user.id))
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        session_handle=session_handle,
+    )
 
 # ============================================================
 # HEALTH CHECK
@@ -593,6 +642,159 @@ async def verify_pin(
 # ============================================================
 # AGENT LOGIN ENDPOINT (Story 1.4 — Jean, Thomas, Sylvie)
 # ============================================================
+
+
+# ============================================================
+# WEBAUTHN / PASSKEY ENDPOINTS
+# ============================================================
+
+
+@router.post("/webauthn/register/options", response_model=WebAuthnRegisterOptionsResponse)
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def webauthn_register_options(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a server challenge for passkey registration."""
+    challenge = secrets.token_urlsafe(32)
+    db.add(
+        WebAuthnChallenge(
+            user_id=current_user.id,
+            challenge=challenge,
+            purpose="REGISTER",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        )
+    )
+    await db.commit()
+    return WebAuthnRegisterOptionsResponse(
+        challenge=challenge,
+        rp_id=request.url.hostname or "localhost",
+        rp_name="BICEC VeriPass",
+        user_id=str(current_user.id),
+        user_name=current_user.phone or current_user.email or str(current_user.id),
+    )
+
+
+@router.post("/webauthn/register/verify")
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def webauthn_register_verify(
+    request: Request,
+    body: WebAuthnRegisterVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist a passkey credential after browser WebAuthn registration."""
+    now = datetime.now(timezone.utc)
+    challenge_result = await db.execute(
+        select(WebAuthnChallenge).where(
+            WebAuthnChallenge.user_id == current_user.id,
+            WebAuthnChallenge.challenge == body.challenge,
+            WebAuthnChallenge.purpose == "REGISTER",
+            WebAuthnChallenge.consumed_at.is_(None),
+        )
+    )
+    challenge = challenge_result.scalar_one_or_none()
+    if challenge is None or challenge.expires_at < now:
+        raise HTTPException(status_code=400, detail="Invalid or expired WebAuthn challenge.")
+
+    challenge.consumed_at = now
+    credential_result = await db.execute(
+        select(WebAuthnCredential).where(WebAuthnCredential.credential_id == body.credential_id)
+    )
+    credential = credential_result.scalar_one_or_none()
+    if credential is None:
+        credential = WebAuthnCredential(
+            user_id=current_user.id,
+            credential_id=body.credential_id,
+        )
+        db.add(credential)
+
+    credential.public_key = body.public_key
+    credential.transports = body.transports
+    credential.device_tag = body.device_tag
+    current_user.biometric_opt_in = True
+    await db.commit()
+    return {"status": "success", "credential_id": credential.credential_id}
+
+
+@router.post("/webauthn/auth/options", response_model=WebAuthnAuthOptionsResponse)
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def webauthn_auth_options(
+    request: Request,
+    body: WebAuthnAuthOptionsRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a server challenge for passkey authentication."""
+    user_result = await db.execute(select(User).where(User.phone == body.phone))
+    user = user_result.scalar_one_or_none()
+    if not user or user.is_deleted:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    credential_result = await db.execute(
+        select(WebAuthnCredential).where(WebAuthnCredential.user_id == user.id)
+    )
+    credentials = credential_result.scalars().all()
+    if not credentials:
+        raise HTTPException(status_code=404, detail="No passkey registered for this account.")
+
+    challenge = secrets.token_urlsafe(32)
+    db.add(
+        WebAuthnChallenge(
+            user_id=user.id,
+            challenge=challenge,
+            purpose="AUTH",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        )
+    )
+    await db.commit()
+    return WebAuthnAuthOptionsResponse(
+        challenge=challenge,
+        rp_id=request.url.hostname or "localhost",
+        allow_credentials=[item.credential_id for item in credentials],
+    )
+
+
+@router.post("/webauthn/auth/verify", response_model=TokenResponse)
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def webauthn_auth_verify(
+    request: Request,
+    body: WebAuthnAuthVerifyRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify a passkey challenge and issue JWT tokens."""
+    user_result = await db.execute(select(User).where(User.phone == body.phone))
+    user = user_result.scalar_one_or_none()
+    if not user or user.is_deleted:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    now = datetime.now(timezone.utc)
+    challenge_result = await db.execute(
+        select(WebAuthnChallenge).where(
+            WebAuthnChallenge.user_id == user.id,
+            WebAuthnChallenge.challenge == body.challenge,
+            WebAuthnChallenge.purpose == "AUTH",
+            WebAuthnChallenge.consumed_at.is_(None),
+        )
+    )
+    challenge = challenge_result.scalar_one_or_none()
+    if challenge is None or challenge.expires_at < now:
+        raise HTTPException(status_code=400, detail="Invalid or expired WebAuthn challenge.")
+
+    credential_result = await db.execute(
+        select(WebAuthnCredential).where(
+            WebAuthnCredential.user_id == user.id,
+            WebAuthnCredential.credential_id == body.credential_id,
+        )
+    )
+    credential = credential_result.scalar_one_or_none()
+    if credential is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    challenge.consumed_at = now
+    credential.last_used_at = now
+    user.biometric_opt_in = True
+    return await _issue_mobile_tokens(db, user)
 
 
 @router.post("/agent/login", response_model=TokenResponse)

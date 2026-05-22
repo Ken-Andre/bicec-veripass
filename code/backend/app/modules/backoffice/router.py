@@ -63,6 +63,8 @@ from app.modules.backoffice.schemas import (
     AssignDossierRequest,
     AssignDossierResponse,
     AutoAssignResponse,
+    DocumentClassifyRequest,
+    DocumentClassifyResponse,
     SupportThreadSchema,
     SupportMessageSchema,
     SupportMessageCreate,
@@ -89,6 +91,17 @@ _REVIEW_STATES = {
     LifecycleState.PENDING_AGENT_REVIEW,
     LifecycleState.PENDING_KYC,
     LifecycleState.PENDING_INFO,
+}
+
+ALLOWED_DOC_CATEGORIES: set[str] = {
+    "CNI_RECTO",
+    "CNI_VERSO",
+    "BILL_ENEO",
+    "BILL_CAMWATER",
+    "NIU",
+    "SELFIE",
+    "ADDRESS_PROOF",
+    "OTHER",
 }
 
 
@@ -422,6 +435,92 @@ async def get_document_file(
         path=str(resolved),
         media_type="image/jpeg",
         filename=resolved.name,
+    )
+
+
+@router.post(
+    "/dossier/{session_id}/documents/{doc_id}/classify",
+    response_model=DocumentClassifyResponse,
+)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def classify_document(
+    request: Request,
+    session_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    body: DocumentClassifyRequest,
+    current_agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.SYLVIE)
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Classify a document sent as a complement into one or more KYC categories."""
+    result = await db.execute(
+        select(Document).where(
+            Document.id == doc_id,
+            Document.session_id == session_id,
+        )
+    )
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    categories = [c.strip().upper() for c in body.categories if c.strip()]
+    if not categories:
+        raise HTTPException(status_code=400, detail="At least one category is required")
+    invalid = sorted(set(categories) - ALLOWED_DOC_CATEGORIES)
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid document categories: {', '.join(invalid)}",
+        )
+
+    primary_doc_type = (body.primary_doc_type or categories[0]).strip().upper()
+    if primary_doc_type not in ALLOWED_DOC_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Invalid primary_doc_type")
+
+    now = datetime.now(timezone.utc)
+    old_doc_type = document.doc_type
+    previous_raw = document.ocr_raw_json if isinstance(document.ocr_raw_json, dict) else {}
+    document.doc_type = primary_doc_type
+    document.ocr_raw_json = {
+        **previous_raw,
+        "backoffice_classification": {
+            "categories": categories,
+            "primary_doc_type": primary_doc_type,
+            "classified_by": str(current_agent.id),
+            "classified_by_name": current_agent.name,
+            "classified_at": now.isoformat(),
+            "reason": body.reason,
+            "previous_doc_type": old_doc_type,
+        },
+    }
+
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="DOCUMENT_CLASSIFY",
+        table_name="documents",
+        record_id=str(session_id),
+        old_data={"document_id": str(document.id), "doc_type": old_doc_type},
+        new_data={
+            "document_id": str(document.id),
+            "doc_type": primary_doc_type,
+            "categories": categories,
+            "agent_name": current_agent.name,
+            "rationale": body.reason,
+        },
+        performed_by=current_agent.id,
+        performed_at=now,
+        client_ip=request.client.host if request.client else None,
+    )
+    db.add(audit)
+    await db.commit()
+
+    return DocumentClassifyResponse(
+        session_id=session_id,
+        document_id=doc_id,
+        doc_type=primary_doc_type,
+        categories=categories,
+        classified_at=now,
     )
 
 
@@ -1044,7 +1143,6 @@ async def correct_ocr_field(
     field.corrected_at = now
 
     # Create audit log
-    from app.modules.audit.models import AuditLog
     audit = AuditLog(
         id=uuid.uuid4(),
         action="OCR_CORRECTION",

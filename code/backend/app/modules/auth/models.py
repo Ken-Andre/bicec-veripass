@@ -11,7 +11,7 @@ from sqlalchemy import (
     Text,
     Enum,
 )
-from sqlalchemy.dialects.postgresql import UUID, INET
+from sqlalchemy.dialects.postgresql import UUID, INET, JSONB
 from sqlalchemy.orm import relationship
 
 from app.db.base_class import Base
@@ -161,3 +161,33 @@ class TokenRevocation(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     expires_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class WebAuthnCredential(Base):
+    __tablename__ = "webauthn_credentials"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    credential_id = Column(Text, nullable=False, unique=True, index=True)
+    public_key = Column(Text, nullable=True)
+    sign_count = Column(Integer, nullable=False, default=0)
+    transports = Column(JSONB, nullable=True)
+    device_tag = Column(String(128), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User")
+
+
+class WebAuthnChallenge(Base):
+    __tablename__ = "webauthn_challenges"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    challenge = Column(String(128), nullable=False, unique=True, index=True)
+    purpose = Column(String(32), nullable=False)  # REGISTER, AUTH
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship("User")

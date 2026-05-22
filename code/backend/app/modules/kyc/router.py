@@ -118,17 +118,25 @@ def _locked_liveness_response(lockout_count_24h: int) -> LivenessResultResponse:
     )
 
 
-async def _get_active_draft_session(
+async def _get_active_editable_session(
     db: AsyncSession, current_user: User
 ) -> KYCSession:
+    """Return a session that the client can still complete.
+
+    PENDING_INFO is intentionally editable so the client can upload requested
+    complements and resubmit the same dossier instead of creating a duplicate.
+    """
     result = await db.execute(
         select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
+        .where(
+            KYCSession.user_id == current_user.id,
+            KYCSession.status.in_([LifecycleState.DRAFT, LifecycleState.PENDING_INFO]),
+        )
         .order_by(KYCSession.started_at.desc())
     )
     session = result.scalars().first()
     if not session:
-        raise HTTPException(status_code=404, detail="No active KYC session")
+        raise HTTPException(status_code=404, detail="No active editable KYC session")
     return session
 
 
@@ -388,7 +396,7 @@ async def start_kyc_session(
     result = await db.execute(
         select(KYCSession).where(
             KYCSession.user_id == current_user.id,
-            KYCSession.status.in_(["DRAFT", "PENDING_KYC", "PENDING_INFO"]),
+            KYCSession.status.in_([LifecycleState.DRAFT, LifecycleState.PENDING_KYC, LifecycleState.PENDING_INFO]),
         )
     )
     existing = result.scalars().first()
@@ -431,7 +439,7 @@ async def upload_document(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload a KYC document (CNI recto/verso, selfie, bill, NIU)."""
-    session = await _get_active_draft_session(db, current_user)
+    session = await _get_active_editable_session(db, current_user)
     return await _store_document_and_create_record(
         session=session,
         file=file,
@@ -461,7 +469,7 @@ async def capture_cni(
     """
     _ = session_id
     normalized_side = _normalize_capture_side(side)
-    session = await _get_active_draft_session(db, current_user)
+    session = await _get_active_editable_session(db, current_user)
     return await _store_document_and_create_record(
         session=session,
         file=file,
@@ -496,7 +504,7 @@ async def capture_bill(
             status_code=400,
             detail="Invalid bill_type. Expected 'ENEO' or 'CAMWATER'.",
         )
-    session = await _get_active_draft_session(db, current_user)
+    session = await _get_active_editable_session(db, current_user)
     return await _store_document_and_create_record(
         session=session,
         file=file,
@@ -590,15 +598,7 @@ async def submit_ocr_review(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit OCR field corrections."""
-    # Get current session
-    result = await db.execute(
-        select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
-        .order_by(KYCSession.started_at.desc())
-    )
-    session = result.scalars().first()
-    if not session:
-        raise HTTPException(status_code=404, detail="No active KYC session")
+    session = await _get_active_editable_session(db, current_user)
 
     result = await db.execute(
         select(Document)
@@ -774,7 +774,9 @@ async def submit_liveness(
         select(KYCSession)
         .where(
             KYCSession.user_id == current_user.id,
-            KYCSession.status.in_(["DRAFT", "LOCKED_LIVENESS"]),
+            KYCSession.status.in_(
+                [LifecycleState.DRAFT, LifecycleState.PENDING_INFO, LifecycleState.LOCKED_LIVENESS]
+            ),
         )
         .order_by(KYCSession.started_at.desc())
     )
@@ -782,12 +784,12 @@ async def submit_liveness(
     if not session:
         raise HTTPException(status_code=404, detail="No active KYC session")
 
-    if session.status == "LOCKED_LIVENESS":
+    if session.status == LifecycleState.LOCKED_LIVENESS:
         await db.commit()
         return _locked_liveness_response(current_user.liveness_lockout_count_24h or 0)
 
     if (current_user.liveness_lockout_count_24h or 0) >= MAX_LIVENESS_LOCKOUTS_PER_WINDOW:
-        session.status = "LOCKED_LIVENESS"
+        session.status = LifecycleState.LOCKED_LIVENESS
         await db.commit()
         return _locked_liveness_response(current_user.liveness_lockout_count_24h or 0)
 
@@ -799,7 +801,7 @@ async def submit_liveness(
     if not is_alive:
         session.liveness_strike_count += 1
         if session.liveness_strike_count >= 3:
-            session.status = "LOCKED_LIVENESS"
+            session.status = LifecycleState.LOCKED_LIVENESS
             current_user.liveness_lockout_count_24h = (
                 (current_user.liveness_lockout_count_24h or 0) + 1
             )
@@ -900,14 +902,7 @@ async def submit_address(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit address information with GPS validation."""
-    result = await db.execute(
-        select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
-        .order_by(KYCSession.started_at.desc())
-    )
-    session = result.scalars().first()
-    if not session:
-        raise HTTPException(status_code=404, detail="No active KYC session")
+    session = await _get_active_editable_session(db, current_user)
 
     # Validate GPS is within Cameroon bounds (~2°N-13°N, 8°E-17°E)
     if body.gps_lat is not None and body.gps_lng is not None:
@@ -936,14 +931,7 @@ async def submit_consent(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit consent checkboxes."""
-    result = await db.execute(
-        select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
-        .order_by(KYCSession.started_at.desc())
-    )
-    session = result.scalars().first()
-    if not session:
-        raise HTTPException(status_code=404, detail="No active KYC session")
+    session = await _get_active_editable_session(db, current_user)
 
     if not (
         body.cgu_accepted and body.privacy_accepted and body.data_processing_accepted
@@ -1003,14 +991,7 @@ async def submit_niu(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit NIU information."""
-    result = await db.execute(
-        select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
-        .order_by(KYCSession.started_at.desc())
-    )
-    session = result.scalars().first()
-    if not session:
-        raise HTTPException(status_code=404, detail="No active KYC session")
+    session = await _get_active_editable_session(db, current_user)
 
     session.niu_type = body.niu_type
     session.last_step_completed = "niu"
@@ -1028,14 +1009,7 @@ async def submit_signature(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit electronic signature. Stored in consent metadata."""
-    result = await db.execute(
-        select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
-        .order_by(KYCSession.started_at.desc())
-    )
-    session = result.scalars().first()
-    if not session:
-        raise HTTPException(status_code=404, detail="No active KYC session")
+    session = await _get_active_editable_session(db, current_user)
 
     # Find or create consent record to attach signature
     result = await db.execute(
@@ -1196,7 +1170,7 @@ async def get_kyc_readiness(
     db: AsyncSession = Depends(get_db),
 ):
     """Return readiness gates before KYC submission."""
-    session = await _get_active_draft_session(db, current_user)
+    session = await _get_active_editable_session(db, current_user)
     return await _compute_kyc_readiness(session=session, db=db)
 
 
@@ -1208,14 +1182,7 @@ async def submit_kyc(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit the complete KYC dossier for review."""
-    result = await db.execute(
-        select(KYCSession)
-        .where(KYCSession.user_id == current_user.id, KYCSession.status == "DRAFT")
-        .order_by(KYCSession.started_at.desc())
-    )
-    session = result.scalars().first()
-    if not session:
-        raise HTTPException(status_code=404, detail="No active KYC session")
+    session = await _get_active_editable_session(db, current_user)
 
     readiness = await _compute_kyc_readiness(session=session, db=db)
     if not readiness.can_submit:
@@ -1239,26 +1206,29 @@ async def submit_kyc(
         session.priority_flag = True
 
     session.confidence_score_global = readiness.confidence_score_global
+    old_status = session.status
+    old_access_level = session.access_level
 
     # Submit — transition per ADR-001: DRAFT → PENDING_AGENT_REVIEW
     new_status = LifecycleState.PENDING_AGENT_REVIEW
     new_access_level = LIFECYCLE_TO_ACCESS_TIER.get(new_status, AccessTier.RESTRICTED)
 
+    now = datetime.now(timezone.utc)
     session.status = new_status
     session.access_level = new_access_level
-    session.submitted_at = datetime.now(timezone.utc)
+    session.submitted_at = now
     session.last_step_completed = "submission"
-    await db.commit()
 
     # Audit log
     audit = AuditLog(
         id=uuid.uuid4(),
-        action="KYC_SUBMIT",
+        action="KYC_RESUBMIT" if old_status == LifecycleState.PENDING_INFO else "KYC_SUBMIT",
         table_name="kyc_sessions",
         record_id=str(session.id),
+        old_data={"status": old_status, "access_level": old_access_level},
         new_data={"status": new_status, "access_level": new_access_level},
         performed_by=current_user.id,
-        performed_at=datetime.now(timezone.utc),
+        performed_at=now,
     )
     db.add(audit)
     await db.commit()

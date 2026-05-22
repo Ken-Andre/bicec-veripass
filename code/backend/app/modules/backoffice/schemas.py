@@ -248,3 +248,24 @@ class AutoAssignResponse(BaseModel):
     agent_name: str
     assigned_at: datetime
     assignment_method: str = "auto"
+
+
+class DocumentClassifyRequest(BaseModel):
+    """Assign a client-provided complement to one or more business categories."""
+
+    categories: list[str] = Field(..., min_length=1)
+    primary_doc_type: Optional[str] = Field(
+        None,
+        description="Optional canonical doc_type to expose as the primary dossier tab.",
+    )
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+class DocumentClassifyResponse(BaseModel):
+    session_id: UUID
+    document_id: UUID
+    doc_type: str
+    categories: list[str]
+    classified_at: datetime
+
+    model_config = {"from_attributes": True}
