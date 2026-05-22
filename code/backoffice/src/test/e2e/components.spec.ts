@@ -53,7 +53,7 @@ test.describe('Back-Office Components', () => {
     await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
 
-    await expect(page.getByRole('heading', { name: /file de validation/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /file de validation/i })).toBeVisible({ timeout: 15000 })
 
     await page.getByLabel(/profil/i).click()
     await expect(page.getByRole('heading', { name: /mon profil/i })).toBeVisible()

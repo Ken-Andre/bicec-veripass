@@ -1,59 +1,67 @@
 # Stage Final Delivery Tracker
 
-Last updated: 2026-05-22
+Last updated: 2026-05-22 12:15 +02:00
 
-## Definition Of Done
+## Proof Status Model
 
-A requirement can move to `DONE` only when all of these are true:
+`DONE` is allowed only when the row has the required source change, rebuilt/restarted live runtime proof when runtime behavior is involved, reproducible test result, and an artifact/API response path.
 
-- Backend and frontend behavior are wired to the documented API contract.
-- Database changes have a linear Alembic migration path; `alembic heads` returns one head.
-- Reproducible tests pass from documented commands.
-- Visual or API evidence is linked in this tracker.
-- The owner has updated module docs when endpoints or behavior changed.
+| Status | Meaning |
+| --- | --- |
+| SOURCE_READY | Code/config/tests exist, but live runtime or artifact proof is not complete. |
+| LIVE_READY | Rebuilt/restarted service was verified through the live URL/API. |
+| EVIDENCE_READY | Screenshots/videos/traces or API proof artifacts exist under `docs/test-evidence/latest/...`. |
+| DONE | All proof required for that row is present. |
 
-## Evidence Commands
+## Verified Commands
 
-| Area | Command | Expected evidence |
+| Area | Command | Result |
 | --- | --- | --- |
-| Backend contracts | `docker compose -f code/docker-compose.yml -f code/docker-compose.test.yml run --rm --no-deps --entrypoint /app/.venv/bin/python api -m pytest tests/unit/test_contract_foundation_schemas.py -q` | `5 passed, 1 cache warning` in one-off test container; live `vp_api` restart still required |
-| Mobile unit tests | `bun run test` from `code/mobile` | Vitest output |
-| Mobile typecheck | `bunx tsc -b --noEmit` from `code/mobile` | TypeScript output |
-| Backoffice typecheck | `bunx tsc --noEmit` from `code/backoffice` | TypeScript output |
-| Backoffice E2E | `bunx playwright test --reporter=line` from `code/backoffice` | `13 passed` |
-| Visual evidence | `bun run test:evidence` from mobile/backoffice | Screenshots, traces, videos under `docs/test-evidence/latest/` |
+| Mobile unit tests | `bun run test` from `code/mobile` | `26 passed`, `170 passed` |
+| Mobile typecheck | `bunx tsc -b --noEmit` from `code/mobile` | Passed |
+| Backend contract tests | `docker compose -f code/docker-compose.yml -f code/docker-compose.test.yml run --rm --no-deps --entrypoint /app/.venv/bin/python api -m pytest tests/unit/test_contract_foundation_schemas.py tests/unit/test_support_compat_contract.py -q` | `6 passed, 1 warning in 0.24s` |
+| Backoffice typecheck | `bunx tsc --noEmit` from `code/backoffice` | Passed |
+| Backoffice E2E | `bunx playwright test --reporter=line` from `code/backoffice` | `13 passed (50.3s)` |
+| Live rebuild | `docker compose -f code/docker-compose.yml build api pwa` then `docker compose -f code/docker-compose.yml up -d api pwa nginx`; later `docker compose -f code/docker-compose.yml build pwa` and `up -d pwa nginx` after banner fix | `vp_api` and `vp_pwa` recreated; `vp_api` healthy; `vp_pwa` rebuilt again at 12:13 +02:00 |
+| Nginx refresh after recreate | `docker compose -f code/docker-compose.yml restart nginx` | Required to clear public `502` after API/PWA recreate |
+| Mobile evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/mobile` | `3 passed (9.8s)` after final PWA rebuild |
+| Backoffice evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/backoffice` | `1 passed (7.7s)` |
 
-## Day 0-1 Foundation
+## Day 1 Stabilization
 
-| Requirement | Status | Owner | Proof required | Evidence |
+| Requirement | Status | Owner | Proof | Evidence |
 | --- | --- | --- | --- | --- |
-| OpenAPI contract includes notifications, support, WebAuthn, and device tag endpoints | IN_PROGRESS | Senior reviewer | `openapi-spec.json` diff and API smoke response | Local `python -m json.tool openapi-spec.json` passed; file is ignored by `.gitignore` and must be force-added or generated in CI |
-| Alembic migration path is linear | DONE | Senior reviewer | `alembic heads` returns one head | `docker compose -f code/docker-compose.yml -f code/docker-compose.test.yml run --rm --no-deps --entrypoint /app/.venv/bin/alembic api heads` -> `025_contract_foundations (head)` |
-| Backend test deps are available without bloating production image | DONE | Senior reviewer | `docker-compose.test.yml` runs pytest in an API test image without changing the production container | Docker Desktop build completed in 10m05s; one-off test container `pytest tests/unit/test_contract_foundation_schemas.py -q` -> `5 passed, 1 warning in 0.04s`; live `vp_api` was not restarted |
-| Acceptance seed creates pending, info-requested, and approved dossiers | IN_PROGRESS | Senior reviewer | Seed script output and API queries | `code/backend/app/db/seed_acceptance_scenario.py` added and `py_compile` passed; seed execution/API query proof still pending |
-| Visual evidence configs capture screenshots, traces, and videos | DONE | Senior reviewer | Playwright evidence run artifacts | `code/mobile/playwright.evidence.config.ts` and `code/backoffice/playwright.evidence.config.ts` added with stable `docs/test-evidence/latest/...` output |
-| Mobile AGENTS endpoint table matches real APIs | DONE | Senior reviewer | Doc diff | `code/mobile/AGENTS.md` updated to real notifications/support endpoints |
+| Unauthenticated mobile protected routes land on `/auth`, not `/auth/phone` | DONE | Senior reviewer | `AuthGuard` added; `bun run test` -> `170 passed`; live `/mobile/auth` -> `200` | `docs/test-evidence/latest/mobile/screens/protected-route-auth-redirect.png` |
+| `/auth` presents explicit login/signup choices | DONE | Senior reviewer | `AuthEntryScreen` added; evidence run against `https://localhost/mobile/auth` passed | `docs/test-evidence/latest/mobile/screens/auth-choice.png`, `docs/test-evidence/latest/mobile/screens/login-route.png` |
+| Auth fallback paths use `/auth` | SOURCE_READY | Senior reviewer | Updated `AuthContext`, `LockScreen`, `PinLoginScreen`, `OtpVerifyScreen`, `EmailOtpVerifyScreen`; unit tests passed | Runtime proof covered by `/auth` evidence; no separate visual row needed |
+| Support API compatibility route exists for stale PWA clients | DONE | Senior reviewer | Live `GET https://localhost/api/v1/support/threads/messages` without token -> `401`, not `404/502`; backend contract tests passed | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md`; canonical PWA chunk uses `/support/threads/current` |
+| PWA support screen uses canonical current-thread endpoint | DONE | Senior reviewer | `grep` inside rebuilt `vp_pwa` found `/support/threads/current` in `SupportScreen-PS4MwtoK.js` and no `/support/threads/messages` primary path | `docker compose ... exec pwa grep -R '/support/threads/messages\|/support/threads/current' ...` |
+| Service worker stale-client handling is visible | LIVE_READY | Senior reviewer | `useServiceWorker` exposes visible reload banner and hourly update check; PWA rebuilt | Needs a forced SW update scenario before `DONE` |
+| Initial online load does not show false "Connexion rétablie" banner | DONE | Senior reviewer | `OfflineBanner` now initializes previous online state from current state; `bun run test` -> `170 passed`; PWA rebuilt and mobile evidence rerun | `docs/test-evidence/latest/mobile/screens/auth-choice.png` |
+| Browser 502 cleanup through public nginx | DONE | Senior reviewer | Initial public checks returned `502`; after `docker compose ... restart nginx`, live checks passed: health `200`, support current `401`, support compat `401`, logo `200`, Sentry health `200`, `/mobile/auth` `200` | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
+| Visual evidence config produces real artifacts | DONE | Senior reviewer | Evidence configs run only `*.evidence.ts`, one worker, video/screenshot/trace enabled; both `.last-run.json` files show `status: passed` | `docs/test-evidence/latest/mobile/`, `docs/test-evidence/latest/backoffice/`, `docs/test-evidence/latest/mobile-html-report/index.html`, `docs/test-evidence/latest/backoffice-html-report/index.html` |
+| Backoffice validation path remains truthful | DONE | Senior reviewer | No fake unit coverage claimed; `bunx tsc --noEmit` passed; `bunx playwright test --reporter=line` -> `13 passed` | Backoffice visual proof: `docs/test-evidence/latest/backoffice/screens/login.png`, `docs/test-evidence/latest/backoffice/screens/dashboard.png` |
 
-## Delivery Matrix
+## Current Evidence Artifacts
 
-| Requirement | Status | Owner | Priority | Proof required | Evidence |
-| --- | --- | --- | --- | --- | --- |
-| Forgot PIN route is reachable | DONE | Dev A | P0 | Mobile route test/typecheck | `/auth/forgot-pin` route registered; mobile full Vitest `166 tests` passed; mobile typecheck passed |
-| WebAuthn backend registration/auth returns JWT | IN_PROGRESS | Dev A | P0 | Backend API tests + mocked mobile tests + manual biometric video | Backend/mobile wiring added; mocked mobile test passed; cryptographic WebAuthn verification and manual biometric video still pending |
-| Notification list/read/subscription APIs exist | IN_PROGRESS | Dev B | P0 | Backend tests and mobile UI test | API/router/schema added; mobile full Vitest `166 tests` passed; backend persistence API tests still pending |
-| Client support thread/messages API and UI exist | IN_PROGRESS | Dev C | P0 | Backend tests and mobile UI test | API/router/schema and mobile UI added; mobile full Vitest `166 tests` passed; backend API tests still pending |
-| Support attachment upload is size/type/hash checked | IN_PROGRESS | Dev C | P1 | Backend API test + visual upload evidence | Upload endpoint added with type/size/SHA-256 enforcement; backend API test and visual proof still pending |
-| Backend access tiers protect banking APIs | IN_PROGRESS | Dev D | P0 | Negative/positive API tests | Banking write guards added; negative/positive API tests still pending |
-| Device tag registration and request convention exist | IN_PROGRESS | Dev D | P0 | API test and header evidence | `/devices/register`, `X-Device-Tag`, `X-Device-Fingerprint` convention added; API/header evidence still pending |
-| Analytics backoffice route is registered and status queries are current | IN_PROGRESS | Dev E | P0 | Backoffice typecheck/E2E and API response after live API rebuild/restart | `/analytics` route registered in source; lifecycle status queries updated in source; backoffice `tsc --noEmit` passed; Playwright E2E `13 passed` against existing API container, so live API rebuild/restart proof is still pending |
-| Mock analytics pages are replaced by live data | PLANNED | Dev E | P1 | Backoffice E2E and API fixtures | Pending |
+| Artifact | Path |
+| --- | --- |
+| Mobile auth choice screenshot | `docs/test-evidence/latest/mobile/screens/auth-choice.png` |
+| Mobile login route screenshot | `docs/test-evidence/latest/mobile/screens/login-route.png` |
+| Mobile protected route redirect screenshot | `docs/test-evidence/latest/mobile/screens/protected-route-auth-redirect.png` |
+| Mobile support screenshot | `docs/test-evidence/latest/mobile/screens/support-screen.png` |
+| Mobile notifications screenshot | `docs/test-evidence/latest/mobile/screens/notifications-screen.png` |
+| Mobile traces/videos/report | `docs/test-evidence/latest/mobile/`, `docs/test-evidence/latest/mobile-html-report/index.html` |
+| Live API proof | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
+| Backoffice login screenshot | `docs/test-evidence/latest/backoffice/screens/login.png` |
+| Backoffice dashboard screenshot | `docs/test-evidence/latest/backoffice/screens/dashboard.png` |
+| Backoffice traces/videos/report | `docs/test-evidence/latest/backoffice/`, `docs/test-evidence/latest/backoffice-html-report/index.html` |
 
-## Evidence Folders
+## Still Not DONE
 
-Store acceptance artifacts under:
-
-- `docs/test-evidence/latest/mobile/`
-- `docs/test-evidence/latest/backoffice/`
-- `docs/test-evidence/latest/api/`
-
-Manual biometric evidence must be stored as `docs/test-evidence/latest/mobile/webauthn-real-device-demo.md` with the device/browser, date, tester, and video filename.
+| Requirement | Status | Reason |
+| --- | --- | --- |
+| Forced service-worker update UX | LIVE_READY | Code and live build exist, but no captured update-trigger scenario yet. |
+| Manual real biometric proof | SOURCE_READY | Automated WebAuthn UI proof can be mocked, but real Face ID/Touch ID still requires manual device video. |
+| Full final-stage attachment acceptance | IN_PROGRESS | File attachment implementation exists in earlier work, but this tracker row still needs live upload evidence before final acceptance. |
+| Long-term support compatibility route removal | PLANNED | `/support/threads/messages` is intentionally temporary and deprecated. |

@@ -2,6 +2,7 @@
 # changing the production Dockerfile default.
 services:
   api:
+    image: code-api-test
     build:
       context: ./backend
       dockerfile: Dockerfile

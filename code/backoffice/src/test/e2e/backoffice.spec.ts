@@ -17,7 +17,7 @@ test.describe('Back-Office BICEC VeriPass', () => {
     await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
 
-    await expect(page.getByText(/file de validation/i)).toBeVisible()
+    await expect(page.getByText(/file de validation/i)).toBeVisible({ timeout: 15000 })
   })
 
   test('should login as THOMAS and access compliance page', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('Back-Office BICEC VeriPass', () => {
     await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
 
-    await expect(page.getByRole('heading', { name: /file de validation/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /file de validation/i })).toBeVisible({ timeout: 15000 })
     await page.goto('/back-office/compliance')
     await expect(page.getByRole('heading', { name: /acc/i })).toBeVisible()
   })

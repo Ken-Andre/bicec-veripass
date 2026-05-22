@@ -276,3 +276,10 @@ paddleocr_test/notebooks/output/
 preview_recto.png
 preview_verso.png
 veripass-images.tar
+
+# ========================
+# Test evidence binary artifacts
+# ========================
+docs/test-evidence/**/*.zip
+docs/test-evidence/**/.last-run.json
+docs/test-evidence/**/*-html-report/
