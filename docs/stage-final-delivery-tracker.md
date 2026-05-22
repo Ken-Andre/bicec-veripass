@@ -1,6 +1,6 @@
 # Stage Final Delivery Tracker
 
-Last updated: 2026-05-22 12:15 +02:00
+Last updated: 2026-05-22 15:39 +02:00
 
 ## Proof Status Model
 
@@ -17,30 +17,35 @@ Last updated: 2026-05-22 12:15 +02:00
 
 | Area | Command | Result |
 | --- | --- | --- |
-| Mobile unit tests | `bun run test` from `code/mobile` | `26 passed`, `170 passed` |
-| Mobile typecheck | `bunx tsc -b --noEmit` from `code/mobile` | Passed |
-| Backend contract tests | `docker compose -f code/docker-compose.yml -f code/docker-compose.test.yml run --rm --no-deps --entrypoint /app/.venv/bin/python api -m pytest tests/unit/test_contract_foundation_schemas.py tests/unit/test_support_compat_contract.py -q` | `6 passed, 1 warning in 0.24s` |
+| Mobile unit tests | `bun run test` from `code/mobile` | `26 passed`, `172 passed` at 15:28 +02:00 |
+| Mobile typecheck | `bunx tsc -b --noEmit` from `code/mobile` | Passed at 15:29 +02:00 |
+| OpenAPI JSON validation | `python -m json.tool openapi-spec.json > $null` | Passed |
+| Backend contract/support tests | `docker compose -f code/docker-compose.yml -f code/docker-compose.test.yml run --rm --no-deps --entrypoint /app/.venv/bin/python api -m pytest tests/unit/test_contract_foundation_schemas.py tests/unit/test_support_compat_contract.py tests/unit/test_support_attachment_contract.py -q` | `9 passed, 1 warning in 0.10s` after OpenAPI update |
 | Backoffice typecheck | `bunx tsc --noEmit` from `code/backoffice` | Passed |
-| Backoffice E2E | `bunx playwright test --reporter=line` from `code/backoffice` | `13 passed (50.3s)` |
-| Live rebuild | `docker compose -f code/docker-compose.yml build api pwa` then `docker compose -f code/docker-compose.yml up -d api pwa nginx`; later `docker compose -f code/docker-compose.yml build pwa` and `up -d pwa nginx` after banner fix | `vp_api` and `vp_pwa` recreated; `vp_api` healthy; `vp_pwa` rebuilt again at 12:13 +02:00 |
-| Nginx refresh after recreate | `docker compose -f code/docker-compose.yml restart nginx` | Required to clear public `502` after API/PWA recreate |
-| Mobile evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/mobile` | `3 passed (9.8s)` after final PWA rebuild |
-| Backoffice evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/backoffice` | `1 passed (7.7s)` |
+| Backoffice E2E | `bunx playwright test --reporter=line` from `code/backoffice` | `13 passed (43.0s)` |
+| Mobile live rebuild | `docker compose -f code/docker-compose.yml build pwa`; `docker compose -f code/docker-compose.yml up -d pwa nginx`; `docker compose -f code/docker-compose.yml restart nginx` | `vp_pwa` recreated and healthy; `vp_nginx` restarted at 15:31 +02:00 |
+| Mobile evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/mobile` | `4 passed (12.2s)` |
+| Backoffice evidence | `BASE_URL=https://localhost bun run test:evidence` from `code/backoffice` | `1 passed (14.9s)` |
+| Live public API smoke | `curl.exe -k` status checks against `https://localhost` | health `200`, support limits/current/compat unauth `401`, `/mobile/auth` `200`, `/mobile/support` `200`, `/back-office/login` `200`, logo `200`, Sentry health `200` |
+| Live authenticated support upload | OTP signup/login via `Invoke-RestMethod`, then multipart `curl.exe -k -F` to `/api/v1/support/threads/{thread_id}/attachments` | `HTTP_STATUS:201`, `attachment_document_id=3701da4e-0daf-41ee-9142-1fbc3f5ec630`, SHA-256 returned |
 
 ## Day 1 Stabilization
 
 | Requirement | Status | Owner | Proof | Evidence |
 | --- | --- | --- | --- | --- |
-| Unauthenticated mobile protected routes land on `/auth`, not `/auth/phone` | DONE | Senior reviewer | `AuthGuard` added; `bun run test` -> `170 passed`; live `/mobile/auth` -> `200` | `docs/test-evidence/latest/mobile/screens/protected-route-auth-redirect.png` |
-| `/auth` presents explicit login/signup choices | DONE | Senior reviewer | `AuthEntryScreen` added; evidence run against `https://localhost/mobile/auth` passed | `docs/test-evidence/latest/mobile/screens/auth-choice.png`, `docs/test-evidence/latest/mobile/screens/login-route.png` |
-| Auth fallback paths use `/auth` | SOURCE_READY | Senior reviewer | Updated `AuthContext`, `LockScreen`, `PinLoginScreen`, `OtpVerifyScreen`, `EmailOtpVerifyScreen`; unit tests passed | Runtime proof covered by `/auth` evidence; no separate visual row needed |
-| Support API compatibility route exists for stale PWA clients | DONE | Senior reviewer | Live `GET https://localhost/api/v1/support/threads/messages` without token -> `401`, not `404/502`; backend contract tests passed | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md`; canonical PWA chunk uses `/support/threads/current` |
-| PWA support screen uses canonical current-thread endpoint | DONE | Senior reviewer | `grep` inside rebuilt `vp_pwa` found `/support/threads/current` in `SupportScreen-PS4MwtoK.js` and no `/support/threads/messages` primary path | `docker compose ... exec pwa grep -R '/support/threads/messages\|/support/threads/current' ...` |
-| Service worker stale-client handling is visible | LIVE_READY | Senior reviewer | `useServiceWorker` exposes visible reload banner and hourly update check; PWA rebuilt | Needs a forced SW update scenario before `DONE` |
-| Initial online load does not show false "Connexion rétablie" banner | DONE | Senior reviewer | `OfflineBanner` now initializes previous online state from current state; `bun run test` -> `170 passed`; PWA rebuilt and mobile evidence rerun | `docs/test-evidence/latest/mobile/screens/auth-choice.png` |
-| Browser 502 cleanup through public nginx | DONE | Senior reviewer | Initial public checks returned `502`; after `docker compose ... restart nginx`, live checks passed: health `200`, support current `401`, support compat `401`, logo `200`, Sentry health `200`, `/mobile/auth` `200` | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
-| Visual evidence config produces real artifacts | DONE | Senior reviewer | Evidence configs run only `*.evidence.ts`, one worker, video/screenshot/trace enabled; both `.last-run.json` files show `status: passed` | `docs/test-evidence/latest/mobile/`, `docs/test-evidence/latest/backoffice/`, `docs/test-evidence/latest/mobile-html-report/index.html`, `docs/test-evidence/latest/backoffice-html-report/index.html` |
-| Backoffice validation path remains truthful | DONE | Senior reviewer | No fake unit coverage claimed; `bunx tsc --noEmit` passed; `bunx playwright test --reporter=line` -> `13 passed` | Backoffice visual proof: `docs/test-evidence/latest/backoffice/screens/login.png`, `docs/test-evidence/latest/backoffice/screens/dashboard.png` |
+| Unauthenticated mobile protected routes land on `/auth`, not `/auth/phone` | DONE | Senior reviewer | `AuthGuard` redirects protected routes to `/auth`; full mobile tests passed; live `/mobile/support` serves app and Playwright confirms redirect | `docs/test-evidence/latest/mobile/screens/protected-route-auth-redirect.png` |
+| Auth entry is clear without replacing the existing welcome page | DONE | Senior reviewer | `/` remains the public welcome/onboarding screen; `/auth` is the protected-route auth choice entry with explicit login/signup actions | `docs/test-evidence/latest/mobile/screens/auth-choice.png`, `docs/test-evidence/latest/mobile/screens/login-route.png` |
+| Auth fallback paths use `/auth` | DONE | Senior reviewer | `AuthContext`, lock, PIN login, OTP and email OTP fallback paths use `/auth`; full mobile tests passed | Covered by auth evidence screenshots and mobile unit suite |
+| Support API compatibility route exists for stale PWA clients | DONE | Senior reviewer | Live `GET https://localhost/api/v1/support/threads/messages` without token -> `401`, not `404/502`; backend contract tests passed | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
+| OpenAPI support contract matches implemented routes | DONE | Senior reviewer | `openapi-spec.json` documents `/support/attachment-limits`, `/support/threads/{thread_id}/attachments`, `attachment_filename`, and `attachment_document_id`; JSON validation passed | `openapi-spec.json`; backend contract tests `9 passed` |
+| PWA support screen uses canonical current-thread endpoint | DONE | Senior reviewer | Rebuilt PWA support flow loads `/support/threads/current` then `/support/threads/{thread_id}/messages`; evidence run has zero 5xx responses | `docs/test-evidence/latest/mobile/screens/support-screen.png` |
+| Client can send requested supporting file from support chat | DONE | Dev C / Senior reviewer | Mobile UI supports PDF/JPG/PNG attachment, optional message, optimistic send, file chip, and backend multipart endpoint creates support message + `Document(COMPLEMENTARY)` + notification | `docs/test-evidence/latest/mobile/screens/support-attachment-selected.png`, `docs/test-evidence/latest/mobile/screens/support-attachment-sent.png`; live API proof `HTTP_STATUS:201` |
+| Attachment limits are visible and enforced | DONE | Dev C / Senior reviewer | UI shows `JPG, PNG ou PDF - 10 Mo max` and `0/4000`; client rejects bad type/oversize; backend rejects bad type `415`, hash mismatch `409`, size over `MAX_DOCUMENT_SIZE_MB` | `code/mobile/src/views/dashboard/SupportScreen.test.tsx`; `code/backend/tests/unit/test_support_attachment_contract.py`; support screenshots |
+| Backoffice can see support attachment metadata | DONE | Dev C / Senior reviewer | Backoffice support message schema/router expose attachment path/SHA-256; evidence viewer renders attached client file metadata | `bunx tsc --noEmit`; `bunx playwright test --reporter=line` |
+| Service worker stale-client handling is visible | DONE | Senior reviewer | `useServiceWorker` exposes update state and evidence trigger; banner has `Nouvelle version disponible`, `Plus tard`, and `Recharger`; PWA rebuilt and served live | `docs/test-evidence/latest/mobile/screens/service-worker-update-banner.png`; mobile evidence `4 passed` |
+| Browser 502 cleanup through public nginx | DONE | Senior reviewer | After rebuild/restart, public checks return `200/401` instead of `502`; nginx restarted after PWA recreate | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
+| Visual evidence config produces real artifacts | DONE | Senior reviewer | Evidence configs run only `*.evidence.ts`, one worker, video/screenshot/trace enabled; both `.last-run.json` files show `status: passed` | `docs/test-evidence/latest/mobile/`, `docs/test-evidence/latest/backoffice/` |
+| Backoffice validation path remains truthful | DONE | Senior reviewer | No fake unit coverage claimed; `bunx tsc --noEmit` passed; `bunx playwright test --reporter=line` -> `13 passed` | `docs/test-evidence/latest/backoffice/screens/login.png`, `docs/test-evidence/latest/backoffice/screens/dashboard.png` |
 
 ## Current Evidence Artifacts
 
@@ -49,7 +54,10 @@ Last updated: 2026-05-22 12:15 +02:00
 | Mobile auth choice screenshot | `docs/test-evidence/latest/mobile/screens/auth-choice.png` |
 | Mobile login route screenshot | `docs/test-evidence/latest/mobile/screens/login-route.png` |
 | Mobile protected route redirect screenshot | `docs/test-evidence/latest/mobile/screens/protected-route-auth-redirect.png` |
-| Mobile support screenshot | `docs/test-evidence/latest/mobile/screens/support-screen.png` |
+| Mobile service-worker update banner | `docs/test-evidence/latest/mobile/screens/service-worker-update-banner.png` |
+| Mobile support initial screenshot | `docs/test-evidence/latest/mobile/screens/support-screen.png` |
+| Mobile support file selected screenshot | `docs/test-evidence/latest/mobile/screens/support-attachment-selected.png` |
+| Mobile support file sent screenshot | `docs/test-evidence/latest/mobile/screens/support-attachment-sent.png` |
 | Mobile notifications screenshot | `docs/test-evidence/latest/mobile/screens/notifications-screen.png` |
 | Mobile traces/videos/report | `docs/test-evidence/latest/mobile/`, `docs/test-evidence/latest/mobile-html-report/index.html` |
 | Live API proof | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
@@ -57,11 +65,14 @@ Last updated: 2026-05-22 12:15 +02:00
 | Backoffice dashboard screenshot | `docs/test-evidence/latest/backoffice/screens/dashboard.png` |
 | Backoffice traces/videos/report | `docs/test-evidence/latest/backoffice/`, `docs/test-evidence/latest/backoffice-html-report/index.html` |
 
-## Still Not DONE
+## Manual Outside This Run
 
 | Requirement | Status | Reason |
 | --- | --- | --- |
-| Forced service-worker update UX | LIVE_READY | Code and live build exist, but no captured update-trigger scenario yet. |
-| Manual real biometric proof | SOURCE_READY | Automated WebAuthn UI proof can be mocked, but real Face ID/Touch ID still requires manual device video. |
-| Full final-stage attachment acceptance | IN_PROGRESS | File attachment implementation exists in earlier work, but this tracker row still needs live upload evidence before final acceptance. |
-| Long-term support compatibility route removal | PLANNED | `/support/threads/messages` is intentionally temporary and deprecated. |
+| Manual real biometric proof | SOURCE_READY | Automated WebAuthn UI proof can be mocked, but real Face ID/Touch ID still requires the manual device video the product owner will capture. |
+
+## Post-Stabilization Cleanup
+
+| Item | Status | Reason |
+| --- | --- | --- |
+| Remove deprecated `/support/threads/messages` compatibility route | PLANNED | Route is intentionally temporary to protect stale PWA clients while service workers refresh. Do not remove until deployed clients have aged out. |
