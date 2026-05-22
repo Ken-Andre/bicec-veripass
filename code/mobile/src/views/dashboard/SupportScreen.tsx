@@ -9,33 +9,48 @@ import type { SupportMessage } from '../../types';
 export function SupportScreen() {
   const { t } = useLanguage();
   const [messages, setMessages] = useState<SupportMessage[]>([]);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
 
   useEffect(() => {
-    apiClient.get<SupportMessage[]>('/support/threads/messages')
-      .then(data => setMessages(data || []))
-      .catch(() => setMessages([]))
-      .finally(() => setLoading(false));
+    let active = true;
+    async function loadThread() {
+      try {
+        const thread = await apiClient.get<{ id: string }>('/support/threads/current');
+        const data = await apiClient.get<SupportMessage[]>(`/support/threads/${thread.id}/messages`);
+        if (!active) return;
+        setThreadId(thread.id);
+        setMessages(data || []);
+      } catch {
+        if (active) setMessages([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void loadThread();
+    return () => { active = false; };
   }, []);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !threadId) return;
     const content = input.trim();
     setInput('');
     // Optimistic
     const optimistic: SupportMessage = {
       id: 'temp_' + Date.now(),
-      thread_id: 't1',
+      thread_id: threadId,
       sender: 'user',
       content,
       created_at: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimistic]);
     try {
-      await apiClient.post<SupportMessage, { content: string }>('/support/threads/t1/messages', { content });
+      const saved = await apiClient.post<SupportMessage, { content: string }>(`/support/threads/${threadId}/messages`, { content });
+      setMessages(prev => prev.map((msg) => msg.id === optimistic.id ? saved : msg));
     } catch {
-      // Silently fail — user can retry
+      setMessages(prev => prev.filter((msg) => msg.id !== optimistic.id));
+      setInput(content);
     }
   };
 
@@ -84,11 +99,13 @@ export function SupportScreen() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder={t('support.placeholder')}
+              disabled={!threadId}
               className="flex-1 h-12 rounded-xl border border-border px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-background"
             />
             <button
+              aria-label="Envoyer le message"
               onClick={handleSend}
-              disabled={!input.trim()}
+              disabled={!input.trim() || !threadId}
               className="h-12 w-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
             >
               <Send className="h-5 w-5" />

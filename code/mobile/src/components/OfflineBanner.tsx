@@ -8,7 +8,8 @@ export const OfflineBanner = () => {
   const { isOnline, isSyncing, pendingCount, needsReuploadCount, failedCount, syncNow } = useConnectivity();
   const [dismissed, setDismissed] = useState(false);
   const [justCameOnline, setJustCameOnline] = useState(false);
-  const prevIsOnline = useRef(isOnline);
+  const prevIsOnline = useRef(false);
+  const prevOnlineForDismiss = useRef(isOnline);
 
   // Detect transition from offline → online to show "back online" message briefly
   useEffect(() => {
@@ -16,22 +17,21 @@ export const OfflineBanner = () => {
     prevIsOnline.current = isOnline;
 
     if (cameOnline && !dismissed) {
-      // Defer setState to avoid synchronous setState inside effect body
-      const showTimer = window.setTimeout(() => setJustCameOnline(true), 0);
+      setJustCameOnline(true);
       const hideTimer = window.setTimeout(() => setJustCameOnline(false), 4000);
-      return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
+      return () => clearTimeout(hideTimer);
     }
     if (!isOnline) {
-      const timer = window.setTimeout(() => setJustCameOnline(false), 0);
-      return () => clearTimeout(timer);
+      setJustCameOnline(false);
     }
   }, [isOnline, dismissed]);
 
-  // Reset dismissed state when going offline
+  // Reset dismissed state only when a new offline event happens.
   useEffect(() => {
-    if (!isOnline && dismissed) {
-      const timer = window.setTimeout(() => setDismissed(false), 0);
-      return () => clearTimeout(timer);
+    const wentOffline = !isOnline && prevOnlineForDismiss.current;
+    prevOnlineForDismiss.current = isOnline;
+    if (wentOffline && dismissed) {
+      setDismissed(false);
     }
   }, [isOnline, dismissed]);
 

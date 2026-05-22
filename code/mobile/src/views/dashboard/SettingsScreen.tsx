@@ -6,13 +6,15 @@ import { useTheme } from '../../hooks/use-theme';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { ChevronRight, Lock, Fingerprint, Bell, Moon, Shield, Wrench } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { disablePushNotifications, enablePushNotifications } from '../../services/pushNotificationService';
 
 export function SettingsScreen() {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
   const { biometricEnabled, isPasskeySupported, setBiometric } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [pushEnabled, setPushEnabled] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(() => localStorage.getItem('vp_push_enabled') === 'true');
+  const [pushLoading, setPushLoading] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
   const isDev = import.meta.env.DEV;
 
@@ -20,6 +22,20 @@ export function SettingsScreen() {
     setBiometricLoading(true);
     await setBiometric(v);
     setBiometricLoading(false);
+  };
+
+  const handlePushToggle = async (v: boolean) => {
+    setPushLoading(true);
+    try {
+      if (v) {
+        setPushEnabled(await enablePushNotifications());
+      } else {
+        await disablePushNotifications();
+        setPushEnabled(false);
+      }
+    } finally {
+      setPushLoading(false);
+    }
   };
 
   return (
@@ -46,7 +62,7 @@ export function SettingsScreen() {
           <div className="space-y-1">
             {[
               { icon: Fingerprint, label: t('settings.biometric') + (!isPasskeySupported ? ` (${t('auth.biometric.unsupported')})` : ''), value: biometricEnabled, onChange: (v: boolean) => handleBiometricToggle(v), disabled: !isPasskeySupported || biometricLoading },
-              { icon: Bell, label: t('settings.notifications'), value: pushEnabled, onChange: setPushEnabled },
+              { icon: Bell, label: t('settings.notifications'), value: pushEnabled, onChange: handlePushToggle, disabled: pushLoading },
               { icon: Moon, label: t('settings.darkMode'), value: theme === 'dark', onChange: toggleTheme },
             ].map((item) => (
               <div key={item.label} className="bg-card border border-border rounded-2xl p-4">

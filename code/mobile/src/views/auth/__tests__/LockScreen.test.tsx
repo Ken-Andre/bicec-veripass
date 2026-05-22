@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import LockScreen from '../LockScreen';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
-const mockUnlock = vi.hoisted(() => vi.fn());
+const mockLogin = vi.hoisted(() => vi.fn());
 const mockPost = vi.hoisted(() => vi.fn());
 
 vi.mock('react-router-dom', async () => {
@@ -24,7 +24,7 @@ vi.mock('../../../contexts/AuthContext', () => ({
       role: 'CLIENT',
       has_pin: true,
     },
-    unlock: mockUnlock,
+    login: mockLogin,
   }),
 }));
 
@@ -68,6 +68,28 @@ describe('LockScreen', () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/auth/phone', { replace: true });
     }, { timeout: 2000 });
-    expect(mockUnlock).not.toHaveBeenCalled();
+    expect(mockLogin).not.toHaveBeenCalled();
+  });
+
+  it('calls login and navigates to the target route on successful PIN entry', async () => {
+    mockPost.mockResolvedValue({
+      access_token: 'test-new-access-token',
+      refresh_token: 'test-new-refresh-token',
+    });
+
+    render(
+      <MemoryRouter>
+        <LockScreen />
+      </MemoryRouter>,
+    );
+
+    ['1', '2', '3', '4', '5', '6'].forEach((digit) => {
+      fireEvent.click(screen.getByRole('button', { name: digit }));
+    });
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith('test-new-access-token', expect.objectContaining({ id: 'user-1' }));
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true });
   });
 });

@@ -131,14 +131,12 @@ export function KycStepGuard({ children }: { children: React.ReactNode }) {
 
   // Phase 1: Not yet hydrated from IndexedDB → neutral state
   if (!hydrated) {
-    console.log(`[KYC:guard] ts=${Date.now()} PHASE=1 route=${location.pathname} hydrated=${hydrated} → LoadingState(Chargement)`);
     return <LoadingState message="Chargement..." />;
   }
 
   // Phase 2: Hydrated but backend reconciliation pending → neutral state
   // 'skipped' and 'failed' pass through (offline mode or error fallback)
   if (reconciliationStatus === 'pending') {
-    console.log(`[KYC:guard] ts=${Date.now()} PHASE=2 route=${location.pathname} reconcStatus=${reconciliationStatus} completedSteps=${JSON.stringify(completedSteps)} → LoadingState(Synchronisation)`);
     return <LoadingState message="Synchronisation..." />;
   }
 
@@ -168,7 +166,6 @@ export function KycStepGuard({ children }: { children: React.ReactNode }) {
   const missingStep = findFirstMissingStep(completedSteps);
   const allowedRoutesForMissing = missingStep ? STEP_TO_ROUTES[missingStep] || [] : [];
   const isOnAllowedRoute = allowedRoutesForMissing.includes(location.pathname);
-  console.log(`[KYC:guard] ts=${Date.now()} PHASE=4 route=${location.pathname} completedSteps=${JSON.stringify(completedSteps)} missingStep=${missingStep || 'null'} allowed=${isOnAllowedRoute} reconcStatus=${reconciliationStatus}`);
   if (missingStep && !isOnAllowedRoute) {
     const redirectPath = STEP_TO_FIRST_ROUTE[missingStep];
     if (location.pathname !== redirectPath) {

@@ -64,6 +64,30 @@ export interface ReviewStatus {
   unreadNotifications: ReviewStatusNotification[];
 }
 
+interface BackendReviewStatus {
+  status: KycStatus;
+  access_level?: AccessTier;
+  accessLevel?: AccessTier;
+  submitted_at?: string | null;
+  submittedAt?: string | null;
+  completed_at?: string | null;
+  completedAt?: string | null;
+  decision: ReviewStatus['decision'];
+  unread_notifications?: ReviewStatusNotification[];
+  unreadNotifications?: ReviewStatusNotification[];
+}
+
+function normalizeReviewStatus(response: BackendReviewStatus): ReviewStatus {
+  return {
+    status: response.status,
+    accessLevel: response.accessLevel ?? response.access_level ?? 'GUEST',
+    submittedAt: response.submittedAt ?? response.submitted_at ?? null,
+    completedAt: response.completedAt ?? response.completed_at ?? null,
+    decision: response.decision ?? null,
+    unreadNotifications: response.unreadNotifications ?? response.unread_notifications ?? [],
+  };
+}
+
 const REVIEW_POLLABLE_STATUSES: KycStatus[] = [
   'SUBMITTED',
   'PENDING',
@@ -203,7 +227,6 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to restore KYC draft from IndexedDB', err);
       } finally {
         if (active) {
-          console.log(`[KYC:hydrate] ts=${Date.now()} hydrated=true IndexedDB=${persisted ? 'found' : 'empty'} completedSteps=${JSON.stringify(persisted?.completedSteps || [])} sessionId=${persisted?.sessionId || 'null'} reconcStatus=still-pending`);
           setHydrated(true);
         }
       }
@@ -230,19 +253,15 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated) return;
     let active = true;
     void (async () => {
-      const ts = Date.now();
-      console.log(`[KYC:AR] ts=${ts} START hydrated=true completedSteps=${JSON.stringify(state.completedSteps)} sessionId=${state.sessionId || 'null'}`);
       try {
         const res = await fetchWithCorrelation('/api/v1/kyc/session/current');
-        if (!active) { console.log(`[KYC:AR] ts=${Date.now()} ABORTED`); return; }
+        if (!active) return;
         if (res.status === 401) {
-          console.log(`[KYC:AR] ts=${Date.now()} DECISION auth-expired keep-local`);
           // Token removal and redirect are handled centrally by apiClient / AuthContext.
           // Avoid duplicate redirects or full page reloads.
           return;
         }
         if (res.status === 403) {
-          console.log(`[KYC:AR] ts=${Date.now()} DECISION forbidden keep-local`);
           if (active) {
             setReconciliationStatus('skipped');
           }
@@ -250,14 +269,11 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
         }
         if (res.ok) {
           const session = await res.json() as BackendSessionData;
-          console.log(`[KYC:AR] ts=${Date.now()} FETCH /session/current status=${res.status} id=${session.id || 'null'} isFreshDraft=${session.status === 'DRAFT' && (session.documents?.length ?? 0) === 0}`);
           if (session.id) {
             let readiness: BackendReadinessData | null = null;
-            try { const r = await fetchWithCorrelation('/api/v1/kyc/readiness'); if (r.ok) readiness = await r.json(); } catch { console.log(`[KYC:AR] FETCH /readiness FAILED`); }
+            try { const r = await fetchWithCorrelation('/api/v1/kyc/readiness'); if (r.ok) readiness = await r.json(); } catch { /* readiness is best effort */ }
             if (active) {
-              console.log(`[KYC:AR] ts=${Date.now()} ACTION hydrateKycFromBackend oldSteps=${JSON.stringify(state.completedSteps)}`);
               hydrateKycFromBackend(session, readiness);
-              console.log(`[KYC:AR] ts=${Date.now()} TRANSITION reconcStatus→done`);
             }
             return;
           }
@@ -265,17 +281,13 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
         if (active) {
           setState(s => {
             const hasStale = s.completedSteps.length > 0 || s.sessionId !== null;
-            console.log(`[KYC:AR] ts=${Date.now()} DECISION no-backend-session ok=${res.ok} hasStale=${hasStale} steps=${JSON.stringify(s.completedSteps)}`);
             if (!hasStale) return s;
-            console.log(`[KYC:AR] ts=${Date.now()} ACTION wipe-stale oldSteps=${JSON.stringify(s.completedSteps)}`);
             return { ...initialState, completedSteps: [] };
           });
           setReconciliationStatus('skipped');
-          console.log(`[KYC:AR] ts=${Date.now()} TRANSITION reconcStatus→skipped`);
         }
       } catch {
-        console.log(`[KYC:AR] ts=${Date.now()} DECISION network-error keeping-local steps=${JSON.stringify(state.completedSteps)}`);
-        if (active) { setReconciliationStatus('skipped'); console.log(`[KYC:AR] ts=${Date.now()} TRANSITION reconcStatus→skipped`); }
+        if (active) setReconciliationStatus('skipped');
       }
     })();
     return () => { active = false; };
@@ -291,15 +303,14 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     const poll = async () => {
       try {
         const { apiClient } = await import('../services/apiClient');
-        const response = await apiClient.get<ReviewStatus>(`/kyc/session/${state.sessionId}/review-status`);
+        const response = await apiClient.get<BackendReviewStatus>('/kyc/review-status');
+        const reviewStatus = normalizeReviewStatus(response);
         
         if (active) {
-          setState(s => ({
-            ...s,
-            status: response.status,
-            accessLevel: response.accessLevel,
-            reviewStatus: response
-          }));
+          setState(s => {
+            if (s.status === reviewStatus.status && s.accessLevel === reviewStatus.accessLevel) return s;
+            return { ...s, status: reviewStatus.status, accessLevel: reviewStatus.accessLevel, reviewStatus };
+          });
         }
       } catch (err) {
         console.warn('Polling review status failed', err);

@@ -6,14 +6,14 @@ import { Bell, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Notification, NotificationType } from '../../types';
 
-const typeIcons: Record<NotificationType, typeof Bell> = {
+const typeIcons: Partial<Record<NotificationType, typeof Bell>> = {
   DOSSIER_APPROVED: CheckCircle,
   DOSSIER_REJECTED: AlertTriangle,
   INFO_REQUESTED: Info,
   GENERAL: Bell,
 };
 
-const typeColors: Record<NotificationType, string> = {
+const typeColors: Partial<Record<NotificationType, string>> = {
   DOSSIER_APPROVED: 'bg-emerald-100 text-emerald-600',
   DOSSIER_REJECTED: 'bg-red-100 text-red-600',
   INFO_REQUESTED: 'bg-amber-100 text-amber-600',
@@ -23,11 +23,15 @@ const typeColors: Record<NotificationType, string> = {
 export function NotificationsScreen() {
   const { t } = useLanguage();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiClient.get<Notification[]>('/kyc/notifications')
-      .then(data => setNotifications(data || []))
+    apiClient.get<{ items: Notification[]; unread_count: number }>('/notifications')
+      .then(data => {
+        setNotifications(data.items || []);
+        setUnreadCount(data.unread_count || 0);
+      })
       .catch(() => setNotifications([]))
       .finally(() => setLoading(false));
   }, []);
@@ -37,6 +41,20 @@ export function NotificationsScreen() {
   return (
     <ScreenLayoutV2 showBack title={t('notifications.title')}>
       <div className="space-y-3 pt-2">
+        {!loading && unreadCount > 0 && (
+          <button
+            type="button"
+            onClick={async () => {
+              await apiClient.post('/notifications/read', { mark_all: true });
+              setNotifications((items) => items.map((item) => ({ ...item, read: true })));
+              setUnreadCount(0);
+            }}
+            className="w-full rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary"
+          >
+            Tout marquer comme lu ({unreadCount})
+          </button>
+        )}
+
         {loading && (
           <div className="space-y-2 animate-pulse">
             {[1,2,3].map(i => <div key={i} className="h-16 bg-muted rounded-2xl" />)}

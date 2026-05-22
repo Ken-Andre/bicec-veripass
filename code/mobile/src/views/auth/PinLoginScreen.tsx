@@ -32,9 +32,13 @@ const PinLoginScreen = () => {
     if (!biometricEnabled || !isPasskeySupported || loading) return;
 
     const tryBiometric = async () => {
-      const success = await authenticateWithPasskey();
-      if (success && user) {
-        setError('Connexion biométrique indisponible pour le moment. Utilisez votre PIN.');
+      const result = await authenticateWithPasskey();
+      if (result?.access_token) {
+        const freshUser = await apiClient.get<User>('/auth/me', {
+          headers: { Authorization: `Bearer ${result.access_token}` },
+        });
+        login(result.access_token, freshUser);
+        navigate('/dashboard', { replace: true });
       }
     };
 
@@ -129,9 +133,13 @@ const PinLoginScreen = () => {
     setError('');
 
     try {
-      const success = await authenticateWithPasskey();
-      if (success && user) {
-        setError('Connexion biométrique indisponible pour le moment. Utilisez votre PIN.');
+      const result = await authenticateWithPasskey();
+      if (result?.access_token) {
+        const freshUser = await apiClient.get<User>('/auth/me', {
+          headers: { Authorization: `Bearer ${result.access_token}` },
+        });
+        login(result.access_token, freshUser);
+        navigate('/dashboard', { replace: true });
       } else {
         setError('Biométrie échouée. Utilisez votre PIN.');
       }

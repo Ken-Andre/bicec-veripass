@@ -265,6 +265,12 @@ export type NotificationType =
   | 'DOSSIER_APPROVED'
   | 'DOSSIER_REJECTED'
   | 'INFO_REQUESTED'
+  | 'KYC_APPROVED'
+  | 'KYC_REJECTED'
+  | 'KYC_INFO_REQUESTED'
+  | 'KYC_SUBMITTED'
+  | 'SUPPORT_MESSAGE'
+  | 'SUPPORT_MESSAGE_SENT'
   | 'GENERAL';
 
 export interface Notification {

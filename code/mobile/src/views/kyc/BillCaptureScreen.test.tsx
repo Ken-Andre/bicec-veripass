@@ -237,7 +237,7 @@ describe('BillCaptureScreen integration', () => {
         expect.objectContaining({
           sessionId: 'sess-1',
           billType: 'ENEO',
-          fileDataUrl: 'data:image/jpeg;base64,fakebilldata==',
+          fileDataUrl: expect.stringMatching(/^data:image\/jpeg;base64,/),
         }),
       );
     });

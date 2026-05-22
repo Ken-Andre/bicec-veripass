@@ -120,22 +120,6 @@ export default function OcrReviewScreen() {
         }
       }
 
-      // Debug log: show which documents were selected and why
-      console.log(
-        '[OCR:source] selected docs per type:',
-        Array.from(bestByType.entries()).map(([t, d]) => ({
-          type: t,
-          docId: ((d.id as string) || '').slice(-12),
-          engine: d.ocr_engine,
-          status: d.ocr_status,
-          fieldsCount: ((d.ocr_fields || []) as Record<string, unknown>[]).length,
-          nonNullCount: ((d.ocr_fields || []) as Record<string, unknown>[]).filter(
-            (f: Record<string, unknown>) => f.extracted_value
-          ).length,
-          captured: (d.captured_at as string || '').slice(0, 19),
-        }))
-      );
-
       // ── FIX DOUBLON ─────────────────────────────────────────────────────────
       // Ordre canonique fixe : recto en premier, puis les champs verso-only.
       // Chaque field_name n'apparaît QU'UNE FOIS — on fusionne recto+verso en
@@ -161,14 +145,14 @@ export default function OcrReviewScreen() {
         const docFields = (doc.ocr_fields || []) as Record<string, unknown>[];
         for (const f of docFields) {
           const fname = f.field_name as string;
-          const score = (f.confidence_score as number) ?? 0;
+          const score = ((f.confidence_score ?? f.confidence) as number) ?? 0;
           const existing = bestByField.get(fname);
-          const existingScore = existing ? ((existing.confidence_score as number) ?? 0) : -1;
+          const existingScore = existing ? (((existing.confidence_score ?? existing.confidence) as number) ?? 0) : -1;
 
           // On garde la valeur avec la confiance la plus haute.
           // En cas d'égalité, on préfère une valeur non-nulle.
-          const existingHasValue = existing && (existing.extracted_value || existing.corrected_value);
-          const candidateHasValue = !!(f.extracted_value || f.corrected_value);
+          const existingHasValue = existing && (existing.extracted_value || existing.corrected_value || existing.value);
+          const candidateHasValue = !!(f.extracted_value || f.corrected_value || f.value);
           if (
             !existing ||
             score > existingScore ||
@@ -205,10 +189,10 @@ export default function OcrReviewScreen() {
 
       const extractedFields: OcrField[] = allOcrFields.map((f) => ({
         field_name: f.field_name as string,
-        value: (f.extracted_value || f.corrected_value || '') as string,
-        confidence: (f.confidence_score as number) ?? 0,
+        value: (f.extracted_value || f.corrected_value || f.value || '') as string,
+        confidence: ((f.confidence_score ?? f.confidence) as number) ?? 0,
         editable:
-          f.human_corrected ? true : ((f.confidence_score as number) ?? 0) < userEditThreshold,
+          f.human_corrected ? true : (((f.confidence_score ?? f.confidence) as number) ?? 0) < userEditThreshold,
       }));
 
       setStatusMessage(null);
@@ -295,7 +279,7 @@ export default function OcrReviewScreen() {
       mountedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setCurrentStep, t, sessionId]);
+  }, [setCurrentStep, sessionId]);
 
   // FIX-5 (Cause 5): Calcul de la validité des champs critiques pour activer le bouton
   const isContinueAllowed = (): boolean => {

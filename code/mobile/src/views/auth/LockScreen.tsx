@@ -5,10 +5,11 @@ import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { apiClient, type ApiError } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import { Delete, Lock } from 'lucide-react';
+import type { PinVerifyResponse } from '../../types';
 
 const LockScreen = () => {
   const navigate = useNavigate();
-  const { user, unlock } = useAuth();
+  const { user, login } = useAuth();
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -36,12 +37,12 @@ const LockScreen = () => {
 
     setLoading(true);
     try {
-      await apiClient.post('/auth/pin/verify', {
+      const res = await apiClient.post<PinVerifyResponse, { phone: string; pin: string }>('/auth/pin/verify', {
         phone: user.phone,
         pin: code
       });
 
-      unlock();
+      login(res.access_token, user);
       const lastRoute = sessionStorage.getItem('vp_last_route') || '/dashboard';
       // Strip any /mobile prefix to avoid double-basename issue
       const cleanRoute = lastRoute.replace(/^\/mobile/, '') || '/dashboard';

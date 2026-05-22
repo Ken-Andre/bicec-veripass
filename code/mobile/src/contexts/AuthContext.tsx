@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, setSessionExpiredHandler } from '../services/apiClient';
-import { isPasskeySupported, registerPasskey, authenticatePasskey, removePasskey } from '../services/passkeyService';
+import { isPasskeySupported, registerPasskey, authenticatePasskey, removePasskey, type PasskeyAuthResult } from '../services/passkeyService';
 import { clearPersistedKycState } from '../services/kycOfflineStore';
 
 interface User {
@@ -28,7 +28,7 @@ interface AuthContextType {
   setPhone: (phone: string) => void;
   setPinSetupCompleted: () => void;
   setBiometric: (enabled: boolean) => Promise<boolean>;
-  authenticateWithPasskey: () => Promise<boolean>;
+  authenticateWithPasskey: () => Promise<PasskeyAuthResult | null>;
   resetAccount: () => void;
   deleteAccount: () => Promise<void>;
 }
@@ -244,10 +244,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const authenticateWithPasskey = useCallback(async (): Promise<boolean> => {
-    if (!biometricEnabled) return false;
-    return authenticatePasskey();
-  }, [biometricEnabled]);
+  const authenticateWithPasskey = useCallback(async (): Promise<PasskeyAuthResult | null> => {
+    if (!biometricEnabled || !user?.phone) return null;
+    return authenticatePasskey(user.phone);
+  }, [biometricEnabled, user?.phone]);
 
   const deleteAccount = async () => {
     try {

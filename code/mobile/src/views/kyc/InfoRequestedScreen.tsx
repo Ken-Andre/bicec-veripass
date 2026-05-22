@@ -10,7 +10,7 @@ import { Info, ArrowRight, MessageCircle, CheckCircle } from 'lucide-react';
 export default function InfoRequestedScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { reviewStatus, setStatus, setAccessLevel } = useKyc();
+  const { reviewStatus, setStatus, setAccessLevel, resetKycForm } = useKyc();
   const [resubmitting, setResubmitting] = useState(false);
 
   const decision = reviewStatus?.decision;
@@ -29,6 +29,7 @@ export default function InfoRequestedScreen() {
       // Start a new KYC session for resubmission
       const res = await apiClient.post<{ session_id: string }, Record<string, never>>('/kyc/session/start', {});
       if (res?.session_id) {
+        resetKycForm();
         setStatus('IN_PROGRESS');
         setAccessLevel('GUEST');
         navigate('/kyc/cni-intro');

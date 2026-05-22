@@ -134,8 +134,14 @@ L'application mobile est structurée en **3 zones distinctes** :
 | `POST /banking/savings/pockets` | SavingsScreen | Créer une poche |
 | `POST /banking/transfers/send` | TransferSendScreen | Virement ISO 20022 |
 | `GET /kyc/review-status` | DashboardPage (poll) | Statut KYC et access tier |
-| `GET /kyc/notifications` | NotificationsScreen | Notifications utilisateur |
-| `GET /support/threads/messages` | SupportScreen | Messages support |
+| `GET /notifications` | NotificationsScreen | Notifications utilisateur |
+| `POST /notifications/read` | NotificationsScreen | Marquer des notifications comme lues |
+| `GET /notifications/subscriptions` | SettingsScreen / PWA push | Abonnements push du device |
+| `POST /notifications/subscriptions` | SettingsScreen / PWA push | Enregistrer un abonnement push |
+| `GET /support/threads/current` | SupportScreen | Fil support courant |
+| `GET /support/threads/{id}/messages` | SupportScreen | Messages support |
+| `POST /support/threads/{id}/messages` | SupportScreen | Envoyer un message support |
+| `POST /support/attachments` | SupportScreen | Envoyer une piece complementaire |
 
 ## Fichiers critiques à ne pas casser
 

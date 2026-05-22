@@ -80,10 +80,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export const createApiClient = (baseUrl: string) => {
   const getHeaders = (extraHeaders?: Record<string, string>) => {
     const token = localStorage.getItem('vp_token');
+    const deviceTag = localStorage.getItem('vp_device_tag');
     return {
       'Content-Type': 'application/json',
       'X-Correlation-ID': generateCorrelationId(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(deviceTag ? { 'X-Device-Tag': deviceTag } : {}),
       ...extraHeaders,
     };
   };
@@ -175,6 +177,10 @@ export function fetchWithCorrelation(
   }
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
+  }
+  const deviceTag = localStorage.getItem('vp_device_tag');
+  if (deviceTag && !headers.has('X-Device-Tag')) {
+    headers.set('X-Device-Tag', deviceTag);
   }
 
   return fetch(url, { ...init, headers }).then((response) => {

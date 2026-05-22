@@ -8,6 +8,10 @@ const mockLogin = vi.hoisted(() => vi.fn());
 const mockAuthenticateWithPasskey = vi.hoisted(() => vi.fn());
 const mockPost = vi.hoisted(() => vi.fn());
 const mockGet = vi.hoisted(() => vi.fn());
+const mockAuthFlags = vi.hoisted(() => ({
+  biometricEnabled: false,
+  isPasskeySupported: false,
+}));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -27,8 +31,8 @@ vi.mock('../../../contexts/AuthContext', () => ({
       role: 'CLIENT',
       has_pin: true,
     },
-    biometricEnabled: false,
-    isPasskeySupported: false,
+    biometricEnabled: mockAuthFlags.biometricEnabled,
+    isPasskeySupported: mockAuthFlags.isPasskeySupported,
     authenticateWithPasskey: mockAuthenticateWithPasskey,
   }),
 }));
@@ -43,6 +47,8 @@ vi.mock('../../../services/apiClient', () => ({
 describe('PinLoginScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthFlags.biometricEnabled = false;
+    mockAuthFlags.isPasskeySupported = false;
   });
 
   it('reloads the authenticated user from /auth/me after a successful PIN login', async () => {
@@ -110,5 +116,36 @@ describe('PinLoginScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/auth/phone');
     }, { timeout: 2000 });
     expect(mockLogin).not.toHaveBeenCalled();
+  });
+
+  it('logs in with a backend-issued token after mocked passkey success', async () => {
+    mockAuthFlags.biometricEnabled = true;
+    mockAuthFlags.isPasskeySupported = true;
+    mockAuthenticateWithPasskey.mockResolvedValue({ access_token: 'bio-token' });
+    mockGet.mockResolvedValue({
+      id: 'user-1',
+      phone: '+237690000005',
+      email: 'fresh@example.com',
+      role: 'CLIENT',
+      has_pin: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <PinLoginScreen />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledWith('/auth/me', {
+        headers: {
+          Authorization: 'Bearer bio-token',
+        },
+      });
+    });
+    expect(mockLogin).toHaveBeenCalledWith('bio-token', expect.objectContaining({
+      phone: '+237690000005',
+    }));
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true });
   });
 });

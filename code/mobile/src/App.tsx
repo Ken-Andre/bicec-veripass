@@ -36,6 +36,9 @@ const PinSetupScreen = lazy(() =>
 const PinLoginScreen = lazy(() =>
   import("./views/auth/PinLoginScreen").then((m) => ({ default: m.default })),
 );
+const ForgotPinScreen = lazy(() =>
+  import("./views/auth/ForgotPinScreen").then((m) => ({ default: m.default })),
+);
 const LockScreen = lazy(() =>
   import("./views/auth/LockScreen").then((m) => ({ default: m.default })),
 );
@@ -227,6 +230,10 @@ function App() {
                     <Route
                       path="/auth/pin-login"
                       element={<PinLoginScreen />}
+                    />
+                    <Route
+                      path="/auth/forgot-pin"
+                      element={<ForgotPinScreen />}
                     />
                     <Route path="/auth/lock" element={<LockScreen />} />
                     <Route
