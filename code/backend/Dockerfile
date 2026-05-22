@@ -25,11 +25,16 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 
+ARG INSTALL_DEV_DEPS=false
 
 # Install all dependencies via uv (BuildKit cache persists pip wheels across rebuilds)
 # id=uv-pip-cache: stable name so BuildKit reuses the same cache across builds/prunes
 RUN --mount=type=cache,id=uv-pip-cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project && \
+    if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
+        uv sync --frozen --no-install-project; \
+    else \
+        uv sync --frozen --no-dev --no-install-project; \
+    fi && \
     find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null ; \
     find /app/.venv -name "wheel*" -exec rm -rf {} + 2>/dev/null ; \
     find /app/.venv -name "*.pyc" -delete
