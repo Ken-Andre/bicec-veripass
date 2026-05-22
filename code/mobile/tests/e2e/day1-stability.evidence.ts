@@ -27,6 +27,9 @@ async function installAuthenticatedState(page: Page) {
       role: 'CLIENT',
       has_pin: true,
     }));
+    localStorage.setItem('vp_push_subscription_id', 'push-sub-evidence');
+    localStorage.setItem('vp_push_enabled', 'true');
+    localStorage.setItem('vp_device_tag', 'vp_dev_evidence');
   });
 }
 
@@ -103,6 +106,50 @@ async function mockAuthenticatedApis(page: Page) {
         ],
       }),
     });
+  });
+  await page.route('**/api/v1/notifications/preferences', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const body = JSON.parse(route.request().postData() || '{}');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          official_channel: body.official_channel ?? 'sms',
+          push_enabled: body.push_enabled ?? true,
+          in_app_enabled: true,
+          updated_at: '2026-05-22T14:30:00Z',
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        official_channel: 'sms',
+        push_enabled: true,
+        in_app_enabled: true,
+        updated_at: '2026-05-22T14:20:00Z',
+      }),
+    });
+  });
+  await page.route('**/api/v1/notifications/subscriptions', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 'push-sub-evidence',
+          endpoint: 'https://push.example/evidence',
+          device_tag: 'vp_dev_evidence',
+          is_active: true,
+          created_at: '2026-05-22T14:00:00Z',
+        },
+      ]),
+    });
+  });
+  await page.route('**/api/v1/notifications/subscriptions/push-sub-evidence', async (route) => {
+    await route.fulfill({ status: 204 });
   });
 }
 
@@ -189,6 +236,18 @@ test.describe('Day 1 mobile evidence', () => {
     await page.goto('/mobile/notifications');
     await expect(page.getByText(/Document complementaire requis/i)).toBeVisible();
     await page.screenshot({ path: path.join(screenshotDir, 'notifications-screen.png'), fullPage: true });
+
+    await page.goto('/mobile/settings');
+    await expect(page.getByText(/Messages officiels/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'SMS' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Email' })).toBeVisible();
+    await page.screenshot({ path: path.join(screenshotDir, 'settings-official-channel.png'), fullPage: true });
+    await page.getByRole('button', { name: 'Email' }).click();
+    await page.screenshot({ path: path.join(screenshotDir, 'settings-official-channel-email.png'), fullPage: true });
+    await page.getByRole('button', { name: 'Notifications push' }).click();
+    await page.waitForFunction(() => localStorage.getItem('vp_push_enabled') === null);
+    await expect(page.getByRole('button', { name: 'Notifications push' })).toHaveClass(/bg-muted/);
+    await page.screenshot({ path: path.join(screenshotDir, 'settings-push-disabled.png'), fullPage: true });
 
     expect(badResponses).toEqual([]);
   });
