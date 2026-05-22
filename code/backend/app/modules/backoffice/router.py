@@ -986,6 +986,8 @@ async def list_support_messages(
             sender_type=m.sender_type,
             sender_id=m.sender_id,
             content=m.content,
+            attachment_path=m.attachment_path,
+            attachment_sha256=m.attachment_sha256,
             sent_at=m.sent_at,
             read_at=m.read_at,
         )
@@ -1051,6 +1053,8 @@ async def send_support_message(
         sender_type=message.sender_type,
         sender_id=message.sender_id,
         content=message.content,
+        attachment_path=message.attachment_path,
+        attachment_sha256=message.attachment_sha256,
         sent_at=message.sent_at,
         read_at=message.read_at,
     )

@@ -14,7 +14,7 @@ import { DossierTimeline } from '@/components/shared/DossierTimeline';
 import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
 import { FaceComparisonCard } from '@/components/shared/FaceComparisonCard';
 import { AddressCoherencePanel } from '@/components/shared/AddressCoherencePanel';
-import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck, Pencil, Save, Tags } from 'lucide-react';
+import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck, Pencil, Save, Tags, FileText } from 'lucide-react';
 import { reviewDossier, assignDossier, autoAssignDossier } from '@/services/dossier-service';
 import { apiGet, apiPost } from '@/services/api-client';
 
@@ -151,6 +151,17 @@ function SupportThreadPanel({ sessionId }: { sessionId: string }) {
                   {msg.sender_type === 'JEAN' ? 'Vous' : 'Client'} · {new Date(msg.sent_at).toLocaleTimeString('fr-FR')}
                 </p>
                 <p>{msg.content}</p>
+                {(msg.attachment_path || msg.attachment_sha256) && (
+                  <div className="mt-2 rounded-md border bg-background/70 px-2 py-1.5 text-xs">
+                    <div className="flex items-center gap-1 font-medium">
+                      <FileText className="h-3 w-3" />
+                      Fichier joint client
+                    </div>
+                    {msg.attachment_sha256 && (
+                      <p className="mt-1 break-all text-muted-foreground">SHA-256: {msg.attachment_sha256}</p>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
             <div ref={messagesEndRef} />

@@ -228,6 +228,8 @@ class SupportMessageSchema(BaseModel):
     sender_type: str
     sender_id: UUID
     content: str
+    attachment_path: Optional[str] = None
+    attachment_sha256: Optional[str] = None
     sent_at: datetime
     read_at: Optional[datetime] = None
 
