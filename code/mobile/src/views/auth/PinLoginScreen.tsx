@@ -85,7 +85,7 @@ const PinLoginScreen = () => {
       const message = apiErr.message || String(err);
       if (apiErr.status === 403 && typeof detail === 'string' && detail.toLowerCase().includes('otp')) {
         setError('Session PIN invalide. Redirection vers OTP...');
-        setTimeout(() => navigate('/auth/phone'), 1500);
+        setTimeout(() => navigate('/auth'), 1500);
         return;
       }
 

@@ -29,7 +29,7 @@ const EmailOtpVerifyScreen = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth/phone');
+      navigate('/auth');
       return;
     }
     inputRefs.current[0]?.focus();

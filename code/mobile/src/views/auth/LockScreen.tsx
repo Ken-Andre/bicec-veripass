@@ -55,7 +55,7 @@ const LockScreen = () => {
       if (apiErr.status === 403 && typeof detail === 'string' && detail.toLowerCase().includes('otp')) {
         setError('Reconnexion OTP requise. Redirection...');
         setTimeout(() => {
-          navigate('/auth/phone', { replace: true });
+          navigate('/auth', { replace: true });
         }, 1500);
         return;
       }
@@ -90,7 +90,7 @@ const LockScreen = () => {
       if (newAttempts >= MAX_ATTEMPTS) {
         setError('Compte bloqué. Reconnexion complète requise.');
         setTimeout(() => {
-          navigate('/', { replace: true });
+          navigate('/auth', { replace: true });
         }, 2000);
       } else {
         setError(`PIN incorrect (${MAX_ATTEMPTS - newAttempts} restants)`);

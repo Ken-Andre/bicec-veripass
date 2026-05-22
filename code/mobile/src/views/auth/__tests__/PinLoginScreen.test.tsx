@@ -113,7 +113,7 @@ describe('PinLoginScreen', () => {
       expect(screen.getByText(/redirection vers otp/i)).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/auth/phone');
+      expect(mockNavigate).toHaveBeenCalledWith('/auth');
     }, { timeout: 2000 });
     expect(mockLogin).not.toHaveBeenCalled();
   });

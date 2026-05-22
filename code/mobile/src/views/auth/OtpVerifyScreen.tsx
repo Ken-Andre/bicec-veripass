@@ -122,7 +122,7 @@ const OtpVerifyScreen = () => {
               Votre session OTP a expiré ou la page a été rechargée. Veuillez recommencer.
             </p>
           </div>
-          <Button onClick={() => navigate('/auth/phone')}>
+          <Button onClick={() => navigate('/auth')}>
             Retour à l'accueil
           </Button>
         </div>

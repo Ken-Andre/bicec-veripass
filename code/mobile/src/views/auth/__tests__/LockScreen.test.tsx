@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LockScreen from '../LockScreen';
 
@@ -36,6 +36,7 @@ vi.mock('../../../services/apiClient', () => ({
 
 describe('LockScreen', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -44,6 +45,7 @@ describe('LockScreen', () => {
       status?: number;
       response?: { data: { detail: string } };
     };
+    vi.useFakeTimers();
     error.status = 403;
     error.response = {
       data: {
@@ -62,13 +64,16 @@ describe('LockScreen', () => {
       fireEvent.click(screen.getByRole('button', { name: digit }));
     });
 
-    await waitFor(() => {
-      expect(screen.getByText(/reconnexion otp requise/i)).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
     });
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/auth/phone', { replace: true });
-    }, { timeout: 2000 });
+    expect(screen.getByText(/reconnexion otp requise/i)).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/auth', { replace: true });
     expect(mockLogin).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('calls login and navigates to the target route on successful PIN entry', async () => {
