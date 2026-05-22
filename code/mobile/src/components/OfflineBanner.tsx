@@ -8,7 +8,7 @@ export const OfflineBanner = () => {
   const { isOnline, isSyncing, pendingCount, needsReuploadCount, failedCount, syncNow } = useConnectivity();
   const [dismissed, setDismissed] = useState(false);
   const [justCameOnline, setJustCameOnline] = useState(false);
-  const prevIsOnline = useRef(false);
+  const prevIsOnline = useRef(isOnline);
   const prevOnlineForDismiss = useRef(isOnline);
 
   // Detect transition from offline → online to show "back online" message briefly

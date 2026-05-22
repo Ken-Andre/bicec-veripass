@@ -9,10 +9,8 @@
  * - Dismiss behavior
  * - Retry button
  *
- * IMPORTANT: The component's `justCameOnline` useEffect fires on initial
- * mount when `isOnline=true`, showing "Connexion rétablie" for 4 seconds.
- * We use vi.useFakeTimers() and advance past the timeout inside act() so
- * React processes the state update from the setTimeout callback.
+ * IMPORTANT: `justCameOnline` should only fire after a real offline -> online
+ * transition, never on the initial online mount.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
@@ -125,14 +123,24 @@ describe('OfflineBanner', () => {
     expect(screen.getByText(/Synchronisation en cours/i)).toBeInTheDocument();
   });
 
-  it('shows "Connexion rétablie" briefly when coming online', () => {
+  it('does not show the reconnected banner on initial online mount', () => {
     setState({ isOnline: true, pendingCount: 0 });
-    render(<OfflineBanner />);
+    const { container } = render(<OfflineBanner />);
 
-    // Immediately after mount with isOnline=true, justCameOnline is set
+    expect(container.innerHTML).toBe('');
+    expect(screen.queryByText(/Connexion rétablie/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the reconnected banner briefly after an offline to online transition', () => {
+    setState({ isOnline: false, pendingCount: 0 });
+    const { rerender } = render(<OfflineBanner />);
+
+    expect(screen.getByText(/Hors ligne/i)).toBeInTheDocument();
+
+    setState({ isOnline: true, pendingCount: 0 });
+    rerender(<OfflineBanner />);
     expect(screen.getByText(/Connexion rétablie/i)).toBeInTheDocument();
 
-    // After 4 seconds, the message clears and banner disappears (no pending items)
     advancePastJustOnline();
     expect(screen.queryByText(/Connexion rétablie/i)).not.toBeInTheDocument();
   });
