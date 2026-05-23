@@ -247,7 +247,11 @@ async function uploadCni(item: KycSyncQueueItem): Promise<void> {
       sessionId: item.session_id,
       step: item.step,
       operation: 'offline_replay_capture_cni_hash_check',
-      extra: { queue_item_id: item.id },
+      extra: {
+        queue_item_id: item.id,
+        client_sha256_prefix: clientSha.slice(0, 12),
+        server_sha256_prefix: serverSha.slice(0, 12),
+      },
     });
     throw new SyncError('capture_cni_hash_mismatch_local_check', {
       code: 'HASH_MISMATCH',
