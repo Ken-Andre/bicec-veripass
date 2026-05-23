@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useKyc } from '../../contexts/KycContext';
@@ -82,6 +82,36 @@ interface SubmitResponse {
   status: KycStatus;
   access_level: AccessTier;
   message: string;
+}
+
+interface CheckItemProps {
+  icon: ReactNode;
+  label: string;
+  detail?: string;
+  ok: boolean | null | undefined;
+  children?: ReactNode;
+}
+
+function CheckItem({ icon, label, detail, ok, children }: CheckItemProps) {
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+      <div className="text-primary">{icon}</div>
+      <div className="flex-1">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      </div>
+      {children}
+      {ok === null ? (
+        <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-muted text-muted-foreground">
+          ?
+        </div>
+      ) : (
+        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${ok ? 'bg-success text-white' : 'bg-destructive/10 text-destructive'}`}>
+          {ok ? '✓' : '✗'}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -229,38 +259,6 @@ export default function ReviewScreen() {
       setSubmitting(false);
     }
   };
-
-  const CheckItem = ({
-    icon,
-    label,
-    detail,
-    ok,
-    children,
-  }: {
-    icon: React.ReactNode;
-    label: string;
-    detail?: string;
-    ok: boolean | null | undefined;
-    children?: React.ReactNode;
-  }) => (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-      <div className="text-primary">{icon}</div>
-      <div className="flex-1">
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground">{detail}</p>
-      </div>
-      {children}
-      {ok === null ? (
-        <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-muted text-muted-foreground">
-          ?
-        </div>
-      ) : (
-        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${ok ? 'bg-success text-white' : 'bg-destructive/10 text-destructive'}`}>
-          {ok ? '✓' : '✗'}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <ScreenLayoutV2 title={t('review.title')} showBack>

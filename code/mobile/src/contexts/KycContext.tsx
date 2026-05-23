@@ -244,6 +244,67 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     });
   }, [state, hydrated]);
 
+  /** Map backend session data to local completedSteps. */
+  const mapSessionToCompletedSteps = useCallback((
+    session: BackendSessionData,
+    readiness: BackendReadinessData | null,
+  ): KycStepType[] => {
+    const steps: KycStepType[] = [];
+    const docTypes = session.documents.map(d => d.doc_type);
+
+    if (docTypes.includes('CNI_RECTO')) steps.push('cni_recto');
+    if (docTypes.includes('CNI_VERSO')) steps.push('cni_verso');
+    if (readiness?.has_ocr_review_confirmed ?? false) steps.push('ocr_review');
+    if (readiness?.has_biometric_result ?? session.biometric_result !== null) steps.push('liveness');
+    if (readiness?.has_bill_document ?? docTypes.some(d => d.startsWith('BILL_'))) steps.push('utility_bill');
+    // Address: pas de flag backend explicite -> on ne déduit pas depuis blocking_reasons.
+    // On garde le local si le backend ne dit rien.
+    if (readiness?.has_consent ?? session.consent_record?.cgu_accepted ?? false) steps.push('consent');
+    // Signature: pas de flag backend explicite -> idem.
+
+    return steps;
+  }, []);
+
+  /** Reconcile local state with backend truth. */
+  const hydrateKycFromBackend = useCallback((
+    session: BackendSessionData,
+    readiness: BackendReadinessData | null,
+  ) => {
+    const backendSteps = mapSessionToCompletedSteps(session, readiness);
+    const isFreshDraft = session.status === 'DRAFT' && session.documents.length === 0;
+
+    setState(s => {
+      if (isFreshDraft) {
+        // Backend says fresh start -> wipe local stale data.
+        return {
+          ...initialState,
+          sessionId: session.id,
+          status: session.status,
+          accessLevel: session.access_level,
+          completedSteps: [],
+        };
+      }
+
+      // Merge: backend truth for completedSteps, keep local wizard state for in-progress captures.
+      const mergedSteps = [...new Set([...backendSteps, ...s.completedSteps])];
+      // Remove steps that backend says are NOT done (backend prime).
+      const reconciledSteps = mergedSteps.filter(step => backendSteps.includes(step));
+
+      return {
+        ...s,
+        sessionId: session.id ?? s.sessionId,
+        status: session.status ?? s.status,
+        accessLevel: session.access_level ?? s.accessLevel,
+        completedSteps: reconciledSteps,
+        // Clear local captures that backend doesn't know about.
+        ...(session.biometric_result === null ? { } : {}),
+        ...(session.consent_record === null ? { consentCgu: false, consentPrivacy: false, consentData: false } : {}),
+      };
+    });
+
+    setReconciliationStatus('done');
+  }, [mapSessionToCompletedSteps]);
+
   // ─── AUTO-RECONCILIATION ──────────────────────────────────────────────────
   // Runs once after hydration to align local state with backend.
   // Sets reconciliationStatus to 'done' (backend session found, reconciled)
@@ -291,9 +352,7 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { active = false; };
-    // hydrateKycFromBackend is declared below and memoized with mapSessionToCompletedSteps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
+  }, [hydrated, hydrateKycFromBackend]);
   // ─── END AUTO-RECONCILIATION ───────────────────────────────────────────────
 
   // ADR-001: Poll review status if PENDING or SUBMITTED
@@ -444,67 +503,6 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     setReconciliationStatus('done');
     setEditStep(null);
   }, []);
-
-  /** Map backend session data to local completedSteps. */
-  const mapSessionToCompletedSteps = useCallback((
-    session: BackendSessionData,
-    readiness: BackendReadinessData | null,
-  ): KycStepType[] => {
-    const steps: KycStepType[] = [];
-    const docTypes = session.documents.map(d => d.doc_type);
-
-    if (docTypes.includes('CNI_RECTO')) steps.push('cni_recto');
-    if (docTypes.includes('CNI_VERSO')) steps.push('cni_verso');
-    if (readiness?.has_ocr_review_confirmed ?? false) steps.push('ocr_review');
-    if (readiness?.has_biometric_result ?? session.biometric_result !== null) steps.push('liveness');
-    if (readiness?.has_bill_document ?? docTypes.some(d => d.startsWith('BILL_'))) steps.push('utility_bill');
-    // Address: pas de flag backend explicite → on ne déduit pas depuis blocking_reasons
-    // On garde le local si le backend ne dit rien
-    if (readiness?.has_consent ?? session.consent_record?.cgu_accepted ?? false) steps.push('consent');
-    // Signature: pas de flag backend explicite → idem
-
-    return steps;
-  }, []);
-
-  /** Reconcile local state with backend truth. */
-  const hydrateKycFromBackend = useCallback((
-    session: BackendSessionData,
-    readiness: BackendReadinessData | null,
-  ) => {
-    const backendSteps = mapSessionToCompletedSteps(session, readiness);
-    const isFreshDraft = session.status === 'DRAFT' && session.documents.length === 0;
-
-    setState(s => {
-      if (isFreshDraft) {
-        // Backend says fresh start — wipe local stale data
-        return {
-          ...initialState,
-          sessionId: session.id,
-          status: session.status,
-          accessLevel: session.access_level,
-          completedSteps: [],
-        };
-      }
-
-      // Merge: backend truth for completedSteps, keep local wizard state for in-progress captures
-      const mergedSteps = [...new Set([...backendSteps, ...s.completedSteps])];
-      // Remove steps that backend says are NOT done (backend prime)
-      const reconciledSteps = mergedSteps.filter(step => backendSteps.includes(step));
-
-      return {
-        ...s,
-        sessionId: session.id ?? s.sessionId,
-        status: session.status ?? s.status,
-        accessLevel: session.access_level ?? s.accessLevel,
-        completedSteps: reconciledSteps,
-        // Clear local captures that backend doesn't know about
-        ...(session.biometric_result === null ? { } : {}),
-        ...(session.consent_record === null ? { consentCgu: false, consentPrivacy: false, consentData: false } : {}),
-      };
-    });
-
-    setReconciliationStatus('done');
-  }, [mapSessionToCompletedSteps]);
 
   /** @deprecated Use resetKycForm() or resetKycFull() instead */
   const resetKyc = useCallback(() => {

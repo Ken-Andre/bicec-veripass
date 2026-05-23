@@ -17,13 +17,12 @@ export const OfflineBanner = () => {
     prevIsOnline.current = isOnline;
 
     if (cameOnline && !dismissed) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setJustCameOnline(true);
+      const showTimer = window.setTimeout(() => setJustCameOnline(true), 0);
       const hideTimer = window.setTimeout(() => setJustCameOnline(false), 4000);
-      return () => clearTimeout(hideTimer);
-    }
-    if (!isOnline) {
-      setJustCameOnline(false);
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+      };
     }
   }, [isOnline, dismissed]);
 
@@ -32,8 +31,8 @@ export const OfflineBanner = () => {
     const wentOffline = !isOnline && prevOnlineForDismiss.current;
     prevOnlineForDismiss.current = isOnline;
     if (wentOffline && dismissed) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDismissed(false);
+      const resetTimer = window.setTimeout(() => setDismissed(false), 0);
+      return () => clearTimeout(resetTimer);
     }
   }, [isOnline, dismissed]);
 

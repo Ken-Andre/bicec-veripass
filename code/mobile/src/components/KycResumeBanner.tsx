@@ -10,6 +10,8 @@ export function KycResumeBanner() {
   const [targetPath, setTargetPath] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [needsReupload, setNeedsReupload] = useState(false);
+  const normalizedPath = location.pathname.replace(/^\/mobile/, '') || '/';
+  const isAuthRoute = normalizedPath === '/auth' || normalizedPath.startsWith('/auth/');
 
   const showMessage = useMemo(() => {
     if (needsReupload) {
@@ -24,6 +26,10 @@ export function KycResumeBanner() {
   useEffect(() => {
     let mounted = true;
     let timer: number | null = null;
+
+    if (isAuthRoute) {
+      return;
+    }
 
     const refresh = async () => {
       const online = typeof navigator === 'undefined' ? true : navigator.onLine;
@@ -62,11 +68,11 @@ export function KycResumeBanner() {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, []);
+  }, [isAuthRoute]);
 
   const isOnTargetPath = targetPath && location.pathname.endsWith(targetPath);
   const isOnKycRoute = location.pathname.includes('/kyc/');
-  if (!visible || !targetPath || isOnTargetPath || isOnKycRoute) return null;
+  if (isAuthRoute || !visible || !targetPath || isOnTargetPath || isOnKycRoute) return null;
 
   return (
     <div className="fixed top-16 left-4 right-4 z-[100] bg-white border border-slate-200 text-slate-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl shadow-xl animate-in slide-in-from-top-5 fade-in duration-300">
