@@ -54,9 +54,12 @@ export default function BillUploadScreen() {
   // Elapsed timer during upload
   useEffect(() => {
     if (!uploading) return;
-    setElapsed(0);
+    const resetTimer = window.setTimeout(() => setElapsed(0), 0);
     const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(resetTimer);
+      clearInterval(timer);
+    };
   }, [uploading]);
 
   const uploadBill = useCallback(async (blob: Blob, dataUrl: string) => {

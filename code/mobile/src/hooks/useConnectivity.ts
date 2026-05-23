@@ -89,7 +89,9 @@ export function useConnectivity(): ConnectivityState {
   // Refresh summary periodically and on mount
   useEffect(() => {
     mountedRef.current = true;
-    void refreshSummary();
+    const initialRefresh = window.setTimeout(() => {
+      void refreshSummary();
+    }, 0);
 
     const interval = window.setInterval(() => {
       void refreshSummary();
@@ -97,6 +99,7 @@ export function useConnectivity(): ConnectivityState {
 
     return () => {
       mountedRef.current = false;
+      clearTimeout(initialRefresh);
       clearInterval(interval);
     };
   }, [refreshSummary]);

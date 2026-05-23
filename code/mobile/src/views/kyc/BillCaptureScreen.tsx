@@ -213,8 +213,13 @@ export default function BillCaptureScreen({ billType: propBillType }: BillCaptur
   }, [t, sessionId, billType]);
 
   useEffect(() => {
-    startCamera();
-    return () => stopCamera();
+    const startTimer = window.setTimeout(() => {
+      void startCamera();
+    }, 0);
+    return () => {
+      clearTimeout(startTimer);
+      stopCamera();
+    };
   }, [startCamera, stopCamera]);
 
   const billLabel = billType === 'ENEO' ? 'ENEO (electricité)' : 'CAMWATER (eau)';

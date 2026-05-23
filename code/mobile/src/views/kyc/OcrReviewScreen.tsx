@@ -269,14 +269,17 @@ export default function OcrReviewScreen() {
   };
 
   useEffect(() => {
-    setCurrentStep('ocr_review');
     mountedRef.current = true;
 
-    fetchThresholds();
-    fetchOcrWithRetry(0);
+    const fetchTimer = window.setTimeout(() => {
+      setCurrentStep('ocr_review');
+      fetchThresholds();
+      fetchOcrWithRetry(0);
+    }, 0);
 
     return () => {
       mountedRef.current = false;
+      clearTimeout(fetchTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setCurrentStep, sessionId]);

@@ -148,19 +148,22 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
      ref is not yet mounted (fixes race condition in Strict Mode / fast nav).
   ──────────────────────────────────────────────────────────────────────────── */
   const attachStream = useCallback((stream: MediaStream) => {
-    const video = videoRef.current;
-    if (!video) {
-      requestAnimationFrame(() => attachStream(stream));
-      return;
-    }
-    video.srcObject = stream;
-    const markReady = () => setCameraReady(true);
-    video.onloadedmetadata = () => {
-      video.play().then(markReady).catch(markReady);
+    const attachWhenReady = () => {
+      const video = videoRef.current;
+      if (!video) {
+        requestAnimationFrame(attachWhenReady);
+        return;
+      }
+      video.srcObject = stream;
+      const markReady = () => setCameraReady(true);
+      video.onloadedmetadata = () => {
+        video.play().then(markReady).catch(markReady);
+      };
+      video.onplaying = markReady;
+      // Safety net: force ready after timeout so user is never stuck
+      initTimerRef.current = setTimeout(markReady, CAMERA_INIT_TIMEOUT_MS);
     };
-    video.onplaying = markReady;
-    // Safety net: force ready after timeout so user is never stuck
-    initTimerRef.current = setTimeout(markReady, CAMERA_INIT_TIMEOUT_MS);
+    attachWhenReady();
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -310,7 +313,7 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
 
   useEffect(() => {
     if (!cameraReady) return;
-    setCameraState('ready');
+    const readyTimer = window.setTimeout(() => setCameraState('ready'), 0);
 
     const interval = setInterval(() => {
       if (!videoRef.current || !canvasRef.current || capturedRef.current) return;
@@ -385,12 +388,20 @@ export default function CniCaptureScreen({ side, nextRoute }: CniCaptureScreenPr
       }
     }, 800);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(readyTimer);
+      clearInterval(interval);
+    };
   }, [cameraReady]);
 
   useEffect(() => {
-    startCamera();
-    return () => stopCamera();
+    const startTimer = window.setTimeout(() => {
+      void startCamera();
+    }, 0);
+    return () => {
+      clearTimeout(startTimer);
+      stopCamera();
+    };
   }, [startCamera, stopCamera]);
 
   // Animated tips during upload

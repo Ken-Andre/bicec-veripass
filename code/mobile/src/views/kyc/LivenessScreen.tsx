@@ -47,7 +47,10 @@ export default function LivenessScreen() {
   const selfieDataUrlRef = useRef<string | null>(null);
   const challengeCompleteRef = useRef(false);
   const sessionIdRef = useRef(sessionId);
-  sessionIdRef.current = sessionId;
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   const toHex = (buffer: ArrayBuffer): string =>
     Array.from(new Uint8Array(buffer))
@@ -300,8 +303,13 @@ export default function LivenessScreen() {
   }, [status, currentChallenge, checkChallenge, stopCamera, t, captureSelfieFrame]);
 
   useEffect(() => {
-    startCamera();
-    return () => stopCamera();
+    const startTimer = window.setTimeout(() => {
+      void startCamera();
+    }, 0);
+    return () => {
+      clearTimeout(startTimer);
+      stopCamera();
+    };
   }, [startCamera, stopCamera]);
 
   useEffect(() => {
