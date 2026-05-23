@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from app.api.v1.router import api_router
 from app.routers.demo import router as demo_router
 from app.core.config import settings
+from app.core.sentry import before_send
 
 # Sentry Init (skip if SKIP_SENTRY=1, needed for tests with Python 3.14)
 if settings.SENTRY_DSN and not os.getenv("SKIP_SENTRY"):
@@ -21,6 +22,7 @@ if settings.SENTRY_DSN and not os.getenv("SKIP_SENTRY"):
         traces_sample_rate=0.1,
         environment=settings.ENVIRONMENT,
         release=f"{settings.PROJECT_NAME}@{settings.PROJECT_VERSION}",
+        before_send=before_send,
     )
 from app.core.logging import logger
 from app.core.exceptions import (
