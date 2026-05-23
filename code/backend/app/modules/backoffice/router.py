@@ -1029,18 +1029,25 @@ async def send_support_message(
     )
     session_user_id = session_result.scalar_one_or_none()
 
-    notification = Notification(
-        id=uuid.uuid4(),
-        user_id=session_user_id,
-        type="SUPPORT_MESSAGE",
-        message=f"Nouveau message de l'agent : {body.content[:100]}",
-        payload={
-            "thread_id": str(thread_id),
-            "session_id": str(thread.session_id),
-        },
-        sent_at=now,
-    )
-    db.add(notification)
+    if session_user_id is None:
+        logger.warning(
+            "Skipping support notification for thread %s: session %s has no user",
+            thread_id,
+            thread.session_id,
+        )
+    else:
+        notification = Notification(
+            id=uuid.uuid4(),
+            user_id=session_user_id,
+            type="SUPPORT_MESSAGE",
+            message=f"Nouveau message de l'agent : {body.content[:100]}",
+            payload={
+                "thread_id": str(thread_id),
+                "session_id": str(thread.session_id),
+            },
+            sent_at=now,
+        )
+        db.add(notification)
 
     await db.commit()
     await db.refresh(message)

@@ -65,7 +65,7 @@ async def get_niu_conflicts(db: AsyncSession) -> list[dict]:
     for conflict in conflicts:
         # Fetch session A details
         session_a_result = await db.execute(
-            select(KYCSession.client_name, KYCSession.created_at).where(
+            select(KYCSession.client_name, KYCSession.started_at).where(
                 KYCSession.id == conflict.session_id_new
             )
         )
@@ -77,7 +77,7 @@ async def get_niu_conflicts(db: AsyncSession) -> list[dict]:
 
         # Fetch session B details
         session_b_result = await db.execute(
-            select(KYCSession.client_name, KYCSession.created_at).where(
+            select(KYCSession.client_name, KYCSession.started_at).where(
                 KYCSession.id == conflict.session_id_existing
             )
         )

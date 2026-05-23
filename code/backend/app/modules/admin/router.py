@@ -2,7 +2,7 @@ import uuid as _uuid
 
 
 from fastapi import APIRouter, Depends, Request, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.db.base  # noqa — ensures all mappers are registered
@@ -77,7 +77,16 @@ async def list_agents(
 ):
     """Paginated agent list. Access: ADMIN_IT only."""
     query = select(Agent).order_by(Agent.name.asc())
-    return await paginate(db, query, page, AdminAgentResponse)
+    total = (await db.execute(select(func.count()).select_from(Agent))).scalar_one()
+    result = await db.execute(query.offset(page.offset).limit(page.limit))
+    agents = result.scalars().all()
+    return PageResponse[AdminAgentResponse](
+        items=[_agent_to_response(agent) for agent in agents],
+        total=total,
+        page=page.page,
+        pages=(total + page.limit - 1) // page.limit if total else 1,
+        limit=page.limit,
+    )
 
 
 @router.post("/agents", response_model=AdminAgentResponse, status_code=status.HTTP_201_CREATED)

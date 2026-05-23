@@ -44,25 +44,28 @@ class AuditLogSchema(BaseModel):
     @classmethod
     def _extract_from_data(cls, data: Any) -> Any:
         """Extract agentName, rationale, previousState, newState from JSONB fields."""
+        def _as_text(value: Any) -> str:
+            return "" if value is None else str(value)
+
         if hasattr(data, "__dict__"):
             # SQLAlchemy model instance
             new = getattr(data, "new_data", None) or {}
             old = getattr(data, "old_data", None) or {}
-            if not hasattr(data, "agentName"):
-                data.agentName = new.get("agent_name", "")
-            if not hasattr(data, "rationale"):
-                data.rationale = new.get("rationale", "")
-            if not hasattr(data, "previousState"):
-                data.previousState = old.get("status", "")
-            if not hasattr(data, "newState"):
-                data.newState = new.get("status", "")
+            if not hasattr(data, "agentName") or getattr(data, "agentName") is None:
+                data.agentName = _as_text(new.get("agent_name", ""))
+            if not hasattr(data, "rationale") or getattr(data, "rationale") is None:
+                data.rationale = _as_text(new.get("rationale", ""))
+            if not hasattr(data, "previousState") or getattr(data, "previousState") is None:
+                data.previousState = _as_text(old.get("status", ""))
+            if not hasattr(data, "newState") or getattr(data, "newState") is None:
+                data.newState = _as_text(new.get("status", ""))
         elif isinstance(data, dict):
             new = data.get("new_data") or {}
             old = data.get("old_data") or {}
-            data.setdefault("agentName", new.get("agent_name", ""))
-            data.setdefault("rationale", new.get("rationale", ""))
-            data.setdefault("previousState", old.get("status", ""))
-            data.setdefault("newState", new.get("status", ""))
+            data["agentName"] = _as_text(data.get("agentName", new.get("agent_name", "")))
+            data["rationale"] = _as_text(data.get("rationale", new.get("rationale", "")))
+            data["previousState"] = _as_text(data.get("previousState", old.get("status", "")))
+            data["newState"] = _as_text(data.get("newState", new.get("status", "")))
         return data
 
 

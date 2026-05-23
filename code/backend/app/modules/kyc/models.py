@@ -45,6 +45,11 @@ class KYCSession(Base):
     submitted_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    @property
+    def created_at(self):
+        """Backward-compatible alias for modules that expect a created_at field."""
+        return self.started_at
+
     client_name = Column(String(200), nullable=True)
     last_step_completed = Column(String(100), nullable=True)
     ocr_review_confirmed = Column(Boolean, default=False)

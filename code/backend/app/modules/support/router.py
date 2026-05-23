@@ -213,27 +213,6 @@ async def get_current_thread(
     )
 
 
-@router.get("/threads/messages", response_model=list[SupportMessageResponse])
-async def list_current_thread_messages_compat(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Deprecated compatibility route for stale PWA clients.
-
-    Canonical route: GET /support/threads/{thread_id}/messages.
-    Remove after deployed service workers no longer request this path.
-    """
-    thread = await _get_or_create_support_thread(db, current_user)
-    await db.flush()
-    result = await db.execute(
-        select(SupportMessage)
-        .where(SupportMessage.thread_id == thread.id)
-        .order_by(SupportMessage.sent_at.asc())
-    )
-    await db.commit()
-    return [_to_message_response(message) for message in result.scalars().all()]
-
-
 @router.get("/threads/{thread_id}/messages", response_model=list[SupportMessageResponse])
 async def list_thread_messages(
     thread_id: uuid.UUID,
