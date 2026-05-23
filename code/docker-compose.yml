@@ -10,9 +10,20 @@ networks:
 
 volumes:
   documents_storage:  # /data/documents — Images CNI, selfies, factures — 10 ans COBAC
+    labels:
+      com.bicec.retention: "10y"
+      com.bicec.type: "pii-documents"
   models_storage:     # /data/models   — PaddleOCR, GLM-OCR, MiniFASNet, FaceNet-512
   db_storage:         # /data/db       — PostgreSQL data files
+    labels:
+      com.bicec.retention: "10y"
+      com.bicec.type: "pii-database"
+  db_backups:         # /backups/db    — PostgreSQL backups (non-pruned par docker prune)
+    labels:
+      com.bicec.retention: "10y"
+      com.bicec.type: "backup"
   redis_data:
+  models_paddlex_storage: # /home/vpuser/.paddlex — Cache for PaddleX models
   nginx_certs:
 
 services:
@@ -28,7 +39,8 @@ services:
       - "80:8080"
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/nginx/certs:/etc/nginx/ssl
+      - ./infra/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
+      - ./infra/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       api:
         condition: service_healthy
@@ -36,15 +48,32 @@ services:
         condition: service_started
       backoffice:
         condition: service_started
+      flower:
+        condition: service_started
     networks:
       - veripass-net
     restart: unless-stopped
+    healthcheck:
+      # curl disponible dans nginx:bookworm — vérifie le redirect HTTP→HTTPS (301)
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -w '%{http_code}' http://localhost:8080/ | grep -qE '^(200|301|302)$' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   #  PWA MARIE (Mobile)
   pwa:
     build:
       context: ./mobile
       dockerfile: Dockerfile
+      args:
+        - VITE_SENTRY_DSN=${VITE_SENTRY_DSN_MOBILE}
+        - VITE_APP_VERSION=${APP_VERSION}
     container_name: vp_pwa
     environment:
       - VITE_API_URL=/api
@@ -53,13 +82,28 @@ services:
     restart: unless-stopped
     # RAM: ~128MB (nginx serve static)
     ports:
-      - "8081:8080" # Optional direct access for debug
+      - "3000:8080" # Optional direct access for debug
+    healthcheck:
+      # wget BusyBox (Alpine) ne supporte pas --spider — utiliser 127.0.0.1 (localhost DNS fail)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   #  BACK-OFFICE SPA 
   backoffice:
     build:
       context: ./backoffice
       dockerfile: Dockerfile
+      args:
+        - VITE_SENTRY_DSN=${VITE_SENTRY_DSN_BACKOFFICE}
+        - VITE_APP_VERSION=${APP_VERSION}
     container_name: vp_backoffice
     environment:
       - VITE_API_URL=/api
@@ -68,7 +112,19 @@ services:
     restart: unless-stopped
     # RAM: ~128MB
     ports:
-      - "8082:8080" # Optional direct access for debug
+      - "3001:8080" # Optional direct access for debug
+    healthcheck:
+      # wget BusyBox (Alpine) ne supporte pas --spider — utiliser 127.0.0.1 (localhost DNS fail)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   #  FASTAPI BACKEND 
   api:
@@ -84,12 +140,45 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
       - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
-      - OCR_CONFIDENCE_THRESHOLD=0.85
-      - PADDLE_LAZY_LOAD=true   # PaddleOCR chargé à la 1ère requête OCR
+      - OTP_MODE=${OTP_MODE:-dev_local}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - OTP_FALLBACK_EMAIL=${OTP_FALLBACK_EMAIL:-true}
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_TLS=${SMTP_TLS:-false}
+      - SMTP_SSL=${SMTP_SSL:-false}
+      - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
+      - OTP_FALLBACK_EMAIL_ADDRESS=${OTP_FALLBACK_EMAIL_ADDRESS}
+      - OCR_CONFIDENCE_THRESHOLD=0.90
+      - PADDLE_WARMUP_ON_START=true  # Warmup au démarrage du worker, pas à la 1ère requête
+      - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+      - PADDLE_CACHE_DIR=/tmp/paddle-cache
+      - OCR_MODELS_ROOT=${OCR_MODELS_ROOT:-/opt/models-offline}
+      - PADDLE_OFFLINE=true
+      - PADDLE_DET_MODEL_DIR=${PADDLE_DET_MODEL_DIR:-/opt/models-offline/paddlex/official_models/PP-OCRv5_server_det}
+      - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/opt/models-offline/paddlex/official_models/latin_PP-OCRv5_mobile_rec}
+      - FACE_MATCH_MIN_SCORE=${FACE_MATCH_MIN_SCORE:-0.8}
+      - ANTI_SPOOFING_MIN_SCORE=${ANTI_SPOOFING_MIN_SCORE:-0.7}
+      - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
+      - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
+      - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/opt/models-offline/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
+      - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/opt/models-offline/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
+      - GLM_OCR_QUEUE=${GLM_OCR_QUEUE:-glm_ocr_jobs}
+      - GLM_OCR_TIMEOUT_SECONDS=${GLM_OCR_TIMEOUT_SECONDS:-90}
+      - SENTRY_DSN=${SENTRY_DSN_BACKEND}
+      - PADDLEX_HOME=/home/vpuser/.paddlex
     volumes:
       - documents_storage:/data/documents
       - models_storage:/data/models
+      - models_paddlex_storage:/home/vpuser/.paddlex
+      - ${OFFLINE_MODELS_DIR:-./infra/models-offline}:/opt/models-offline:ro
+      - ../paddleocr_test/images:/tmp/test-images:ro  # CNI test images for /test/extract endpoint
+      - ./backend/alembic/versions:/app/alembic/versions:ro  # Bind mount pour migrations sans rebuild
     depends_on:
+      storage_init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -97,7 +186,7 @@ services:
     networks:
       - veripass-net
     restart: unless-stopped
-    mem_limit: 2.5g     # PaddleOCR lazy (2GB) + FastAPI workers (512MB)
+    mem_limit: 4g       # PaddleOCR (3GB) + FastAPI workers (512MB)
     ports:
       - "8001:8000"     # Debug direct access (sans nginx) - CHANGED from 8000 to avoid conflicts
     healthcheck:
@@ -106,7 +195,64 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     # GLM-OCR via worker Celery séparé
+
+  # ── STORAGE INIT (init-container, fixes volume ownership) ───────────────
+  storage_init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_storage_init
+    entrypoint: []
+    command:
+      [
+        "sh",
+        "-lc",
+        "mkdir -p /data/documents /data/models /home/vpuser/.paddlex && chown -R vpuser:vpgroup /data/documents /data/models /home/vpuser/.paddlex || true",
+      ]
+    user: root
+    volumes:
+      - documents_storage:/data/documents
+      - models_storage:/data/models
+      - models_paddlex_storage:/home/vpuser/.paddlex
+    networks:
+      - veripass-net
+    restart: "no"
+
+  # ── MODEL INIT (init-container, runs once) ──────────────────────────────
+  model_init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vp_model_init
+    profiles: ["online-init"]
+    entrypoint: []
+    command: ["python", "scripts/download_models.py"]
+    environment:
+      - MODELS_PATH=/data/models
+      - PADDLE_CACHE_DIR=/tmp/paddle-cache
+      - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+      - PADDLE_DET_MODEL_DIR=${PADDLE_DET_MODEL_DIR:-/data/models/paddle/PP-OCRv5_server_det}
+      - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/data/models/paddle/PP-OCRv5_server_rec}
+      - PADDLE_CLS_MODEL_DIR=${PADDLE_CLS_MODEL_DIR:-/data/models/paddle/ch_ppocr_mobile_v2.0_cls_infer}
+      - PADDLEX_HOME=/home/vpuser/.paddlex
+    volumes:
+      - models_storage:/data/models
+      - models_paddlex_storage:/home/vpuser/.paddlex
+    networks:
+      - veripass-net
+    restart: "no"  # Runs once; docker compose manages retries via depends_on
+    mem_limit: 4g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   #  CELERY WORKERS 
   celery_ocr:
@@ -114,23 +260,57 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: vp_celery_ocr
-    command: celery -A app.celery worker -Q glm_ocr_jobs --concurrency=1 -n ocr_worker@%h
+    entrypoint: []
+    command: ["python", "-m", "celery", "-A", "app.celery", "worker", "-Q", "glm_ocr_jobs", "--concurrency=1", "-n", "ocr_worker@%h", "--loglevel=info"]
     environment:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_PATH=/data/documents
       - MODELS_PATH=/data/models
+      - PADDLE_CACHE_DIR=/tmp/paddle-cache
+      - OCR_MODELS_ROOT=${OCR_MODELS_ROOT:-/opt/models-offline}
+      - PADDLE_OFFLINE=true
+      - PADDLE_DET_MODEL_DIR=${PADDLE_DET_MODEL_DIR:-/opt/models-offline/paddlex/official_models/PP-OCRv5_server_det}
+      - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/opt/models-offline/paddlex/official_models/latin_PP-OCRv5_mobile_rec}
       - GLM_LAZY_LOAD=true      # GLM-OCR chargé à la 1ère tâche de la queue
+      - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
+      - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
+      - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/opt/models-offline/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
+      - GLM_OCR_MMPROJ_PATH=${GLM_OCR_MMPROJ_PATH:-/opt/models-offline/glm-ocr/mmproj-GLM-OCR-Q8_0.gguf}
+      - GLM_OCR_QUEUE=${GLM_OCR_QUEUE:-glm_ocr_jobs}
+      - GLM_OCR_TIMEOUT_SECONDS=${GLM_OCR_TIMEOUT_SECONDS:-90}
+      - OCR_ONLINE=${OCR_ONLINE:-false}
+      - OCR_CLOUD_URL=${OCR_CLOUD_URL}
+      - OCR_CLOUD_API_KEY=${OCR_CLOUD_API_KEY}
+      - OCR_CLOUD_KEY=${OCR_CLOUD_KEY}
+      - SKIP_MIGRATIONS=1
+      - SENTRY_DSN=${SENTRY_DSN_BACKEND}
+      - PADDLEX_HOME=/home/vpuser/.paddlex
     volumes:
       - documents_storage:/data/documents
       - models_storage:/data/models
+      - models_paddlex_storage:/home/vpuser/.paddlex
+      - ${OFFLINE_MODELS_DIR:-./infra/models-offline}:/opt/models-offline:ro
     depends_on:
+      storage_init:
+        condition: service_completed_successfully
       api:
         condition: service_healthy  # Ne démarre qu'après API prête
     networks:
       - veripass-net
     restart: unless-stopped
     mem_limit: 3.5g     # GLM-OCR 0.9B quantifié: 2.5-3.5GB RAM lazy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery inspect ping -d ocr_worker@$$HOSTNAME 2>/dev/null | grep -q pong || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     # Séquentiel obligatoire (concurrency=1)
 
   celery_notifications:
@@ -138,12 +318,26 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: vp_celery_notif
-    command: celery -A app.celery worker -Q notifications,provisioning_batch,sanctions_sync --concurrency=2 -n notif_worker@%h
+    entrypoint: []
+    command: ["python", "-m", "celery", "-A", "app.celery", "worker", "-Q", "celery,notifications,provisioning_batch,sanctions_sync", "--concurrency=2", "-n", "notif_worker@%h", "--loglevel=info"]
     environment:
       - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
       - REDIS_URL=redis://redis:6379/0
       - ORANGE_SMS_CLIENT_ID=${ORANGE_SMS_CLIENT_ID}
       - ORANGE_SMS_CLIENT_SECRET=${ORANGE_SMS_CLIENT_SECRET}
+      - OTP_MODE=${OTP_MODE:-dev_local}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - OTP_FALLBACK_EMAIL=${OTP_FALLBACK_EMAIL:-true}
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_TLS=${SMTP_TLS:-false}
+      - SMTP_SSL=${SMTP_SSL:-false}
+      - SMTP_FROM=${SMTP_FROM:-noreply@bicec-veripass.cm}
+      - OTP_FALLBACK_EMAIL_ADDRESS=${OTP_FALLBACK_EMAIL_ADDRESS}
+      - SKIP_MIGRATIONS=1
+      - SENTRY_DSN=${SENTRY_DSN_BACKEND}
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,23 +347,86 @@ services:
       - veripass-net
     restart: unless-stopped
     mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery inspect ping -d notif_worker@$$HOSTNAME 2>/dev/null | grep -q pong || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   celery_beat:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: vp_celery_beat
-    command: celery -A app.celery beat --loglevel=info
+    entrypoint: []
+    command: ["python", "-m", "celery", "-A", "app.celery", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://vp_user:${DB_PASSWORD}@postgres:5432/veripass
+      - DB_PASSWORD=${DB_PASSWORD}
+      - BACKUP_RETENTION_DAYS=7
+      - SKIP_MIGRATIONS=1
+      - SENTRY_DSN=${SENTRY_DSN_BACKEND}
+    volumes:
+      - db_backups:/backups/db
+      - /var/run/docker.sock:/var/run/docker.sock:rw  # Docker socket with write access for prune task
+    user: root  # Required to access docker.sock (usually root:docker or root:root)
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 128m
+    healthcheck:
+      # redis-cli absent dans l'image Python — utiliser Python + redis pour pinger le broker
+      test: ["CMD-SHELL", "python -c \"import redis; r=redis.from_url('redis://redis:6379/0'); r.ping()\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    # Crons: sync PEP/Sanctions (hebdo), backup DB (quotidien), prune disk (si >85%)
+
+  #  FLOWER — Celery Monitoring 
+  flower:
+    image: mher/flower:2.0
+    container_name: vp_flower
+    command: celery --broker=redis://redis:6379/0 flower --port=5555 --basic-auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin}
+    ports:
+      - "5555:5555"
     depends_on:
       redis:
         condition: service_healthy
     networks:
       - veripass-net
     restart: unless-stopped
-    mem_limit: 128m
-    # Crons: sync PEP/Sanctions (hebdo), backup DB (quotidien), prune disk (si >85%)
+    mem_limit: 256m
+    healthcheck:
+      # wget BusyBox ne supporte pas --user/--password et flower retourne 401 sans auth
+      # nc vérifie juste que le port TCP est ouvert (flower tourne)
+      test: ["CMD-SHELL", "nc -z localhost 5555 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   #  POSTGRESQL 
   postgres:
@@ -181,6 +438,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - db_storage:/var/lib/postgresql/data
+      - db_backups:/backups/db
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "15432:5432"    # Debug: accès direct depuis host (DBeaver, pgAdmin, Alembic) - CHANGED from 5432 to avoid conflicts
@@ -194,6 +452,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   #  REDIS 
   redis:
@@ -214,3 +477,30 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # MAILPIT (Local SMTP for Dev)
+  mailpit:
+    image: axllent/mailpit
+    container_name: vp_mailpit
+    ports:
+      - "8025:8025"   # Web UI
+      - "1025:1025"   # SMTP port
+    networks:
+      - veripass-net
+    restart: unless-stopped
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8025/api/v1/info || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

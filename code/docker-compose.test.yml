@@ -1,0 +1,10 @@
+# Test override: builds the API image with backend dev dependencies without
+# changing the production Dockerfile default.
+services:
+  api:
+    image: code-api-test
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        INSTALL_DEV_DEPS: "true"

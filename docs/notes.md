@@ -348,3 +348,35 @@ Et je ne suis donc pas sur que t'as tout pris
 ***
 https://chat.z.ai/space/e1a382y7tge0-ppt
 ***
+---
+Pour une application bancaire en PWA (Progressive Web App), le choix dépend de votre priorité entre la sécurité/fluidité et la richesse des fonctionnalités natives.
+1. Le choix de la raison : Vite + React
+C'est souvent l'option privilégiée pour une application bancaire "pure" (où l'utilisateur doit obligatoirement se connecter).
+Pourquoi ce choix ? Une application bancaire est un outil métier, pas un site de contenu. Vous n'avez pas besoin de SEO (référencement Google) puisque tout se passe derrière un login.
+Performance PWA : Les PWA basées sur Vite sont extrêmement légères. Une fois l'application installée sur le téléphone, elle se comporte comme une application native fluide car tout le rendu se fait côté client (CSR).
+Sécurité : En séparant strictement le Frontend (Vite) du Backend (API sécurisée), vous réduisez la surface d'attaque sur le serveur de rendu. 
+Reddit
+Reddit
+ +1
+2. Le choix de la puissance : Next.js + React
+Utilisez Next.js si votre application inclut une partie publique importante (marketing, simulateurs de prêts, blogs financiers). 
+Webcreatis
+Webcreatis
+Avantages : Il offre une expérience de chargement initial ultra-rapide grâce au rendu serveur (SSR).
+Complexité PWA : Configurer une PWA avec Next.js (gestion du mode hors-ligne, service workers) est un peu plus complexe qu'avec Vite, mais des outils comme next-pwa facilitent la tâche.
+Confiance : Des plateformes financières majeures comme Binance utilisent Next.js pour leurs interfaces. 
+Next.js
+Next.js
+ +3
+Existe-t-il "mieux" ?
+Si vous cherchez une alternative moderne qui combine le meilleur des deux mondes pour une application bancaire :
+Remix : Il devient très populaire pour les applications complexes car il gère les formulaires et les erreurs de réseau de manière exceptionnelle, ce qui est critique pour des transactions bancaires.
+React Native (avec Expo) : Si vous réalisez que la PWA ne suffit pas et que vous voulez publier sur l'App Store/Play Store tout en gardant une base de code React. 
+Medium
+Medium
+ +1
+Conseil final :
+Si votre application est 100% privée (dashboard bancaire), partez sur Vite + React. C'est plus simple à maintenir, plus rapide à développer et parfait pour une PWA légère. 
+Reddit
+Reddit
+ +1

@@ -1,11 +1,20 @@
+# syntax=docker/dockerfile:1
 # Build stage
-FROM python:3.11-alpine AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 # Install build dependencies
-RUN apk add --no-cache \
-    build-base \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
+    for i in 1 2 3 4 5; do apt-get update && break || sleep 15; done && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
     curl \
-    libffi-dev
+    libffi-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -15,44 +24,68 @@ WORKDIR /app
 # Copy dependency files only (for better layer caching)
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies
-RUN uv sync --frozen --no-dev --no-install-project && \
-    uv pip install --upgrade pip>=25.3 && \
-    # Clean up pip cache to reduce layer size
-    find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
-    find /app/.venv -name "wheel*" -exec rm -rf {} + 2>/dev/null || true && \
+
+ARG INSTALL_DEV_DEPS=false
+
+# Install all dependencies via uv (BuildKit cache persists pip wheels across rebuilds)
+# id=uv-pip-cache: stable name so BuildKit reuses the same cache across builds/prunes
+RUN --mount=type=cache,id=uv-pip-cache,target=/root/.cache/uv \
+    if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
+        uv sync --frozen --no-install-project; \
+    else \
+        uv sync --frozen --no-dev --no-install-project; \
+    fi && \
+    find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null ; \
+    find /app/.venv -name "wheel*" -exec rm -rf {} + 2>/dev/null ; \
     find /app/.venv -name "*.pyc" -delete
 
 # Final stage
-FROM python:3.11-alpine
+FROM python:3.11-slim-bookworm
 
-# Install runtime dependencies for OCR (Alpine equivalents)
-RUN apk add --no-cache \
-    mesa-gl \
-    glib \
-    libstdc++ && \
-    # Clean apk cache to reduce image size
-    rm -rf /var/cache/apk/*
+# Install runtime dependencies:
+# - OCR: libgl1, libglib2.0-0, libstdc++
+# - PostgreSQL client tools: postgresql-client
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
+    for i in 1 2 3 4 5; do apt-get update && break || sleep 15; done && \
+    apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libstdc++6 \
+    postgresql-client \
+    gnupg \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 
 # Create a non-root user
-RUN addgroup -S vpgroup && adduser -S vpuser -G vpgroup
+RUN groupadd vpgroup && useradd -m vpuser -G vpgroup
 
 WORKDIR /app
 
 # Copy the virtualenv from the builder
-COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder --chown=vpuser:vpgroup /app/.venv /app/.venv
 
 # Copy application code and set ownership
 COPY --chown=vpuser:vpgroup . .
 
 # Ensure storage directory exists and set entrypoint permissions
-RUN mkdir -p /data/documents && chown -R vpuser:vpgroup /data/documents && \
+RUN mkdir -p /data/documents /data/models /backups/db /tmp/paddle-cache /home/vpuser/.paddlex && \
+    chown -R vpuser:vpgroup /data/documents /data/models /backups/db /tmp/paddle-cache /home/vpuser/.paddlex && \
     chmod +x /app/entrypoint.sh
+
+# Models are pre-downloaded into models_storage volume by the model_init service
+# (docker compose service: model_init → scripts/download_models.py)
+# Set env var to prevent PaddleOCR from checking the model source on each startup
+ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \

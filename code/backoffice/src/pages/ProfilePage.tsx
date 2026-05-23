@@ -1,12 +1,19 @@
+import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
-import { User, Mail, Shield, Building2 } from 'lucide-react'
+import { User, Mail, Shield, Building2, KeyRound, Loader2, CheckCircle } from 'lucide-react'
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth()
+  const { user, logout, getAuthHeader } = useAuth()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changing, setChanging] = useState(false)
+  const [changeError, setChangeError] = useState('')
+  const [changeSuccess, setChangeSuccess] = useState(false)
 
   if (!user) return null
 
@@ -78,6 +85,61 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" />Changer le mot de passe</CardTitle>
+          <CardDescription>Modifiez votre mot de passe</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {changeSuccess && (
+            <div className="flex items-center gap-2 rounded-md bg-green-50 p-3 text-sm text-green-700">
+              <CheckCircle className="h-4 w-4" />Mot de passe modifié avec succès
+            </div>
+          )}
+          {changeError && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{changeError}</div>
+          )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Mot de passe actuel</label>
+            <Input type="password" value={currentPassword} onChange={e => { setCurrentPassword(e.target.value); setChangeSuccess(false); setChangeError('') }} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Nouveau mot de passe</label>
+            <Input type="password" value={newPassword} onChange={e => { setNewPassword(e.target.value); setChangeSuccess(false); setChangeError('') }} placeholder="Min. 8 caractères" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Confirmer le nouveau mot de passe</label>
+            <Input type="password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setChangeSuccess(false); setChangeError('') }} />
+          </div>
+          <Button
+            onClick={async () => {
+              setChangeError(''); setChangeSuccess(false)
+              if (newPassword !== confirmPassword) { setChangeError('Les mots de passe ne correspondent pas'); return }
+              if (newPassword.length < 8) { setChangeError('Le mot de passe doit contenir au moins 8 caractères'); return }
+              setChanging(true)
+              try {
+                const res = await fetch('/api/v1/auth/agent/password-change', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+                  body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+                })
+                if (!res.ok) {
+                  const data = await res.json().catch(() => ({}))
+                  throw new Error(data.detail || 'Erreur lors du changement')
+                }
+                setChangeSuccess(true)
+                setCurrentPassword(''); setNewPassword(''); setConfirmPassword('')
+              } catch (err: any) { setChangeError(err.message) }
+              finally { setChanging(false) }
+            }}
+            disabled={changing || !currentPassword || !newPassword || !confirmPassword}
+          >
+            {changing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+            Changer le mot de passe
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -62,10 +62,10 @@ VITE v8.0.0  ready in 1053 ms  ➜  Local:   http://localhost:3000/
 
 Les modules suivants existent dans `src/views/` mais ne sont pas encore configurés dans le routeur :
 
-| Module | Chemin | Statut |
-|--------|--------|--------|
-| **auth** | `/auth` | 404 - Non routé |
-| **kyc** | `/kyc` | 404 - Non routé |
+| Module        | Chemin       | Statut          |
+| ------------- | ------------ | --------------- |
+| **auth**      | `/auth`      | 404 - Non routé |
+| **kyc**       | `/kyc`       | 404 - Non routé |
 | **dashboard** | `/dashboard` | 404 - Non routé |
 | **discovery** | `/discovery` | 404 - Non routé |
 
@@ -105,15 +105,15 @@ Les modules suivants existent dans `src/views/` mais ne sont pas encore configur
 
 ## Dépendances Principales
 
-| Package | Version | Usage |
-|---------|---------|-------|
-| react | 18.x | Framework UI |
-| react-router-dom | v6 | Routing |
-| @tanstack/react-query | v5 | Data fetching |
-| vite-plugin-pwa | v1.2.0 | PWA support |
-| tailwindcss | v4 | Styling |
-| lucide-react | latest | Icônes |
-| clsx + tailwind-merge | latest | Utilitaires CSS |
+| Package               | Version | Usage           |
+| --------------------- | ------- | --------------- |
+| react                 | 18.x    | Framework UI    |
+| react-router-dom      | v6      | Routing         |
+| @tanstack/react-query | v5      | Data fetching   |
+| vite-plugin-pwa       | v1.2.0  | PWA support     |
+| tailwindcss           | v4      | Styling         |
+| lucide-react          | latest  | Icônes          |
+| clsx + tailwind-merge | latest  | Utilitaires CSS |
 
 ---
 
@@ -143,7 +143,7 @@ Les modules suivants existent dans `src/views/` mais ne sont pas encore configur
 ### Lancer le frontend
 ```bash
 cd code/mobile
-npm run dev
+bun run dev
 ```
 
 ### Lancer le backend (pour intégration)

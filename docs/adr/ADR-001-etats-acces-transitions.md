@@ -84,3 +84,20 @@ stateDiagram-v2
 - **Mobile** : Utilisation d'un `AccessTierProvider` pour gérer dynamiquement les bannières et le blocage des fonctions (épargne, virements si LIMITED).
 - **Back-Office** : Priorisation des files par `lifecycle_state`. Thomas gère les transitions complexes (FRAUD, Déduplication).
 - **API** : Les permissions sont calculées sur `access_tier`. Les opérations financières sont rejetées si `access_tier != FULL_ACCESS`.
+
+## Conséquences supplémentaires (2026-04-05)
+
+### Auto-lock par inactivité
+Le frontend mobile implémente un mécanisme de verrouillage automatique :
+- Timer d'inactivité configurable (5 min prod, 25 s dev)
+- Détection via mouse, touch, keyboard events
+- Verrouillage transparent avec preservation de la route dans `sessionStorage`
+- Transition vers `LockScreen` avant expiration
+- Passkeys (WebAuthn) intégrés pour le déverrouillage biométrique (**non testé**)
+
+### Audit COBAC
+Le module d'audit backend assure la conformité COBAC R-2023/01 :
+- Tracking de toutes les actions système (qui, quoi, quand, rationale)
+- Export CSV pour rapports réglementaires
+- Accès restreint aux rôles ADMIN_IT et SYLVIE
+- Intégration avec les Celery tasks pour les opérations planifiées (PEP sync, KYC abandoned, sanctions check)

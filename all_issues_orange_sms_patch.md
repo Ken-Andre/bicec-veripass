@@ -12,7 +12,7 @@ Update existing INFRA-06 to lock Orange SMS as the official solution and remove 
 ## Subtasks
 - [ ] Remove SMTP tasks from implementation and docs.
 - [ ] Configure Orange SMS with provisioned identifiers:
-  - Application ID: `pMTnm7GeS9AxgrR4`
+  - Application ID: `[ORANGE_APP_ID — voir .env]`
   - Client ID: provisioned
 - [ ] Add environment variables:
   - `ORANGE_APP_ID`

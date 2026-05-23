@@ -7,10 +7,16 @@ WORKDIR /app
 COPY package.json bun.lock ./
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile
 
 # Copy application code
 COPY . .
+
+# Pass Sentry DSN and Version as build-time arguments for Vite injection
+ARG VITE_SENTRY_DSN
+ARG VITE_APP_VERSION
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+ENV VITE_APP_VERSION=$VITE_APP_VERSION
 
 # Build the application
 RUN bun run build && \
@@ -20,21 +26,23 @@ RUN bun run build && \
 # Final stage
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 
-# Switch to root to install security updates and clean
+# Switch to root
 USER root
-RUN apk update && apk upgrade --no-cache && \
-    # Clean apk cache to reduce final image size
-    rm -rf /var/cache/apk/*
+# Skip apk update/upgrade to avoid network issues in CI - base image already has updates
+RUN rm -rf /var/cache/apk/*
 
-# Add health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
+# Add health check — wget BusyBox (Alpine) ne supporte pas --spider
+# Utiliser 127.0.0.1 au lieu de localhost (résolution DNS Alpine)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
 
 # Switch back to the unprivileged user
 USER 101
 
 # Copy build artifacts
 COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy Nginx config for SPA routing
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 

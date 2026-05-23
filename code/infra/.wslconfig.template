@@ -1,0 +1,74 @@
+[wsl2]
+# ============================================================================
+# BICEC VeriPass — WSL2 Configuration Template
+# ============================================================================
+#
+# INSTALLATION:
+# 1. Copier ce fichier vers: C:\Users\<USERNAME>\.wslconfig
+# 2. Remplacer <USERNAME> par votre nom d'utilisateur Windows dans swapFile
+# 3. Ajuster processors selon votre CPU (voir commentaires ci-dessous)
+# 4. Redémarrer WSL: wsl --shutdown
+# 5. Relancer Docker Desktop
+# 6. Vérifier: wsl --list --verbose (État = Running)
+#
+# Guide complet: docs/setup-wsl2-windows.md
+# ============================================================================
+
+# ── RAM ──────────────────────────────────────────────────────────────────────
+# 8GB pour Docker, 8GB restants pour Windows/IDE/Chrome
+# CRITIQUE: Sans cette limite, Docker peut consommer 12-14 GB (OOM en Sprint 2+)
+#
+# Budget RAM services (Sprint 2+ avec modèles IA):
+#   nginx + pwa + backoffice : ~384 MB
+#   api (PaddleOCR lazy)     : 2.5 GB
+#   celery_ocr (GLM-OCR)     : 3.5 GB
+#   celery_notif + beat      : 640 MB
+#   postgres + redis + flower: 1.0 GB
+#   ─────────────────────────────────
+#   TOTAL                    : ~8.5 GB  → cap à 8GB + 2GB swap
+memory=8GB
+
+# ── CPU ──────────────────────────────────────────────────────────────────────
+# Ajuster selon votre machine:
+#   Intel/AMD i3  / Ryzen 3 (4 cores)  → processors=2
+#   Intel/AMD i5  / Ryzen 5 (6 cores)  → processors=4  ← défaut recommandé
+#   Intel/AMD i7+ / Ryzen 7+ (8+ cores)→ processors=6
+processors=4
+
+# ── Swap ─────────────────────────────────────────────────────────────────────
+# 2GB buffer pour absorber les pics temporaires (chargement modèles IA)
+swap=2GB
+# IMPORTANT: Remplacer <USERNAME> par votre nom d'utilisateur Windows
+swapFile=C:\\Users\\<USERNAME>\\AppData\\Local\\Temp\\wsl-swap.vhdx
+
+# ── Performance ──────────────────────────────────────────────────────────────
+# Désactive le reporting de pages mémoire libres (réduit le bruit CPU)
+pageReporting=false
+
+# Permet d'accéder aux ports WSL2 via localhost depuis Windows
+localhostForwarding=true
+
+# ── Réseau (WSL2 2.0+ — Windows 11 22H2+) ────────────────────────────────────
+# Décommenter si vous avez des problèmes de connectivité réseau avec Docker
+# networkingMode=mirrored
+
+# ── Récupération mémoire (WSL2 2.0+ — Windows 11 22H2+) ──────────────────────
+# Libère automatiquement la RAM WSL2 après des pics (ex: chargement modèles IA)
+# gradual = libération progressive en arrière-plan (recommandé)
+# dropcache = libération immédiate (plus agressif)
+[experimental]
+autoMemoryReclaim=gradual
+sparseVhd=true
+
+# ============================================================================
+# VÉRIFICATION POST-INSTALLATION:
+#
+#   # Vérifier que WSL tourne
+#   wsl --list --verbose
+#
+#   # Vérifier la RAM disponible dans un container
+#   docker exec vp_api free -h
+#   # Attendu: Mem total ~7.8Gi
+#
+# DÉPANNAGE: docs/setup-wsl2-windows.md
+# ============================================================================

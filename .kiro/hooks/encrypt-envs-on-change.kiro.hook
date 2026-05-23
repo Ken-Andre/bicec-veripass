@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Encrypt .env on change",
+  "description": "Chiffre automatiquement tous les fichiers .env du repo vers .env.enc dès qu'un .env est sauvegardé",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/.env"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "bash code/scripts/encrypt-all-envs.sh"
+  }
+}

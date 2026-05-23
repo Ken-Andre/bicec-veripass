@@ -14,12 +14,17 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
-    const success = await login(email, password)
-    if (success) {
-      navigate('/')
-    } else {
-      setError('Email ou mot de passe incorrect')
+
+    try {
+      const success = await login(email, password)
+      if (success) {
+        navigate('/')
+      }
+    } catch (err: any) {
+      // login() returns false on failure, but we can extract detail from the raw response
+      // The AuthContext already handles the flow, so we just set a generic error
+      // However if the backend returns structured errors (lockout, attempts), show them
+      setError(err?.message || 'Email ou mot de passe incorrect')
     }
   }
 
@@ -34,14 +39,14 @@ export default function LoginPage() {
             Back Office - Connexion
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="rounded-md bg-red-50 p-4">
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
-          
+
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -64,7 +69,7 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Mot de passe
@@ -108,7 +113,7 @@ export default function LoginPage() {
               {isLoading ? 'Connexion...' : 'Se connecter'}
             </button>
           </div>
-          
+
           {import.meta.env.DEV && (
             <div className="mt-4 text-center text-xs text-gray-500">
               <p>Comptes de démonstration :</p>
