@@ -79,6 +79,10 @@ export function HomePage() {
       navigate(user && !user.has_pin ? '/auth/pin-setup' : '/dashboard', { replace: true });
       return;
     }
+    if (user?.has_pin) {
+      navigate('/auth/pin-login', { replace: true });
+      return;
+    }
     const timer = setTimeout(() => setShowOnboarding(true), SPLASH_DURATION);
     return () => clearTimeout(timer);
   }, [loading, isAuthenticated, user, navigate]);

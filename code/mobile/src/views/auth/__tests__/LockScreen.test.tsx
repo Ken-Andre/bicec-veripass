@@ -5,7 +5,13 @@ import LockScreen from '../LockScreen';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockLogin = vi.hoisted(() => vi.fn());
+const mockAuthenticateWithPasskey = vi.hoisted(() => vi.fn());
 const mockPost = vi.hoisted(() => vi.fn());
+const mockGet = vi.hoisted(() => vi.fn());
+const mockAuthFlags = vi.hoisted(() => ({
+  biometricEnabled: false,
+  isPasskeySupported: false,
+}));
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -25,12 +31,16 @@ vi.mock('../../../contexts/AuthContext', () => ({
       has_pin: true,
     },
     login: mockLogin,
+    biometricEnabled: mockAuthFlags.biometricEnabled,
+    isPasskeySupported: mockAuthFlags.isPasskeySupported,
+    authenticateWithPasskey: mockAuthenticateWithPasskey,
   }),
 }));
 
 vi.mock('../../../services/apiClient', () => ({
   apiClient: {
     post: mockPost,
+    get: mockGet,
   },
 }));
 
@@ -38,6 +48,16 @@ describe('LockScreen', () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    sessionStorage.clear();
+    mockAuthFlags.biometricEnabled = false;
+    mockAuthFlags.isPasskeySupported = false;
+    mockGet.mockResolvedValue({
+      id: 'user-1',
+      phone: '+237690000005',
+      email: 'fresh@example.com',
+      role: 'CLIENT',
+      has_pin: true,
+    });
   });
 
   it('redirects to OTP instead of counting a wrong PIN when backend requires OTP', async () => {
@@ -93,7 +113,56 @@ describe('LockScreen', () => {
     });
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test-new-access-token', expect.objectContaining({ id: 'user-1' }));
+      expect(mockGet).toHaveBeenCalledWith('/auth/me', {
+        headers: {
+          Authorization: 'Bearer test-new-access-token',
+        },
+      });
+      expect(mockLogin).toHaveBeenCalledWith('test-new-access-token', expect.objectContaining({
+        email: 'fresh@example.com',
+      }));
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true });
+  });
+
+  it('does not resume back to the lock route after successful PIN entry', async () => {
+    sessionStorage.setItem('vp_last_route', '/auth/lock');
+    mockPost.mockResolvedValue({
+      access_token: 'test-new-access-token',
+      refresh_token: 'test-new-refresh-token',
+    });
+
+    render(
+      <MemoryRouter>
+        <LockScreen />
+      </MemoryRouter>,
+    );
+
+    ['1', '2', '3', '4', '5', '6'].forEach((digit) => {
+      fireEvent.click(screen.getByRole('button', { name: digit }));
+    });
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith('test-new-access-token', expect.any(Object));
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true });
+  });
+
+  it('shows biometric login on the lock screen when enrolled', async () => {
+    mockAuthFlags.biometricEnabled = true;
+    mockAuthFlags.isPasskeySupported = true;
+    mockAuthenticateWithPasskey.mockResolvedValue({ access_token: 'bio-token' });
+
+    render(
+      <MemoryRouter>
+        <LockScreen />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /connexion biom/i }));
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith('bio-token', expect.objectContaining({ email: 'fresh@example.com' }));
     });
     expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true });
   });
