@@ -21,10 +21,11 @@ from sqlalchemy.orm import selectinload
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.security import get_current_user, make_session_handle, verify_session_handle
+from app.core.security import make_session_handle, verify_session_handle
 from app.core.logging import logger
 from app.db.session import get_db
 from app.modules.auth.models import User
+from app.modules.devices.dependencies import require_registered_device
 from app.modules.kyc.models import (
     KYCSession,
     Document,
@@ -275,7 +276,7 @@ async def get_root(request: Request):
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_current_session(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the current active KYC session for the user.
@@ -388,7 +389,7 @@ async def get_current_session(
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def start_kyc_session(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Start a new KYC session for the user."""
@@ -435,7 +436,7 @@ async def upload_document(
     file: UploadFile = File(...),
     doc_type: str = Form("CNI_RECTO"),
     client_sha256: str | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload a KYC document (CNI recto/verso, selfie, bill, NIU)."""
@@ -457,7 +458,7 @@ async def capture_cni(
     side: str = Form(...),
     session_id: str | None = Form(None),
     client_sha256: str | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Story-aligned CNI upload endpoint.
@@ -487,7 +488,7 @@ async def capture_bill(
     bill_type: str = Form("ENEO"),
     session_id: str | None = Form(None),
     client_sha256: str | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload utility bill (ENEO or CAMWATER) as proof of residence.
@@ -559,7 +560,7 @@ async def _resolve_document_by_handle(
 async def get_document_ocr(
     request: Request,
     doc_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Get OCR results for a document.
@@ -594,7 +595,7 @@ async def get_document_ocr(
 async def submit_ocr_review(
     request: Request,
     body: OCRReviewSubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit OCR field corrections."""
@@ -649,7 +650,7 @@ async def submit_ocr_review(
 async def confirm_ocr_review(
     request: Request,
     body: OCRConfirmSubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Story-aligned OCR confirmation endpoint.
@@ -670,7 +671,7 @@ async def confirm_ocr_review(
 async def merge_ocr_fields(
     request: Request,
     session_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Merge recto + verso OCR extractions into a unified identity record.
@@ -764,7 +765,7 @@ async def merge_ocr_fields(
 async def submit_liveness(
     request: Request,
     body: LivenessSubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit liveness challenge result."""
@@ -881,7 +882,7 @@ async def submit_liveness(
 async def capture_liveness(
     request: Request,
     body: LivenessSubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Story-aligned liveness endpoint alias."""
@@ -898,7 +899,7 @@ async def capture_liveness(
 async def submit_address(
     request: Request,
     body: AddressSubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit address information with GPS validation."""
@@ -927,7 +928,7 @@ async def submit_address(
 async def submit_consent(
     request: Request,
     body: ConsentSubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit consent checkboxes."""
@@ -987,7 +988,7 @@ async def submit_consent(
 async def submit_niu(
     request: Request,
     body: NIUSubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit NIU information."""
@@ -1005,7 +1006,7 @@ async def submit_niu(
 async def submit_signature(
     request: Request,
     body: SignatureSubmitRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit electronic signature. Stored in consent metadata."""
@@ -1166,7 +1167,7 @@ async def _compute_kyc_readiness(
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_kyc_readiness(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Return readiness gates before KYC submission."""
@@ -1178,7 +1179,7 @@ async def get_kyc_readiness(
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def submit_kyc(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit the complete KYC dossier for review."""
@@ -1255,7 +1256,7 @@ async def submit_kyc(
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_review_status(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Poll review status for the user's submitted KYC session.
@@ -1344,7 +1345,7 @@ async def get_review_status(
 async def mark_notifications_read(
     request: Request,
     mark_all: bool = False,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Mark notifications as read.
@@ -1382,7 +1383,7 @@ async def mark_notifications_read(
 async def mark_notification_read(
     request: Request,
     notification_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
     """Mark a single notification as read.

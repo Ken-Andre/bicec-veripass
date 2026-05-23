@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.core.security import get_current_user
 from app.db.session import get_db
 from app.modules.auth.models import User
+from app.modules.devices.dependencies import require_registered_device
 from app.modules.kyc.models import KYCSession
 from app.modules.banking import service
 from app.modules.banking.schemas import (
@@ -31,7 +31,7 @@ router = APIRouter()
 
 async def require_banking_write_access(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
 ) -> User:
     """Require an approved KYC access tier before money-moving actions."""
     result = await db.execute(
@@ -54,7 +54,7 @@ async def require_banking_write_access(
 @router.get("/account", response_model=AccountInfoResponse)
 async def get_account(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
 ):
     """Return user's account info (balance derived from transactions)."""
     info = await service.get_account_info(db, current_user.id)
@@ -68,7 +68,7 @@ async def get_account(
 @router.get("/cards", response_model=list[CardResponse])
 async def list_cards(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
 ):
     """List user's bank cards."""
     cards = await service.list_cards(db, current_user.id)
@@ -162,7 +162,7 @@ async def send_transfer(
 @router.get("/transfers", response_model=list[TransferResponse])
 async def list_transfers(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
 ):
     """List user's transfers."""
     transfers = await service.list_transfers(db, current_user.id)
@@ -192,7 +192,7 @@ async def list_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
 ):
     """List user's transactions with optional category filter."""
     cat = None if category in (None, "all") else category
@@ -219,7 +219,7 @@ async def list_transactions(
 @router.get("/savings/pockets", response_model=SavingsSummaryResponse)
 async def list_savings_pockets(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_registered_device),
 ):
     """List user's savings pockets with total."""
     pockets = await service.list_savings_pockets(db, current_user.id)
