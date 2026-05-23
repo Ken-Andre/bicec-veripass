@@ -6,6 +6,15 @@ const SENTRY_PROXY_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/v1/sentry-proxy`
   : '/api/v1/sentry-proxy';
 
+export function getSentryProjectFromTransportUrl(transportUrl: string): string {
+  try {
+    const url = new URL(transportUrl);
+    return url.pathname.split('/').filter(Boolean).at(-2) || '';
+  } catch {
+    return '';
+  }
+}
+
 export function initBackofficeSentry(): void {
   if (!import.meta.env.VITE_SENTRY_DSN) return;
 
@@ -19,11 +28,13 @@ export function initBackofficeSentry(): void {
       const sentryKey = url.searchParams.get('sentry_key') || '';
       const sentryVersion = url.searchParams.get('sentry_version') || '7';
       const sentryClient = url.searchParams.get('sentry_client') || '';
+      const sentryProject = getSentryProjectFromTransportUrl(transportOptions.url);
 
       const proxyUrl = new URL(SENTRY_PROXY_URL, window.location.origin);
       proxyUrl.searchParams.set('sentry_key', sentryKey);
       proxyUrl.searchParams.set('sentry_version', sentryVersion);
       proxyUrl.searchParams.set('sentry_client', sentryClient);
+      proxyUrl.searchParams.set('sentry_project', sentryProject);
 
       const bodyStr = typeof request.body === 'string' ? request.body : new TextDecoder().decode(request.body);
 

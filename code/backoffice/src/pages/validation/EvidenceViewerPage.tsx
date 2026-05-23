@@ -13,7 +13,6 @@ import { ImageViewer } from '@/components/shared/ImageViewer';
 import { DossierTimeline } from '@/components/shared/DossierTimeline';
 import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
 import { FaceComparisonCard } from '@/components/shared/FaceComparisonCard';
-import { AddressCoherencePanel } from '@/components/shared/AddressCoherencePanel';
 import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck, Pencil, Save, Tags, FileText } from 'lucide-react';
 import { reviewDossier, assignDossier, autoAssignDossier } from '@/services/dossier-service';
 import { apiGet, apiPost } from '@/services/api-client';
@@ -500,7 +499,7 @@ export default function EvidenceViewerPage() {
                   <CardTitle className="flex items-center gap-2">
                     Comparaison Visage / CNI
                     {faceScore != null && (
-                      <Badge variant={faceScore >= 0.8 ? 'default' : 'destructive'}>
+                      <Badge variant={faceScore >= 0.8 ? 'default' : 'danger'}>
                         {(faceScore * 100).toFixed(0)}% match
                       </Badge>
                     )}

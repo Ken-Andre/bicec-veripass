@@ -9,7 +9,6 @@ import MainLayout from './components/layout/MainLayout'
 import { PageLoader } from './components/PageLoader'
 
 const LoginPage = lazy(() => import('./pages/LoginPage'))
-const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const ValidationQueuePage = lazy(() => import('./pages/validation/ValidationQueuePage'))
 const EvidenceViewerPage = lazy(() => import('./pages/validation/EvidenceViewerPage'))
 const ComplianceDashboard = lazy(() => import('./pages/compliance/ComplianceDashboard'))
