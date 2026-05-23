@@ -187,6 +187,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    if (!isAuthenticated || !user || localStorage.getItem('vp_device_tag')) return;
+    void ensureDeviceRegistered().catch((err) => {
+      console.warn('Device registration failed', err);
+    });
+  }, [isAuthenticated, user]);
+
   const login = useCallback((token: string, userData: User) => {
     localStorage.setItem('vp_token', token);
     localStorage.setItem('vp_user', JSON.stringify(userData));
