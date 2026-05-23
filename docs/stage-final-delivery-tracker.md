@@ -1,6 +1,6 @@
 # Stage Final Delivery Tracker
 
-Last updated: 2026-05-22 22:59 +02:00
+Last updated: 2026-05-23 01:40 +02:00
 
 ## Proof Status Model
 
@@ -31,6 +31,8 @@ Last updated: 2026-05-22 22:59 +02:00
 | Live support limits/preference API | OTP signup/login via `Invoke-RestMethod`; live GET/PUT through `https://localhost/api/v1` | Support limits returned image `4 Mo`, PDF `6 Mo`, PDF pages `5`, message `4000`; preferences default `sms`, SMS update `200`, email without email `400` |
 | Live Day 3 device/push API | OTP signup/login via `Invoke-RestMethod`; device registration; push create/list/delete through `https://localhost/api/v1` | Device tag `vp_dev_865d59e41f9942595733b6c561aadee9cecfa929c11aad56`; push subscription `1614bb99-f801-4dc8-aa4b-b304f3f45b02`; list before delete `1`, after delete `0` |
 | Live authenticated support upload | OTP signup/login via `Invoke-RestMethod`, then multipart `curl.exe -k -F` to `/api/v1/support/threads/{thread_id}/attachments` after the 17:09 rebuild | `HTTP_STATUS:201`, `attachment_document_id=c41ce1ca-47fc-4844-885a-32ddc58ce100`, SHA-256 `743815b19badc9de3f2dcadd0539cb037319cf66a114f5f33da0de4f25c832be` |
+| Backend device enforcement tests | `docker compose -f code/docker-compose.yml -f code/docker-compose.test.yml run --rm --no-deps --entrypoint /app/.venv/bin/python api -m pytest tests/unit/test_device_enforcement_contract.py tests/unit/test_contract_foundation_schemas.py -q` | `9 passed, 1 warning in 0.04s` |
+| Live Day 3 device-tag enforcement API | Rebuilt/recreated API with `docker compose -f code/docker-compose.yml build api`; `docker compose -f code/docker-compose.yml up -d api nginx`; `docker compose -f code/docker-compose.yml restart nginx`; OTP auth + device register + protected route checks through `https://localhost/api/v1` | health `200`; device register `200`; banking/KYC without tag `428`; banking/KYC wrong tag `403`; banking/KYC registered tag `200` |
 
 ## Day 1 Stabilization
 
@@ -64,7 +66,7 @@ Last updated: 2026-05-22 22:59 +02:00
 | --- | --- | --- | --- | --- |
 | Mobile registers privacy-reduced device tag and sends it on API calls | DONE | Dev D / Senior reviewer | Mobile builds a local seed + reduced metadata hash, registers `/devices/register` with `X-Device-Fingerprint`, stores returned `vp_device_tag`, and `apiClient`/multipart fetch include `X-Device-Tag`; live API proof returned a deterministic `vp_dev_...` tag | `code/mobile/src/services/deviceRegistrationService.test.ts`; `docs/test-evidence/latest/api/day3-live-api-proof-2026-05-22.md` |
 | Push subscription lifecycle is linked to device tag | DONE | Dev B / Senior reviewer | Mobile stores server subscription id on enable, lists/deletes the matching active subscription on disable, and sends `device_tag`; live API proof create/list/delete passed | `code/mobile/src/services/pushNotificationService.test.ts`; `docs/test-evidence/latest/api/day3-live-api-proof-2026-05-22.md` |
-| Server-side device-tag enforcement on high-risk routes | SOURCE_READY | Dev D / Senior reviewer | Device registration table/router exists and clients now send `X-Device-Tag`; enforcement policy is not yet applied to KYC/banking routes, so this is not DONE | Pending |
+| Server-side device-tag enforcement on high-risk routes | DONE | Dev D / Senior reviewer | `require_registered_device` is applied to banking and KYC routes; backend contract tests passed; rebuilt live API blocks missing/wrong tags and allows registered tags | `docs/test-evidence/latest/api/day3-device-enforcement-proof-2026-05-23.md` |
 
 ## Current Evidence Artifacts
 
@@ -84,6 +86,7 @@ Last updated: 2026-05-22 22:59 +02:00
 | Mobile traces/videos/report | `docs/test-evidence/latest/mobile/`, `docs/test-evidence/latest/mobile-html-report/index.html` |
 | Live API proof | `docs/test-evidence/latest/api/day1-live-api-proof-2026-05-22.md` |
 | Day 3 live API proof | `docs/test-evidence/latest/api/day3-live-api-proof-2026-05-22.md` |
+| Day 3 device enforcement proof | `docs/test-evidence/latest/api/day3-device-enforcement-proof-2026-05-23.md` |
 | Backoffice login screenshot | `docs/test-evidence/latest/backoffice/screens/login.png` |
 | Backoffice dashboard screenshot | `docs/test-evidence/latest/backoffice/screens/dashboard.png` |
 | Backoffice traces/videos/report | `docs/test-evidence/latest/backoffice/`, `docs/test-evidence/latest/backoffice-html-report/index.html` |
