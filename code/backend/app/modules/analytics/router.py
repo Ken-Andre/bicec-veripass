@@ -22,11 +22,11 @@ async def get_root():
 async def get_dashboard(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _agent=Depends(require_agent_role(AgentRole.SYLVIE, AgentRole.ADMIN_IT)),
+    _agent=Depends(require_agent_role(AgentRole.SYLVIE, AgentRole.ADMIN_IT, AgentRole.THOMAS)),
 ):
     """Analytics dashboard — KPIs, funnel metrics, agent performance.
 
-    Access: SYLVIE, ADMIN_IT
+    Access: SYLVIE, ADMIN_IT, THOMAS
     """
-    stats = await analytics_service.get_dashboard_stats(db)
+    stats = await analytics_service.get_dashboard_stats(db, role=_agent.role)
     return stats

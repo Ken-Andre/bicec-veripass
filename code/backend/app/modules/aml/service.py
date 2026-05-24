@@ -1,5 +1,6 @@
 """Module Service layer AML/CFT."""
 
+import uuid
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
@@ -9,6 +10,59 @@ from app.modules.aml.models import BatchJob
 from app.modules.kyc.models import KYCSession, AmlAlert, AmlAlertStatus, DuplicateCheck
 from app.modules.admin.models import Agency
 from app.modules.auth.models import Agent
+
+
+async def get_aml_alert_by_id(db: AsyncSession, alert_id: str) -> Optional[dict]:
+    """Récupère une alerte AML spécifique par son identifiant."""
+    logger.info(f"Fetching AML alert by id: {alert_id}")
+    try:
+        alert_uuid = uuid.UUID(alert_id) if isinstance(alert_id, str) else alert_id
+    except ValueError:
+        return None
+
+    result = await db.execute(
+        select(AmlAlert)
+        .options(selectinload(AmlAlert.pep_sanctions))
+        .where(AmlAlert.id == alert_uuid)
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        return None
+
+    # Fetch client name from KYC session
+    kyc_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == alert.session_id)
+    )
+    kyc_session = kyc_result.scalar_one_or_none()
+    client_name = kyc_session.client_name if kyc_session else "Unknown"
+    niu_val = kyc_session.niu_type if kyc_session else ""
+
+    # Compute matches/hits
+    hits = []
+    if alert.pep_sanctions:
+        hits.append({
+            "id": str(alert.pep_sanctions.id),
+            "listName": alert.pep_sanctions.source,
+            "matchedName": alert.pep_sanctions.full_name,
+            "matchScore": float(alert.match_score),
+            "listType": "PEP",
+            "country": alert.pep_sanctions.nationality,
+            "details": f"Programs: {', '.join(alert.pep_sanctions.programs or [])}",
+        })
+
+    return {
+        "id": str(alert.id),
+        "sessionId": str(alert.session_id),
+        "clientName": client_name,
+        "niu": niu_val or "",
+        "severity": "CRITICAL" if float(alert.match_score) > 0.85 else "HIGH" if float(alert.match_score) > 0.7 else "MEDIUM",
+        "status": alert.status.value if hasattr(alert.status, "value") else str(alert.status),
+        "hits": hits,
+        "createdAt": alert.created_at,
+        "reviewedBy": str(alert.cleared_by) if alert.cleared_by else None,
+        "reviewedAt": alert.resolved_at,
+        "justification": alert.justification,
+    }
 
 
 async def get_aml_alerts(db: AsyncSession) -> list[dict]:
@@ -298,12 +352,11 @@ async def trigger_amplitude_batch(db: AsyncSession, session_ids: list[str]) -> s
     """Lance un job batch de provisionnement Amplitude."""
     logger.info(f"Triggering batch job for {len(session_ids)} sessions")
     job = BatchJob(
-        job_type="AMPLITUDDE_PROVISIONING",
+        job_type="AMPLITUDE_PROVISIONING",
         status="PENDING",
         total_items=len(session_ids),
     )
     db.add(job)
     await db.commit()
     await db.refresh(job)
-    # TODO: Trigger Celery task for actual processing
     return str(job.id)

@@ -213,7 +213,7 @@ async def list_queue(
     agency_code: str | None = Query(None, description="Filter by agency code"),
     client_name: str | None = Query(None, description="Search by client name (partial match)"),
     _agent: Agent = Depends(
-        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT)
+        require_agent_role(AgentRole.JEAN, AgentRole.SYLVIE, AgentRole.ADMIN_IT)
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -348,6 +348,26 @@ async def get_dossier_detail(
     if not session:
         raise HTTPException(status_code=404, detail="Dossier not found")
 
+    if _agent.role == AgentRole.THOMAS:
+        # Verify if dossier has active compliance triggers
+        has_aml = len(session.aml_alerts) > 0
+        
+        # Query DuplicateCheck to see if a NIU conflict exists
+        from app.modules.kyc.models import DuplicateCheck
+        dup_res = await db.execute(
+            select(DuplicateCheck).where(
+                (DuplicateCheck.session_id_new == session_id) | 
+                (DuplicateCheck.session_id_existing == session_id)
+            )
+        )
+        has_dup = dup_res.first() is not None
+
+        if not (has_aml or has_dup):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: compliance check does not exist for this dossier."
+            )
+
     client_name = _extract_client_name_from_docs(session.documents)
     user_phone = session.user.phone if session.user else None
     agency_code = session.agency.code if session.agency else None
@@ -407,15 +427,17 @@ async def get_dossier_detail(
         for d in session.decisions
     ]
 
-    aml_briefs = [
-        DossierAmlAlertBrief(
-            id=a.id,
-            alert_type=a.alert_type,
-            match_score=float(a.match_score),
-            status=a.status,
-        )
-        for a in session.aml_alerts
-    ]
+    aml_briefs = []
+    if _agent.role != AgentRole.JEAN:
+        aml_briefs = [
+            DossierAmlAlertBrief(
+                id=a.id,
+                alert_type=a.alert_type,
+                match_score=float(a.match_score),
+                status=a.status,
+            )
+            for a in session.aml_alerts
+        ]
 
     assigned_agent_id: uuid.UUID | None = None
     assigned_agent_name: str | None = None

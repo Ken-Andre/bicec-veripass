@@ -42,6 +42,21 @@ async def list_aml_alerts(
     return alerts
 
 
+@router.get("/alerts/{alert_id}", response_model=AmlAlertResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def get_aml_alert(
+    request: Request,
+    alert_id: str,
+    db: AsyncSession = Depends(get_db),
+    _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
+):
+    """Détails d'une alerte AML spécifique."""
+    alert = await service.get_aml_alert_by_id(db, alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return alert
+
+
 @router.post("/alerts/{alert_id}/clear")
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def clear_aml_alert(

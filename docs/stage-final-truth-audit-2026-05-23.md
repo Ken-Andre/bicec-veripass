@@ -4,7 +4,7 @@ This document answers one question only: are all internship requirements proven 
 
 Short answer: no.
 
-The current evidence proves several Day 1-3 stabilization items, but it does not yet prove the full banking/KYC/backoffice happy path from client onboarding to final approval, nor all compliance/analytics/security/offline-ATM requirements.
+The current evidence proves several Day 1-3 stabilization items and now includes a live API KYC happy path from client onboarding to final approval. It still does not prove the full browser/mobile camera journey, all compliance/analytics/security/offline-ATM requirements, or real biometric device interaction.
 
 ## Evidence Boundary
 
@@ -14,15 +14,16 @@ Current visual/API evidence under `docs/test-evidence/latest/` covers:
 - Mobile support chat UI with attachment selection/sending using mocked Playwright routes.
 - Mobile notifications/settings preference screens using mocked Playwright routes.
 - Backoffice login and first dashboard render.
+- Backoffice final approved dossier detail screenshot for the live KYC happy-path session.
 - Live API proof for support upload, notification preferences, device registration, push subscription lifecycle, device-tag enforcement, and removal of the stale support compatibility endpoint.
+- Live API proof for KYC happy path using notebook CNI images plus generated one-page bill/support PDFs: OTP signup, device tag, CNI recto/verso upload, OCR correction, liveness, address, consent, NIU, signature, readiness, submission, JEAN queue/open/auto-assign/info request, client support file upload, JEAN classification/approval, client final `APPROVED` status.
 
 Current evidence does not cover:
 
 - A full KYC A-to-Z browser journey.
-- Uploading real CNI images from `paddleocr_test/notebooks/output/images`.
-- Real OCR extraction screenshots/results tied to those images.
-- Liveness capture evidence.
-- Client submission -> JEAN opens dossier -> JEAN requests info -> client sends file -> JEAN classifies file -> JEAN approves -> client sees final status.
+- Real mobile camera capture screenshots for CNI/liveness.
+- Full OCR extraction quality validation on every notebook CNI; the live happy-path proof records OCR status `PARTIAL` and then proves manual correction/review.
+- Browser screenshots for the mobile client KYC screens. Backoffice now has a visual screenshot of the final approved dossier, but not step-by-step screenshots for request-info/classification/approval button clicks.
 - Role-by-role backoffice proof beyond basic navigation/login.
 - Analytics/dashboard metrics with non-static operational values.
 - DAB/ATM offline locator.
@@ -34,19 +35,19 @@ Current evidence does not cover:
 | Client creates/resumes session | PARTIAL | Auth and persisted KYC state exist, but no full visual/API proof across logout/reload/device resume. |
 | Continue where left off | PARTIAL | IndexedDB/offline KYC persistence exists with unit tests, but no end-to-end visual proof. |
 | Return to any KYC step before submission | PARTIAL | Review/step guard code exists; not visually proven across all steps. |
-| Upload CNI | SOURCE_READY | Mobile/backend routes exist; no live proof using notebook CNI images yet. |
-| OCR extraction + correction/review | SOURCE_READY | OCR service/routes/UI exist; no live proof on real `paddleocr_test` CNI images in `docs/test-evidence/latest/`. |
+| Upload CNI | DONE for live API | `run_kyc_happy_path_acceptance.py` uploaded `cni_0_recto.jpg` and `cni_0_verso.jpg` through `https://localhost/api/v1/kyc/capture/cni`; evidence stores copied input images and hashes. Browser/camera proof still separate. |
+| OCR extraction + correction/review | LIVE_READY | Live proof records OCR status `PARTIAL` on notebook images and then posts manual OCR correction/review successfully. Full OCR quality/extraction benchmark across all CNI images remains open. |
 | Background document authenticity verification | PARTIAL | Client quality checks and OCR metadata exist; no proven server-side authenticity/tamper/security-feature verification. |
-| Client passes liveness | SOURCE_READY | UI/backend routes exist; no visual or live API happy-path evidence in latest artifacts. |
-| Liveness authenticity / anti-spoof | PARTIAL | Landmark heuristic and score logic exist; no replay/photo/depth proof and no final evidence. |
-| Client submits dossier | SOURCE_READY | Readiness/submit routes exist; no full live A-to-Z proof. |
-| Backoffice opens dossier | PARTIAL | Routes and EvidenceViewer exist; latest backoffice proof only shows dashboard, not dossier detail. |
-| Backoffice requests complementary file | SOURCE_READY | Review decision route supports `INFO_REQUESTED`; not visually/API-proven in latest artifacts. |
+| Client passes liveness | DONE for live API | Acceptance proof posts deterministic landmark frames and receives `is_alive=True`, `anti_spoofing_score=0.9354`. Browser/camera proof still separate. |
+| Liveness authenticity / anti-spoof | PARTIAL | Landmark heuristic is proven by API; replay/photo/depth proof and real camera evidence remain open. |
+| Client submits dossier | DONE for live API | Readiness returned `can_submit=True`; submit returned `PENDING_AGENT_REVIEW`. Browser proof still separate. |
+| Backoffice opens dossier | DONE | JEAN opened the submitted dossier by raw session id through the API; rebuilt backoffice evidence captures the final approved dossier detail page. |
+| Backoffice requests complementary file | DONE for live API | JEAN posted `INFO_REQUESTED`; client review status returned `PENDING_INFO` with unread notification. |
 | Push + in-app notifications after authorization | PARTIAL | In-app and push subscription lifecycle are proven; actual background push delivery is not proven. |
 | Client sends requested file by chat with visible/enforced limits | DONE for support upload | UI/backend limits and live multipart upload are proven. |
-| Backoffice assigns complementary file to categories | SOURCE_READY | Classification route exists; no live/visual proof. |
-| Backoffice validates dossier | SOURCE_READY | Review decision route exists; no complete JEAN visual/API proof. |
-| Client sees final approved status | SOURCE_READY | Status/notification paths exist; no full proof after JEAN approval. |
+| Backoffice assigns complementary file to categories | DONE for live API / EVIDENCE_READY final view | Support attachment created a `Document` id and JEAN classified it as `ADDRESS_PROOF`; final backoffice screenshot shows the support attachment and approval trail. Step-click browser proof remains open. |
+| Backoffice validates dossier | DONE for live API / EVIDENCE_READY final view | JEAN approval returned `APPROVED` and `LIMITED_ACCESS`; final backoffice screenshot shows `APPROVED` and the audit timeline. Step-click browser proof remains open. |
+| Client sees final approved status | DONE for live API | Final `/kyc/review-status` returned `APPROVED` and unread `KYC_APPROVED` notification. Browser proof still open. |
 | Expiry/policy/sanctions/suspicious/global notifications | PARTIAL/TODO | Model/task pieces exist, sanctions sync exists, but broadcast/policy/expiry workflows are not proven end to end. |
 | Access by client status | PARTIAL | Access-tier mapping and some banking enforcement exist; no full role/status matrix evidence. |
 | Device tag / metadata identity | DONE for current enforcement slice | Device registration, tag storage, and high-risk route enforcement are proven live. |
@@ -68,30 +69,27 @@ Current evidence does not cover:
 
 ## KYC Happy Path Verdict
 
-The KYC happy path is not yet closed with proof.
+The KYC happy path is now closed with live API proof, but not yet with full browser/visual proof.
 
-The backend has the pieces: session, document capture, OCR review, liveness, address, NIU, consent, signature, readiness, submit. The mobile has screens for those steps. But there is no latest artifact that drives one client through all of them using real sample images and then proves the backoffice side.
+Evidence:
 
-Minimum proof still required:
+- `docs/test-evidence/latest/kyc-happy-path/README.md`
+- `docs/test-evidence/latest/kyc-happy-path/kyc-happy-path-live-api-proof.json`
+- `docs/test-evidence/latest/kyc-happy-path/input-images/cni_recto.jpg`
+- `docs/test-evidence/latest/kyc-happy-path/input-images/cni_verso.jpg`
 
-1. Seed or create one live client with phone/email/PIN/device tag.
-2. Upload `cni_0_recto.jpg` and `cni_0_verso.jpg` from `paddleocr_test/notebooks/output/images`.
-3. Capture/store OCR response and correction/review.
-4. Complete liveness using deterministic test payload.
-5. Upload bill/address/NIU/consent/signature.
-6. Submit dossier and prove status `PENDING_AGENT_REVIEW`.
-7. Login as JEAN, open dossier, request complementary file.
-8. Client receives notification and sends file by support chat.
-9. JEAN classifies the complementary file.
-10. JEAN approves.
-11. Client sees final approved status.
-12. Produce screenshots/video/trace and API proof for each step.
+What remains:
+
+1. Add mobile Playwright/browser screenshots around the live accepted dossier, not mocked routes.
+2. Add backoffice Playwright screenshots for the intermediate button-click states: info request, classification, and approval modals.
+3. Add OCR benchmark evidence across more notebook CNIs if the goal is to prove extraction quality, not only correction/review.
+4. Add real camera/liveness visual proof; real biometric proof remains manual.
 
 ## Backoffice And Dispatch Verdict
 
-JEAN role is not fully proven.
+JEAN role is partially proven.
 
-Evidence currently proves JEAN can log in and see a dashboard. It does not prove JEAN's full operational workflow in latest artifacts.
+Evidence now proves JEAN's full operational API workflow on one dossier: queue lookup, dossier open, auto-assign, info request, classification, approval. It also includes one rebuilt backoffice screenshot of the final approved dossier detail page. It still does not prove every intermediate visual click state.
 
 Auto-assign exists, but it is not yet a certified load-balancing system:
 
@@ -116,15 +114,15 @@ Weak:
 - Evidence tests still mock key mobile APIs, so screenshots prove UI states more than full integration.
 - Analytics contains static SLA values.
 - Backend document files are not proven encrypted at rest.
-- The full KYC/backoffice happy path is not covered by a reproducible acceptance suite.
+- The full KYC/backoffice happy path now has a reproducible live API acceptance suite, but still needs visual browser evidence.
 - Some docs/files still contain encoding artifacts or stale assumptions.
 
 ## Immediate Next Work
 
 The next correct work item is not more cleanup. It is the acceptance proof suite:
 
-1. Build `kyc-happy-path.acceptance` API script using real notebook CNI images.
-2. Add mobile/backoffice Playwright evidence around that seeded/proven flow.
-3. Add backoffice JEAN evidence for dossier open, info request, classification, approval.
-4. Add analytics proof or downgrade analytics claims until real metrics are implemented.
-5. Add DAB/ATM offline locator implementation and evidence.
+1. Add mobile/backoffice Playwright evidence around the live accepted flow.
+2. Add backoffice JEAN visual evidence for dossier open, info request, classification, approval.
+3. Add analytics proof or downgrade analytics claims until real metrics are implemented.
+4. Add DAB/ATM offline locator implementation and evidence.
+5. Add real biometric manual video once the product owner records it.
