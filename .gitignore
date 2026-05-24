@@ -251,6 +251,7 @@ bicec-veripass-boss/code/
 # IDE / Agents
 # ========================
 .openclaude/
+.playwright-mcp/
 
 # ========================
 # Claude skills directory
