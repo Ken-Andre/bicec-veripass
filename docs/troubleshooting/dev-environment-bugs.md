@@ -458,14 +458,16 @@ docker compose exec api python scripts/seed_banking.py
 
 #### Protections en place
 
-**Labels** (dans `docker-compose.yml`) : les volumes critiques portent `com.bicec.retention: "10y"`.
+**Volumes externes** : `documents_storage`, `db_storage` et `db_backups` pointent vers des volumes Docker existants via `VP_DOCUMENTS_VOLUME_NAME`, `VP_DB_VOLUME_NAME` et `VP_DB_BACKUPS_VOLUME_NAME`. Docker Compose ne doit pas les recreer.
 
-**Prune filtré** — ne toucher qu'aux volumes sans label :
+**Amorcage non destructif** — creer uniquement les volumes manquants :
 ```bash
-docker volume prune --filter "label!=com.bicec.retention"
+./scripts/ensure_docker_volumes.sh
+# ou Windows:
+.\scripts\ensure_docker_volumes.ps1
 ```
 
-**Règle d'or** : ne JAMAIS utiliser `docker compose down -v`, `docker system prune --volumes`, ou `docker volume prune` sans filtre.
+**Règle d'or** : ne JAMAIS utiliser `docker compose down -v`, `docker system prune --volumes`, ou `docker volume prune` sur cet environnement hors procedure exceptionnelle revue.
 
 #### Backup DB
 

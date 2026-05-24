@@ -72,7 +72,6 @@ Le script nettoie :
 - Conteneurs arrêtés
 - Images dangereuses (dangling)
 - Réseaux non utilisés
-- Volumes non utilisés
 - Cache de build
 
 Gain d'espace typique : 5-15% du disque Docker

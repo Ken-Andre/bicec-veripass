@@ -117,7 +117,7 @@ def backup_postgres(self):
 @celery_app.task(name="app.tasks.maintenance.check_disk_usage")
 def check_disk_usage():
     """
-    Check disk usage and trigger docker prune if > 85%.
+    Check disk usage and trigger a non-volume docker prune if > 85%.
     Runs at 03:00 UTC via Celery Beat.
     """
     try:
@@ -153,7 +153,7 @@ def check_disk_usage():
                 f"Disk usage {usage_pct}% exceeds threshold (85%), triggering prune..."
             )
             prune_result = subprocess.run(
-                ["docker", "system", "prune", "-af", "--volumes"],
+                ["docker", "system", "prune", "-af"],
                 capture_output=True,
                 text=True,
                 timeout=300,
