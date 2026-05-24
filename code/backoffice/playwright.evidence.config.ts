@@ -7,7 +7,7 @@ export default defineConfig({
   ...baseConfig,
   testMatch: /.*\.evidence\.ts/,
   workers: 1,
-  outputDir: '../../docs/test-evidence/latest/backoffice',
+  outputDir: '../../docs/test-evidence/latest/backoffice/_playwright',
   reporter: [['html', { outputFolder: '../../docs/test-evidence/latest/backoffice-html-report' }]],
   webServer: liveBaseURL ? undefined : {
     ...baseConfig.webServer,
