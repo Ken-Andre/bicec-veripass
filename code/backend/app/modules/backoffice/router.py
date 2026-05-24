@@ -14,6 +14,7 @@ Endpoints:
 - POST /support/threads/{id}/messages — Send a message in a thread
 """
 
+import mimetypes
 import uuid
 from datetime import datetime, timezone
 
@@ -100,6 +101,7 @@ ALLOWED_DOC_CATEGORIES: set[str] = {
     "BILL_CAMWATER",
     "NIU",
     "SELFIE",
+    "IDENTITY_PROOF",
     "ADDRESS_PROOF",
     "OTHER",
 }
@@ -108,6 +110,58 @@ ALLOWED_DOC_CATEGORIES: set[str] = {
 @router.get("/")
 async def get_root():
     return {"module": "backoffice", "status": "initialized"}
+
+
+class CommandCenterAgentLoadSchema(BaseModel):
+    """Read-only agent load snapshot for operational dashboards."""
+
+    id: str
+    name: str
+    email: str
+    role: str
+    agency_id: str | None = None
+    is_available: bool
+    active_dossier_count: int
+    last_activity_at: str | None = None
+
+
+def _agent_load_to_response(agent: Agent) -> CommandCenterAgentLoadSchema:
+    return CommandCenterAgentLoadSchema(
+        id=str(agent.id),
+        name=agent.name,
+        email=agent.email,
+        role=agent.role.value if hasattr(agent.role, "value") else str(agent.role),
+        agency_id=str(agent.agency_id) if agent.agency_id else None,
+        is_available=agent.is_available,
+        active_dossier_count=agent.active_dossier_count or 0,
+        last_activity_at=agent.last_activity_at.isoformat() if agent.last_activity_at else None,
+    )
+
+
+@router.get("/agents/load", response_model=PageResponse[CommandCenterAgentLoadSchema])
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def list_agent_load(
+    request: Request,
+    _agent: Agent = Depends(require_agent_role(AgentRole.SYLVIE, AgentRole.ADMIN_IT)),
+    page: PageParams = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read-only load distribution for command center dashboards.
+
+    This is intentionally separate from /admin/agents: SYLVIE can supervise
+    operational load, but only ADMIN_IT can create, edit, or deactivate agents.
+    """
+    query = select(Agent).order_by(Agent.role.asc(), Agent.name.asc())
+    total = (await db.execute(select(func.count()).select_from(Agent))).scalar_one()
+    result = await db.execute(query.offset(page.offset).limit(page.limit))
+    agents = result.scalars().all()
+    return PageResponse[CommandCenterAgentLoadSchema](
+        items=[_agent_load_to_response(agent) for agent in agents],
+        total=total,
+        page=page.page,
+        pages=(total + page.limit - 1) // page.limit if total else 1,
+        limit=page.limit,
+    )
 
 
 async def _extract_client_name(session: KYCSession) -> str | None:
@@ -433,7 +487,8 @@ async def get_document_file(
 
     return FileResponse(
         path=str(resolved),
-        media_type="image/jpeg",
+        media_type=mimetypes.guess_type(resolved.name)[0]
+        or "application/octet-stream",
         filename=resolved.name,
     )
 
