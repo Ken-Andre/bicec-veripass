@@ -19,6 +19,8 @@ import { apiGet, apiPost } from '@/services/api-client';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 const TOKEN_KEY = 'veripass_access_token';
+const IMAGE_PLACEHOLDER =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
 function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
@@ -338,8 +340,8 @@ export default function EvidenceViewerPage() {
     );
   }
 
-  const needsAssign = !dossier.assigned_agent_id;
   const isReviewable = dossier.status === 'PENDING_AGENT_REVIEW' || dossier.status === 'PENDING_KYC' || dossier.status === 'FRAUD_SUSPECT';
+  const needsAssign = isReviewable && !dossier.assigned_agent_id;
 
   return (
     <div className="space-y-4">
@@ -402,7 +404,7 @@ export default function EvidenceViewerPage() {
             </CardHeader>
             <CardContent>
               <ImageViewer
-                src={imageUrl || '/placeholder.jpg'}
+                src={imageUrl || IMAGE_PLACEHOLDER}
                 alt={currentDoc?.doc_type || 'Document'}
                 className="min-h-[300px]"
               />
@@ -419,7 +421,7 @@ export default function EvidenceViewerPage() {
                     <Select value={classifyDocType} onValueChange={setClassifyDocType}>
                       <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                       <SelectContent>
-                        {['CNI_RECTO', 'CNI_VERSO', 'BILL_ENEO', 'BILL_CAMWATER', 'NIU', 'SELFIE', 'ADDRESS_PROOF', 'OTHER'].map((type) => (
+                        {['CNI_RECTO', 'CNI_VERSO', 'BILL_ENEO', 'BILL_CAMWATER', 'NIU', 'SELFIE', 'IDENTITY_PROOF', 'ADDRESS_PROOF', 'OTHER'].map((type) => (
                           <SelectItem key={type} value={type}>{type}</SelectItem>
                         ))}
                       </SelectContent>
@@ -514,7 +516,7 @@ export default function EvidenceViewerPage() {
                           src={`${selfieUrl}?token=${token}`}
                           alt="Selfie"
                           className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
+                          onError={(e) => { (e.target as HTMLImageElement).src = IMAGE_PLACEHOLDER; }}
                         />
                       </div>
                     </div>
@@ -525,7 +527,7 @@ export default function EvidenceViewerPage() {
                           src={`${cniUrl}?token=${token}`}
                           alt="CNI Recto"
                           className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
+                          onError={(e) => { (e.target as HTMLImageElement).src = IMAGE_PLACEHOLDER; }}
                         />
                       </div>
                     </div>

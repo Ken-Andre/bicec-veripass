@@ -35,7 +35,16 @@ export async function fetchAuditLog(sessionId?: string) {
     ? `/backoffice/audit-logs?session_id=${sessionId}`
     : '/backoffice/audit-logs'
   const res = await apiGet<PageResponse<unknown>>(path)
-  return res.items
+  return res.items.map((item: any) => ({
+    ...item,
+    timestamp: item.timestamp || item.performed_at,
+    agentId: item.agentId || item.agent_id || item.performed_by,
+    actionType: item.actionType || item.action,
+    previousState: item.previousState || item.previous_state || '',
+    newState: item.newState || item.new_state || '',
+    rationale: item.rationale || item.reason || '',
+    sessionId: item.sessionId || item.session_id || item.record_id,
+  }))
 }
 
 export async function reviewDossier(sessionId: string, decision: string, reason: string) {
