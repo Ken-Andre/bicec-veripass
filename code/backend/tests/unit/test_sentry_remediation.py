@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi.exceptions import RequestValidationError
@@ -9,8 +10,11 @@ from app.api.v1.sentry_proxy import _allowed_envelope_url_for_project, _extract_
 from app.core.sentry import before_send
 from app.modules.admin.router import _agent_to_response
 from app.modules.auth.models import AgentRole
+from app.modules.backoffice.router import ALLOWED_DOC_CATEGORIES
 from app.modules.backoffice.schemas import AuditLogSchema
 from app.modules.kyc.models import KYCSession
+from app.modules.kyc.router import _session_start_response
+from app.services.ocr_service import OCRService
 
 
 def _envelope(project_id: str) -> bytes:
@@ -84,3 +88,24 @@ def test_kyc_session_created_at_aliases_started_at():
     started_at = datetime(2026, 5, 23, tzinfo=timezone.utc)
     session = KYCSession(user_id=uuid.uuid4(), started_at=started_at)
     assert session.created_at == started_at
+
+
+def test_session_start_response_uses_existing_session_message():
+    session = KYCSession(id=uuid.uuid4(), user_id=uuid.uuid4(), status="DRAFT")
+    response = _session_start_response(session, existing=True)
+    assert response["status"] == "DRAFT"
+    assert response["message"] == "Existing session found"
+
+
+def test_backoffice_accepts_identity_proof_classification():
+    assert "IDENTITY_PROOF" in ALLOWED_DOC_CATEGORIES
+
+
+def test_ocr_pdf_upload_is_skipped_without_sentry_error(tmp_path):
+    pdf_path = Path(tmp_path) / "bill_eneo_acceptance.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+
+    result = OCRService().extract_from_path(pdf_path, doc_type="BILL_ENEO")
+
+    assert result["engine"] == "UNSUPPORTED_FILE_TYPE"
+    assert result["needs_glm_fallback"] is False

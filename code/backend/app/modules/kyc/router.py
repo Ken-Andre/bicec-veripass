@@ -17,6 +17,7 @@ from fastapi import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.core.rate_limit import limiter
@@ -139,6 +140,36 @@ async def _get_active_editable_session(
     if not session:
         raise HTTPException(status_code=404, detail="No active editable KYC session")
     return session
+
+
+async def _get_latest_active_session(
+    db: AsyncSession,
+    user_id: UUID,
+) -> KYCSession | None:
+    result = await db.execute(
+        select(KYCSession)
+        .where(
+            KYCSession.user_id == user_id,
+            KYCSession.status.in_(
+                [
+                    LifecycleState.DRAFT,
+                    LifecycleState.PENDING_KYC,
+                    LifecycleState.PENDING_INFO,
+                ]
+            ),
+        )
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+def _session_start_response(session: KYCSession, *, existing: bool) -> dict[str, str]:
+    return {
+        "session_id": make_session_handle(str(session.id)),
+        "status": session.status,
+        "message": "Existing session found" if existing else "Session started",
+    }
 
 
 async def _store_document_and_create_record(
@@ -394,19 +425,9 @@ async def start_kyc_session(
 ):
     """Start a new KYC session for the user."""
     # Check for existing active session
-    result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status.in_([LifecycleState.DRAFT, LifecycleState.PENDING_KYC, LifecycleState.PENDING_INFO]),
-        )
-    )
-    existing = result.scalars().first()
+    existing = await _get_latest_active_session(db, current_user.id)
     if existing:
-        return {
-            "session_id": make_session_handle(str(existing.id)),
-            "status": existing.status,
-            "message": "Existing session found",
-        }
+        return _session_start_response(existing, existing=True)
 
     # Create new session — ADR-001: DRAFT → RESTRICTED access
     # Note: ADR-001 specifies GUEST for DRAFT, but existing sessions use RESTRICTED.
@@ -419,14 +440,17 @@ async def start_kyc_session(
         started_at=datetime.now(timezone.utc),
     )
     db.add(session)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        existing = await _get_latest_active_session(db, current_user.id)
+        if existing:
+            return _session_start_response(existing, existing=True)
+        raise
 
     logger.info(f"KYC session started for user {current_user.id}")
-    return {
-        "session_id": make_session_handle(str(session.id)),
-        "status": "DRAFT",
-        "message": "Session started",
-    }
+    return _session_start_response(session, existing=False)
 
 
 @router.post("/document/upload", response_model=DocumentResponse)
@@ -1445,3 +1469,221 @@ async def get_cities(request: Request, region_code: str):
 async def get_quartiers(request: Request, city_code: str):
     """Get quartiers for a city."""
     return geo_data.get_quartiers(city_code)
+
+
+# === ATM / GAB Management & Synchronization Endpoints ===
+
+@router.get("/atms", response_model=list[ATMResponse])
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def list_atms(
+    request: Request,
+    current_user: User = Depends(require_registered_device),
+    db: AsyncSession = Depends(get_db)
+):
+    """List ATMs matching the user's KYC session access level. Seeding dynamically if empty."""
+    from app.modules.kyc.models import ATM, KYCSession
+    
+    # Query current user's session to check access level
+    session_result = await db.execute(
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id)
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
+    )
+    session = session_result.scalar_one_or_none()
+    access_level = "GUEST"
+    if session:
+        access_level = session.access_level
+
+    # Seeding safeguard to remain Demo-Ready
+    result = await db.execute(select(ATM))
+    atms = result.scalars().all()
+    if not atms:
+        initial_atms = [
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Siege Bonanjo",
+                city="Douala",
+                address="Avenue du General de Gaulle, Bonanjo",
+                latitude=4.0419,
+                longitude=9.6877,
+                services=["Retrait", "Consultation solde", "Mini releve"],
+                available_24h=True,
+                access_tier="basic"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Yaounde Centre",
+                city="Yaounde",
+                address="Boulevard du 20 Mai, Centre-ville",
+                latitude=3.8667,
+                longitude=11.5167,
+                services=["Retrait", "Consultation solde"],
+                available_24h=True,
+                access_tier="basic"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Akwa",
+                city="Douala",
+                address="Boulevard de la Liberte, Akwa",
+                latitude=4.0533,
+                longitude=9.6996,
+                services=["Retrait", "Depot cheque", "Consultation solde"],
+                available_24h=True,
+                access_tier="full"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Bastos",
+                city="Yaounde",
+                address="Quartier Bastos",
+                latitude=3.8954,
+                longitude=11.5158,
+                services=["Retrait", "Depot cheque"],
+                available_24h=True,
+                access_tier="full"
+            ),
+        ]
+        db.add_all(initial_atms)
+        await db.commit()
+    body: ATMCreate,
+    current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
+    db: AsyncSession = Depends(get_db)
+):
+    """Add a new ATM to the directory. Restricted strictly to ADMIN_IT."""
+    from app.modules.kyc.models import ATM
+    
+    atm = ATM(
+        id=uuid.uuid4(),
+        name=body.name,
+        city=body.city,
+        address=body.address,
+        latitude=body.latitude,
+        longitude=body.longitude,
+        services=body.services,
+        available_24h=body.available_24h,
+        access_tier=body.access_tier
+    )
+    db.add(atm)
+    
+    # Audit log
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="ATM_CREATE",
+        table_name="atms",
+        record_id=str(atm.id),
+        new_data={
+            "name": body.name,
+            "city": body.city,
+            "address": body.address,
+            "access_tier": body.access_tier
+        },
+        performed_by=current_agent.id,
+        performed_at=datetime.now(timezone.utc),
+        client_ip=request.client.host if request.client else None
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(atm)
+    return atm
+
+
+@router.put("/backoffice/atms/{atm_id}", response_model=ATMResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def update_atm(
+    request: Request,
+    atm_id: UUID,
+    body: ATMUpdate,
+    current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update ATM attributes. Restricted to ADMIN_IT."""
+    from app.modules.kyc.models import ATM
+    
+    result = await db.execute(select(ATM).where(ATM.id == atm_id))
+    atm = result.scalar_one_or_none()
+    if not atm:
+        raise HTTPException(status_code=404, detail="ATM not found")
+        
+    old_data = {
+        "name": atm.name,
+        "city": atm.city,
+        "address": atm.address,
+        "services": atm.services,
+        "available_24h": atm.available_24h,
+        "access_tier": atm.access_tier
+    }
+
+    if body.name is not None:
+        atm.name = body.name
+    if body.city is not None:
+        atm.city = body.city
+    if body.address is not None:
+        atm.address = body.address
+    if body.latitude is not None:
+        atm.latitude = body.latitude
+    if body.longitude is not None:
+        atm.longitude = body.longitude
+    if body.services is not None:
+        atm.services = body.services
+    if body.available_24h is not None:
+        atm.available_24h = body.available_24h
+    if body.access_tier is not None:
+        atm.access_tier = body.access_tier
+
+    atm.last_verified = datetime.now(timezone.utc).date()
+
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="ATM_UPDATE",
+        table_name="atms",
+        record_id=str(atm.id),
+        old_data=old_data,
+        new_data={
+            "name": atm.name,
+            "city": atm.city,
+            "address": atm.address,
+            "access_tier": atm.access_tier
+        },
+        performed_by=current_agent.id,
+        performed_at=datetime.now(timezone.utc),
+        client_ip=request.client.host if request.client else None
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(atm)
+    return atm
+
+
+@router.delete("/backoffice/atms/{atm_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def delete_atm(
+    request: Request,
+    atm_id: UUID,
+    current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete an ATM from the directory. Restricted to ADMIN_IT."""
+    from app.modules.kyc.models import ATM
+    
+    result = await db.execute(select(ATM).where(ATM.id == atm_id))
+    atm = result.scalar_one_or_none()
+    if not atm:
+        raise HTTPException(status_code=404, detail="ATM not found")
+
+    await db.delete(atm)
+
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="ATM_DELETE",
+        table_name="atms",
+        record_id=str(atm_id),
+        old_data={"name": atm.name, "city": atm.city},
+        performed_by=current_agent.id,
+        performed_at=datetime.now(timezone.utc),
+        client_ip=request.client.host if request.client else None
+    )
+    db.add(audit)
+    await db.commit()
+    return None

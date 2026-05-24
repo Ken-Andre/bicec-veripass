@@ -1525,15 +1525,26 @@ class OCRService:
 
         img_arr = cv2.imread(str(image_path))
         if img_arr is None:
-            logger.error(f"Failed to read image: {image_path}")
             empty_fields = BILL_FIELDS.get(doc_type, CNI_FIELDS) if doc_type.startswith("BILL_") else CNI_FIELDS
+            if image_path.suffix.lower() == ".pdf":
+                logger.warning("Skipping image OCR for PDF upload: %s", image_path)
+                return {
+                    "fields": {f: {"value": None, "conf": 0.0} for f in empty_fields},
+                    "blocks": [],
+                    "engine": "UNSUPPORTED_FILE_TYPE",
+                    "needs_glm_fallback": False,
+                    "avg_confidence": 0.0,
+                    "process_time_ms": round((time.perf_counter() - start_time) * 1000, 2),
+                }
+
+            logger.error(f"Failed to read image: {image_path}")
             return {
                 "fields": {f: {"value": None, "conf": 0.0} for f in empty_fields},
                 "blocks": [],
-                "engine": "paddleocr_error",
+                "engine": "PADDLE_ERROR",
                 "needs_glm_fallback": True,
                 "avg_confidence": 0.0,
-                "process_time_ms": 0.0,
+                "process_time_ms": round((time.perf_counter() - start_time) * 1000, 2),
             }
 
         result = self._extract_from_array(img_arr, doc_type=doc_type)

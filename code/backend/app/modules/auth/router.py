@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
@@ -78,13 +79,43 @@ async def _get_or_create_mobile_session(db: AsyncSession, user: User) -> KYCSess
             user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
         )
         db.add(kyc_session)
-        await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            result = await db.execute(
+                select(KYCSession)
+                .where(
+                    KYCSession.user_id == user.id,
+                    KYCSession.status.in_(_active_mobile_statuses()),
+                )
+                .order_by(KYCSession.started_at.desc())
+                .limit(1)
+            )
+            kyc_session = result.scalar_one_or_none()
+            if kyc_session is None:
+                raise
     return kyc_session
 
 
 async def _issue_mobile_tokens(db: AsyncSession, user: User) -> TokenResponse:
     kyc_session = await _get_or_create_mobile_session(db, user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(
+            select(KYCSession)
+            .where(
+                KYCSession.user_id == user.id,
+                KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
+            )
+            .order_by(KYCSession.started_at.desc())
+            .limit(1)
+        )
+        kyc_session = result.scalar_one_or_none()
+        if kyc_session is None:
+            raise
     await db.refresh(kyc_session)
     session_handle = make_session_handle(str(kyc_session.id))
     access_token = create_access_token(
@@ -342,7 +373,22 @@ async def verify_otp_endpoint(
         if not kyc_session.last_step_completed:
             kyc_session.last_step_completed = "PHONE_VERIFIED"
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(
+            select(KYCSession)
+            .where(
+                KYCSession.user_id == user.id,
+                KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
+            )
+            .order_by(KYCSession.started_at.desc())
+            .limit(1)
+        )
+        kyc_session = result.scalar_one_or_none()
+        if kyc_session is None:
+            raise
     await db.refresh(kyc_session)
     session_handle = make_session_handle(str(kyc_session.id))
 
@@ -615,7 +661,22 @@ async def verify_pin(
             user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
         )
         db.add(kyc_session)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            kyc_result = await db.execute(
+                select(KYCSession)
+                .where(
+                    KYCSession.user_id == user.id,
+                    KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
+                )
+                .order_by(KYCSession.started_at.desc())
+                .limit(1)
+            )
+            kyc_session = kyc_result.scalar_one_or_none()
+            if kyc_session is None:
+                raise
         await db.refresh(kyc_session)
 
     session_handle = make_session_handle(str(kyc_session.id))

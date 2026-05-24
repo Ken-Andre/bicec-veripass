@@ -3,9 +3,11 @@
 import hashlib
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
@@ -20,6 +22,20 @@ router = APIRouter()
 def _make_device_tag(user_id: uuid.UUID, fingerprint_hash: str) -> str:
     digest = hashlib.sha256(f"{user_id}:{fingerprint_hash}".encode("utf-8")).hexdigest()
     return f"vp_dev_{digest[:48]}"
+
+
+def _refresh_device(
+    device: DeviceRegistration,
+    *,
+    metadata: dict[str, Any] | None,
+    user_agent: str | None,
+    now: datetime,
+) -> DeviceRegistration:
+    device.metadata_json = metadata
+    device.user_agent = user_agent
+    device.last_seen_at = now
+    device.is_active = True
+    return device
 
 
 @router.post("/register", response_model=DeviceRegisterResponse)
@@ -37,6 +53,9 @@ async def register_device(
     """
     fingerprint_hash = x_device_fingerprint or body.fingerprint_hash
     now = datetime.now(timezone.utc)
+    device_tag = _make_device_tag(current_user.id, fingerprint_hash)
+    user_agent = request.headers.get("user-agent")
+
     result = await db.execute(
         select(DeviceRegistration).where(
             DeviceRegistration.user_id == current_user.id,
@@ -47,21 +66,43 @@ async def register_device(
     if device is None:
         device = DeviceRegistration(
             user_id=current_user.id,
-            device_tag=_make_device_tag(current_user.id, fingerprint_hash),
+            device_tag=device_tag,
             fingerprint_hash=fingerprint_hash,
             metadata_json=body.metadata,
-            user_agent=request.headers.get("user-agent"),
+            user_agent=user_agent,
             created_at=now,
             last_seen_at=now,
         )
         db.add(device)
     else:
-        device.metadata_json = body.metadata
-        device.user_agent = request.headers.get("user-agent")
-        device.last_seen_at = now
-        device.is_active = True
+        _refresh_device(
+            device,
+            metadata=body.metadata,
+            user_agent=user_agent,
+            now=now,
+        )
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(
+            select(DeviceRegistration).where(
+                DeviceRegistration.user_id == current_user.id,
+                DeviceRegistration.device_tag == device_tag,
+            )
+        )
+        device = result.scalar_one_or_none()
+        if device is None:
+            raise
+        _refresh_device(
+            device,
+            metadata=body.metadata,
+            user_agent=user_agent,
+            now=now,
+        )
+        await db.commit()
+
     await db.refresh(device)
     return DeviceRegisterResponse(
         id=device.id,

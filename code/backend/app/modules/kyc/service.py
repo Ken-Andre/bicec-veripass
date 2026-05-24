@@ -424,6 +424,8 @@ async def _upsert_ocr_fields(
 
 
 def _needs_glm_fallback(result: OCRExtractionResult, doc_type: str) -> bool:
+    if result.engine == "UNSUPPORTED_FILE_TYPE":
+        return False
     required = DEFAULT_REQUIRED_FIELDS.get(doc_type, [])
     present_required = sum(1 for field in required if result.fields.get(field))
     if present_required < min(len(required), settings.OCR_GLM_FALLBACK_MIN_FIELDS):
