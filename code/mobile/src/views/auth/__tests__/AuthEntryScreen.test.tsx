@@ -8,6 +8,14 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
 
+vi.mock('../../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    isAuthenticated: false,
+    user: null,
+    loading: false,
+  }),
+}));
+
 describe('AuthEntryScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();

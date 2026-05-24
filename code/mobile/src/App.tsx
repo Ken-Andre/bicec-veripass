@@ -70,6 +70,11 @@ const CardsScreen = lazy(() =>
     default: m.CardsScreen,
   })),
 );
+const AtmFinderScreen = lazy(() =>
+  import("./views/dashboard/AtmFinderScreen").then((m) => ({
+    default: m.AtmFinderScreen,
+  })),
+);
 const TransfersScreen = lazy(() =>
   import("./views/dashboard/TransfersScreen").then((m) => ({
     default: m.TransfersScreen,
@@ -191,7 +196,8 @@ function AuthenticatedKycResumeBanner() {
 
 function LockGuard({ children }: { children: React.ReactNode }) {
   const { isLocked } = useAuth();
-  if (isLocked) return <Navigate to="/auth/lock" replace />;
+  const sessionLocked = sessionStorage.getItem("vp_is_locked") === "true";
+  if (isLocked && sessionLocked) return <Navigate to="/auth/lock" replace />;
   return <>{children}</>;
 }
 
@@ -277,6 +283,7 @@ function App() {
                     >
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/cards" element={<CardsScreen />} />
+                      <Route path="/cards/atm-finder" element={<AtmFinderScreen />} />
                       <Route path="/transfers" element={<TransfersScreen />} />
                       <Route
                         path="/transfers/send"

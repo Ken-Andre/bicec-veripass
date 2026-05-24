@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { apiClient } from '../../services/apiClient';
@@ -8,6 +9,7 @@ import { cn } from '../../lib/utils';
 
 export function CardsScreen() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [cards, setCards] = useState<BankCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState<Record<string, boolean>>({});
@@ -137,7 +139,11 @@ export function CardsScreen() {
             </div>
           ))}
 
-          <div className="bg-card border border-border rounded-2xl p-4 cursor-pointer active:scale-95 transition-all">
+          <button
+            type="button"
+            onClick={() => navigate('/cards/atm-finder')}
+            className="w-full bg-card border border-border rounded-2xl p-4 text-left active:scale-95 transition-all"
+          >
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <MapPin className="h-5 w-5 text-primary" />
@@ -147,7 +153,7 @@ export function CardsScreen() {
                 <p className="text-xs text-muted-foreground">{t('cards.findAtmDesc')}</p>
               </div>
             </div>
-          </div>
+          </button>
         </div>
       </ScreenLayoutV2>
     </div>
