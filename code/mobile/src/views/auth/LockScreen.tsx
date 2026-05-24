@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
@@ -10,13 +10,19 @@ import type { PinVerifyResponse, User } from '../../types';
 
 const LockScreen = () => {
   const navigate = useNavigate();
-  const { user, login, biometricEnabled, isPasskeySupported, authenticateWithPasskey } = useAuth();
+  const { user, login, biometricEnabled, isPasskeySupported, authenticateWithPasskey, isAuthenticated } = useAuth();
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/auth', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const MAX_ATTEMPTS = 5;
 
