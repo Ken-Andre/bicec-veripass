@@ -1547,6 +1547,85 @@ async def list_atms(
         ]
         db.add_all(initial_atms)
         await db.commit()
+    stmt = select(ATM)
+    if access_level == "GUEST":
+        stmt = stmt.where(ATM.access_tier == "basic")
+    
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+
+@router.get("/backoffice/atms", response_model=list[ATMResponse])
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def list_backoffice_atms(
+    request: Request,
+    current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all ATMs in the directory for backoffice administration. Restricted to ADMIN_IT."""
+    from app.modules.kyc.models import ATM
+    
+    # Seeding safeguard to remain Demo-Ready
+    result = await db.execute(select(ATM))
+    atms = result.scalars().all()
+    if not atms:
+        initial_atms = [
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Siege Bonanjo",
+                city="Douala",
+                address="Avenue du General de Gaulle, Bonanjo",
+                latitude=4.0419,
+                longitude=9.6877,
+                services=["Retrait", "Consultation solde", "Mini releve"],
+                available_24h=True,
+                access_tier="basic"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Yaounde Centre",
+                city="Yaounde",
+                address="Boulevard du 20 Mai, Centre-ville",
+                latitude=3.8667,
+                longitude=11.5167,
+                services=["Retrait", "Consultation solde"],
+                available_24h=True,
+                access_tier="basic"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Akwa",
+                city="Douala",
+                address="Boulevard de la Liberte, Akwa",
+                latitude=4.0533,
+                longitude=9.6996,
+                services=["Retrait", "Depot cheque", "Consultation solde"],
+                available_24h=True,
+                access_tier="full"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Bastos",
+                city="Yaounde",
+                address="Quartier Bastos",
+                latitude=3.8954,
+                longitude=11.5158,
+                services=["Retrait", "Depot cheque"],
+                available_24h=True,
+                access_tier="full"
+            ),
+        ]
+        db.add_all(initial_atms)
+        await db.commit()
+        
+    res = await db.execute(select(ATM))
+    return res.scalars().all()
+
+
+@router.post("/backoffice/atms", response_model=ATMResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def create_atm(
+    request: Request,
     body: ATMCreate,
     current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
     db: AsyncSession = Depends(get_db)

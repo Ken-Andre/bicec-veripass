@@ -32,7 +32,7 @@ ALLOWED_ATTACHMENT_TYPES = {
 }
 MAX_MESSAGE_CHARS = 4000
 SUPPORT_IMAGE_MAX_SIZE_MB = 4
-SUPPORT_PDF_MAX_SIZE_MB = 6
+SUPPORT_PDF_MAX_SIZE_MB = 5
 SUPPORT_PDF_MAX_PAGES = 5
 
 
@@ -113,12 +113,12 @@ async def _validate_and_store_attachment(
             detail="Format non supporte. Utilisez JPG, PNG ou PDF.",
         )
 
-    hard_max_size = settings.MAX_DOCUMENT_SIZE_MB * 1024 * 1024
     content = await file.read()
-    if len(content) > hard_max_size:
+    max_allowed_size = 5 * 1024 * 1024
+    if len(content) > max_allowed_size:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Fichier trop volumineux. Limite: {settings.MAX_DOCUMENT_SIZE_MB} Mo.",
+            detail="Fichier trop volumineux. Limite: 5 Mo.",
         )
 
     if file.content_type in {"image/jpeg", "image/png"}:

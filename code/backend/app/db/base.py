@@ -23,6 +23,7 @@ from app.modules.kyc.models import (  # noqa
     SupportThread,
     SupportMessage,
     Notification,
+    ATM,
 )
 from app.modules.admin.models import Agency, ProvisioningBatch, ProvisioningBatchItem  # noqa
 from app.modules.audit.models import AuditLog  # noqa

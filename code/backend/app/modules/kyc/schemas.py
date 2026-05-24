@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, date
 
 
 # === ADR-001 Lifecycle States & Access Tiers ===
@@ -237,3 +237,41 @@ class GeoQuartierResponse(BaseModel):
     name: str
     city_code: str
     commune_name: str
+
+
+# === ATM / GAB Schemas ===
+class ATMCreate(BaseModel):
+    name: str = Field(..., max_length=100)
+    city: str = Field(..., max_length=50)
+    address: str = Field(..., max_length=200)
+    latitude: float
+    longitude: float
+    services: List[str] = Field(default_factory=list)
+    available_24h: bool = True
+    access_tier: str = "basic"
+
+
+class ATMUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    city: Optional[str] = Field(None, max_length=50)
+    address: Optional[str] = Field(None, max_length=200)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    services: Optional[List[str]] = None
+    available_24h: Optional[bool] = None
+    access_tier: Optional[str] = None
+
+
+class ATMResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: str
+    name: str
+    city: str
+    address: str
+    latitude: float
+    longitude: float
+    services: List[str]
+    available_24h: bool
+    access_tier: str
+    last_verified: date

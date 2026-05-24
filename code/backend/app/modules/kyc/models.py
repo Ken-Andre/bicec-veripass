@@ -385,3 +385,18 @@ class Notification(Base):
 
     # Relationships
     user = relationship("User", back_populates="notifications")
+
+
+class ATM(Base):
+    __tablename__ = "atms"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False)
+    city = Column(String(50), nullable=False)
+    address = Column(String(200), nullable=False)
+    latitude = Column(Numeric(10, 6), nullable=False)
+    longitude = Column(Numeric(10, 6), nullable=False)
+    services = Column(JSONB, nullable=False, default=list)  # e.g., ["Retrait", "Depot cheque"]
+    available_24h = Column(Boolean, default=True)
+    access_tier = Column(String(20), default="basic")  # basic vs full
+    last_verified = Column(DATE, default=lambda: datetime.now(timezone.utc).date())
