@@ -281,6 +281,13 @@ veripass-images.tar
 # ========================
 # Test evidence binary artifacts
 # ========================
+docs/test-evidence/**/_playwright/
 docs/test-evidence/**/*.zip
 docs/test-evidence/**/.last-run.json
 docs/test-evidence/**/*-html-report/
+
+# ========================
+# Ad-hoc test output
+# ========================
+docs/test-evidence/latest/kyc-happy-path/
+code/b_logs_utf8.txt
