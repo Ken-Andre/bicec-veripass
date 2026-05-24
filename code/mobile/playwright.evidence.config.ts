@@ -5,7 +5,7 @@ export default defineConfig({
   ...baseConfig,
   testMatch: /.*\.evidence\.ts/,
   workers: 1,
-  outputDir: '../../docs/test-evidence/latest/mobile',
+  outputDir: '../../docs/test-evidence/latest/mobile/_playwright',
   reporter: [['html', { outputFolder: '../../docs/test-evidence/latest/mobile-html-report' }]],
   projects: [baseConfig.projects?.[0]].filter(Boolean),
   use: {
