@@ -15,7 +15,6 @@ import {
 import { useState } from 'react'
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['JEAN', 'THOMAS', 'SYLVIE', 'ADMIN_IT'] },
   { name: 'Validation KYC', href: '/validation', icon: FileCheck, roles: ['JEAN'] },
   { name: 'Conformité AML', href: '/compliance', icon: Shield, roles: ['THOMAS'] },
   { name: 'Command Center', href: '/command-center', icon: Command, roles: ['SYLVIE'] },
