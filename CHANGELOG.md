@@ -4,8 +4,10 @@
 
 ### Weekly recap (2026-05-18 to 2026-05-24)
 
-- Added KYC image-processing and encryption-related utilities, plus OCR merge logic to improve document processing consistency.
-- Updated backend startup/dependencies and gitignore hygiene to stabilize runtime and local development behavior.
+- Added major mobile enhancements: auth entry and guard flows, lock-screen/biometric and device auto-registration, push notifications, support chat attachments, and an offline ATM finder flow.
+- Expanded backend capabilities with device-tag enforcement for banking/KYC routes, support attachment validation/upload endpoints, notification preferences APIs, AML alert detail endpoint, ATM data/model support, and better KYC session integrity/error handling.
+- Upgraded backoffice with analytics pages using real API data and role-based views, ATM directory administration, support evidence visibility, command-center loading improvements, and assignment/audit-log behavior fixes.
+- Added broad integration and evidence coverage across backend/mobile/backoffice, including KYC auth and ATM integration tests, service worker/support upload tests, and delivery/live-proof documentation updates.
 - PR references: none recorded in commit history for this period.
 
 ### Weekly recap (2026-05-11 to 2026-05-17)
