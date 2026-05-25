@@ -13,7 +13,8 @@ from app.modules.kyc.models import (
     OCRField,
     BiometricResult,
     DuplicateCheck,
-    DossierAssignment
+    DossierAssignment,
+    SupportThread,
 )
 from app.modules.auth.models import Agent, User, AgentRole
 from app.modules.admin.models import Agency

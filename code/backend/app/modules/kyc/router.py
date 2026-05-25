@@ -22,10 +22,10 @@ from sqlalchemy.orm import selectinload
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.security import make_session_handle, verify_session_handle
+from app.core.security import make_session_handle, verify_session_handle, require_agent_role
 from app.core.logging import logger
 from app.db.session import get_db
-from app.modules.auth.models import User
+from app.modules.auth.models import User, Agent, AgentRole
 from app.modules.devices.dependencies import require_registered_device
 from app.modules.kyc.models import (
     KYCSession,
@@ -65,6 +65,9 @@ from app.modules.kyc.schemas import (
     LifecycleState,
     AccessTier,
     LIFECYCLE_TO_ACCESS_TIER,
+    ATMCreate,
+    ATMUpdate,
+    ATMResponse,
 )
 from app.modules.kyc import geo_data
 

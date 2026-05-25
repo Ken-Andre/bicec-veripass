@@ -3,6 +3,7 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from datetime import datetime, date
+from uuid import UUID
 
 
 # === ADR-001 Lifecycle States & Access Tiers ===
@@ -265,7 +266,7 @@ class ATMUpdate(BaseModel):
 class ATMResponse(BaseModel):
     model_config = {"from_attributes": True}
 
-    id: str
+    id: UUID
     name: str
     city: str
     address: str
