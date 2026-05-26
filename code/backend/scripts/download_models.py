@@ -15,6 +15,7 @@ Compatible with PaddleOCR >= 3.x (new parameter names).
 
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 # Disable connectivity check noise
@@ -22,8 +23,11 @@ os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
 MODELS_PATH = os.environ.get("MODELS_PATH", "/data/models")
 PADDLE_CACHE = os.environ.get("PADDLE_CACHE_DIR", "/tmp/paddle-cache")
+DEEPFACE_HOME = os.environ.get("DEEPFACE_HOME", MODELS_PATH)
+DEEPFACE_DETECTOR = os.environ.get("DEEPFACE_DETECTOR_BACKEND", "opencv")
 
 os.environ.setdefault("PADDLE_HOME", PADDLE_CACHE)
+os.environ.setdefault("DEEPFACE_HOME", DEEPFACE_HOME)
 
 # Where PaddleOCR will store models (using the new API key names)
 PADDLE_MODEL_DIR = f"{MODELS_PATH}/paddle"
@@ -117,6 +121,8 @@ print()
 print("=" * 60)
 print("DeepFace Model Pre-downloader")
 print("=" * 60)
+print(f"  DeepFace home -> {DEEPFACE_HOME}")
+print(f"  Detector      -> {DEEPFACE_DETECTOR}")
 
 try:
     from deepface import DeepFace  # type: ignore
@@ -129,8 +135,22 @@ try:
         print(f"  ⚠️  Facenet512 download failed: {e}")
 
     try:
-        from deepface.detectors import FaceDetector  # type: ignore
-        FaceDetector.build_model("retinaface")
+        from PIL import Image
+        import numpy as np
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = Path(tmpdir) / "face_a.jpg"
+            second = Path(tmpdir) / "face_b.jpg"
+            dummy = np.zeros((224, 224, 3), dtype=np.uint8)
+            Image.fromarray(dummy).save(first)
+            Image.fromarray(dummy).save(second)
+            DeepFace.verify(
+                img1_path=str(first),
+                img2_path=str(second),
+                model_name="Facenet512",
+                detector_backend=DEEPFACE_DETECTOR,
+                enforce_detection=False,
+            )
         print("  ✅ retinaface detector downloaded")
     except Exception as e:
         print(f"  ⚠️  retinaface download failed: {e}")
@@ -140,4 +160,4 @@ except ImportError as e:
     print(f"⚠️  DeepFace not installed — skipping model pre-download: {e}")
 except Exception as e:
     print(f"⚠️  DeepFace pre-download failed: {e}")
-    print("   Face matching will fall back to histogram similarity.")
+    print("   Face match will report ERROR until DeepFace is available.")

@@ -1,5 +1,6 @@
 """Module service layer logic."""
 
+import os
 from typing import Dict, Any
 from app.core.orange_sms import orange_sms
 import logging
@@ -13,7 +14,8 @@ async def send_sms_notification(phone_number: str, message: str) -> Dict[str, An
     """
     from app.core.config import settings
 
-    if settings.OTP_MODE == "dev_local":
+    otp_mode = os.environ.get("OTP_MODE", settings.OTP_MODE)
+    if otp_mode == "dev_local":
         print("\n" + "=" * 50)
         print("DEBUG SMS [dev_local mode]")
         print(f"TO:      {phone_number}")
