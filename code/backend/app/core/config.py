@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     OCR_GLM_FALLBACK_MIN_FIELDS: int = 2
     FACE_MATCH_MIN_SCORE: float = 0.8
     ANTI_SPOOFING_MIN_SCORE: float = 0.7
-    DEEPFACE_DETECTOR_BACKEND: str = "retinaface"  # retinaface (best) or opencv (lightweight fallback)
+    DEEPFACE_DETECTOR_BACKEND: str = "opencv"  # opencv for MVP RAM budget; retinaface can be enabled on larger hosts
 
     # Orange SMS API
     ORANGE_CLIENT_ID: str = ""

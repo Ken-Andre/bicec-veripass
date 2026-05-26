@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 import os
 import re
 import subprocess
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean, pstdev
@@ -60,6 +58,28 @@ class OCRExtractionResult:
         if not self.confidences:
             return 0.0
         return float(min(self.confidences.values()))
+
+
+FACE_MATCH_MODEL_NAME = "Facenet512"
+FACE_MATCH_STATUS_PASSED = "PASSED"
+FACE_MATCH_STATUS_FAILED = "FAILED"
+FACE_MATCH_STATUS_NOT_PERFORMED = "NOT_PERFORMED"
+FACE_MATCH_STATUS_ERROR = "ERROR"
+
+
+@dataclass(frozen=True)
+class FaceMatchComputation:
+    status: str
+    reason: str
+    score: float | None = None
+    distance: float | None = None
+    threshold: float | None = None
+    detector: str | None = None
+    model: str = FACE_MATCH_MODEL_NAME
+
+    @property
+    def attempted(self) -> bool:
+        return self.status in {FACE_MATCH_STATUS_PASSED, FACE_MATCH_STATUS_FAILED}
 
 
 def _threshold_ratio() -> float:
@@ -612,53 +632,140 @@ def compute_anti_spoofing_score_from_landmarks(
     return _clamp_01(score)
 
 
-def _byte_histogram_similarity(path_a: Path, path_b: Path) -> float:
-    def histogram(path: Path) -> Counter:
-        raw = path.read_bytes()[:1024 * 512]
-        return Counter(raw)
+def _landmark_points(
+    landmarks_json: list[dict[str, Any]],
+    index: int,
+) -> list[tuple[float, float, float]]:
+    points: list[tuple[float, float, float]] = []
+    for frame in landmarks_json:
+        try:
+            point = frame.get("landmarks", [])[index]
+            points.append(
+                (
+                    float(point.get("x", 0.0)),
+                    float(point.get("y", 0.0)),
+                    float(point.get("z", 0.0)),
+                )
+            )
+        except Exception:
+            continue
+    return points
 
-    hist_a = histogram(path_a)
-    hist_b = histogram(path_b)
-    keys = set(hist_a) | set(hist_b)
-    dot = sum(hist_a.get(k, 0) * hist_b.get(k, 0) for k in keys)
-    norm_a = math.sqrt(sum(v * v for v in hist_a.values()))
-    norm_b = math.sqrt(sum(v * v for v in hist_b.values()))
-    if norm_a == 0 or norm_b == 0:
+
+def compute_liveness_motion_score(
+    landmarks_json: list[dict[str, Any]],
+    challenge_type: str,
+) -> float:
+    """Score whether submitted landmark frames show challenge-specific motion."""
+    if len(landmarks_json) < 6:
         return 0.0
-    return _clamp_01(dot / (norm_a * norm_b))
+
+    nose_points = _landmark_points(landmarks_json, 1)
+    if len(nose_points) < 2:
+        return 0.0
+
+    xs = [p[0] for p in nose_points]
+    ys = [p[1] for p in nose_points]
+    zs = [p[2] for p in nose_points]
+    x_span = max(xs) - min(xs)
+    y_span = max(ys) - min(ys)
+    z_span = max(zs) - min(zs)
+
+    frame_score = _clamp_01(len(landmarks_json) / 24.0)
+    movement_score = _clamp_01((x_span + y_span + z_span) * 6)
+
+    normalized_challenge = (challenge_type or "").strip().lower()
+    if normalized_challenge in {"turn_left", "turn_right"}:
+        challenge_score = _clamp_01(x_span * 10)
+    elif normalized_challenge == "blink":
+        challenge_score = _clamp_01((y_span + z_span) * 8)
+    elif normalized_challenge == "smile":
+        mouth_left = _landmark_points(landmarks_json, 61)
+        mouth_right = _landmark_points(landmarks_json, 291)
+        if len(mouth_left) >= 2 and len(mouth_right) >= 2:
+            widths = [
+                abs(left[0] - right[0])
+                for left, right in zip(mouth_left, mouth_right, strict=False)
+            ]
+            challenge_score = _clamp_01((max(widths) - min(widths)) * 12)
+        else:
+            challenge_score = movement_score
+    else:
+        challenge_score = 0.0
+
+    return _clamp_01((0.35 * frame_score) + (0.35 * movement_score) + (0.30 * challenge_score))
 
 
-def _deepface_verify_if_available(cni_path: Path, selfie_path: Path) -> float | None:
+def is_liveness_challenge_passed(
+    landmarks_json: list[dict[str, Any]],
+    challenge_type: str,
+) -> bool:
+    return compute_liveness_motion_score(landmarks_json, challenge_type) > 0.35
+
+
+def _face_match_error(reason: str) -> FaceMatchComputation:
+    return FaceMatchComputation(
+        status=FACE_MATCH_STATUS_ERROR,
+        reason=reason,
+        threshold=float(settings.FACE_MATCH_MIN_SCORE),
+    )
+
+
+def _configure_deepface_home() -> None:
+    deepface_home = os.environ.get("DEEPFACE_HOME") or settings.MODELS_PATH
+    os.environ.setdefault("DEEPFACE_HOME", deepface_home)
+    try:
+        Path(deepface_home).mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        logger.warning("Could not create DEEPFACE_HOME=%s: %s", deepface_home, exc)
+
+
+def _deepface_verify_if_available(cni_path: Path, selfie_path: Path) -> FaceMatchComputation:
+    _configure_deepface_home()
     try:
         from deepface import DeepFace  # type: ignore
     except Exception as exc:
         logger.warning("DeepFace import failed: %s", exc)
-        return None
+        return _face_match_error("deepface_unavailable")
 
-    detector = settings.DEEPFACE_DETECTOR_BACKEND
+    detector = (settings.DEEPFACE_DETECTOR_BACKEND or "").strip() or "retinaface"
     fallback_detector = "opencv"  # Lightweight fallback if primary detector fails
+    detectors = list(dict.fromkeys([detector, fallback_detector]))
+    last_error: Exception | None = None
 
     # Try primary detector backend, then fallback
-    for backend in [detector, fallback_detector]:
-        if backend == detector and backend == fallback_detector:
-            # Avoid trying the same backend twice
-            continue
+    for backend in detectors:
         try:
             result = DeepFace.verify(
                 img1_path=str(cni_path),
                 img2_path=str(selfie_path),
-                model_name="Facenet512",
+                model_name=FACE_MATCH_MODEL_NAME,
                 detector_backend=backend,
                 enforce_detection=False,
             )
-            distance = float(result.get("distance", 1.0))
+            distance = float(result.get("distance", 1.0) or 1.0)
             score = _clamp_01(1.0 - distance)
-            logger.info(
-                "DeepFace verify OK (detector=%s, distance=%.4f, score=%.4f)",
-                backend, distance, score,
+            threshold = float(settings.FACE_MATCH_MIN_SCORE)
+            status = (
+                FACE_MATCH_STATUS_PASSED
+                if score >= threshold
+                else FACE_MATCH_STATUS_FAILED
             )
-            return score
+            reason = "score_above_threshold" if status == FACE_MATCH_STATUS_PASSED else "score_below_threshold"
+            logger.info(
+                "DeepFace verify OK (detector=%s, distance=%.4f, score=%.4f, status=%s)",
+                backend, distance, score, status,
+            )
+            return FaceMatchComputation(
+                status=status,
+                reason=reason,
+                score=score,
+                distance=distance,
+                threshold=threshold,
+                detector=backend,
+            )
         except Exception as exc:
+            last_error = exc
             logger.warning(
                 "DeepFace verification failed with detector=%s: %s",
                 backend, exc,
@@ -666,16 +773,18 @@ def _deepface_verify_if_available(cni_path: Path, selfie_path: Path) -> float | 
             if backend == detector:
                 logger.info("Retrying with fallback detector: %s", fallback_detector)
                 continue
-            return None
 
-    return None
+    reason = "deepface_verify_failed"
+    if last_error is not None:
+        reason = f"{reason}: {type(last_error).__name__}"
+    return _face_match_error(reason)
 
 
-async def compute_face_match_score_for_session(
+async def compute_face_match_for_session(
     *,
     session_id: UUID,
     db: AsyncSession,
-) -> float | None:
+) -> FaceMatchComputation:
     result = await db.execute(
         select(Document).where(
             Document.session_id == session_id,
@@ -685,20 +794,40 @@ async def compute_face_match_score_for_session(
     docs = result.scalars().all()
     cni = next((d for d in docs if d.doc_type == "CNI_RECTO"), None)
     selfie = next((d for d in docs if d.doc_type == "SELFIE"), None)
-    if not cni or not selfie:
-        return None
+    if not cni:
+        return FaceMatchComputation(
+            status=FACE_MATCH_STATUS_NOT_PERFORMED,
+            reason="missing_cni_recto",
+            threshold=float(settings.FACE_MATCH_MIN_SCORE),
+        )
+    if not selfie:
+        return FaceMatchComputation(
+            status=FACE_MATCH_STATUS_NOT_PERFORMED,
+            reason="missing_selfie",
+            threshold=float(settings.FACE_MATCH_MIN_SCORE),
+        )
 
     cni_path = _resolve_document_path(cni)
     selfie_path = _resolve_document_path(selfie)
-    if not cni_path.exists() or not selfie_path.exists():
-        return None
+    missing_files = [
+        label
+        for label, path in (("cni_recto", cni_path), ("selfie", selfie_path))
+        if not path.exists()
+    ]
+    if missing_files:
+        return FaceMatchComputation(
+            status=FACE_MATCH_STATUS_NOT_PERFORMED,
+            reason=f"missing_document_file:{','.join(missing_files)}",
+            threshold=float(settings.FACE_MATCH_MIN_SCORE),
+        )
 
-    deepface_score = _deepface_verify_if_available(cni_path, selfie_path)
-    if deepface_score is not None:
-        return deepface_score
+    return await asyncio.to_thread(_deepface_verify_if_available, cni_path, selfie_path)
 
-    try:
-        return _byte_histogram_similarity(cni_path, selfie_path)
-    except Exception as exc:
-        logger.warning("Fallback face matching failed: %s", exc)
-        return None
+
+async def compute_face_match_score_for_session(
+    *,
+    session_id: UUID,
+    db: AsyncSession,
+) -> float | None:
+    """Backward-compatible score-only wrapper for older call sites."""
+    return (await compute_face_match_for_session(session_id=session_id, db=db)).score

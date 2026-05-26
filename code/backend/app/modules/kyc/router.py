@@ -39,7 +39,13 @@ from app.modules.kyc.models import (
 from app.modules.kyc.service import (
     process_document_ocr_pipeline,
     compute_anti_spoofing_score_from_landmarks,
-    compute_face_match_score_for_session,
+    compute_face_match_for_session,
+    is_liveness_challenge_passed,
+    FACE_MATCH_MODEL_NAME,
+    FACE_MATCH_STATUS_ERROR,
+    FACE_MATCH_STATUS_FAILED,
+    FACE_MATCH_STATUS_NOT_PERFORMED,
+    FACE_MATCH_STATUS_PASSED,
 )
 from app.modules.audit.models import AuditLog
 from app.modules.kyc.schemas import (
@@ -87,6 +93,27 @@ def _is_valid_sha256(value: str) -> bool:
     return bool(SHA256_HEX_RE.fullmatch(value.strip()))
 
 
+def _float_or_none(value) -> float | None:
+    return float(value) if value is not None else None
+
+
+def _biometric_response(biometric: BiometricResult) -> BiometricResultResponse:
+    return BiometricResultResponse(
+        id=make_session_handle(str(biometric.id)),
+        face_match_score=_float_or_none(biometric.face_match_score),
+        face_match_status=biometric.face_match_status,
+        face_match_reason=biometric.face_match_reason,
+        face_match_distance=_float_or_none(biometric.face_match_distance),
+        face_match_threshold=_float_or_none(biometric.face_match_threshold),
+        face_match_detector=biometric.face_match_detector,
+        liveness_score=_float_or_none(biometric.liveness_score),
+        anti_spoofing_score=_float_or_none(biometric.anti_spoofing_score),
+        model_version_face=biometric.model_version_face,
+        model_version_liveness=biometric.model_version_liveness,
+        processed_at=biometric.processed_at,
+    )
+
+
 def _normalize_capture_side(side: str) -> str:
     normalized = side.strip().upper()
     if normalized not in VALID_CAPTURE_SIDES:
@@ -115,6 +142,8 @@ def _locked_liveness_response(lockout_count_24h: int) -> LivenessResultResponse:
         attempts_remaining=0,
         strikes_remaining=0,
         face_match_score=None,
+        face_match_status=FACE_MATCH_STATUS_NOT_PERFORMED,
+        face_match_reason="liveness_locked",
         anti_spoofing_score=None,
         is_locked=True,
         cooldown_seconds=LIVENESS_LOCKOUT_COOLDOWN_SECONDS,
@@ -355,6 +384,17 @@ async def get_current_session(
         status=kyc_session.status,
         access_level=kyc_session.access_level,
         niu_type=kyc_session.niu_type,
+        niu_number=kyc_session.niu_number,
+        niu_declarative=bool(kyc_session.niu_declarative),
+        address_city=kyc_session.address_city,
+        address_commune=kyc_session.address_commune,
+        address_quartier=kyc_session.address_quartier,
+        address_lieu_dit=kyc_session.address_lieu_dit,
+        address_details=kyc_session.address_details,
+        gps_latitude=_float_or_none(kyc_session.gps_latitude),
+        gps_longitude=_float_or_none(kyc_session.gps_longitude),
+        utility_provider=kyc_session.utility_provider,
+        utility_bill_date=kyc_session.utility_bill_date,
         confidence_score_global=float(kyc_session.confidence_score_global)
         if kyc_session.confidence_score_global
         else None,
@@ -389,19 +429,7 @@ async def get_current_session(
             )
             for doc in kyc_session.documents
         ],
-        biometric_result=BiometricResultResponse(
-            id=make_session_handle(str(kyc_session.biometric_results.id)),
-            face_match_score=float(kyc_session.biometric_results.face_match_score)
-            if kyc_session.biometric_results.face_match_score
-            else None,
-            liveness_score=float(kyc_session.biometric_results.liveness_score)
-            if kyc_session.biometric_results.liveness_score
-            else None,
-            anti_spoofing_score=float(kyc_session.biometric_results.anti_spoofing_score)
-            if kyc_session.biometric_results.anti_spoofing_score
-            else None,
-            processed_at=kyc_session.biometric_results.processed_at,
-        )
+        biometric_result=_biometric_response(kyc_session.biometric_results)
         if kyc_session.biometric_results
         else None,
         consent_record=ConsentRecordResponse(
@@ -821,10 +849,19 @@ async def submit_liveness(
         await db.commit()
         return _locked_liveness_response(current_user.liveness_lockout_count_24h or 0)
 
-    # In production, validate landmarks and compute liveness score
-    # For now, accept if landmarks are provided
-    is_alive = len(body.landmarks_json) > 0
-    confidence = 0.95 if is_alive else 0.0
+    anti_spoofing_score = compute_anti_spoofing_score_from_landmarks(
+        body.landmarks_json,
+        body.challenge_type,
+    )
+    challenge_passed = is_liveness_challenge_passed(
+        body.landmarks_json,
+        body.challenge_type,
+    )
+    is_alive = (
+        anti_spoofing_score >= settings.ANTI_SPOOFING_MIN_SCORE
+        and challenge_passed
+    )
+    confidence = anti_spoofing_score
 
     if not is_alive:
         session.liveness_strike_count += 1
@@ -839,32 +876,34 @@ async def submit_liveness(
         await db.commit()
         return LivenessResultResponse(
             is_alive=False,
-            confidence=0.0,
+            confidence=confidence,
             attempts_remaining=3 - session.liveness_strike_count,
             strikes_remaining=3 - session.liveness_strike_count,
             face_match_score=None,
-            anti_spoofing_score=None,
+            face_match_status=FACE_MATCH_STATUS_NOT_PERFORMED,
+            face_match_reason="liveness_failed",
+            anti_spoofing_score=anti_spoofing_score,
             is_locked=False,
             cooldown_seconds=None,
             lockout_count_24h=current_user.liveness_lockout_count_24h or 0,
             branch_fallback_available=False,
         )
 
-    anti_spoofing_score = compute_anti_spoofing_score_from_landmarks(
-        body.landmarks_json,
-        body.challenge_type,
-    )
-    face_match_score = await compute_face_match_score_for_session(
+    face_match_result = await compute_face_match_for_session(
         session_id=session.id,
         db=db,
     )
-    # face_match_score is None when no SELFIE document exists yet.
-    # In that case, we do NOT substitute the liveness confidence —
-    # a None score is honest and signals that face matching was not performed.
-    if face_match_score is not None and (
-        anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
-        or face_match_score < settings.FACE_MATCH_MIN_SCORE
-    ):
+    if face_match_result.status == FACE_MATCH_STATUS_NOT_PERFORMED:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "FACE_MATCH_EVIDENCE_MISSING",
+                "message": "CNI recto and selfie evidence are required before liveness can be completed.",
+                "reason": face_match_result.reason,
+            },
+        )
+
+    if face_match_result.status == FACE_MATCH_STATUS_FAILED:
         session.priority_flag = True
 
     result = await db.execute(
@@ -876,16 +915,42 @@ async def submit_liveness(
             id=uuid.uuid4(),
             session_id=session.id,
             liveness_score=confidence,
-            face_match_score=face_match_score,
+            face_match_score=face_match_result.score,
+            face_match_status=face_match_result.status,
+            face_match_reason=face_match_result.reason,
+            face_match_distance=face_match_result.distance,
+            face_match_threshold=face_match_result.threshold,
+            face_match_detector=face_match_result.detector,
             anti_spoofing_score=anti_spoofing_score,
+            model_version_face=FACE_MATCH_MODEL_NAME,
+            model_version_liveness="landmarks_v1",
             processed_at=datetime.now(timezone.utc),
         )
         db.add(biometric)
     else:
         biometric.liveness_score = confidence
-        biometric.face_match_score = face_match_score
+        biometric.face_match_score = face_match_result.score
+        biometric.face_match_status = face_match_result.status
+        biometric.face_match_reason = face_match_result.reason
+        biometric.face_match_distance = face_match_result.distance
+        biometric.face_match_threshold = face_match_result.threshold
+        biometric.face_match_detector = face_match_result.detector
         biometric.anti_spoofing_score = anti_spoofing_score
+        biometric.model_version_face = FACE_MATCH_MODEL_NAME
+        biometric.model_version_liveness = "landmarks_v1"
         biometric.processed_at = datetime.now(timezone.utc)
+
+    if face_match_result.status == FACE_MATCH_STATUS_ERROR:
+        await db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "FACE_MATCH_ERROR",
+                "message": "Face match engine unavailable. Please retry liveness.",
+                "reason": face_match_result.reason,
+            },
+        )
+
     session.liveness_strike_count = 0
     session.last_step_completed = "liveness"
     await db.commit()
@@ -895,7 +960,9 @@ async def submit_liveness(
         confidence=confidence,
         attempts_remaining=3 - session.liveness_strike_count,
         strikes_remaining=3 - session.liveness_strike_count,
-        face_match_score=face_match_score,
+        face_match_score=face_match_result.score,
+        face_match_status=face_match_result.status,
+        face_match_reason=face_match_result.reason,
         anti_spoofing_score=anti_spoofing_score,
         is_locked=False,
         cooldown_seconds=None,
@@ -940,12 +1007,23 @@ async def submit_address(
                 detail="GPS coordinates outside Cameroon bounds. Please ensure location services are enabled.",
             )
 
+    session.address_city = body.city
+    session.address_commune = body.commune
+    session.address_quartier = body.quartier
+    session.address_lieu_dit = body.lieu_dit
+    session.address_details = body.region
+    session.gps_latitude = body.gps_lat
+    session.gps_longitude = body.gps_lng
     session.last_step_completed = "address"
     await db.commit()
 
     return {
         "status": "success",
         "message": "Address and GPS validated",
+        "address_city": session.address_city,
+        "address_commune": session.address_commune,
+        "address_quartier": session.address_quartier,
+        "address_lieu_dit": session.address_lieu_dit,
         "gps_validated": body.gps_lat is not None and body.gps_lng is not None,
     }
 
@@ -1021,11 +1099,45 @@ async def submit_niu(
     """Submit NIU information."""
     session = await _get_active_editable_session(db, current_user)
 
-    session.niu_type = body.niu_type
+    niu_type = body.niu_type.strip().upper()
+    if niu_type not in {"MISSING", "DECLARATIVE", "UPLOADED"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid niu_type. Expected MISSING, DECLARATIVE, or UPLOADED.",
+        )
+
+    niu_value = body.niu_value.strip().upper() if body.niu_value else None
+    if niu_type == "DECLARATIVE":
+        if not niu_value:
+            raise HTTPException(status_code=400, detail="niu_value is required for DECLARATIVE NIU")
+        if not re.fullmatch(r"M\d{10,14}", niu_value):
+            raise HTTPException(status_code=400, detail="Invalid NIU format")
+    elif niu_type == "UPLOADED":
+        doc_result = await db.execute(
+            select(Document)
+            .where(Document.session_id == session.id, Document.doc_type == "NIU")
+            .limit(1)
+        )
+        if doc_result.scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=409,
+                detail="NIU upload evidence is required before submitting niu_type=UPLOADED",
+            )
+    else:
+        niu_value = None
+
+    session.niu_type = niu_type
+    session.niu_number = niu_value
+    session.niu_declarative = niu_type == "DECLARATIVE"
     session.last_step_completed = "niu"
     await db.commit()
 
-    return {"status": "success", "niu_type": body.niu_type}
+    return {
+        "status": "success",
+        "niu_type": niu_type,
+        "niu_number": session.niu_number,
+        "niu_declarative": session.niu_declarative,
+    }
 
 
 @router.post("/signature/submit")
@@ -1097,10 +1209,6 @@ async def _compute_kyc_readiness(
     biometric = result.scalar_one_or_none()
     has_biometric_result = biometric is not None
 
-    # Liveness capture already provides a face image; if biometric result exists,
-    # it satisfies the SELFIE requirement (no separate selfie upload needed).
-    if has_biometric_result:
-        doc_types = doc_types | {"SELFIE"}
     missing = sorted(required - doc_types)
     blocking_reasons: list[str] = []
     warnings: list[str] = []
@@ -1156,8 +1264,15 @@ async def _compute_kyc_readiness(
     if not has_ocr_review:
         blocking_reasons.append("OCR review not completed. Please confirm identity fields first.")
 
+    face_match_status = biometric.face_match_status if biometric else None
+    face_match_attempted = face_match_status in {
+        FACE_MATCH_STATUS_PASSED,
+        FACE_MATCH_STATUS_FAILED,
+    }
     if not has_biometric_result:
         blocking_reasons.append("Liveness step not completed")
+    elif not face_match_attempted:
+        blocking_reasons.append("Face match not completed")
 
     confidence_score_global: float | None = None
     if biometric and ocr_scores:
@@ -1171,7 +1286,9 @@ async def _compute_kyc_readiness(
         if face_match_score is not None:
             score_components.append(face_match_score)
         confidence_score_global = float(mean(score_components))
-        if face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE:
+        if face_match_status == FACE_MATCH_STATUS_FAILED or (
+            face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE
+        ):
             warnings.append("Face match below threshold: priority manual review will be applied.")
         if anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE:
             warnings.append("Anti-spoofing below threshold: priority manual review will be applied.")
@@ -1228,7 +1345,9 @@ async def submit_kyc(
 
     # Flag for stronger manual review, but keep submission path available.
     # Only check face_match if it was actually computed (not None).
-    low_face_match = face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE
+    low_face_match = biometric.face_match_status == FACE_MATCH_STATUS_FAILED or (
+        face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE
+    )
     low_anti_spoofing = anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
     if low_face_match or low_anti_spoofing:
         session.priority_flag = True

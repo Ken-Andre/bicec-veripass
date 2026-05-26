@@ -29,6 +29,18 @@ class KYCSession(Base):
     status = Column(String(50), nullable=False, default="DRAFT")
     access_level = Column(String(50), nullable=False, default="RESTRICTED")
     niu_type = Column(String(50), nullable=True)  # DECLARATIVE, UPLOADED, MISSING
+    niu_number = Column(String(32), nullable=True)
+    niu_declarative = Column(Boolean, nullable=False, default=False)
+
+    address_city = Column(String(100), nullable=True)
+    address_commune = Column(String(100), nullable=True)
+    address_quartier = Column(String(100), nullable=True)
+    address_lieu_dit = Column(String(150), nullable=True)
+    address_details = Column(Text, nullable=True)
+    gps_latitude = Column(Numeric(10, 7), nullable=True)
+    gps_longitude = Column(Numeric(10, 7), nullable=True)
+    utility_provider = Column(String(30), nullable=True)
+    utility_bill_date = Column(DATE, nullable=True)
 
     confidence_score_global = Column(Numeric(5, 4), nullable=True)
     liveness_strike_count = Column(Integer, default=0)
@@ -163,6 +175,11 @@ class BiometricResult(Base):
     )
 
     face_match_score = Column(Numeric(5, 4), nullable=True)
+    face_match_status = Column(String(20), nullable=True)
+    face_match_reason = Column(Text, nullable=True)
+    face_match_distance = Column(Numeric(8, 6), nullable=True)
+    face_match_threshold = Column(Numeric(5, 4), nullable=True)
+    face_match_detector = Column(String(50), nullable=True)
     liveness_score = Column(Numeric(5, 4), nullable=True)
     anti_spoofing_score = Column(Numeric(5, 4), nullable=True)
 

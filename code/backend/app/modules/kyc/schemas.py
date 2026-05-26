@@ -92,8 +92,15 @@ class BiometricResultResponse(BaseModel):
 
     id: str
     face_match_score: Optional[float] = None
+    face_match_status: Optional[str] = None
+    face_match_reason: Optional[str] = None
+    face_match_distance: Optional[float] = None
+    face_match_threshold: Optional[float] = None
+    face_match_detector: Optional[str] = None
     liveness_score: Optional[float] = None
     anti_spoofing_score: Optional[float] = None
+    model_version_face: Optional[str] = None
+    model_version_liveness: Optional[str] = None
     processed_at: datetime
 
 
@@ -126,6 +133,17 @@ class KYCSessionResponse(BaseModel):
     status: str
     access_level: str
     niu_type: Optional[str] = None
+    niu_number: Optional[str] = None
+    niu_declarative: bool = False
+    address_city: Optional[str] = None
+    address_commune: Optional[str] = None
+    address_quartier: Optional[str] = None
+    address_lieu_dit: Optional[str] = None
+    address_details: Optional[str] = None
+    gps_latitude: Optional[float] = None
+    gps_longitude: Optional[float] = None
+    utility_provider: Optional[str] = None
+    utility_bill_date: Optional[date] = None
     confidence_score_global: Optional[float] = None
     liveness_strike_count: int = 0
     last_step_completed: Optional[str] = None
@@ -188,6 +206,8 @@ class LivenessResultResponse(BaseModel):
     attempts_remaining: int
     strikes_remaining: int
     face_match_score: float | None = None
+    face_match_status: str | None = None
+    face_match_reason: str | None = None
     anti_spoofing_score: float | None = None
     is_locked: bool = False
     cooldown_seconds: int | None = None
@@ -212,7 +232,7 @@ class MergeOCRResponse(BaseModel):
 
 # === NIU ===
 class NIUSubmitRequest(BaseModel):
-    niu_type: str = Field(..., description="DECLARATIVE, UPLOADED")
+    niu_type: str = Field(..., description="MISSING, DECLARATIVE, UPLOADED")
     niu_value: Optional[str] = None
 
 
