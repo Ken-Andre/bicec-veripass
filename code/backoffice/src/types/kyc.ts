@@ -94,6 +94,12 @@ export interface KycDocument {
 
 export interface BiometricResult {
   faceMatchScore: number;
+  faceMatchStatus?: 'PASSED' | 'FAILED' | 'NOT_PERFORMED' | 'ERROR';
+  faceMatchReason?: string;
+  faceMatchDistance?: number;
+  faceMatchThreshold?: number;
+  faceMatchDetector?: string;
+  modelVersionFace?: string;
   livenessScore: number;
   antiSpoofingScore: number;
   selfieQuality: number;

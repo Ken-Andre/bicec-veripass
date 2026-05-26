@@ -462,9 +462,37 @@ export default function EvidenceViewerPage() {
                 selfieDocId={selfieDoc.id}
                 cniRectoDocId={cniRectoDoc.id}
                 faceMatchScore={dossier.biometric_result?.face_match_score}
+                faceMatchStatus={dossier.biometric_result?.face_match_status}
+                faceMatchReason={dossier.biometric_result?.face_match_reason}
+                faceMatchDistance={dossier.biometric_result?.face_match_distance}
+                faceMatchThreshold={dossier.biometric_result?.face_match_threshold}
+                faceMatchDetector={dossier.biometric_result?.face_match_detector}
+                modelVersionFace={dossier.biometric_result?.model_version_face}
               />
             );
           })()}
+
+          <Card>
+            <CardHeader><CardTitle>Adresse et NIU</CardTitle></CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {[
+                { label: 'Ville', value: dossier.address_city },
+                { label: 'Commune', value: dossier.address_commune },
+                { label: 'Quartier', value: dossier.address_quartier },
+                { label: 'Lieu-dit', value: dossier.address_lieu_dit },
+                { label: 'Region', value: dossier.address_details },
+                { label: 'GPS', value: dossier.gps_latitude != null && dossier.gps_longitude != null ? `${dossier.gps_latitude}, ${dossier.gps_longitude}` : null },
+                { label: 'Type NIU', value: dossier.niu_type },
+                { label: 'Numero NIU', value: dossier.niu_number },
+                { label: 'NIU declaratif', value: dossier.niu_declarative ? 'Oui' : 'Non' },
+              ].map((item: any) => (
+                <div key={item.label} className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">{item.label}</span>
+                  <span className="font-medium text-right">{item.value || 'N/A'}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
           {dossier.biometric_result && (
             <Card>
@@ -485,57 +513,6 @@ export default function EvidenceViewerPage() {
               </CardContent>
             </Card>
           )}
-
-          {/* Face Match Comparison: Selfie vs CNI Recto side-by-side */}
-          {(() => {
-            const selfieDoc = documents.find((d: any) => d.doc_type === 'SELFIE');
-            const cniRectoDoc = documents.find((d: any) => d.doc_type === 'CNI_RECTO');
-            if (!selfieDoc || !cniRectoDoc) return null;
-            const selfieUrl = `${API_BASE}/backoffice/dossier/${id}/documents/${selfieDoc.id}/file`;
-            const cniUrl = `${API_BASE}/backoffice/dossier/${id}/documents/${cniRectoDoc.id}/file`;
-            const token = getToken();
-            const faceScore = dossier.biometric_result?.face_match_score;
-            return (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Comparaison Visage / CNI
-                    {faceScore != null && (
-                      <Badge variant={faceScore >= 0.8 ? 'default' : 'danger'}>
-                        {(faceScore * 100).toFixed(0)}% match
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground text-center font-medium">Selfie</p>
-                      <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
-                        <img
-                          src={`${selfieUrl}?token=${token}`}
-                          alt="Selfie"
-                          className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).src = IMAGE_PLACEHOLDER; }}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground text-center font-medium">CNI Recto</p>
-                      <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
-                        <img
-                          src={`${cniUrl}?token=${token}`}
-                          alt="CNI Recto"
-                          className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).src = IMAGE_PLACEHOLDER; }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })()}
 
           <Card>
             <CardHeader><CardTitle>Historique</CardTitle></CardHeader>

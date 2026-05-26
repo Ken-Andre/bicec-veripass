@@ -13,9 +13,26 @@ interface FaceComparisonCardProps {
   selfieDocId: string;
   cniRectoDocId: string;
   faceMatchScore?: number | null;
+  faceMatchStatus?: string | null;
+  faceMatchReason?: string | null;
+  faceMatchDistance?: number | null;
+  faceMatchThreshold?: number | null;
+  faceMatchDetector?: string | null;
+  modelVersionFace?: string | null;
 }
 
-export function FaceComparisonCard({ sessionId, selfieDocId, cniRectoDocId, faceMatchScore }: FaceComparisonCardProps) {
+export function FaceComparisonCard({
+  sessionId,
+  selfieDocId,
+  cniRectoDocId,
+  faceMatchScore,
+  faceMatchStatus,
+  faceMatchReason,
+  faceMatchDistance,
+  faceMatchThreshold,
+  faceMatchDetector,
+  modelVersionFace,
+}: FaceComparisonCardProps) {
   const [selfieError, setSelfieError] = useState(false);
   const [cniError, setCniError] = useState(false);
   const token = getToken();
@@ -32,17 +49,23 @@ export function FaceComparisonCard({ sessionId, selfieDocId, cniRectoDocId, face
     : 'text-muted-foreground';
 
   const scoreBadge = faceMatchScore != null
-    ? faceMatchScore >= 0.85 ? 'default' : faceMatchScore >= 0.6 ? 'secondary' : 'destructive'
-    : 'outline';
+    ? faceMatchScore >= 0.85 ? 'default' : faceMatchScore >= 0.6 ? 'secondary' : 'danger'
+    : 'secondary';
+
+  const statusBadge = faceMatchStatus === 'PASSED'
+    ? 'default'
+    : faceMatchStatus === 'FAILED' || faceMatchStatus === 'ERROR'
+      ? 'danger'
+      : 'secondary';
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold">Comparaison Visage / CNI</CardTitle>
-          {faceMatchScore != null && (
-            <Badge variant={scoreBadge as any}>
-              Match: {(faceMatchScore * 100).toFixed(0)}%
+          {(faceMatchStatus || faceMatchScore != null) && (
+            <Badge variant={(faceMatchStatus ? statusBadge : scoreBadge) as any}>
+              {faceMatchStatus || `Match: ${(faceMatchScore! * 100).toFixed(0)}%`}
             </Badge>
           )}
         </div>
@@ -105,6 +128,33 @@ export function FaceComparisonCard({ sessionId, selfieDocId, cniRectoDocId, face
             </div>
           </div>
         )}
+
+        <div className="mt-3 grid grid-cols-2 gap-2 rounded-md border bg-muted/30 p-2 text-xs">
+          <div>
+            <p className="text-muted-foreground">Statut</p>
+            <Badge variant={statusBadge as any} className="mt-1">{faceMatchStatus || 'N/A'}</Badge>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Raison</p>
+            <p className="font-mono break-all">{faceMatchReason || 'N/A'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Distance</p>
+            <p className="font-mono">{faceMatchDistance != null ? faceMatchDistance.toFixed(4) : 'N/A'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Seuil</p>
+            <p className="font-mono">{faceMatchThreshold != null ? `${(faceMatchThreshold * 100).toFixed(0)}%` : 'N/A'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Detecteur</p>
+            <p className="font-mono">{faceMatchDetector || 'N/A'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Modele</p>
+            <p className="font-mono">{modelVersionFace || 'N/A'}</p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
