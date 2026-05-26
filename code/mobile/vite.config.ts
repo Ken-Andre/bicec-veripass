@@ -83,6 +83,7 @@ export default defineConfig(async ({ mode }) => {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+      fileParallelism: false,
     },
     build: {
       sourcemap: mode === 'production',

@@ -8,12 +8,12 @@ import type { SupportMessage } from '../../types';
 
 const MAX_MESSAGE_CHARS = 4000;
 const IMAGE_MAX_SIZE_MB = 4;
-const PDF_MAX_SIZE_MB = 5;
+const PDF_MAX_SIZE_MB = 6;
 const PDF_MAX_PAGES = 5;
 const IMAGE_MAX_SIZE_BYTES = IMAGE_MAX_SIZE_MB * 1024 * 1024;
 const PDF_MAX_SIZE_BYTES = PDF_MAX_SIZE_MB * 1024 * 1024;
 const ACCEPTED_ATTACHMENT_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
-const ACCEPTED_ATTACHMENT_LABEL = `JPG/PNG 4 Mo max - PDF 5 Mo, ${PDF_MAX_PAGES} pages max`;
+const ACCEPTED_ATTACHMENT_LABEL = `JPG/PNG 4 Mo max - PDF ${PDF_MAX_SIZE_MB} Mo, ${PDF_MAX_PAGES} pages max`;
 
 function formatTime(d: string) {
   return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });

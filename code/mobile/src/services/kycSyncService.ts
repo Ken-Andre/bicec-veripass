@@ -161,8 +161,15 @@ function classifyHttpSyncError(
         : `HTTP_${responseStatus}`;
 
   if (responseStatus === 409) {
-    return new SyncError(`${operation}_hash_mismatch`, {
-      code: 'HASH_MISMATCH',
+    const detailRecord = detail && typeof detail === 'object'
+      ? detail as Record<string, unknown>
+      : {};
+    const nestedDetail = detailRecord.detail && typeof detailRecord.detail === 'object'
+      ? detailRecord.detail as Record<string, unknown>
+      : {};
+    const detailCode = detailRecord.code || nestedDetail.code || 'CONFLICT';
+    return new SyncError(`${operation}_conflict`, {
+      code: String(detailCode),
       retryable: false,
       queueStatus: 'needs_reupload',
     });
@@ -280,13 +287,14 @@ async function uploadLiveness(item: KycSyncQueueItem): Promise<void> {
         body: formData,
       });
       if (!selfieRes.ok) {
-        captureKycMessage('Offline replay: selfie upload failed, liveness will proceed without face match', 'upload_failure', {
+        const detail = await selfieRes.json().catch(() => null);
+        captureKycMessage('Offline replay: selfie upload failed, liveness replay blocked', 'upload_failure', {
           sessionId: item.session_id,
           step: 'liveness',
           operation: 'offline_replay_selfie_upload',
           extra: { queue_item_id: item.id, status: selfieRes.status },
         });
-        // Non-fatal: liveness submit can still succeed, just without face match
+        throw classifyHttpSyncError(selfieRes.status, 'selfie_upload', detail);
       }
     } catch (err) {
       captureKycException(err, 'upload_failure', {
@@ -295,7 +303,7 @@ async function uploadLiveness(item: KycSyncQueueItem): Promise<void> {
         operation: 'offline_replay_selfie_upload',
         extra: { queue_item_id: item.id },
       });
-      // Non-fatal: continue with liveness submit
+      throw err;
     }
   }
 

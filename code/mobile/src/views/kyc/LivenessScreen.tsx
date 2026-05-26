@@ -12,6 +12,11 @@ import { fetchWithCorrelation } from '../../services/apiClient';
 import { captureKycException, captureKycMessage } from '../../services/sentry';
 
 type ChallengeType = 'smile' | 'blink' | 'turn_left' | 'turn_right';
+type SelfieUploadResult = {
+  ok: boolean;
+  networkLike: boolean;
+  message?: string;
+};
 
 const CHALLENGES: ChallengeType[] = ['smile', 'blink', 'turn_left'];
 const HOLD_FRAMES = 8;
@@ -68,6 +73,16 @@ export default function LivenessScreen() {
     }
   }, []);
 
+  const isNetworkLikeError = (err: unknown): boolean => {
+    return err instanceof TypeError
+      || (err instanceof Error && (
+        err.message.toLowerCase().includes('fetch')
+        || err.name === 'AbortError'
+        || err.message.toLowerCase().includes('abort')
+        || err.message.toLowerCase().includes('network')
+      ));
+  };
+
   /** Capture a selfie frame from the video stream (front-facing, neutral face). */
   const captureSelfieFrame = useCallback(() => {
     if (!videoRef.current) return;
@@ -88,7 +103,7 @@ export default function LivenessScreen() {
   }, []);
 
   /** Upload selfie as a SELFIE document to the backend so face matching works. */
-  const uploadSelfie = useCallback(async (): Promise<boolean> => {
+  const uploadSelfie = useCallback(async (): Promise<SelfieUploadResult> => {
     const dataUrl = selfieDataUrlRef.current;
     if (!dataUrl) {
       captureKycMessage('No selfie frame captured, skipping selfie upload', 'upload_failure', {
@@ -96,7 +111,11 @@ export default function LivenessScreen() {
         step: 'liveness',
         operation: 'selfie_upload_no_frame',
       });
-      return false;
+      return {
+        ok: false,
+        networkLike: false,
+        message: 'Selfie non capture. Veuillez recommencer la verification.',
+      };
     }
 
     // Convert data URL to Blob
@@ -127,9 +146,13 @@ export default function LivenessScreen() {
       });
       if (!res.ok) {
         const detail = await res.json().catch(() => null);
-        throw new Error(`selfie_upload_failed_${res.status}: ${JSON.stringify(detail)}`);
+        return {
+          ok: false,
+          networkLike: res.status >= 500,
+          message: `selfie_upload_failed_${res.status}: ${JSON.stringify(detail)}`,
+        };
       }
-      return true;
+      return { ok: true, networkLike: false };
     } catch (err) {
       // Queue for offline retry — store selfie in liveness offline payload
       captureKycException(err, 'upload_failure', {
@@ -139,7 +162,11 @@ export default function LivenessScreen() {
         extra: { queued_offline: true },
       });
       // Fall through — liveness submit will include selfie in offline queue
-      return false;
+      return {
+        ok: false,
+        networkLike: isNetworkLikeError(err),
+        message: err instanceof Error ? err.message : String(err),
+      };
     }
   }, [computeSha256, sessionId]);
 
@@ -329,8 +356,26 @@ export default function LivenessScreen() {
     }
 
     // Upload selfie BEFORE liveness submit so the backend has the SELFIE
-    // document available for face matching in compute_face_match_score_for_session.
-    const selfieOk = await uploadSelfie();
+    // document available for the backend face-match computation.
+    const selfieUpload = await uploadSelfie();
+    if (!selfieUpload.ok) {
+      if (selfieUpload.networkLike) {
+        await enqueueOfflineLivenessCapture({
+          sessionId: ensureSessionId(),
+          challengeType: CHALLENGES[Math.min(currentChallenge, CHALLENGES.length - 1)],
+          landmarks: payload,
+          selfieDataUrl: selfieDataUrlRef.current ?? undefined,
+        });
+        completeStep('liveness');
+        resetLivenessAttempts();
+        setMessage('Connexion indisponible. La verification sera synchronisee automatiquement au retour reseau.');
+        navigate('/kyc/address');
+        return;
+      }
+      setMessage('Selfie non accepte. Veuillez recommencer la verification faciale.');
+      setStatus('fail');
+      return;
+    }
 
     try {
       const finalChallenge = CHALLENGES[Math.min(currentChallenge, CHALLENGES.length - 1)];
@@ -346,33 +391,31 @@ export default function LivenessScreen() {
 
       completeStep('liveness');
       resetLivenessAttempts();
-      if (result.face_match_score == null) {
-        captureKycMessage('Liveness OK but face_match_score is null (DeepFace unavailable or no SELFIE doc)', 'liveness_failure', {
+      if (result.face_match_status !== 'PASSED') {
+        captureKycMessage('Liveness completed with non-passing face match status', 'liveness_failure', {
           sessionId,
           step: 'liveness',
-          operation: 'liveness_face_match_null',
+          operation: 'liveness_face_match_status',
+          extra: {
+            face_match_status: result.face_match_status,
+            face_match_reason: result.face_match_reason,
+          },
         });
       }
       navigate('/kyc/address');
       await runKycSyncNow();
     } catch (err) {
-      const networkLike = err instanceof TypeError
-        || (err instanceof Error && (
-          err.message.toLowerCase().includes('fetch')
-          || err.name === 'AbortError'
-          || err.message.toLowerCase().includes('abort')
-        ));
+      const networkLike = isNetworkLikeError(err);
       if (networkLike) {
         await enqueueOfflineLivenessCapture({
           sessionId: ensureSessionId(),
           challengeType: CHALLENGES[Math.min(currentChallenge, CHALLENGES.length - 1)],
           landmarks: payload,
-          selfieDataUrl: selfieOk ? undefined : (selfieDataUrlRef.current ?? undefined), // Only include selfie in offline queue if online upload failed
         });
         completeStep('liveness');
         resetLivenessAttempts();
         setMessage('Connexion indisponible. La verification sera synchronisee automatiquement au retour reseau.');
-      navigate('/kyc/bill-select');
+        navigate('/kyc/address');
         return;
       }
       captureKycException(err, 'match_error', {
