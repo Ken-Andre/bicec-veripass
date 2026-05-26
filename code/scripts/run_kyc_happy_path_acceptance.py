@@ -8,7 +8,6 @@ every API status/body needed by the delivery tracker.
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import json
 import mimetypes
@@ -377,6 +376,14 @@ def run(args: argparse.Namespace) -> int:
         fields={"bill_type": "ENEO", "session_id": session_handle, "client_sha256": _sha256(bill_pdf)},
         files={"file": bill_pdf},
     )
+    selfie = api.request_multipart(
+        "upload selfie evidence",
+        "/kyc/document/upload",
+        token=mobile_token,
+        device_tag=device_tag,
+        fields={"doc_type": "SELFIE", "client_sha256": _sha256(cni_recto)},
+        files={"file": cni_recto},
+    )
 
     api.request_json(
         "ocr correction review",
@@ -401,6 +408,13 @@ def run(args: argparse.Namespace) -> int:
         device_tag=device_tag,
         payload={"challenge_type": "turn_right", "landmarks_json": _landmarks()},
     )
+    if liveness.get("face_match_status") not in {"PASSED", "FAILED"}:
+        raise ApiFailure(
+            "Liveness completed without an attempted face match",
+            step="liveness submit",
+            status=200,
+            body=json.dumps(liveness),
+        )
     api.request_json(
         "address submit",
         "POST",
@@ -436,7 +450,7 @@ def run(args: argparse.Namespace) -> int:
         "/kyc/niu/submit",
         token=mobile_token,
         device_tag=device_tag,
-        payload={"niu_type": "DECLARATIVE", "niu_value": f"NIU-{run_id}"},
+        payload={"niu_type": "DECLARATIVE", "niu_value": f"M{run_id}"},
     )
     one_px_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
     api.request_json(
@@ -586,6 +600,7 @@ def run(args: argparse.Namespace) -> int:
             "recto_doc": {"id": recto.get("id"), "ocr_status": recto.get("ocr_status")},
             "verso_doc": {"id": verso.get("id"), "ocr_status": verso.get("ocr_status")},
             "bill_doc": {"id": bill.get("id"), "ocr_status": bill.get("ocr_status")},
+            "selfie_doc": {"id": selfie.get("id"), "sha256_hash": selfie.get("sha256_hash")},
             "liveness": liveness,
             "readiness": readiness,
             "submitted": submitted,

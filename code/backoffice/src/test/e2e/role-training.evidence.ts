@@ -43,6 +43,17 @@ function ensureEvidenceDir() {
   fs.mkdirSync(screenshotDir, { recursive: true });
 }
 
+async function screenshotEvidence(page: Page, filename: string) {
+  const target = path.join(screenshotDir, filename);
+  try {
+    await page.screenshot({ path: target, fullPage: true });
+  } catch {
+    const parsed = path.parse(filename);
+    const fallback = path.join(screenshotDir, `${parsed.name}-${Date.now()}${parsed.ext}`);
+    await page.screenshot({ path: fallback, fullPage: true });
+  }
+}
+
 function collectBadResponses(page: Page) {
   const badResponses: string[] = [];
   page.on('response', (response) => {
@@ -70,15 +81,12 @@ test.describe('Backoffice role training evidence', () => {
       const badResponses = collectBadResponses(page);
       await login(page, role.email);
       await expect(page.getByRole('heading', { name: role.home })).toBeVisible({ timeout: 15000 });
-      await page.screenshot({ path: path.join(screenshotDir, role.screenshot), fullPage: true });
+      await screenshotEvidence(page, role.screenshot);
 
       for (const route of role.routes) {
         await page.goto(`/back-office${route}`);
         await page.waitForLoadState('networkidle');
-        await page.screenshot({
-          path: path.join(screenshotDir, `role-${role.key}-${route.replace(/\//g, '-').replace(/^-/, '')}.png`),
-          fullPage: true,
-        });
+        await screenshotEvidence(page, `role-${role.key}-${route.replace(/\//g, '-').replace(/^-/, '')}.png`);
       }
 
       expect(badResponses).toEqual([]);
@@ -98,7 +106,7 @@ test.describe('Backoffice role training evidence', () => {
     }, proof.raw_session_id);
     await expect(page.getByText(proof.raw_session_id.slice(0, 8))).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('APPROVED').first()).toBeVisible({ timeout: 15000 });
-    await page.screenshot({ path: path.join(screenshotDir, 'role-jean-approved-dossier-training.png'), fullPage: true });
+    await screenshotEvidence(page, 'role-jean-approved-dossier-training.png');
 
     expect(badResponses).toEqual([]);
   });

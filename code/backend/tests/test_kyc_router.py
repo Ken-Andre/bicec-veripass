@@ -5,10 +5,14 @@ from unittest.mock import patch, AsyncMock
 import uuid
 import hashlib
 
+from sqlalchemy import select
+
 from app.main import app
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.modules.auth.models import User
+from app.modules.kyc.models import KYCSession, Document, BiometricResult
+from app.modules.kyc.service import FaceMatchComputation, FACE_MATCH_STATUS_FAILED
 
 
 @pytest.fixture
@@ -151,3 +155,90 @@ class TestKYCRouter:
             json=payload
         )
         assert response.status_code in [200, 422, 400]
+
+    @pytest.mark.asyncio
+    async def test_liveness_missing_selfie_returns_409(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        mock_user,
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        session = (
+            await db_session.execute(
+                select(KYCSession)
+                .where(KYCSession.user_id == mock_user.id)
+                .order_by(KYCSession.started_at.desc())
+            )
+        ).scalars().first()
+        db_session.add(
+            Document(
+                id=uuid.uuid4(),
+                session_id=session.id,
+                doc_type="CNI_RECTO",
+                file_path="cni.jpg",
+                sha256_hash="a" * 64,
+            )
+        )
+        await db_session.commit()
+
+        frames = [
+            {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
+            for i in range(40)
+        ]
+        response = await client.post(
+            "/api/v1/kyc/capture/liveness",
+            json={"landmarks_json": frames, "challenge_type": "turn_left"},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "FACE_MATCH_EVIDENCE_MISSING"
+        biometric = (
+            await db_session.execute(select(BiometricResult).where(BiometricResult.session_id == session.id))
+        ).scalar_one_or_none()
+        assert biometric is None
+
+    @pytest.mark.asyncio
+    async def test_liveness_face_mismatch_sets_priority_flag(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        monkeypatch,
+        mock_user,
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        session = (
+            await db_session.execute(
+                select(KYCSession)
+                .where(KYCSession.user_id == mock_user.id)
+                .order_by(KYCSession.started_at.desc())
+            )
+        ).scalars().first()
+
+        async def fake_face_match(*, session_id, db):
+            return FaceMatchComputation(
+                status=FACE_MATCH_STATUS_FAILED,
+                reason="score_below_threshold",
+                score=0.62,
+                distance=0.38,
+                threshold=0.80,
+                detector="opencv",
+            )
+
+        monkeypatch.setattr("app.modules.kyc.router.compute_face_match_for_session", fake_face_match)
+        frames = [
+            {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
+            for i in range(40)
+        ]
+        response = await client.post(
+            "/api/v1/kyc/capture/liveness",
+            json={"landmarks_json": frames, "challenge_type": "turn_left"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["face_match_status"] == FACE_MATCH_STATUS_FAILED
+        await db_session.refresh(session)
+        assert session.priority_flag is True

@@ -10,6 +10,17 @@ function ensureEvidenceDir() {
   fs.mkdirSync(screenshotDir, { recursive: true });
 }
 
+async function screenshotEvidence(page: Page, filename: string) {
+  const target = path.join(screenshotDir, filename);
+  try {
+    await page.screenshot({ path: target, fullPage: true });
+  } catch {
+    const parsed = path.parse(filename);
+    const fallback = path.join(screenshotDir, `${parsed.name}-${Date.now()}${parsed.ext}`);
+    await page.screenshot({ path: fallback, fullPage: true });
+  }
+}
+
 async function clearBrowserState(page: Page) {
   await page.addInitScript(() => {
     localStorage.clear();
@@ -176,11 +187,11 @@ test.describe('Day 1 mobile evidence', () => {
     await expect(page.getByRole('heading', { name: /BICEC VeriPass/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Se connecter/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Creer un compte|Créer un compte/i })).toBeVisible();
-    await page.screenshot({ path: path.join(screenshotDir, 'auth-choice.png'), fullPage: true });
+    await screenshotEvidence(page, 'auth-choice.png');
 
     await page.getByRole('button', { name: /Se connecter/i }).click();
     await expect(page).toHaveURL(/\/mobile\/auth\/phone\?mode=login$/);
-    await page.screenshot({ path: path.join(screenshotDir, 'login-route.png'), fullPage: true });
+    await screenshotEvidence(page, 'login-route.png');
 
     expect(badResponses).toEqual([]);
   });
@@ -191,7 +202,7 @@ test.describe('Day 1 mobile evidence', () => {
     await page.goto('/mobile/support');
     await expect(page).toHaveURL(/\/mobile\/auth$/);
     await expect(page.getByRole('button', { name: /Se connecter/i })).toBeVisible();
-    await page.screenshot({ path: path.join(screenshotDir, 'protected-route-auth-redirect.png'), fullPage: true });
+    await screenshotEvidence(page, 'protected-route-auth-redirect.png');
   });
 
   test('service worker update banner is visible and actionable', async ({ page }) => {
@@ -204,7 +215,7 @@ test.describe('Day 1 mobile evidence', () => {
     await expect(page.getByText(/Nouvelle version disponible/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /Recharger/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Plus tard/i })).toBeVisible();
-    await page.screenshot({ path: path.join(screenshotDir, 'service-worker-update-banner.png'), fullPage: true });
+    await screenshotEvidence(page, 'service-worker-update-banner.png');
   });
 
   test('support and notifications screens render without 5xx responses', async ({ page }) => {
@@ -217,7 +228,7 @@ test.describe('Day 1 mobile evidence', () => {
     await expect(page.getByText(/JPG\/PNG 4 Mo max - PDF 6 Mo, 5 pages max/i)).toBeVisible();
     await expect(page.getByText(/0\/4000/i)).toBeVisible();
     await expect(page.getByPlaceholder(/Tapez votre message/i)).toBeEnabled();
-    await page.screenshot({ path: path.join(screenshotDir, 'support-screen.png'), fullPage: true });
+    await screenshotEvidence(page, 'support-screen.png');
 
     await page.locator('input[type="file"]').setInputFiles({
       name: 'justificatif.pdf',
@@ -226,28 +237,28 @@ test.describe('Day 1 mobile evidence', () => {
     });
     await expect(page.getByText('justificatif.pdf')).toBeVisible();
     await expect(page.getByPlaceholder(/Ajouter un message optionnel/i)).toBeVisible();
-    await page.screenshot({ path: path.join(screenshotDir, 'support-attachment-selected.png'), fullPage: true });
+    await screenshotEvidence(page, 'support-attachment-selected.png');
 
     await page.getByPlaceholder(/Ajouter un message optionnel/i).fill('Justificatif joint');
     await page.getByRole('button', { name: /Envoyer le message/i }).click();
     await expect(page.getByText(/evidence-sha256|Justificatif joint|justificatif.pdf/i).first()).toBeVisible();
-    await page.screenshot({ path: path.join(screenshotDir, 'support-attachment-sent.png'), fullPage: true });
+    await screenshotEvidence(page, 'support-attachment-sent.png');
 
     await page.goto('/mobile/notifications');
     await expect(page.getByText(/Document complementaire requis/i)).toBeVisible();
-    await page.screenshot({ path: path.join(screenshotDir, 'notifications-screen.png'), fullPage: true });
+    await screenshotEvidence(page, 'notifications-screen.png');
 
     await page.goto('/mobile/settings');
     await expect(page.getByText(/Messages officiels/i)).toBeVisible();
     await expect(page.getByRole('button', { name: 'SMS' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Email' })).toBeVisible();
-    await page.screenshot({ path: path.join(screenshotDir, 'settings-official-channel.png'), fullPage: true });
+    await screenshotEvidence(page, 'settings-official-channel.png');
     await page.getByRole('button', { name: 'Email' }).click();
-    await page.screenshot({ path: path.join(screenshotDir, 'settings-official-channel-email.png'), fullPage: true });
+    await screenshotEvidence(page, 'settings-official-channel-email.png');
     await page.getByRole('button', { name: 'Notifications push' }).click();
     await page.waitForFunction(() => localStorage.getItem('vp_push_enabled') === null);
     await expect(page.getByRole('button', { name: 'Notifications push' })).toHaveClass(/bg-muted/);
-    await page.screenshot({ path: path.join(screenshotDir, 'settings-push-disabled.png'), fullPage: true });
+    await screenshotEvidence(page, 'settings-push-disabled.png');
 
     expect(badResponses).toEqual([]);
   });

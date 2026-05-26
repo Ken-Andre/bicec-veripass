@@ -14,6 +14,17 @@ function ensureEvidenceDir() {
   fs.mkdirSync(screenshotDir, { recursive: true });
 }
 
+async function screenshotEvidence(page: Page, filename: string) {
+  const target = path.join(screenshotDir, filename);
+  try {
+    await page.screenshot({ path: target, fullPage: true });
+  } catch {
+    const parsed = path.parse(filename);
+    const fallback = path.join(screenshotDir, `${parsed.name}-${Date.now()}${parsed.ext}`);
+    await page.screenshot({ path: fallback, fullPage: true });
+  }
+}
+
 function collectBadResponses(page: Page) {
   const badResponses: string[] = [];
   page.on('response', (response) => {
@@ -49,7 +60,7 @@ async function clickPin(page: Page, pin: string) {
 async function loginWithPhoneOtp(page: Page, phone: string) {
   const localPhone = phone.replace('+237', '');
   await page.goto('/mobile/');
-  await page.screenshot({ path: path.join(screenshotDir, 'live-client-welcome.png'), fullPage: true });
+  await screenshotEvidence(page, 'live-client-welcome.png');
 
   await page.getByRole('button', { name: /Me connecter/i }).click();
   await expect(page).toHaveURL(/\/mobile\/auth\/phone\?mode=login$/);
@@ -96,12 +107,12 @@ test.describe('Live client demo evidence', () => {
 
     await loginWithPhoneOtp(page, proof.client_phone);
     await completePinIfNeeded(page);
-    await page.screenshot({ path: path.join(screenshotDir, 'live-client-after-login.png'), fullPage: true });
+    await screenshotEvidence(page, 'live-client-after-login.png');
 
     await page.goto('/mobile/support');
     await expect(page.getByRole('heading', { name: /Support/i })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(/JPG\/PNG 4 Mo max - PDF 6 Mo, 5 pages max/i)).toBeVisible();
-    await page.screenshot({ path: path.join(screenshotDir, 'live-client-support-before-upload.png'), fullPage: true });
+    await screenshotEvidence(page, 'live-client-support-before-upload.png');
 
     await page.locator('input[type="file"]').setInputFiles({
       name: 'justificatif-demo.pdf',
@@ -112,18 +123,18 @@ test.describe('Live client demo evidence', () => {
     await page.getByPlaceholder(/Ajouter un message optionnel/i).fill(supportMessage);
     await page.getByRole('button', { name: /Envoyer le message/i }).click();
     await expect(page.getByText(supportMessage).first()).toBeVisible({ timeout: 15000 });
-    await page.screenshot({ path: path.join(screenshotDir, 'live-client-support-upload-sent.png'), fullPage: true });
+    await screenshotEvidence(page, 'live-client-support-upload-sent.png');
 
     await page.goto('/mobile/notifications');
     await expect(page.getByRole('heading', { name: /Notifications/i })).toBeVisible({ timeout: 15000 });
-    await page.screenshot({ path: path.join(screenshotDir, 'live-client-notifications.png'), fullPage: true });
+    await screenshotEvidence(page, 'live-client-notifications.png');
 
     await page.goto('/mobile/cards/atm-finder');
-    await expect(page.getByRole('heading', { name: /DAB a proximite/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: /DAB (a|à) proximit(e|é)/i })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(/Catalogue hors ligne/i)).toBeVisible();
-    await page.getByRole('button', { name: /Trier par proximite/i }).click();
-    await expect(page.getByText(/DAB tries par proximite|Position indisponible/i)).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: path.join(screenshotDir, 'live-client-atm-finder.png'), fullPage: true });
+    await page.getByRole('button', { name: /Trier par proximit(e|é)/i }).click();
+    await expect(page.getByText(/DAB tri(e|é)s par proximit(e|é)|Position indisponible/i)).toBeVisible({ timeout: 10000 });
+    await screenshotEvidence(page, 'live-client-atm-finder.png');
 
     expect(badResponses).toEqual([]);
   });
