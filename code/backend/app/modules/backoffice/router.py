@@ -213,7 +213,9 @@ async def list_queue(
     agency_code: str | None = Query(None, description="Filter by agency code"),
     client_name: str | None = Query(None, description="Search by client name (partial match)"),
     _agent: Agent = Depends(
-        require_agent_role(AgentRole.JEAN, AgentRole.SYLVIE, AgentRole.ADMIN_IT)
+        require_agent_role(
+            AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT
+        )
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -405,14 +407,25 @@ async def get_dossier_detail(
         bio_brief = DossierBiometricBrief(
             id=session.biometric_results.id,
             face_match_score=float(session.biometric_results.face_match_score)
-            if session.biometric_results.face_match_score
+            if session.biometric_results.face_match_score is not None
             else None,
+            face_match_status=session.biometric_results.face_match_status,
+            face_match_reason=session.biometric_results.face_match_reason,
+            face_match_distance=float(session.biometric_results.face_match_distance)
+            if session.biometric_results.face_match_distance is not None
+            else None,
+            face_match_threshold=float(session.biometric_results.face_match_threshold)
+            if session.biometric_results.face_match_threshold is not None
+            else None,
+            face_match_detector=session.biometric_results.face_match_detector,
             liveness_score=float(session.biometric_results.liveness_score)
-            if session.biometric_results.liveness_score
+            if session.biometric_results.liveness_score is not None
             else None,
             anti_spoofing_score=float(session.biometric_results.anti_spoofing_score)
-            if session.biometric_results.anti_spoofing_score
+            if session.biometric_results.anti_spoofing_score is not None
             else None,
+            model_version_face=session.biometric_results.model_version_face,
+            model_version_liveness=session.biometric_results.model_version_liveness,
             processed_at=session.biometric_results.processed_at,
         )
 
@@ -462,6 +475,17 @@ async def get_dossier_detail(
         completed_at=session.completed_at,
         last_step_completed=session.last_step_completed,
         niu_type=session.niu_type,
+        niu_number=session.niu_number,
+        niu_declarative=bool(session.niu_declarative),
+        address_city=session.address_city,
+        address_commune=session.address_commune,
+        address_quartier=session.address_quartier,
+        address_lieu_dit=session.address_lieu_dit,
+        address_details=session.address_details,
+        gps_latitude=float(session.gps_latitude) if session.gps_latitude is not None else None,
+        gps_longitude=float(session.gps_longitude) if session.gps_longitude is not None else None,
+        utility_provider=session.utility_provider,
+        utility_bill_date=session.utility_bill_date,
         user_phone=user_phone,
         client_name=client_name,
         agency_code=agency_code,

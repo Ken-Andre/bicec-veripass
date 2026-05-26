@@ -1,6 +1,6 @@
 """Backoffice Pydantic schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
@@ -149,8 +149,15 @@ class DossierBiometricBrief(BaseModel):
 
     id: UUID
     face_match_score: Optional[float] = None
+    face_match_status: Optional[str] = None
+    face_match_reason: Optional[str] = None
+    face_match_distance: Optional[float] = None
+    face_match_threshold: Optional[float] = None
+    face_match_detector: Optional[str] = None
     liveness_score: Optional[float] = None
     anti_spoofing_score: Optional[float] = None
+    model_version_face: Optional[str] = None
+    model_version_liveness: Optional[str] = None
     processed_at: datetime
 
     model_config = {"from_attributes": True}
@@ -192,6 +199,17 @@ class DossierDetailSchema(BaseModel):
     completed_at: Optional[datetime] = None
     last_step_completed: Optional[str] = None
     niu_type: Optional[str] = None
+    niu_number: Optional[str] = None
+    niu_declarative: bool = False
+    address_city: Optional[str] = None
+    address_commune: Optional[str] = None
+    address_quartier: Optional[str] = None
+    address_lieu_dit: Optional[str] = None
+    address_details: Optional[str] = None
+    gps_latitude: Optional[float] = None
+    gps_longitude: Optional[float] = None
+    utility_provider: Optional[str] = None
+    utility_bill_date: Optional[date] = None
 
     user_phone: Optional[str] = None
     client_name: Optional[str] = None
