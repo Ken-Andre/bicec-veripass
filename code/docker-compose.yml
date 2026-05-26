@@ -157,6 +157,8 @@ services:
       - PADDLE_DET_MODEL_DIR=${PADDLE_DET_MODEL_DIR:-/opt/models-offline/paddlex/official_models/PP-OCRv5_server_det}
       - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/opt/models-offline/paddlex/official_models/latin_PP-OCRv5_mobile_rec}
       - FACE_MATCH_MIN_SCORE=${FACE_MATCH_MIN_SCORE:-0.8}
+      - DEEPFACE_HOME=${DEEPFACE_HOME:-/data/models}
+      - DEEPFACE_DETECTOR_BACKEND=${DEEPFACE_DETECTOR_BACKEND:-opencv}
       - ANTI_SPOOFING_MIN_SCORE=${ANTI_SPOOFING_MIN_SCORE:-0.7}
       - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
       - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
@@ -210,7 +212,7 @@ services:
       [
         "sh",
         "-lc",
-        "mkdir -p /data/documents /data/models /home/vpuser/.paddlex && chown -R vpuser:vpgroup /data/documents /data/models /home/vpuser/.paddlex || true",
+        "mkdir -p /data/documents /data/models/.deepface/weights /home/vpuser/.paddlex && chown -R vpuser:vpgroup /data/documents /data/models /home/vpuser/.paddlex || true",
       ]
     user: root
     volumes:
@@ -238,6 +240,8 @@ services:
       - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/data/models/paddle/PP-OCRv5_server_rec}
       - PADDLE_CLS_MODEL_DIR=${PADDLE_CLS_MODEL_DIR:-/data/models/paddle/ch_ppocr_mobile_v2.0_cls_infer}
       - PADDLEX_HOME=/home/vpuser/.paddlex
+      - DEEPFACE_HOME=${DEEPFACE_HOME:-/data/models}
+      - DEEPFACE_DETECTOR_BACKEND=${DEEPFACE_DETECTOR_BACKEND:-opencv}
     volumes:
       - models_storage:/data/models
       - models_paddlex_storage:/home/vpuser/.paddlex
