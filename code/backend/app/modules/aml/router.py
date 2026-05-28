@@ -1,35 +1,39 @@
-"""Module AML/CFT API Routes."""
+"""AML/CFT API routes."""
 
-from fastapi import APIRouter, Depends, Request, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.rate_limit import limiter
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.core.security import require_agent_role
 from app.db.session import get_db
-from app.modules.auth.models import AgentRole
 from app.modules.aml import service
 from app.modules.aml.schemas import (
-    AmlAlertResponse,
-    AmlAlertAction,
-    AmlEscalation,
-    NiuConflictResponse,
-    NiuConflictResolve,
-    AgencyResponse,
     AgencyCreate,
+    AgencyResponse,
     AgencyUpdate,
+    AmlAlertAction,
+    AmlAlertResponse,
+    AmlEscalation,
     BatchJobResponse,
+    DocumentExpiryListResponse,
+    GlobalNotificationRequest,
+    GlobalNotificationResponse,
+    NiuConflictResolve,
+    NiuConflictResponse,
 )
+from app.modules.auth.models import AgentRole
 
 router = APIRouter()
 
 
 @router.get("/")
-async def get_root(_agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT))):
+async def get_root(
+    _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT)),
+):
     return {"module": "aml", "status": "active"}
 
 
-# ===== AML Alerts =====
 @router.get("/alerts", response_model=list[AmlAlertResponse])
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_aml_alerts(
@@ -37,9 +41,7 @@ async def list_aml_alerts(
     db: AsyncSession = Depends(get_db),
     _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
 ):
-    """Liste des alertes AML en attente."""
-    alerts = await service.get_aml_alerts(db)
-    return alerts
+    return await service.get_aml_alerts(db)
 
 
 @router.get("/alerts/{alert_id}", response_model=AmlAlertResponse)
@@ -50,7 +52,6 @@ async def get_aml_alert(
     db: AsyncSession = Depends(get_db),
     _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
 ):
-    """Détails d'une alerte AML spécifique."""
     alert = await service.get_aml_alert_by_id(db, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -66,8 +67,7 @@ async def clear_aml_alert(
     db: AsyncSession = Depends(get_db),
     agent=Depends(require_agent_role(AgentRole.THOMAS)),
 ):
-    """Classe une alerte AML sans suite (faux positif)."""
-    success = await service.clear_aml_alert(db, alert_id, body.justification)
+    success = await service.clear_aml_alert(db, alert_id, body.justification, agent)
     if not success:
         raise HTTPException(status_code=404, detail="Alert not found")
     return {"status": "cleared", "alert_id": alert_id}
@@ -82,8 +82,13 @@ async def confirm_aml_alert(
     db: AsyncSession = Depends(get_db),
     agent=Depends(require_agent_role(AgentRole.THOMAS)),
 ):
-    """Confirme un risque AML."""
-    success = await service.confirm_aml_alert(db, alert_id, body.justification)
+    success = await service.confirm_aml_alert(
+        db,
+        alert_id,
+        body.justification,
+        agent,
+        request.client.host if request.client else None,
+    )
     if not success:
         raise HTTPException(status_code=404, detail="Alert not found")
     return {"status": "confirmed", "alert_id": alert_id}
@@ -98,14 +103,12 @@ async def escalate_aml_alert(
     db: AsyncSession = Depends(get_db),
     agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
 ):
-    """Escale une alerte AML au niveau supérieur."""
-    success = await service.escalate_aml_alert(db, alert_id, body.reason)
+    success = await service.escalate_aml_alert(db, alert_id, body.reason, agent)
     if not success:
         raise HTTPException(status_code=404, detail="Alert not found")
     return {"status": "escalated", "alert_id": alert_id}
 
 
-# ===== NIU Conflicts =====
 @router.get("/niu-conflicts", response_model=list[NiuConflictResponse])
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_niu_conflicts(
@@ -113,9 +116,7 @@ async def list_niu_conflicts(
     db: AsyncSession = Depends(get_db),
     _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
 ):
-    """Liste des conflits NIU détectés (déduplication)."""
-    conflicts = await service.get_niu_conflicts(db)
-    return conflicts
+    return await service.get_niu_conflicts(db)
 
 
 @router.post("/niu-conflicts/{conflict_id}/resolve")
@@ -127,28 +128,56 @@ async def resolve_niu_conflict(
     db: AsyncSession = Depends(get_db),
     agent=Depends(require_agent_role(AgentRole.THOMAS)),
 ):
-    """Résout un conflit NIU (fusion ou fraude)."""
     success = await service.resolve_niu_conflict(
-        db, conflict_id, body.action.value, body.justification
+        db,
+        conflict_id,
+        body.action.value,
+        body.justification,
+        agent,
     )
     if not success:
         raise HTTPException(status_code=404, detail="Conflict not found")
     return {"status": body.action.value, "conflict_id": conflict_id}
 
 
-# ===== Agencies =====
+@router.get("/document-expiry", response_model=DocumentExpiryListResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def list_document_expiry(
+    request: Request,
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
+):
+    return await service.get_document_expiry_alerts(db, page=page, limit=limit)
+
+
+@router.post("/notify-global", response_model=GlobalNotificationResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def notify_global(
+    request: Request,
+    body: GlobalNotificationRequest,
+    db: AsyncSession = Depends(get_db),
+    agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
+):
+    result = await service.notify_global_regulatory_event(
+        db,
+        notification_type=body.type,
+        message=body.message,
+        reason=body.reason,
+        agent=agent,
+    )
+    return {"created": result["created"], "eventKey": result["event_key"]}
+
+
 @router.get("/agencies", response_model=list[AgencyResponse])
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_agencies(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _agent=Depends(
-        require_agent_role(AgentRole.THOMAS, AgentRole.ADMIN_IT, AgentRole.SYLVIE)
-    ),
+    _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.ADMIN_IT, AgentRole.SYLVIE)),
 ):
-    """Liste de toutes les agences."""
-    agencies = await service.get_agencies(db)
-    return agencies
+    return await service.get_agencies(db)
 
 
 @router.post("/agencies", status_code=status.HTTP_201_CREATED)
@@ -159,9 +188,7 @@ async def create_agency(
     db: AsyncSession = Depends(get_db),
     _agent=Depends(require_agent_role(AgentRole.ADMIN_IT, AgentRole.THOMAS)),
 ):
-    """Crée une nouvelle agence."""
-    agency = await service.create_agency(db, body.code, body.name, body.city)
-    return agency
+    return await service.create_agency(db, body.code, body.name, body.city)
 
 
 @router.put("/agencies/{agency_id}")
@@ -173,7 +200,6 @@ async def update_agency_route(
     db: AsyncSession = Depends(get_db),
     _agent=Depends(require_agent_role(AgentRole.ADMIN_IT, AgentRole.THOMAS)),
 ):
-    """Met à jour une agence."""
     update_dict = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
     agency = await service.update_agency(db, agency_id, **update_dict)
     if not agency:
@@ -189,13 +215,11 @@ async def delete_agency_route(
     db: AsyncSession = Depends(get_db),
     _agent=Depends(require_agent_role(AgentRole.ADMIN_IT, AgentRole.THOMAS)),
 ):
-    """Supprime une agence."""
     success = await service.delete_agency(db, agency_id)
     if not success:
         raise HTTPException(status_code=404, detail="Agency not found")
 
 
-# ===== Batch Jobs =====
 @router.get("/batch-jobs", response_model=list[BatchJobResponse])
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def list_batch_jobs(
@@ -203,9 +227,7 @@ async def list_batch_jobs(
     db: AsyncSession = Depends(get_db),
     _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
 ):
-    """Liste des jobs batch de provisionnement Amplitude."""
-    jobs = await service.get_batch_jobs(db)
-    return jobs
+    return await service.get_batch_jobs(db)
 
 
 @router.post("/batch-jobs/trigger", status_code=status.HTTP_202_ACCEPTED)
@@ -215,8 +237,5 @@ async def trigger_batch_job(
     db: AsyncSession = Depends(get_db),
     _agent=Depends(require_agent_role(AgentRole.THOMAS)),
 ):
-    """Déclenche un job batch de provisionnement Amplitude."""
-    # TODO: Récupérer les sessions en attente de provisionnement
-    session_ids = []
-    job_id = await service.trigger_amplitude_batch(db, session_ids)
+    job_id = await service.trigger_amplitude_batch(db, [])
     return {"job_id": job_id, "status": "triggered"}

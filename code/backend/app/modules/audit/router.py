@@ -1,6 +1,6 @@
 """Module Audit API Routes."""
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import limiter
@@ -44,11 +44,22 @@ async def export_audit_log_cobac(
     date_from: str,
     date_to: str,
     db: AsyncSession = Depends(get_db),
-    _agent=Depends(require_agent_role(AgentRole.SYLVIE)),
+    _agent=Depends(require_agent_role(AgentRole.SYLVIE, AgentRole.ADMIN_IT)),
 ):
     """
     Export du journal d'audit pour le régulateur COBAC.
-    Access: SYLVIE uniquement
+    Access: SYLVIE, ADMIN_IT
     """
     entries = await service.export_audit_log_cobac(db, date_from, date_to)
-    return {"entries": entries, "count": len(entries)}
+    report = service.build_cobac_audit_report_html(
+        entries,
+        date_from=date_from,
+        date_to=date_to,
+        generated_by=getattr(_agent, "name", None),
+    )
+    filename = f"rapport-cobac-audit-{date_to}.html"
+    return Response(
+        content=report,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
