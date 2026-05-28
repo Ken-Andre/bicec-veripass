@@ -12,11 +12,13 @@ Endpoints:
 - POST /support/threads — Create support thread
 - GET  /support/threads/{id}/messages — List messages in a thread
 - POST /support/threads/{id}/messages — Send a message in a thread
+- GET  /support/messages/{id}/attachment — Download support attachment
 """
 
 import mimetypes
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Query, status
 from fastapi.responses import FileResponse
@@ -49,10 +51,15 @@ from app.modules.kyc.schemas import (
     LIFECYCLE_TO_ACCESS_TIER,
 )
 from app.modules.audit.models import AuditLog
+from app.modules.analytics.service import (
+    record_ocr_performance_best_effort,
+    track_event_best_effort,
+)
 from app.modules.kyc.storage import DocumentStorage
 from app.modules.backoffice.schemas import (
-    KYCQueueItemSchema,
     AuditLogSchema,
+    KYCQueueItemSchema,
+    KYCQueueStatsSchema,
     DossierDetailSchema,
     DossierDocumentBrief,
     DossierBiometricBrief,
@@ -74,6 +81,47 @@ from app.modules.backoffice.schemas import (
 
 router = APIRouter()
 document_storage = DocumentStorage()
+
+
+def _request_uuid(request: Request) -> uuid.UUID | None:
+    raw = getattr(request.state, "correlation_id", None)
+    try:
+        return uuid.UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
+
+
+def _attachment_filename(path: str | None) -> str | None:
+    if not path:
+        return None
+    name = Path(path).name
+    parts = name.split("_", 1)
+    return parts[1] if len(parts) == 2 else name
+
+
+def _resolve_attachment_path(path: str) -> Path:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    return (document_storage.base_path / candidate).resolve()
+
+
+async def _resolve_attachment_document_id(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    attachment_path: str | None,
+    attachment_sha256: str | None,
+) -> uuid.UUID | None:
+    if not attachment_path and not attachment_sha256:
+        return None
+    query = select(Document.id).where(Document.session_id == session_id)
+    if attachment_sha256:
+        query = query.where(Document.sha256_hash == attachment_sha256)
+    elif attachment_path:
+        query = query.where(Document.file_path == attachment_path)
+    query = query.order_by(Document.captured_at.desc())
+    result = await db.execute(query.limit(1))
+    return result.scalar_one_or_none()
 
 
 _ROLE_DECISIONS: dict[AgentRole, set[str]] = {
@@ -120,20 +168,148 @@ class CommandCenterAgentLoadSchema(BaseModel):
     email: str
     role: str
     agency_id: str | None = None
+    agency_code: str | None = None
+    agency_name: str | None = None
     is_available: bool
+    is_connected: bool
     active_dossier_count: int
+    active_queue_count: int
+    completed_dossier_count: int
+    total_assigned_count: int
     last_activity_at: str | None = None
 
 
-def _agent_load_to_response(agent: Agent) -> CommandCenterAgentLoadSchema:
+AGENT_CONNECTED_WINDOW = timedelta(minutes=5)
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _is_agent_connected(agent: Agent) -> bool:
+    last_activity_at = _as_utc(agent.last_activity_at)
+    if not last_activity_at:
+        return False
+    return datetime.now(timezone.utc) - last_activity_at <= AGENT_CONNECTED_WINDOW
+
+
+async def _count_agent_active_queue(db: AsyncSession, agent_id: uuid.UUID) -> int:
+    result = await db.execute(
+        select(func.count(func.distinct(DossierAssignment.session_id)))
+        .select_from(DossierAssignment)
+        .join(KYCSession, KYCSession.id == DossierAssignment.session_id)
+        .where(
+            DossierAssignment.agent_id == agent_id,
+            DossierAssignment.is_current == True,  # noqa: E712
+            DossierAssignment.completed_at == None,  # noqa: E711
+            KYCSession.status.in_(_REVIEW_STATES),
+        )
+    )
+    return int(result.scalar() or 0)
+
+
+async def _sync_agent_active_count(db: AsyncSession, agent_id: uuid.UUID) -> None:
+    agent = await db.get(Agent, agent_id)
+    if agent:
+        agent.active_dossier_count = await _count_agent_active_queue(db, agent_id)
+
+
+async def _agent_load_counts(
+    db: AsyncSession, agent_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, dict[str, int]]:
+    counts = {
+        agent_id: {
+            "active_queue_count": 0,
+            "completed_dossier_count": 0,
+            "total_assigned_count": 0,
+        }
+        for agent_id in agent_ids
+    }
+    if not agent_ids:
+        return counts
+
+    active_rows = await db.execute(
+        select(
+            DossierAssignment.agent_id,
+            func.count(func.distinct(DossierAssignment.session_id)),
+        )
+        .select_from(DossierAssignment)
+        .join(KYCSession, KYCSession.id == DossierAssignment.session_id)
+        .where(
+            DossierAssignment.agent_id.in_(agent_ids),
+            DossierAssignment.is_current == True,  # noqa: E712
+            DossierAssignment.completed_at == None,  # noqa: E711
+            KYCSession.status.in_(_REVIEW_STATES),
+        )
+        .group_by(DossierAssignment.agent_id)
+    )
+    for agent_id, count in active_rows.all():
+        counts[agent_id]["active_queue_count"] = int(count or 0)
+
+    completed_rows = await db.execute(
+        select(
+            ValidationDecision.agent_id,
+            func.count(func.distinct(ValidationDecision.session_id)),
+        )
+        .where(ValidationDecision.agent_id.in_(agent_ids))
+        .group_by(ValidationDecision.agent_id)
+    )
+    for agent_id, count in completed_rows.all():
+        counts[agent_id]["completed_dossier_count"] = int(count or 0)
+
+    assigned_rows = await db.execute(
+        select(
+            DossierAssignment.agent_id,
+            func.count(func.distinct(DossierAssignment.session_id)),
+        )
+        .where(DossierAssignment.agent_id.in_(agent_ids))
+        .group_by(DossierAssignment.agent_id)
+    )
+    for agent_id, count in assigned_rows.all():
+        counts[agent_id]["total_assigned_count"] = int(count or 0)
+
+    return counts
+
+
+async def _least_loaded_connected_agent(
+    db: AsyncSession, candidates: list[Agent]
+) -> Agent | None:
+    connected = [agent for agent in candidates if _is_agent_connected(agent)]
+    if not connected:
+        return None
+    counts = await _agent_load_counts(db, [agent.id for agent in connected])
+    return min(
+        connected,
+        key=lambda agent: (
+            counts[agent.id]["active_queue_count"],
+            agent.name.lower(),
+        ),
+    )
+
+
+def _agent_load_to_response(
+    agent: Agent, counts: dict[str, int]
+) -> CommandCenterAgentLoadSchema:
+    active_queue_count = counts.get("active_queue_count", 0)
+    agency = getattr(agent, "agency", None)
     return CommandCenterAgentLoadSchema(
         id=str(agent.id),
         name=agent.name,
         email=agent.email,
         role=agent.role.value if hasattr(agent.role, "value") else str(agent.role),
         agency_id=str(agent.agency_id) if agent.agency_id else None,
+        agency_code=getattr(agency, "code", None),
+        agency_name=getattr(agency, "name", None),
         is_available=agent.is_available,
-        active_dossier_count=agent.active_dossier_count or 0,
+        is_connected=_is_agent_connected(agent),
+        active_dossier_count=active_queue_count,
+        active_queue_count=active_queue_count,
+        completed_dossier_count=counts.get("completed_dossier_count", 0),
+        total_assigned_count=counts.get("total_assigned_count", 0),
         last_activity_at=agent.last_activity_at.isoformat() if agent.last_activity_at else None,
     )
 
@@ -151,12 +327,17 @@ async def list_agent_load(
     This is intentionally separate from /admin/agents: SYLVIE can supervise
     operational load, but only ADMIN_IT can create, edit, or deactivate agents.
     """
-    query = select(Agent).order_by(Agent.role.asc(), Agent.name.asc())
+    query = (
+        select(Agent)
+        .options(selectinload(Agent.agency))
+        .order_by(Agent.role.asc(), Agent.name.asc())
+    )
     total = (await db.execute(select(func.count()).select_from(Agent))).scalar_one()
     result = await db.execute(query.offset(page.offset).limit(page.limit))
     agents = result.scalars().all()
+    counts = await _agent_load_counts(db, [agent.id for agent in agents])
     return PageResponse[CommandCenterAgentLoadSchema](
-        items=[_agent_load_to_response(agent) for agent in agents],
+        items=[_agent_load_to_response(agent, counts[agent.id]) for agent in agents],
         total=total,
         page=page.page,
         pages=(total + page.limit - 1) // page.limit if total else 1,
@@ -198,6 +379,48 @@ def _extract_client_name_from_docs(documents: list) -> str | None:
     if parts:
         return " ".join(parts)
     return None
+
+
+@router.get(
+    "/queue/stats",
+    response_model=KYCQueueStatsSchema,
+)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def get_queue_stats(
+    request: Request,
+    _agent: Agent = Depends(
+        require_agent_role(
+            AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT
+        )
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Stable KYC queue counters for dashboard cards, independent of UI filters."""
+    result = await db.execute(
+        select(KYCSession.status, func.count(KYCSession.id))
+        .where(
+            KYCSession.status.in_(
+                [
+                    LifecycleState.PENDING_AGENT_REVIEW,
+                    LifecycleState.PENDING_KYC,
+                    LifecycleState.PENDING_INFO,
+                    LifecycleState.FRAUD_SUSPECT,
+                    LifecycleState.APPROVED,
+                    LifecycleState.REJECTED,
+                ]
+            )
+        )
+        .group_by(KYCSession.status)
+    )
+    counts = {status: int(count) for status, count in result.all()}
+    return KYCQueueStatsSchema(
+        pending=counts.get(LifecycleState.PENDING_AGENT_REVIEW, 0)
+        + counts.get(LifecycleState.PENDING_KYC, 0),
+        info_required=counts.get(LifecycleState.PENDING_INFO, 0),
+        fraud_suspect=counts.get(LifecycleState.FRAUD_SUSPECT, 0),
+        approved=counts.get(LifecycleState.APPROVED, 0),
+        rejected=counts.get(LifecycleState.REJECTED, 0),
+    )
 
 
 @router.get(
@@ -708,10 +931,16 @@ async def submit_review_decision(
     )
     db.add(decision_record)
 
+    closed_agent_ids: set[uuid.UUID] = set()
     for assignment in session.assignments:
         if assignment.is_current and assignment.completed_at is None:
             assignment.completed_at = now
             assignment.is_current = False
+            closed_agent_ids.add(assignment.agent_id)
+
+    await db.flush()
+    for agent_id in closed_agent_ids:
+        await _sync_agent_active_count(db, agent_id)
 
     audit = AuditLog(
         id=uuid.uuid4(),
@@ -750,6 +979,25 @@ async def submit_review_decision(
         sent_at=now,
     )
     db.add(user_notification)
+
+    event_by_decision = {
+        "APPROVED": "KYC_APPROVED",
+        "REJECTED": "KYC_REJECTED",
+        "INFO_REQUESTED": "KYC_INFO_REQUESTED",
+        "FRAUD_SUSPECT": "KYC_FRAUD_SUSPECT",
+    }
+    await track_event_best_effort(
+        db,
+        event_type=event_by_decision.get(body.decision, f"KYC_{body.decision}"),
+        session_id=session.id,
+        user_id=session.user_id,
+        agent_id=current_agent.id,
+        agency_id=session.agency_id,
+        occurred_at=now,
+        step="agent_review",
+        status=new_status,
+        request_id=_request_uuid(request),
+    )
 
     await db.commit()
 
@@ -803,6 +1051,8 @@ async def assign_dossier(
     if not target_agent.is_available:
         raise HTTPException(status_code=400, detail="Target agent is not available")
 
+    now = datetime.now(timezone.utc)
+    previous_agent_ids: set[uuid.UUID] = set()
     result = await db.execute(
         select(DossierAssignment).where(
             DossierAssignment.session_id == session_id,
@@ -812,10 +1062,10 @@ async def assign_dossier(
     )
     current_assignment = result.scalar_one_or_none()
     if current_assignment:
-        current_assignment.completed_at = datetime.now(timezone.utc)
+        current_assignment.completed_at = now
         current_assignment.is_current = False
+        previous_agent_ids.add(current_assignment.agent_id)
 
-    now = datetime.now(timezone.utc)
     assignment = DossierAssignment(
         id=uuid.uuid4(),
         session_id=session_id,
@@ -825,7 +1075,9 @@ async def assign_dossier(
     )
     db.add(assignment)
 
-    target_agent.active_dossier_count = (target_agent.active_dossier_count or 0) + 1
+    await db.flush()
+    for agent_id in previous_agent_ids | {target_agent.id}:
+        await _sync_agent_active_count(db, agent_id)
 
     audit = AuditLog(
         id=uuid.uuid4(),
@@ -868,7 +1120,7 @@ async def auto_assign_dossier(
     Algorithm:
     1. Find JEAN agents with same agency_id as the dossier (if set)
     2. Fallback to any available JEAN agent
-    3. Pick the one with lowest active_dossier_count
+    3. Pick the connected agent with the lowest live active queue count
     """
     result = await db.execute(
         select(KYCSession)
@@ -889,6 +1141,7 @@ async def auto_assign_dossier(
         Agent.is_available == True,  # noqa: E712
     )
 
+    target_agent = None
     if session.agency_id:
         same_agency = (
             select(Agent)
@@ -897,28 +1150,36 @@ async def auto_assign_dossier(
                 Agent.is_available == True,  # noqa: E712
                 Agent.agency_id == session.agency_id,
             )
-            .order_by(Agent.active_dossier_count.asc())
+            .order_by(Agent.name.asc())
         )
         result = await db.execute(same_agency)
-        target_agent = result.scalars().first()
+        target_agent = await _least_loaded_connected_agent(
+            db, list(result.scalars().all())
+        )
 
         if not target_agent:
             result = await db.execute(
-                agent_query.order_by(Agent.active_dossier_count.asc())
+                agent_query.order_by(Agent.name.asc())
             )
-            target_agent = result.scalars().first()
+            target_agent = await _least_loaded_connected_agent(
+                db, list(result.scalars().all())
+            )
     else:
         result = await db.execute(
-            agent_query.order_by(Agent.active_dossier_count.asc())
+            agent_query.order_by(Agent.name.asc())
         )
-        target_agent = result.scalars().first()
+        target_agent = await _least_loaded_connected_agent(
+            db, list(result.scalars().all())
+        )
 
     if not target_agent:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Aucun agent JEAN disponible pour assigner ce dossier.",
+            detail="Aucun agent JEAN disponible et connecte pour assigner ce dossier.",
         )
 
+    now = datetime.now(timezone.utc)
+    previous_agent_ids: set[uuid.UUID] = set()
     result = await db.execute(
         select(DossierAssignment).where(
             DossierAssignment.session_id == session_id,
@@ -928,10 +1189,10 @@ async def auto_assign_dossier(
     )
     current_assignment = result.scalar_one_or_none()
     if current_assignment:
-        current_assignment.completed_at = datetime.now(timezone.utc)
+        current_assignment.completed_at = now
         current_assignment.is_current = False
+        previous_agent_ids.add(current_assignment.agent_id)
 
-    now = datetime.now(timezone.utc)
     assignment = DossierAssignment(
         id=uuid.uuid4(),
         session_id=session_id,
@@ -940,7 +1201,9 @@ async def auto_assign_dossier(
         is_current=True,
     )
     db.add(assignment)
-    target_agent.active_dossier_count = (target_agent.active_dossier_count or 0) + 1
+    await db.flush()
+    for agent_id in previous_agent_ids | {target_agent.id}:
+        await _sync_agent_active_count(db, agent_id)
 
     audit = AuditLog(
         id=uuid.uuid4(),
@@ -1074,12 +1337,27 @@ async def list_support_messages(
     db: AsyncSession = Depends(get_db),
 ):
     """List all messages in a support thread."""
+    thread_result = await db.execute(
+        select(SupportThread).where(SupportThread.id == thread_id)
+    )
+    thread = thread_result.scalar_one_or_none()
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
+
     result = await db.execute(
         select(SupportMessage)
         .where(SupportMessage.thread_id == thread_id)
         .order_by(SupportMessage.sent_at.asc())
     )
     messages = result.scalars().all()
+    attachment_doc_ids: dict[uuid.UUID, uuid.UUID | None] = {}
+    for message in messages:
+        attachment_doc_ids[message.id] = await _resolve_attachment_document_id(
+            db,
+            thread.session_id,
+            message.attachment_path,
+            message.attachment_sha256,
+        )
     return [
         SupportMessageSchema(
             id=m.id,
@@ -1089,6 +1367,8 @@ async def list_support_messages(
             content=m.content,
             attachment_path=m.attachment_path,
             attachment_sha256=m.attachment_sha256,
+            attachment_filename=_attachment_filename(m.attachment_path),
+            attachment_document_id=attachment_doc_ids.get(m.id),
             sent_at=m.sent_at,
             read_at=m.read_at,
         )
@@ -1163,8 +1443,43 @@ async def send_support_message(
         content=message.content,
         attachment_path=message.attachment_path,
         attachment_sha256=message.attachment_sha256,
+        attachment_filename=_attachment_filename(message.attachment_path),
+        attachment_document_id=None,
         sent_at=message.sent_at,
         read_at=message.read_at,
+    )
+
+
+@router.get("/support/messages/{message_id}/attachment")
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def get_support_message_attachment(
+    request: Request,
+    message_id: uuid.UUID,
+    _agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE)
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download attachment linked to a support message."""
+    result = await db.execute(
+        select(SupportMessage).where(SupportMessage.id == message_id)
+    )
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Support message not found")
+    if not message.attachment_path:
+        raise HTTPException(status_code=404, detail="No attachment for this message")
+
+    resolved = _resolve_attachment_path(message.attachment_path)
+    if not resolved.exists() or not resolved.is_file():
+        raise HTTPException(status_code=404, detail="Attachment file not found on disk")
+
+    download_name = _attachment_filename(message.attachment_path) or resolved.name
+    return FileResponse(
+        path=str(resolved),
+        media_type=mimetypes.guess_type(resolved.name)[0]
+        or "application/octet-stream",
+        filename=download_name,
     )
 
 
@@ -1272,6 +1587,19 @@ async def correct_ocr_field(
         performed_at=now,
     )
     db.add(audit)
+    await track_event_best_effort(
+        db,
+        event_type="OCR_CORRECTED",
+        session_id=session_uuid,
+        user_id=session.user_id,
+        agent_id=current_agent.id,
+        agency_id=session.agency_id,
+        step="ocr_correction",
+        status=session.status,
+        metadata={"field_name": body.field_name, "document_id": str(doc_uuid)},
+        request_id=_request_uuid(request),
+    )
+    await record_ocr_performance_best_effort(db, doc_uuid)
 
     await db.commit()
 

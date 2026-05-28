@@ -25,6 +25,16 @@ class KYCQueueItemSchema(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class KYCQueueStatsSchema(BaseModel):
+    """Stable queue counters independent from table filters."""
+
+    pending: int = 0
+    info_required: int = 0
+    fraud_suspect: int = 0
+    approved: int = 0
+    rejected: int = 0
+
+
 class AuditLogSchema(BaseModel):
     """Audit log entry aligned with DossierTimeline component."""
 
@@ -251,6 +261,8 @@ class SupportMessageSchema(BaseModel):
     content: str
     attachment_path: Optional[str] = None
     attachment_sha256: Optional[str] = None
+    attachment_filename: Optional[str] = None
+    attachment_document_id: Optional[UUID] = None
     sent_at: datetime
     read_at: Optional[datetime] = None
 
