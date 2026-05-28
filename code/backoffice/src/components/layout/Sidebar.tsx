@@ -2,12 +2,12 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { cn } from '../../lib/utils'
 import {
-  LayoutDashboard,
   FileCheck,
   Shield,
   BarChart3,
   Command,
   Settings,
+  ScrollText,
   LogOut,
   X,
   Menu,
@@ -18,7 +18,8 @@ const navigation = [
   { name: 'Validation KYC', href: '/validation', icon: FileCheck, roles: ['JEAN'] },
   { name: 'Conformité AML', href: '/compliance', icon: Shield, roles: ['THOMAS'] },
   { name: 'Command Center', href: '/command-center', icon: Command, roles: ['SYLVIE'] },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['SYLVIE', 'THOMAS'] },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['SYLVIE', 'THOMAS', 'ADMIN_IT'] },
+  { name: 'Journal audit', href: '/admin/audit', icon: ScrollText, roles: ['SYLVIE', 'ADMIN_IT'] },
   { name: 'Administration', href: '/admin', icon: Settings, roles: ['ADMIN_IT'] },
 ]
 

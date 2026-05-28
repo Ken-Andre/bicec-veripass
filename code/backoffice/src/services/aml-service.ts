@@ -16,6 +16,10 @@ export async function fetchBatchJobs() {
   return apiGet('/aml/batch-jobs')
 }
 
+export async function fetchDocumentExpiry() {
+  return apiGet('/aml/document-expiry')
+}
+
 export async function clearAmlAlert(alertId: string, justification: string) {
   return apiPost(`/aml/alerts/${alertId}/clear`, { justification })
 }

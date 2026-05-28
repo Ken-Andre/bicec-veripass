@@ -335,6 +335,8 @@ export default function AdminPage() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      aria-label={`Modifier ${agent.name}`}
+                      title={`Modifier ${agent.name}`}
                       onClick={() => {
                         setEditTarget(agent)
                         setEditForm({ name: agent.name, email: agent.email, role: agent.role, is_available: agent.is_available })
@@ -342,11 +344,23 @@ export default function AdminPage() {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setResetTarget(agent)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Reinitialiser le mot de passe de ${agent.name}`}
+                      title={`Reinitialiser le mot de passe de ${agent.name}`}
+                      onClick={() => setResetTarget(agent)}
+                    >
                       <KeyRound className="h-4 w-4" />
                     </Button>
                     {agent.is_available && (
-                      <Button variant="ghost" size="sm" onClick={() => handleDeactivate(agent)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Desactiver ${agent.name}`}
+                        title={`Desactiver ${agent.name}`}
+                        onClick={() => handleDeactivate(agent)}
+                      >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     )}
@@ -408,6 +422,8 @@ export default function AdminPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Modifier le GAB ${atm.name}`}
+                          title={`Modifier le GAB ${atm.name}`}
                           className="h-8 w-8 p-0 text-slate-600 hover:text-teal-600 hover:bg-teal-50"
                           onClick={() => {
                             setEditAtmTarget(atm)
@@ -428,6 +444,8 @@ export default function AdminPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Supprimer le GAB ${atm.name}`}
+                          title={`Supprimer le GAB ${atm.name}`}
                           className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                           onClick={() => handleDeleteAtm(atm.id, atm.name)}
                         >
@@ -503,7 +521,7 @@ export default function AdminPage() {
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold">Nouvel agent</h2>
-              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
+              <Button variant="ghost" size="sm" aria-label="Fermer la creation d agent" onClick={() => setShowCreate(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -569,7 +587,7 @@ export default function AdminPage() {
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold">Modifier — {editTarget.name}</h2>
-              <Button variant="ghost" size="sm" onClick={() => setEditTarget(null)}>
+              <Button variant="ghost" size="sm" aria-label="Fermer la modification d agent" onClick={() => setEditTarget(null)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -635,7 +653,7 @@ export default function AdminPage() {
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold">Réinitialiser mot de passe — {resetTarget.name}</h2>
-              <Button variant="ghost" size="sm" onClick={() => setResetTarget(null)}>
+              <Button variant="ghost" size="sm" aria-label="Fermer la reinitialisation du mot de passe" onClick={() => setResetTarget(null)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -673,7 +691,7 @@ export default function AdminPage() {
                 <Plus className="h-5 w-5 text-teal-600" />
                 Nouveau Guichet GAB
               </h2>
-              <Button variant="ghost" size="sm" onClick={() => setShowCreateAtm(false)}>
+              <Button variant="ghost" size="sm" aria-label="Fermer la creation de GAB" onClick={() => setShowCreateAtm(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -769,6 +787,7 @@ export default function AdminPage() {
                 <span className="text-sm font-medium text-slate-700">Disponible 24h/24 - 7j/7</span>
                 <button
                   type="button"
+                  aria-label={atmForm.available_24h ? 'Desactiver la disponibilite 24h/24' : 'Activer la disponibilite 24h/24'}
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${atmForm.available_24h ? 'bg-teal-600' : 'bg-slate-200'}`}
                   onClick={() => setAtmForm({ ...atmForm, available_24h: !atmForm.available_24h })}
                 >
@@ -797,7 +816,7 @@ export default function AdminPage() {
                 <Pencil className="h-5 w-5 text-teal-600" />
                 Modifier GAB
               </h2>
-              <Button variant="ghost" size="sm" onClick={() => setEditAtmTarget(null)}>
+              <Button variant="ghost" size="sm" aria-label="Fermer la modification de GAB" onClick={() => setEditAtmTarget(null)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -893,6 +912,7 @@ export default function AdminPage() {
                 <span className="text-sm font-medium text-slate-700">Disponible 24h/24 - 7j/7</span>
                 <button
                   type="button"
+                  aria-label={atmForm.available_24h ? 'Desactiver la disponibilite 24h/24' : 'Activer la disponibilite 24h/24'}
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${atmForm.available_24h ? 'bg-teal-600' : 'bg-slate-200'}`}
                   onClick={() => setAtmForm({ ...atmForm, available_24h: !atmForm.available_24h })}
                 >

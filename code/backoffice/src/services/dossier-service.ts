@@ -21,9 +21,22 @@ export interface PageResponse<T> {
   pages: number
 }
 
-export async function fetchQueue(): Promise<QueueItem[]> {
-  const res = await apiGet<PageResponse<QueueItem>>('/backoffice/queue')
+export interface QueueStats {
+  pending: number
+  info_required: number
+  fraud_suspect: number
+  approved: number
+  rejected: number
+}
+
+export async function fetchQueue(status?: string): Promise<QueueItem[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : ''
+  const res = await apiGet<PageResponse<QueueItem>>(`/backoffice/queue${query}`)
   return res.items
+}
+
+export async function fetchQueueStats(): Promise<QueueStats> {
+  return apiGet('/backoffice/queue/stats')
 }
 
 export async function fetchDossier(id: string) {
@@ -33,7 +46,7 @@ export async function fetchDossier(id: string) {
 export async function fetchAuditLog(sessionId?: string) {
   const path = sessionId
     ? `/backoffice/audit-logs?session_id=${sessionId}`
-    : '/backoffice/audit-logs'
+    : '/backoffice/audit-logs?limit=100'
   const res = await apiGet<PageResponse<unknown>>(path)
   return res.items.map((item: any) => ({
     ...item,

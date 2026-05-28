@@ -12,8 +12,7 @@ export enum AmlSeverity {
 }
 
 export enum AmlAlertStatus {
-  PENDING = 'PENDING',
-  UNDER_REVIEW = 'UNDER_REVIEW',
+  OPEN = 'OPEN',
   CLEARED = 'CLEARED',
   CONFIRMED = 'CONFIRMED',
   ESCALATED = 'ESCALATED',
@@ -59,7 +58,7 @@ export interface NiuConflict {
     confidence: number;
   };
   similarityScore: number;
-  status: 'PENDING' | 'MERGED' | 'FRAUD';
+  status: 'OPEN' | 'MERGED' | 'FRAUD';
 }
 
 export interface Agency {
@@ -80,4 +79,22 @@ export interface BatchJob {
   failedItems: number;
   startedAt: string;
   completedAt?: string;
+}
+
+export interface DocumentExpiryItem {
+  sessionId: string;
+  clientName: string;
+  status: string;
+  accessLevel: string;
+  expiryDate: string | null;
+  state: 'expired' | 'expiring';
+  notifiedAt?: string | null;
+  contact?: string | null;
+}
+
+export interface DocumentExpiryResponse {
+  items: DocumentExpiryItem[];
+  total: number;
+  page: number;
+  limit: number;
 }

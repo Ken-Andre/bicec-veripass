@@ -30,7 +30,7 @@ export default defineConfig(async ({ mode }) => {
   }
 
   return {
-    base: './',
+    base: '/back-office/',
     plugins,
     resolve: {
       alias: {
