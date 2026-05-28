@@ -13,7 +13,7 @@ from docx.enum.style import WD_STYLE_TYPE
 
 OUT_DIR = Path(__file__).resolve().parent
 WORKSPACE = OUT_DIR.parents[1]
-DOCX_PATH = OUT_DIR / "memoire-stage-andre-yoann-kenmogne-v1.docx"
+DOCX_PATH = OUT_DIR / "memoire-stage-andre-yoann-kenmogne-v2.docx"
 FIG_DIR = OUT_DIR / "figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -95,6 +95,8 @@ def configure_styles(doc):
         style.paragraph_format.line_spacing = 1.5
         style.paragraph_format.space_before = Pt(before)
         style.paragraph_format.space_after = Pt(after)
+        if name == "Heading 1":
+            style.paragraph_format.page_break_before = True
 
     caption = styles.add_style("Caption Memoire", WD_STYLE_TYPE.PARAGRAPH)
     style_font(caption, "Arial", 11, GRAY)
@@ -262,7 +264,7 @@ def add_cover(doc):
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = p.add_run("Cycle ingénieur X5 - UCAC-ICAM")
+    r = p.add_run("Cycle ingénieur X5, UCAC-ICAM")
     set_run_font(r, size=13, color=GRAY, bold=True)
 
     doc.add_paragraph()
@@ -288,7 +290,7 @@ def add_cover(doc):
         ("Entreprise d'accueil", "Banque Internationale du Cameroun pour l'Epargne et le Crédit (BICEC)"),
         ("Département", "Etude & Développement"),
         ("Tuteur entreprise", "M. Jackson Parfait KOMBE LELE"),
-        ("Encadreur institut", "[Nom de l'encadreur UCAC-ICAM à compléter]"),
+        ("Encadreur institut", "M. EWOLO MODO Igor Salomon"),
         ("Période de stage", "du 19 janvier 2026 au 18 juin 2026"),
     ]
     for idx, (label, value) in enumerate(rows):
@@ -425,118 +427,10 @@ def add_preliminaries(doc):
     for text in [
         "Je tiens à exprimer ma reconnaissance à la Banque Internationale du Cameroun pour l'Epargne et le Crédit (BICEC) pour m'avoir accueilli dans un environnement professionnel exigeant, au contact direct d'un projet bancaire à forte portée opérationnelle et réglementaire.",
         "Mes remerciements vont particulièrement à M. Jackson Parfait KOMBE LELE, Responsable du Département Etude & Développement, pour son encadrement, sa disponibilité et la confiance accordée dans la réalisation de ce projet. Je remercie également les équipes de la BICEC qui ont contribué, par leurs échanges et leurs exigences métier, à donner au projet une orientation concrète et utile.",
-        "J'adresse aussi mes remerciements à l'UCAC-ICAM et à mes encadreurs académiques pour la formation reçue, l'accompagnement méthodologique et l'exigence qui structure ce mémoire de fin d'études.",
+        "J'adresse aussi mes remerciements à l'UCAC-ICAM, ainsi qu'à M. EWOLO MODO Igor Salomon, mon encadreur académique, pour l'accompagnement méthodologique et l'exigence qui structurent ce mémoire de fin d'études.",
         "Enfin, je remercie ma famille, mes proches et toutes les personnes qui m'ont soutenu durant cette période de stage. Leur présence a été déterminante dans la conduite de ce travail."
     ]:
         add_front_paragraph(doc, text)
-
-    doc.add_page_break()
-    add_page_title(doc, "Résumé")
-    for text in [
-        "Ce mémoire présente la conception et le développement de BICEC VeriPass, un écosystème intelligent d'acquisition client destiné à digitaliser l'entrée en relation bancaire et à renforcer l'automatisation contrôlée de la conformité Know Your Customer (KYC). Le projet s'inscrit dans un contexte de transformation du secteur bancaire camerounais, marqué par la pression concurrentielle des fintechs et du Mobile Money, par les attentes de rapidité des clients et par le renforcement des exigences de vigilance imposées aux établissements assujettis.",
-        "La solution proposée vise à réduire les délais de constitution du dossier client, à limiter les erreurs de saisie, à améliorer la traçabilité des contrôles et à fournir aux agents de conformité un dossier numérique complet. Elle combine une application mobile de capture, un backend FastAPI, une base PostgreSQL, des traitements asynchrones Redis/Celery, des mécanismes OCR et biométriques, ainsi qu'un backoffice de validation humaine. L'automatisation n'a pas pour objectif de supprimer le contrôle humain ; elle prépare, structure et qualifie le dossier afin que la décision finale reste explicable, documentée et auditée.",
-        "Le mémoire analyse d'abord le contexte institutionnel, réglementaire et opérationnel du projet, puis présente l'architecture fonctionnelle et technique de la solution. Il met en évidence la façon dont les choix d'implémentation répondent aux enjeux de souveraineté des données, d'auditabilité, de sécurité documentaire et d'expérience client."
-    ]:
-        add_front_paragraph(doc, text)
-    p = doc.add_paragraph(style="Front Matter")
-    r = p.add_run("Mots-clés : ")
-    set_run_font(r, size=12, bold=True)
-    p.add_run("KYC, COBAC, onboarding digital, OCR, biométrie, conformité bancaire, FastAPI, React PWA, audit trail, BICEC.")
-
-    doc.add_page_break()
-    add_page_title(doc, "Abstract")
-    for text in [
-        "This report presents the design and development of BICEC VeriPass, an intelligent customer acquisition ecosystem built to digitize bank onboarding and strengthen controlled automation of Know Your Customer (KYC) compliance. The project takes place in the Cameroonian banking context, where banks face stronger competition from fintech and mobile money services, increasing customer expectations for speed, and stricter due diligence obligations.",
-        "The proposed solution reduces dossier preparation time, limits manual data entry errors, improves compliance traceability, and provides backoffice agents with structured digital evidence. It combines a mobile capture journey, a FastAPI backend, PostgreSQL persistence, Redis/Celery asynchronous processing, OCR and biometric verification mechanisms, and a human validation backoffice. Automation does not replace the compliance decision; it prepares and qualifies the dossier so that final activation remains explainable, documented, and auditable.",
-        "The report first analyzes the institutional, regulatory and operational context, then presents the functional and technical architecture of the solution. It highlights how the implementation choices answer data sovereignty, auditability, document security and customer experience requirements."
-    ]:
-        add_front_paragraph(doc, text)
-    p = doc.add_paragraph(style="Front Matter")
-    r = p.add_run("Keywords: ")
-    set_run_font(r, size=12, bold=True)
-    p.add_run("KYC, COBAC, digital onboarding, OCR, biometrics, banking compliance, FastAPI, React PWA, audit trail, BICEC.")
-
-    doc.add_page_break()
-    add_page_title(doc, "Sommaire provisoire")
-    add_front_paragraph(
-        doc,
-        "Le sommaire ci-dessous reprend la structure complète du mémoire. Les numéros de page seront actualisés automatiquement dans la version finale, après stabilisation de toutes les sections et annexes."
-    )
-    add_caption_above(doc, "Tableau 1. Structure prévue du mémoire")
-    table = doc.add_table(rows=1, cols=2)
-    table.rows[0].cells[0].text = "Partie"
-    table.rows[0].cells[1].text = "Contenu"
-    rows = [
-        ("Introduction générale", "Contexte, problématique, objectifs, méthodologie et plan du mémoire"),
-        ("Chapitre 1", "Réglementation COBAC, présentation de la BICEC et analyse du processus KYC existant"),
-        ("Chapitre 2", "Analyse fonctionnelle, architecture cible et conception du pipeline de données KYC"),
-        ("Chapitre 3", "Implémentation, tests, résultats et limites de la solution BICEC VeriPass"),
-        ("Conclusion générale", "Bilan du stage, apports, limites et perspectives"),
-        ("Annexes", "Sujet validé, extraits d'architecture, captures, contrats API et preuves de tests"),
-    ]
-    for left, right in rows:
-        cells = table.add_row().cells
-        cells[0].text = left
-        cells[1].text = right
-    format_table(table)
-
-    doc.add_page_break()
-    add_page_title(doc, "Listes préliminaires")
-    doc.add_heading("Liste des tableaux", level=2)
-    for item in [
-        "Tableau 1. Structure prévue du mémoire",
-        "Tableau 2. Abréviations utilisées",
-        "Tableau 3. Fiche signalétique synthétique de la BICEC",
-        "Tableau 4. Traduction des exigences réglementaires en mécanismes projet",
-        "Tableau 5. Limites du processus manuel et réponse attendue du pipeline numérique",
-    ]:
-        doc.add_paragraph(item, style="Front Matter")
-    doc.add_heading("Liste des figures", level=2)
-    doc.add_paragraph("Figure 1. Chaîne fonctionnelle du pipeline KYC VeriPass", style="Front Matter")
-
-    doc.add_page_break()
-    add_page_title(doc, "Liste des abréviations")
-    add_caption_above(doc, "Tableau 2. Abréviations utilisées")
-    table = doc.add_table(rows=1, cols=2)
-    table.rows[0].cells[0].text = "Abréviation"
-    table.rows[0].cells[1].text = "Signification"
-    rows = [
-        ("AML/CFT", "Anti-Money Laundering / Countering the Financing of Terrorism"),
-        ("API", "Application Programming Interface"),
-        ("BEAC", "Banque des Etats de l'Afrique Centrale"),
-        ("BICEC", "Banque Internationale du Cameroun pour l'Epargne et le Crédit"),
-        ("CEMAC", "Communauté Economique et Monétaire de l'Afrique Centrale"),
-        ("CNI", "Carte Nationale d'Identité"),
-        ("COBAC", "Commission Bancaire de l'Afrique Centrale"),
-        ("KYC", "Know Your Customer"),
-        ("LBC/FT", "Lutte contre le blanchiment de capitaux et le financement du terrorisme"),
-        ("NIU", "Numéro d'Identifiant Unique"),
-        ("OCR", "Optical Character Recognition"),
-        ("PFE", "Projet de Fin d'Etudes"),
-        ("PWA", "Progressive Web Application"),
-        ("RBAC", "Role-Based Access Control"),
-    ]
-    for abbr, meaning in rows:
-        cells = table.add_row().cells
-        cells[0].text = abbr
-        cells[1].text = meaning
-    format_table(table)
-
-    doc.add_page_break()
-    add_page_title(doc, "Glossaire")
-    gloss = [
-        ("Audit trail", "Journal horodaté des actions réalisées sur un dossier, permettant de reconstituer qui a fait quoi, quand et pourquoi."),
-        ("Backoffice", "Interface interne utilisée par les agents BICEC pour traiter, contrôler et décider sur les dossiers clients."),
-        ("Face matching", "Comparaison biométrique entre le visage capturé lors du selfie et la photographie du document d'identité."),
-        ("Liveness", "Vérification de vivacité destinée à s'assurer que la personne filmée est présente physiquement et qu'il ne s'agit pas d'une photo, d'un écran ou d'une attaque de présentation."),
-        ("Pipeline KYC", "Chaîne de traitement qui collecte les pièces, extrait les données, contrôle leur cohérence, qualifie le risque, stocke les preuves et route le dossier vers la validation humaine."),
-        ("Souveraineté des données", "Principe selon lequel les données sensibles restent maîtrisées localement, avec des choix d'hébergement, de stockage et de traitement compatibles avec les contraintes de l'organisation et du pays."),
-    ]
-    for term, definition in gloss:
-        p = doc.add_paragraph(style="Front Matter")
-        r = p.add_run(term + " : ")
-        set_run_font(r, bold=True)
-        p.add_run(definition)
 
 
 def add_body(doc):
