@@ -48,6 +48,10 @@ from app.modules.kyc.service import (
     FACE_MATCH_STATUS_PASSED,
 )
 from app.modules.audit.models import AuditLog
+from app.modules.analytics.service import (
+    record_ocr_performance_best_effort,
+    track_event_best_effort,
+)
 from app.modules.kyc.schemas import (
     KYCSessionResponse,
     KYCSubmitResponse,
@@ -91,6 +95,14 @@ def _normalize_sha256(value: str) -> str:
 
 def _is_valid_sha256(value: str) -> bool:
     return bool(SHA256_HEX_RE.fullmatch(value.strip()))
+
+
+def _request_uuid(request: Request) -> uuid.UUID | None:
+    raw = getattr(request.state, "correlation_id", None)
+    try:
+        return uuid.UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
 
 
 def _float_or_none(value) -> float | None:
@@ -299,6 +311,31 @@ async def _store_document_and_create_record(
 
     await db.refresh(doc, attribute_names=["ocr_fields"])
 
+    await track_event_best_effort(
+        db,
+        event_type="DOCUMENT_UPLOADED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        occurred_at=doc.captured_at,
+        step=f"upload_{doc_type.lower()}",
+        status=doc.ocr_status,
+        metadata={"doc_type": doc.doc_type, "file_size_bytes": doc.file_size_bytes},
+    )
+    await track_event_best_effort(
+        db,
+        event_type="OCR_FAILED" if doc.ocr_status == "FAILED" else "OCR_COMPLETED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        occurred_at=doc.captured_at,
+        step="ocr",
+        status=doc.ocr_status,
+        metadata={"doc_type": doc.doc_type, "engine": doc.ocr_engine},
+    )
+    await record_ocr_performance_best_effort(db, doc.id)
+    await db.commit()
+
     logger.info(
         "Document %s uploaded for session %s — ocr_status=%s",
         doc_type,
@@ -481,6 +518,17 @@ async def start_kyc_session(
         raise
 
     logger.info(f"KYC session started for user {current_user.id}")
+    await track_event_best_effort(
+        db,
+        event_type="KYC_SESSION_STARTED",
+        session_id=session.id,
+        user_id=current_user.id,
+        occurred_at=session.started_at,
+        step="start",
+        status=session.status,
+        request_id=_request_uuid(request),
+    )
+    await db.commit()
     return _session_start_response(session, existing=False)
 
 
@@ -695,6 +743,27 @@ async def submit_ocr_review(
 
     session.last_step_completed = "ocr_review"
     session.ocr_review_confirmed = True
+    await track_event_best_effort(
+        db,
+        event_type="OCR_CORRECTED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        step="ocr_review",
+        status=session.status,
+        metadata={"corrected_fields": sorted(body.fields.keys())},
+        request_id=_request_uuid(request),
+    )
+    await track_event_best_effort(
+        db,
+        event_type="OCR_REVIEW_CONFIRMED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        step="ocr_review",
+        status=session.status,
+        request_id=_request_uuid(request),
+    )
     await db.commit()
 
     return {"status": "success", "message": "OCR review submitted"}
@@ -853,6 +922,7 @@ async def submit_liveness(
         body.landmarks_json,
         body.challenge_type,
     )
+
     challenge_passed = is_liveness_challenge_passed(
         body.landmarks_json,
         body.challenge_type,
@@ -870,9 +940,31 @@ async def submit_liveness(
             current_user.liveness_lockout_count_24h = (
                 (current_user.liveness_lockout_count_24h or 0) + 1
             )
+            await track_event_best_effort(
+                db,
+                event_type="LIVENESS_FAILED",
+                session_id=session.id,
+                user_id=session.user_id,
+                agency_id=session.agency_id,
+                step="liveness",
+                status=session.status,
+                metadata={"locked": True, "anti_spoofing_score": anti_spoofing_score},
+                request_id=_request_uuid(request),
+            )
             await db.commit()
             return _locked_liveness_response(current_user.liveness_lockout_count_24h)
 
+        await track_event_best_effort(
+            db,
+            event_type="LIVENESS_FAILED",
+            session_id=session.id,
+            user_id=session.user_id,
+            agency_id=session.agency_id,
+            step="liveness",
+            status=session.status,
+            metadata={"locked": False, "anti_spoofing_score": anti_spoofing_score},
+            request_id=_request_uuid(request),
+        )
         await db.commit()
         return LivenessResultResponse(
             is_alive=False,
@@ -905,6 +997,17 @@ async def submit_liveness(
 
     if face_match_result.status == FACE_MATCH_STATUS_FAILED:
         session.priority_flag = True
+        await track_event_best_effort(
+            db,
+            event_type="FACE_MATCH_FAILED",
+            session_id=session.id,
+            user_id=session.user_id,
+            agency_id=session.agency_id,
+            step="face_match",
+            status=session.status,
+            metadata={"score": face_match_result.score, "reason": face_match_result.reason},
+            request_id=_request_uuid(request),
+        )
 
     result = await db.execute(
         select(BiometricResult).where(BiometricResult.session_id == session.id)
@@ -953,6 +1056,20 @@ async def submit_liveness(
 
     session.liveness_strike_count = 0
     session.last_step_completed = "liveness"
+    await track_event_best_effort(
+        db,
+        event_type="LIVENESS_PASSED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        step="liveness",
+        status=session.status,
+        metadata={
+            "anti_spoofing_score": anti_spoofing_score,
+            "face_match_status": face_match_result.status,
+        },
+        request_id=_request_uuid(request),
+    )
     await db.commit()
 
     return LivenessResultResponse(
@@ -1074,6 +1191,17 @@ async def submit_consent(
         )
         db.add(consent)
     session.last_step_completed = "consent"
+    await track_event_best_effort(
+        db,
+        event_type="CONSENT_SUBMITTED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        occurred_at=consent.signed_at,
+        step="consent",
+        status=session.status,
+        request_id=_request_uuid(request),
+    )
     await db.commit()
 
     return ConsentRecordResponse(
@@ -1378,7 +1506,29 @@ async def submit_kyc(
         performed_at=now,
     )
     db.add(audit)
+    await track_event_best_effort(
+        db,
+        event_type="KYC_SUBMITTED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        occurred_at=now,
+        step="submission",
+        status=new_status,
+        request_id=_request_uuid(request),
+    )
     await db.commit()
+
+    try:
+        from app.tasks.kyc import celery_screen_session_against_sanctions
+
+        celery_screen_session_against_sanctions.delay(str(session.id))
+    except Exception as exc:
+        logger.warning(
+            "Unable to enqueue AML screening for session %s: %s",
+            session.id,
+            exc,
+        )
 
     logger.info(f"KYC submitted for user {current_user.id}, session {session.id}")
     message = "Dossier soumis avec succès. Un agent validera votre dossier sous 24-48h."

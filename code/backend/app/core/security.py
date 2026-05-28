@@ -296,6 +296,14 @@ async def get_current_agent(
             detail="Agent not found",
         )
 
+    now = datetime.now(timezone.utc)
+    last_activity_at = agent.last_activity_at
+    if last_activity_at and last_activity_at.tzinfo is None:
+        last_activity_at = last_activity_at.replace(tzinfo=timezone.utc)
+    if not last_activity_at or now - last_activity_at > timedelta(minutes=1):
+        agent.last_activity_at = now
+        await db.commit()
+
     return agent
 
 

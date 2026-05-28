@@ -237,7 +237,7 @@ class DossierAssignment(Base):
 
 
 class AmlAlertStatus(str, Enum):
-    PENDING = "PENDING"
+    OPEN = "OPEN"
     CLEARED = "CLEARED"
     CONFIRMED = "CONFIRMED"
     ESCALATED = "ESCALATED"
@@ -305,9 +305,16 @@ class DuplicateCheck(Base):
     )
 
     match_type = Column(String(50), nullable=False)
+    niu_number = Column(String(32), nullable=True)
+    similarity_score = Column(Numeric(5, 4), nullable=True)
+    status = Column(String(50), nullable=False, default="OPEN")
     resolution = Column(String(50), nullable=True)
+    justification = Column(Text, nullable=True)
     resolved_by = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     # Relationships
     session_new = relationship(
