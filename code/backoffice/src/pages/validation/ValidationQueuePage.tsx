@@ -1,4 +1,4 @@
-import { useQueue } from '@/hooks/useQueryHooks';
+import { useQueue, useQueueStats } from '@/hooks/useQueryHooks';
 import { usePagination } from '@/hooks/usePagination';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +14,15 @@ import { Eye, Filter, Search, Loader2, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useMemo } from 'react';
 import type { QueueItem } from '@/services/dossier-service';
+
+const labelsByStatus: Record<string, string> = {
+  PENDING_AGENT_REVIEW: 'En attente',
+  PENDING_KYC: 'En attente',
+  APPROVED: 'Approuve',
+  REJECTED: 'Rejete',
+  FRAUD_SUSPECT: 'Fraude suspectee',
+  PENDING_INFO: 'Infos requises',
+};
 
 function getStatusBadge(status: string) {
   const variants: Record<string, 'warning' | 'default' | 'success' | 'danger' | 'secondary'> = {
@@ -42,15 +51,14 @@ function getStatusBadge(status: string) {
 export default function ValidationQueuePage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const { data: sessions, isLoading, error } = useQueue();
+  const [statusFilter, setStatusFilter] = useState<string>('ACTIVE');
+  const apiStatus = statusFilter === 'ACTIVE' ? undefined : statusFilter;
+  const { data: sessions, isLoading, error } = useQueue(apiStatus);
+  const { data: queueStats } = useQueueStats();
 
   const filtered = useMemo(() => {
     if (!sessions) return [];
     let result = sessions as QueueItem[];
-    if (statusFilter !== 'ALL') {
-      result = result.filter((s) => s.status === statusFilter);
-    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter((s) => {
@@ -60,24 +68,23 @@ export default function ValidationQueuePage() {
       });
     }
     return result;
-  }, [sessions, statusFilter, search]);
+  }, [sessions, search]);
 
-  const activeStatusCounts = useMemo(() => {
-    if (!sessions) return { pending: 0, review: 0, aml: 0, approved: 0 };
-    const list = sessions as QueueItem[];
-    return {
-      pending: list.filter((s) => s.status === 'PENDING_AGENT_REVIEW' || s.status === 'PENDING_KYC').length,
-      review: list.filter((s) => s.status === 'PENDING_INFO').length,
-      aml: list.filter((s) => s.status === 'FRAUD_SUSPECT').length,
-      approved: list.filter((s) => s.status === 'APPROVED').length,
-    };
-  }, [sessions]);
+  const queueCounts = {
+    pending: queueStats?.pending ?? 0,
+    review: queueStats?.info_required ?? 0,
+    aml: queueStats?.fraud_suspect ?? 0,
+    approved: queueStats?.approved ?? 0,
+  };
 
   const { page, setPage, pageData, totalPages, totalItems } = usePagination(filtered, 10);
 
   const unassignedItems = useMemo(() => {
+    if (statusFilter !== 'ACTIVE') return [];
     return (sessions as QueueItem[] || []).filter((s) => !s.assigned_agent_name);
-  }, [sessions]);
+  }, [sessions, statusFilter]);
+
+  const scopeLabel = statusFilter === 'ACTIVE' ? 'a traiter' : (labelsByStatus[statusFilter] || statusFilter);
 
   if (isLoading) {
     return (
@@ -105,7 +112,7 @@ export default function ValidationQueuePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">File de validation</h1>
           <p className="text-muted-foreground mt-1">
-            Dossiers KYC en attente de revue — {totalItems} dossier{totalItems !== 1 ? 's' : ''}
+            Dossiers KYC {scopeLabel} — {totalItems} dossier{totalItems !== 1 ? 's' : ''}
           </p>
         </div>
         <div className="flex gap-2">
@@ -116,7 +123,7 @@ export default function ValidationQueuePage() {
               const first = unassignedItems[0];
               if (first) navigate(`/validation/dossier/${first.id}`);
             }}
-            disabled={unassignedItems.length === 0}
+            disabled={statusFilter !== 'ACTIVE' || unassignedItems.length === 0}
             title="Prendre le prochain dossier non assigné"
           >
             <UserCheck className="h-4 w-4 mr-1" />
@@ -127,12 +134,12 @@ export default function ValidationQueuePage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { label: 'En attente', value: activeStatusCounts.pending, color: 'bg-yellow-100 text-yellow-800' },
-          { label: 'Infos requises', value: activeStatusCounts.review, color: 'bg-blue-100 text-blue-800' },
-          { label: 'AML en cours', value: activeStatusCounts.aml, color: 'bg-purple-100 text-purple-800' },
-          { label: 'Approuvés', value: activeStatusCounts.approved, color: 'bg-green-100 text-green-800' },
+          { key: 'pending', label: 'En attente', value: queueCounts.pending, color: 'bg-yellow-100 text-yellow-800' },
+          { key: 'info-required', label: 'Infos requises', value: queueCounts.review, color: 'bg-blue-100 text-blue-800' },
+          { key: 'aml', label: 'AML en cours', value: queueCounts.aml, color: 'bg-purple-100 text-purple-800' },
+          { key: 'approved', label: 'Approuvés', value: queueCounts.approved, color: 'bg-green-100 text-green-800' },
         ].map((stat) => (
-          <Card key={stat.label}>
+          <Card key={stat.label} data-testid={`queue-stat-${stat.key}`}>
             <CardHeader className="pb-2">
               <CardDescription>{stat.label}</CardDescription>
             </CardHeader>
@@ -161,7 +168,7 @@ export default function ValidationQueuePage() {
                 <SelectValue placeholder="Filtrer par statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Tous les statuts</SelectItem>
+                <SelectItem value="ACTIVE">Dossiers actifs</SelectItem>
                 <SelectItem value="PENDING_AGENT_REVIEW">En attente</SelectItem>
                 <SelectItem value="PENDING_INFO">Infos requises</SelectItem>
                 <SelectItem value="FRAUD_SUSPECT">Fraude suspectée</SelectItem>

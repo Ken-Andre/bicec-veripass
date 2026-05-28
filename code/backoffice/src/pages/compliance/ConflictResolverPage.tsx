@@ -12,13 +12,34 @@ import {
 } from '@/components/ui/Table';
 import { ChevronLeft, ChevronRight, GitMerge, AlertTriangle, Loader2, X } from 'lucide-react';
 import { useState } from 'react';
+import { Textarea } from '@/components/ui/Textarea';
+import { resolveNiuConflict } from '@/services/aml-service';
 
 export default function ConflictResolverPage() {
-  const { data: conflicts, isLoading } = useNiuConflicts();
+  const { data: conflicts, isLoading, refetch } = useNiuConflicts();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [justification, setJustification] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const { page, setPage, pageData, totalPages, totalItems } = usePagination(conflicts || [], 5);
 
   const selected = (conflicts || []).find((c: { id: string }) => c.id === selectedId);
+
+  const handleResolve = async (action: 'MERGED' | 'FRAUD') => {
+    if (!selected || !justification.trim()) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await resolveNiuConflict(selected.id, action, justification.trim());
+      setJustification('');
+      setSelectedId(null);
+      await refetch();
+    } catch (err: any) {
+      setActionError(err?.detail || 'Action impossible');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -59,7 +80,7 @@ export default function ConflictResolverPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={c.status === 'PENDING' ? 'default' : 'secondary'}>{c.status}</Badge>
+                      <Badge variant={c.status === 'OPEN' ? 'default' : 'secondary'}>{c.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant={selectedId === c.id ? 'default' : 'outline'} onClick={() => setSelectedId(c.id)}>
@@ -90,6 +111,9 @@ export default function ConflictResolverPage() {
             <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-warning" /> Comparaison détaillée — {selected.niu}</CardTitle>
           </CardHeader>
           <CardContent>
+            {actionError && (
+              <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{actionError}</div>
+            )}
             <div className="grid md:grid-cols-2 gap-6">
               {/* Session A */}
               <Card>
@@ -114,9 +138,28 @@ export default function ConflictResolverPage() {
                 </CardContent>
               </Card>
             </div>
+            <Textarea
+              value={justification}
+              onChange={(event) => setJustification(event.target.value)}
+              placeholder="Justification obligatoire..."
+              className="mt-4 min-h-[84px]"
+            />
             <div className="flex gap-3 mt-4">
-              <Button className="flex-1"><GitMerge className="h-4 w-4 mr-2" /> Fusionner</Button>
-              <Button variant="destructive" className="flex-1"><X className="h-4 w-4 mr-2" /> Marquer fraude</Button>
+              <Button
+                className="flex-1"
+                disabled={actionLoading || !justification.trim()}
+                onClick={() => handleResolve('MERGED')}
+              >
+                <GitMerge className="h-4 w-4 mr-2" /> Fusionner
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                disabled={actionLoading || !justification.trim()}
+                onClick={() => handleResolve('FRAUD')}
+              >
+                <X className="h-4 w-4 mr-2" /> Marquer fraude
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -1,14 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { AlertTriangle, CheckCircle, RefreshCw, Download, Activity, Loader2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Download, Activity, Loader2, Wifi, Users } from 'lucide-react'
 import { fetchDashboardStats } from '@/services/dossier-service'
 import { apiGet } from '@/services/api-client'
 
+type AgentLoad = {
+  id: string
+  name: string
+  email: string
+  role: string
+  agency_id: string | null
+  agency_code?: string | null
+  agency_name?: string | null
+  is_available: boolean
+  is_connected?: boolean
+  active_dossier_count: number
+  active_queue_count?: number
+  completed_dossier_count?: number
+  total_assigned_count?: number
+  last_activity_at?: string | null
+}
+
 export default function CommandCenterPage() {
   const [stats, setStats] = useState<any>(null)
-  const [agents, setAgents] = useState<any[]>([])
+  const [agents, setAgents] = useState<AgentLoad[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,8 +62,41 @@ export default function CommandCenterPage() {
   const validatedToday = parseInt(stats?.summary?.find((s: any) => s.name.includes('Valid'))?.value || '0')
   const toTreat = parseInt(stats?.summary?.find((s: any) => s.name.includes('traiter'))?.value || '0')
 
-  const jeanAgents = agents.filter((a: any) => a.role === 'JEAN')
-  const availableAgents = jeanAgents.filter((a: any) => a.is_available)
+  const jeanAgents = agents.filter((a) => a.role === 'JEAN')
+  const availableAgents = jeanAgents.filter((a) => a.is_available)
+  const connectedAgents = jeanAgents.filter((a) => a.is_connected)
+  const agencyLoads = useMemo(() => {
+    const groups = new Map<string, {
+      label: string
+      agents: AgentLoad[]
+      active: number
+      completed: number
+      totalAssigned: number
+      available: number
+      connected: number
+    }>()
+    jeanAgents.forEach((agent) => {
+      const key = agent.agency_id || 'unassigned'
+      const label = agent.agency_code || agent.agency_name || 'Sans agence'
+      const current = groups.get(key) || {
+        label,
+        agents: [],
+        active: 0,
+        completed: 0,
+        totalAssigned: 0,
+        available: 0,
+        connected: 0,
+      }
+      current.agents.push(agent)
+      current.active += agent.active_queue_count ?? agent.active_dossier_count ?? 0
+      current.completed += agent.completed_dossier_count ?? 0
+      current.totalAssigned += agent.total_assigned_count ?? 0
+      current.available += agent.is_available ? 1 : 0
+      current.connected += agent.is_connected ? 1 : 0
+      groups.set(key, current)
+    })
+    return Array.from(groups.values()).sort((a, b) => b.active - a.active || a.label.localeCompare(b.label))
+  }, [jeanAgents])
 
   return (
     <div className="space-y-6">
@@ -67,11 +117,24 @@ export default function CommandCenterPage() {
 
       {!loading && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
-                  <div className={`h-3 w-3 rounded-full ${agents.length > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'} flex-shrink-0`} />
+                  <Wifi className="h-8 w-8 text-blue-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-2xl font-bold">
+                      {connectedAgents.length}/{jeanAgents.length}
+                    </p>
+                    <p className="text-sm text-slate-500">Agents connectes</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <Users className="h-8 w-8 text-green-500 flex-shrink-0" />
                   <div>
                     <p className="text-2xl font-bold">
                       {availableAgents.length}/{jeanAgents.length}
@@ -143,37 +206,51 @@ export default function CommandCenterPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Repartition de charge</CardTitle>
-                <CardDescription>Distribution des dossiers par agent JEAN</CardDescription>
+                <CardDescription>Charge active par agence, historique separe</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {jeanAgents.length === 0 ? (
+                  {agencyLoads.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Aucun agent JEAN trouve</p>
                   ) : (
-                    jeanAgents.map((agent: any) => {
-                      const load = agent.active_dossier_count || 0
-                      const maxPerAgent = 6
-                      const pct = Math.min((load / maxPerAgent) * 100, 100)
+                    agencyLoads.map((agency) => {
+                      const capacity = Math.max(agency.available * 6, 1)
+                      const pct = Math.min((agency.active / capacity) * 100, 100)
                       return (
-                        <div key={agent.id} className="space-y-2">
+                        <div key={agency.label} className="space-y-2 rounded-md border p-3">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium">{agent.name}</span>
+                            <span className="font-medium">{agency.label}</span>
                             <span className="text-sm text-slate-500">
-                              {load}/{maxPerAgent} dossiers {!agent.is_available && <Badge variant="secondary" className="ml-2">Inactif</Badge>}
+                              {agency.active} actifs - {agency.completed} traites
                             </span>
                           </div>
                           <div className="h-2 rounded-full bg-slate-200">
                             <div className={`h-2 rounded-full transition-all ${pct > 80 ? 'bg-red-500' : pct > 60 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${pct}%` }} />
                           </div>
+                          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                            <Badge variant="secondary">{agency.connected}/{agency.agents.length} connectes</Badge>
+                            <Badge variant="secondary">{agency.available}/{agency.agents.length} disponibles</Badge>
+                            <span>{agency.totalAssigned} affectations historiques</span>
+                          </div>
+                          <details className="text-sm">
+                            <summary className="cursor-pointer text-slate-600">Voir agents</summary>
+                            <div className="mt-2 space-y-2">
+                              {agency.agents.map((agent) => (
+                                <div key={agent.id} className="flex items-center justify-between gap-3 text-slate-600">
+                                  <span>{agent.name}</span>
+                                  <span className="text-right">
+                                    {agent.active_queue_count ?? agent.active_dossier_count ?? 0} actifs - {agent.completed_dossier_count ?? 0} traites
+                                    {!agent.is_connected && <Badge variant="secondary" className="ml-2">Hors ligne</Badge>}
+                                    {!agent.is_available && <Badge variant="secondary" className="ml-2">Indisponible</Badge>}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
                         </div>
                       )
                     })
                   )}
-                </div>
-                <div className="mt-6 flex gap-2">
-                  <Button variant="outline" className="flex-1">
-                    <RefreshCw className="mr-2 h-4 w-4" />Redistribuer
-                  </Button>
                 </div>
               </CardContent>
             </Card>

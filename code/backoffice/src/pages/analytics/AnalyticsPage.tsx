@@ -1,333 +1,252 @@
-import { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  AlertTriangle,
+  BarChart3,
+  CheckCircle,
+  Clock,
+  Database,
+  FileText,
+  Filter,
+  Loader2,
+  ShieldAlert,
+  ShieldCheck,
+  TrendingUp,
+  Wrench,
+} from 'lucide-react'
+import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiGet } from '@/services/api-client'
-import {
-  BarChart3,
-  TrendingUp,
-  TrendingDown,
-  Users,
-  Target,
-  Clock,
-  Loader2,
-  ShieldCheck,
-  ShieldAlert,
-  HelpCircle,
-  CreditCard,
-  AlertTriangle,
-} from 'lucide-react'
+
+type Filters = {
+  date_from: string
+  date_to: string
+  agency_id: string
+  channel: string
+  doc_type: string
+  agent_id: string
+}
+
+const emptyFilters: Filters = {
+  date_from: '',
+  date_to: '',
+  agency_id: '',
+  channel: '',
+  doc_type: '',
+  agent_id: '',
+}
+
+function buildQuery(filters: Filters) {
+  const params = new URLSearchParams()
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value.trim()) params.set(key, value.trim())
+  })
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+function MetricCard({ title, value, icon: Icon }: { title: string; value: string | number; icon: any }) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-4 pt-6">
+        <Icon className="h-7 w-7 flex-shrink-0 text-slate-600" />
+        <div className="min-w-0">
+          <p className="text-2xl font-semibold text-slate-950">{value ?? 0}</p>
+          <p className="text-sm text-slate-500">{title}</p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function EmptyState({ label }: { label: string }) {
+  return <div className="rounded-md border border-dashed p-8 text-center text-sm text-slate-500">{label}</div>
+}
 
 export default function AnalyticsPage() {
   const { user } = useAuth()
+  const [filters, setFilters] = useState<Filters>(emptyFilters)
+  const [appliedFilters, setAppliedFilters] = useState<Filters>(emptyFilters)
   const [data, setData] = useState<any>(null)
+  const [technical, setTechnical] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const visibleTabs = useMemo(() => {
+    if (user?.role === 'THOMAS') return ['fraud', 'compliance']
+    if (user?.role === 'ADMIN_IT') return ['qa', 'technical']
+    return ['overview', 'funnel', 'documents', 'fraud', 'compliance', 'marketing', 'qa', 'technical']
+  }, [user?.role])
+
+  const [activeTab, setActiveTab] = useState('overview')
+
+  useEffect(() => {
+    if (!visibleTabs.includes(activeTab)) setActiveTab(visibleTabs[0] || 'overview')
+  }, [activeTab, visibleTabs])
+
   useEffect(() => {
     async function load() {
+      setLoading(true)
+      setError(null)
+      const query = buildQuery(appliedFilters)
       try {
-        const stats = await apiGet('/analytics/dashboard')
-        setData(stats)
-      } catch (err: any) {
-        console.error('Failed to load analytics dashboard:', err)
-        setError('Impossible de charger les statistiques')
+        const dashboard = await apiGet(`/analytics/dashboard${query}`)
+        setData(dashboard)
+        if (user?.role === 'SYLVIE' || user?.role === 'ADMIN_IT') {
+          try {
+            setTechnical(await apiGet(`/analytics/technical${query}`))
+          } catch (technicalErr) {
+            console.warn('Failed to load technical analytics:', technicalErr)
+            setTechnical({
+              db: 'n/a',
+              redis: 'n/a',
+              sentry_proxy: 'n/a',
+              environment: 'n/a',
+              qa: dashboard?.qa || {},
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load analytics:', err)
+        setError('Impossible de charger les métriques analytics')
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [])
+  }, [appliedFilters, user?.role])
 
   if (loading) {
     return (
-      <div className="flex h-[400px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex h-[360px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
       </div>
     )
   }
 
-  if (error) {
-    return (
-      <div className="rounded-lg bg-red-50 p-4 text-red-700">
-        {error}
-      </div>
-    )
-  }
+  if (error) return <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">{error}</div>
 
-  const isThomas = user?.role === 'THOMAS'
+  const funnel = data?.funnel || []
+  const documents = data?.document_performance || {}
+  const fraud = data?.fraud_gaps || {}
+  const compliance = data?.compliance_kpis || {}
+  const marketing = data?.marketing?.channels || []
+  const qa = data?.qa || technical?.qa || {}
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Analytics & Métriques</h1>
-        <p className="text-slate-500">
-          Tableau de bord décisionnel personnalisé • Rôle : {user?.role}
-        </p>
+        <h1 className="text-2xl font-bold text-slate-950">Analytics & métriques</h1>
+        <p className="text-sm text-slate-500">Données issues du schéma DWH PostgreSQL</p>
       </div>
 
-      {/* Summary Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {isThomas ? (
-          <>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <ShieldAlert className="h-8 w-8 text-red-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{data?.summary?.find((s: any) => s.name.includes('AML'))?.value || '0'}</p>
-                    <p className="text-sm text-slate-500">Alertes AML en cours</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <BarChart3 className="h-8 w-8 text-orange-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{data?.summary?.find((s: any) => s.name.includes('Conflits'))?.value || '0'}</p>
-                    <p className="text-sm text-slate-500">Conflits NIU détectés</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <ShieldCheck className="h-8 w-8 text-green-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{data?.summary?.find((s: any) => s.name.includes('classés'))?.value || '0'}</p>
-                    <p className="text-sm text-slate-500">Faux positifs écartés</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <AlertTriangle className="h-8 w-8 text-red-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{data?.summary?.find((s: any) => s.name.includes('confirmées'))?.value || '0'}</p>
-                    <p className="text-sm text-slate-500">Alertes confirmées</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        ) : (
-          <>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <TrendingUp className="h-8 w-8 text-green-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{data?.conversion_metrics?.conversion_rate || '0%'}</p>
-                    <p className="text-sm text-slate-500">Taux de conversion</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <TrendingDown className="h-8 w-8 text-red-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{data?.conversion_metrics?.abandon_rate || '0%'}</p>
-                    <p className="text-sm text-slate-500">Taux d'abandon</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <Users className="h-8 w-8 text-blue-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{data?.conversion_metrics?.total_onboardings || '0'}</p>
-                    <p className="text-sm text-slate-500">Dossiers créés</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <Clock className="h-8 w-8 text-purple-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{data?.sla?.avg_validation_time || '1.5h'}</p>
-                    <p className="text-sm text-slate-500">Délai moyen de validation</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
+      <Card>
+        <CardContent className="grid gap-3 pt-6 md:grid-cols-3 xl:grid-cols-6">
+          <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
+          <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
+          <Input placeholder="Agence ID" value={filters.agency_id} onChange={(e) => setFilters({ ...filters, agency_id: e.target.value })} />
+          <Input placeholder="Canal" value={filters.channel} onChange={(e) => setFilters({ ...filters, channel: e.target.value })} />
+          <Input placeholder="Type document" value={filters.doc_type} onChange={(e) => setFilters({ ...filters, doc_type: e.target.value })} />
+          <Button onClick={() => setAppliedFilters(filters)}>
+            <Filter className="mr-2 h-4 w-4" />
+            Filtrer
+          </Button>
+        </CardContent>
+      </Card>
 
-      {/* Advanced Performance & Gaps Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Compliance and Fraud Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5 text-red-600" /> Sécurité et Fraude
-            </CardTitle>
-            <CardDescription>Indicateurs de robustesse et détection d'identité</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-sm font-medium">Échecs Liveness capturés</span>
-              <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
-                {data?.fraud_gaps?.liveness_failures || 0} tentatives suspectes
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-sm font-medium">Cas confirmés de fraude</span>
-              <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
-                {data?.fraud_gaps?.fraud_suspects || 0} suspects
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-sm font-medium">Conflits d'identité (NIU)</span>
-              <span className="rounded bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-800">
-                {data?.fraud_gaps?.niu_conflicts || 0} doublons
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Score Biométrique Moyen</span>
-              <span className="text-sm font-bold text-green-600">
-                {data?.fraud_gaps?.avg_biometric_score || '96.4%'}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="h-auto flex-wrap justify-start">
+          {visibleTabs.includes('overview') && <TabsTrigger value="overview">Vue générale</TabsTrigger>}
+          {visibleTabs.includes('funnel') && <TabsTrigger value="funnel">Funnel adoption</TabsTrigger>}
+          {visibleTabs.includes('documents') && <TabsTrigger value="documents">Documents & OCR</TabsTrigger>}
+          {visibleTabs.includes('fraud') && <TabsTrigger value="fraud">Fraude & AML</TabsTrigger>}
+          {visibleTabs.includes('compliance') && <TabsTrigger value="compliance">Compliance</TabsTrigger>}
+          {visibleTabs.includes('marketing') && <TabsTrigger value="marketing">Marketing</TabsTrigger>}
+          {visibleTabs.includes('qa') && <TabsTrigger value="qa">QA & opérations</TabsTrigger>}
+          {visibleTabs.includes('technical') && <TabsTrigger value="technical">Technique</TabsTrigger>}
+        </TabsList>
 
-        {/* Customer Operations & Support */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <HelpCircle className="h-5 w-5 text-blue-600" /> Support et Opérations Clients
-            </CardTitle>
-            <CardDescription>Indicateurs d'assistance active et gestion de cartes</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-sm font-medium">Fils de discussion de support actifs</span>
-              <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
-                {data?.customer_operations?.active_support_threads || 0} ouverts
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-sm font-medium">Demandes de réinitialisation Passcode</span>
-              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-800">
-                {data?.customer_operations?.passcode_resets || 0} requêtes
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium flex items-center gap-2">
-                <CreditCard className="h-4 w-4" /> Demandes de Cartes (Visa/Mastercard)
-              </span>
-              <span className="text-sm font-bold text-slate-900">
-                {data?.customer_operations?.visa_mastercard_delivery || 0} cartes
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Taux de conversion" value={data?.conversion_metrics?.conversion_rate || '0%'} icon={TrendingUp} />
+            <MetricCard title="Taux d'abandon" value={data?.conversion_metrics?.abandon_rate || '0%'} icon={AlertTriangle} />
+            <MetricCard title="Dossiers créés" value={data?.conversion_metrics?.total_onboardings || 0} icon={FileText} />
+            <MetricCard title="SLA validation" value={data?.sla?.avg_validation_time || '0m'} icon={Clock} />
+          </div>
+        </TabsContent>
 
-        {/* Operational Funnel & Document Extracts (Omitted for Thomas) */}
-        {!isThomas && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-blue-600" /> Funnel de conversion
-                </CardTitle>
-                <CardDescription>Étapes réelles du parcours client</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {data?.funnel?.map((item: any, index: number) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <div className="w-32 text-sm">{item.step}</div>
-                      <div className="flex-1">
-                        <div className="h-2 rounded-full bg-slate-200">
-                          <div
-                            className="h-2 rounded-full bg-blue-500 transition-all"
-                            style={{ width: `${item.rate}%` }}
-                          />
-                        </div>
-                      </div>
-                      <div className="w-16 text-right text-sm font-medium">{item.count}</div>
-                      <div className="w-12 text-right text-sm text-slate-500">{item.rate}%</div>
-                    </div>
-                  ))}
+        <TabsContent value="funnel">
+          <Card>
+            <CardHeader><CardTitle>Funnel adoption</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {funnel.length === 0 && <EmptyState label="Aucune donnée de funnel disponible dans le DWH." />}
+              {funnel.map((item: any) => (
+                <div key={item.step} className="grid grid-cols-[150px_1fr_90px] items-center gap-3 text-sm">
+                  <span>{item.step}</span>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full bg-slate-700" style={{ width: `${Math.min(item.rate || 0, 100)}%` }} />
+                  </div>
+                  <span className="text-right font-medium">{item.count} · {item.rate}%</span>
                 </div>
-              </CardContent>
-            </Card>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-purple-600" /> Performance OCR & Documents
-                </CardTitle>
-                <CardDescription>Vitesse d'extraction et taux de complétion manuelle</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-sm font-medium">Taux de correction manuelle</span>
-                  <span className="rounded bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800">
-                    {data?.document_performance?.manual_correction_rate || '5%'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-sm font-medium">Confiance Moyenne de l'OCR</span>
-                  <span className="text-sm font-bold text-green-600">
-                    {data?.document_performance?.avg_ocr_confidence || '88%'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-sm font-medium">Vitesse moyenne d'extraction</span>
-                  <span className="text-sm font-bold text-slate-700">
-                    {data?.document_performance?.avg_ocr_speed || '1.8s'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Total documents extraits</span>
-                  <span className="text-sm font-bold text-slate-900">
-                    {data?.document_performance?.cni_extracted_count || 0} dossiers
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+        <TabsContent value="documents" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="Documents traités" value={documents.total_documents || 0} icon={FileText} />
+          <MetricCard title="Vitesse OCR moyenne" value={documents.avg_ocr_speed || '0ms'} icon={Clock} />
+          <MetricCard title="Confiance OCR moyenne" value={documents.avg_ocr_confidence || '0%'} icon={CheckCircle} />
+          <MetricCard title="Correction manuelle" value={documents.manual_correction_rate || '0%'} icon={Wrench} />
+        </TabsContent>
 
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-blue-600" /> Charge & Efficacité des Agents
-                </CardTitle>
-                <CardDescription>Statut opérationnel en temps réel par validateur</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {data?.agent_performance?.map((agent: any, index: number) => (
-                    <div key={index} className="rounded-lg border p-4 bg-slate-50/50">
-                      <p className="font-semibold text-slate-950">{agent.name}</p>
-                      <p className="text-sm text-slate-500 mb-2">Rôle : {agent.role}</p>
-                      <div className="flex justify-between text-xs text-slate-500 border-t pt-2 mt-2">
-                        <span>Charge : {agent.dossiers} en attente</span>
-                        <span>Traités : {agent.completed}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {data?.agent_performance?.length === 0 && (
-                    <p className="text-sm text-slate-500 col-span-3 text-center py-4">Aucun agent validateur connecté</p>
-                  )}
+        <TabsContent value="fraud" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="Échecs liveness" value={fraud.liveness_failures || 0} icon={ShieldAlert} />
+          <MetricCard title="Face match failed" value={fraud.face_match_failures || 0} icon={AlertTriangle} />
+          <MetricCard title="Conflits NIU" value={fraud.niu_conflicts || 0} icon={BarChart3} />
+          <MetricCard title="Fraudes suspectées" value={fraud.fraud_suspects || 0} icon={ShieldAlert} />
+        </TabsContent>
+
+        <TabsContent value="compliance" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="Alertes AML ouvertes" value={compliance.open_alerts || 0} icon={ShieldAlert} />
+          <MetricCard title="Alertes confirmées" value={compliance.confirmed_alerts || 0} icon={AlertTriangle} />
+          <MetricCard title="Couverture consentement" value={compliance.consent_coverage_rate || '0%'} icon={ShieldCheck} />
+          <MetricCard title="Taux screening PEP" value={compliance.pep_sanctions_check_rate || '0%'} icon={CheckCircle} />
+        </TabsContent>
+
+        <TabsContent value="marketing">
+          <Card>
+            <CardHeader><CardTitle>Adoption par canal</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {marketing.length === 0 && <EmptyState label="Aucun canal mesuré." />}
+              {marketing.map((channel: any) => (
+                <div key={channel.channel} className="flex items-center justify-between rounded-md border p-3 text-sm">
+                  <span className="font-medium">{channel.channel}</span>
+                  <span>{channel.sessions} sessions</span>
+                  <Badge>{channel.conversion_rate}</Badge>
                 </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="qa" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="OCR failed" value={qa.ocr_failed || 0} icon={AlertTriangle} />
+          <MetricCard title="OCR partial" value={qa.ocr_partial || 0} icon={FileText} />
+          <MetricCard title="Erreurs auditables" value={qa.audit_error_events || 0} icon={BarChart3} />
+          <MetricCard title="Jobs Celery failed" value={qa.celery_failed_jobs || 0} icon={Wrench} />
+        </TabsContent>
+
+        <TabsContent value="technical" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="Base de données" value={technical?.db || 'n/a'} icon={Database} />
+          <MetricCard title="Redis" value={technical?.redis || 'n/a'} icon={Database} />
+          <MetricCard title="Sentry proxy" value={technical?.sentry_proxy || 'n/a'} icon={ShieldCheck} />
+          <MetricCard title="Environnement" value={technical?.environment || 'n/a'} icon={Wrench} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
