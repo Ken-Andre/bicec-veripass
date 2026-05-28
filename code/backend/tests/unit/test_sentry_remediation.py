@@ -10,7 +10,7 @@ from app.api.v1.sentry_proxy import _allowed_envelope_url_for_project, _extract_
 from app.core.sentry import before_send
 from app.modules.admin.router import _agent_to_response
 from app.modules.auth.models import AgentRole
-from app.modules.backoffice.router import ALLOWED_DOC_CATEGORIES
+from app.modules.backoffice.router import ALLOWED_DOC_CATEGORIES, _agent_load_to_response
 from app.modules.backoffice.schemas import AuditLogSchema
 from app.modules.kyc.models import KYCSession
 from app.modules.kyc.router import _session_start_response
@@ -65,6 +65,40 @@ def test_admin_agent_response_serialization_normalizes_enum_and_dates():
     response = _agent_to_response(agent)
     assert response.role == "JEAN"
     assert response.last_activity_at == "2026-05-23T00:00:00+00:00"
+
+
+def test_command_center_agent_load_separates_live_load_from_history():
+    agent = SimpleNamespace(
+        id=uuid.uuid4(),
+        name="Jean",
+        email="jean@example.test",
+        role=AgentRole.JEAN,
+        agency_id=None,
+        agency=None,
+        is_available=True,
+        active_dossier_count=99,
+        last_activity_at=datetime.now(timezone.utc),
+    )
+    response = _agent_load_to_response(
+        agent,
+        {
+            "active_queue_count": 0,
+            "completed_dossier_count": 4,
+            "total_assigned_count": 4,
+        },
+    )
+    assert response.active_dossier_count == 0
+    assert response.active_queue_count == 0
+    assert response.completed_dossier_count == 4
+    assert response.total_assigned_count == 4
+    assert response.is_connected is True
+
+
+def test_db_registration_configures_banking_relationships():
+    import app.db  # noqa: F401
+    from sqlalchemy.orm import configure_mappers
+
+    configure_mappers()
 
 
 def test_audit_log_schema_tolerates_missing_jsonb_fields():

@@ -199,7 +199,7 @@ class TestAmlAlertsAccess:
 
 
 class TestAnalyticsDashboardAccess:
-    """GET /api/v1/analytics/dashboard — SYLVIE, ADMIN_IT only."""
+    """GET /api/v1/analytics/dashboard - SYLVIE, ADMIN_IT, THOMAS only."""
 
     @pytest.mark.asyncio
     async def test_jean_role_denied(self, client: AsyncClient):
@@ -218,3 +218,30 @@ class TestAnalyticsDashboardAccess:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code not in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_admin_it_technical_allowed(self, client: AsyncClient):
+        token = _agent_token(AgentRole.ADMIN_IT)
+        response = await client.get(
+            "/api/v1/analytics/technical",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code not in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_thomas_fraud_allowed(self, client: AsyncClient):
+        token = _agent_token(AgentRole.THOMAS)
+        response = await client.get(
+            "/api/v1/analytics/fraud",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code not in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_thomas_technical_denied(self, client: AsyncClient):
+        token = _agent_token(AgentRole.THOMAS)
+        response = await client.get(
+            "/api/v1/analytics/technical",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 403
