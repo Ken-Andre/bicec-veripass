@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "events": [
+    {
+      "type": "createObjectURL",
+      "url": "blob:http://localhost:5174/2df4b138-55a8-4acb-bc89-c6be1abaa3cb",
+      "blobType": "application/json",
+      "blobSize": 14442
+    },
+    {
+      "type": "anchorClick",
+      "download": "export-cobac-2026-05-27.json",
+      "href": "blob:http://localhost:5174/2df4b138-55a8-4acb-bc89-c6be1abaa3cb",
+      "inDom": false,
+      "rel": null,
+      "target": null
+    },
+    {
+      "type": "revokeObjectURL",
+      "url": "blob:http://localhost:5174/2df4b138-55a8-4acb-bc89-c6be1abaa3cb"
+    }
+  ],
+  "buttonText": "Export COBAC"
+}

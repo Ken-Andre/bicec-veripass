@@ -1,0 +1,419 @@
+{
+  "entries": [
+    {
+      "id": "08944c27-6ecd-4040-bbc4-e9d5be67e1d4",
+      "timestamp": "2026-05-23T15:24:24.256575+00:00",
+      "action": "DOCUMENT_CLASSIFY",
+      "table_name": "documents",
+      "record_id": "6cb5621e-8106-46e9-ba32-f0c27fd78492",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "doc_type": "CNI_RECTO",
+        "document_id": "a151b63f-82bf-49a2-99d0-d35ea72c9f77"
+      },
+      "new_data": {
+        "doc_type": "CNI_RECTO",
+        "rationale": "Verification WebBridge: categorisation complementaire valide.",
+        "agent_name": "Jean Dupont",
+        "categories": [
+          "CNI_RECTO",
+          "OTHER"
+        ],
+        "document_id": "a151b63f-82bf-49a2-99d0-d35ea72c9f77"
+      },
+      "client_ip": "172.18.0.1"
+    },
+    {
+      "id": "d40f0b5b-318d-4c23-ad6f-8ad0da9de0de",
+      "timestamp": "2026-05-23T15:24:34.164873+00:00",
+      "action": "KYC_REVIEW_APPROVED",
+      "table_name": "kyc_sessions",
+      "record_id": "6cb5621e-8106-46e9-ba32-f0c27fd78492",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_KYC",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "APPROVED",
+        "rationale": "Verification WebBridge: documents conformes, OCR et biometrie acceptes.",
+        "agent_name": "Jean Dupont",
+        "access_level": "LIMITED_ACCESS"
+      },
+      "client_ip": "172.18.0.1"
+    },
+    {
+      "id": "10e26832-0122-4907-89cf-e7083d8d7477",
+      "timestamp": "2026-05-23T15:37:48.395570+00:00",
+      "action": "KYC_SUBMIT",
+      "table_name": "kyc_sessions",
+      "record_id": "7ee71e11-5cd3-4c9f-aaa2-97672b98f122",
+      "performed_by": "ae184e19-49b7-4160-94e0-f77c1843b57f",
+      "old_data": {
+        "status": "DRAFT",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED"
+      },
+      "client_ip": null
+    },
+    {
+      "id": "47fa2db5-b216-4ff9-87fb-7c3a1249bd84",
+      "timestamp": "2026-05-23T15:37:48.887952+00:00",
+      "action": "DOSSIER_AUTO_ASSIGN",
+      "table_name": "dossier_assignments",
+      "record_id": "7ee71e11-5cd3-4c9f-aaa2-97672b98f122",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {},
+      "new_data": {
+        "method": "auto",
+        "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+        "assigned_by": "Jean Dupont",
+        "assigned_to": "Jean Dupont"
+      },
+      "client_ip": "172.18.0.9"
+    },
+    {
+      "id": "2d5ecd23-0cec-453d-9e39-414ef4247b72",
+      "timestamp": "2026-05-23T15:37:48.936721+00:00",
+      "action": "KYC_REVIEW_INFO_REQUESTED",
+      "table_name": "kyc_sessions",
+      "record_id": "7ee71e11-5cd3-4c9f-aaa2-97672b98f122",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "PENDING_INFO",
+        "rationale": "Merci de transmettre un justificatif complementaire lisible.",
+        "agent_name": "Jean Dupont",
+        "access_level": "RESTRICTED"
+      },
+      "client_ip": "172.18.0.9"
+    },
+    {
+      "id": "602cad57-5181-445e-a9eb-f542f224016a",
+      "timestamp": "2026-05-23T15:37:49.233270+00:00",
+      "action": "DOCUMENT_CLASSIFY",
+      "table_name": "documents",
+      "record_id": "7ee71e11-5cd3-4c9f-aaa2-97672b98f122",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "doc_type": "COMPLEMENTARY",
+        "document_id": "2c99b0ef-91cf-421f-88aa-f3974ad3df57"
+      },
+      "new_data": {
+        "doc_type": "ADDRESS_PROOF",
+        "rationale": "Client sent requested complementary address proof via support chat.",
+        "agent_name": "Jean Dupont",
+        "categories": [
+          "ADDRESS_PROOF"
+        ],
+        "document_id": "2c99b0ef-91cf-421f-88aa-f3974ad3df57"
+      },
+      "client_ip": "172.18.0.9"
+    },
+    {
+      "id": "29d78403-30d9-474a-bda3-0975395dcbfd",
+      "timestamp": "2026-05-23T15:37:49.254134+00:00",
+      "action": "KYC_REVIEW_APPROVED",
+      "table_name": "kyc_sessions",
+      "record_id": "7ee71e11-5cd3-4c9f-aaa2-97672b98f122",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_INFO",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "APPROVED",
+        "rationale": "Dossier complet apres justificatif complementaire.",
+        "agent_name": "Jean Dupont",
+        "access_level": "LIMITED_ACCESS"
+      },
+      "client_ip": "172.18.0.9"
+    },
+    {
+      "id": "8715c241-6107-4ee0-b19d-848e8461b102",
+      "timestamp": "2026-05-23T15:51:16.303643+00:00",
+      "action": "KYC_SUBMIT",
+      "table_name": "kyc_sessions",
+      "record_id": "6746a0c6-306c-4578-9470-ee58128d0360",
+      "performed_by": "217dce9c-18b2-4701-bdeb-ff9f45ec5ba1",
+      "old_data": {
+        "status": "DRAFT",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED"
+      },
+      "client_ip": null
+    },
+    {
+      "id": "ac0dbb74-ab77-4482-9f34-c5f224eea267",
+      "timestamp": "2026-05-23T15:51:16.704978+00:00",
+      "action": "DOSSIER_AUTO_ASSIGN",
+      "table_name": "dossier_assignments",
+      "record_id": "6746a0c6-306c-4578-9470-ee58128d0360",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {},
+      "new_data": {
+        "method": "auto",
+        "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+        "assigned_by": "Jean Dupont",
+        "assigned_to": "Jean Dupont"
+      },
+      "client_ip": "172.18.0.9"
+    },
+    {
+      "id": "c26330ab-af86-4372-9957-3f1e9dc23320",
+      "timestamp": "2026-05-23T15:51:16.744606+00:00",
+      "action": "KYC_REVIEW_INFO_REQUESTED",
+      "table_name": "kyc_sessions",
+      "record_id": "6746a0c6-306c-4578-9470-ee58128d0360",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "PENDING_INFO",
+        "rationale": "Merci de transmettre un justificatif complementaire lisible.",
+        "agent_name": "Jean Dupont",
+        "access_level": "RESTRICTED"
+      },
+      "client_ip": "172.18.0.9"
+    },
+    {
+      "id": "a4ae4752-9f00-4ec3-9743-9a9f35856eca",
+      "timestamp": "2026-05-23T15:51:17.059383+00:00",
+      "action": "DOCUMENT_CLASSIFY",
+      "table_name": "documents",
+      "record_id": "6746a0c6-306c-4578-9470-ee58128d0360",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "doc_type": "COMPLEMENTARY",
+        "document_id": "045a0297-9af2-4b8b-bd77-b2b4ede9e6c6"
+      },
+      "new_data": {
+        "doc_type": "ADDRESS_PROOF",
+        "rationale": "Client sent requested complementary address proof via support chat.",
+        "agent_name": "Jean Dupont",
+        "categories": [
+          "ADDRESS_PROOF"
+        ],
+        "document_id": "045a0297-9af2-4b8b-bd77-b2b4ede9e6c6"
+      },
+      "client_ip": "172.18.0.9"
+    },
+    {
+      "id": "eb37219c-57bb-498e-8176-d013b07c87d1",
+      "timestamp": "2026-05-23T15:51:17.102858+00:00",
+      "action": "KYC_REVIEW_APPROVED",
+      "table_name": "kyc_sessions",
+      "record_id": "6746a0c6-306c-4578-9470-ee58128d0360",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_INFO",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "APPROVED",
+        "rationale": "Dossier complet apres justificatif complementaire.",
+        "agent_name": "Jean Dupont",
+        "access_level": "LIMITED_ACCESS"
+      },
+      "client_ip": "172.18.0.9"
+    },
+    {
+      "id": "9a0252a2-2e4f-4bd1-b023-5d509246e206",
+      "timestamp": "2026-05-26T04:00:04.287969+00:00",
+      "action": "KYC_SUBMIT",
+      "table_name": "kyc_sessions",
+      "record_id": "0a9816e8-7824-4cad-97e5-f99aa62ce4f5",
+      "performed_by": "f67950a3-c88d-4266-b976-32d34eec6e68",
+      "old_data": {
+        "status": "DRAFT",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED"
+      },
+      "client_ip": null
+    },
+    {
+      "id": "a211fa9f-6a46-4545-ac1e-a1d6da0f8e6e",
+      "timestamp": "2026-05-26T04:00:04.934236+00:00",
+      "action": "DOSSIER_AUTO_ASSIGN",
+      "table_name": "dossier_assignments",
+      "record_id": "0a9816e8-7824-4cad-97e5-f99aa62ce4f5",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {},
+      "new_data": {
+        "method": "auto",
+        "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+        "assigned_by": "Jean Dupont",
+        "assigned_to": "Jean Dupont"
+      },
+      "client_ip": "172.18.0.12"
+    },
+    {
+      "id": "3953dcf6-7b68-4422-91c5-6564edf225a4",
+      "timestamp": "2026-05-26T04:00:04.972050+00:00",
+      "action": "KYC_REVIEW_INFO_REQUESTED",
+      "table_name": "kyc_sessions",
+      "record_id": "0a9816e8-7824-4cad-97e5-f99aa62ce4f5",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "PENDING_INFO",
+        "rationale": "Merci de transmettre un justificatif complementaire lisible.",
+        "agent_name": "Jean Dupont",
+        "access_level": "RESTRICTED"
+      },
+      "client_ip": "172.18.0.12"
+    },
+    {
+      "id": "c9de2299-b510-49ef-b477-3116e10a1f3a",
+      "timestamp": "2026-05-26T04:00:12.083126+00:00",
+      "action": "DOCUMENT_CLASSIFY",
+      "table_name": "documents",
+      "record_id": "0a9816e8-7824-4cad-97e5-f99aa62ce4f5",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "doc_type": "COMPLEMENTARY",
+        "document_id": "6922ebc4-91e3-4b7d-be92-bf71cdc42897"
+      },
+      "new_data": {
+        "doc_type": "ADDRESS_PROOF",
+        "rationale": "Client sent requested complementary address proof via support chat.",
+        "agent_name": "Jean Dupont",
+        "categories": [
+          "ADDRESS_PROOF"
+        ],
+        "document_id": "6922ebc4-91e3-4b7d-be92-bf71cdc42897"
+      },
+      "client_ip": "172.18.0.12"
+    },
+    {
+      "id": "88fa097d-d569-4904-a217-95ddabc1563a",
+      "timestamp": "2026-05-26T04:00:12.108168+00:00",
+      "action": "KYC_REVIEW_APPROVED",
+      "table_name": "kyc_sessions",
+      "record_id": "0a9816e8-7824-4cad-97e5-f99aa62ce4f5",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_INFO",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "APPROVED",
+        "rationale": "Dossier complet apres justificatif complementaire.",
+        "agent_name": "Jean Dupont",
+        "access_level": "LIMITED_ACCESS"
+      },
+      "client_ip": "172.18.0.12"
+    },
+    {
+      "id": "3b43ed20-2267-411a-8d0f-9273e51703a7",
+      "timestamp": "2026-05-26T04:09:29.692161+00:00",
+      "action": "KYC_SUBMIT",
+      "table_name": "kyc_sessions",
+      "record_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "performed_by": "858c3460-220a-495a-91c2-d2d52d312bca",
+      "old_data": {
+        "status": "DRAFT",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED"
+      },
+      "client_ip": null
+    },
+    {
+      "id": "a45a270a-4ffe-4dc4-8f69-a16fcfa7554a",
+      "timestamp": "2026-05-26T04:09:30.337958+00:00",
+      "action": "DOSSIER_AUTO_ASSIGN",
+      "table_name": "dossier_assignments",
+      "record_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {},
+      "new_data": {
+        "method": "auto",
+        "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+        "assigned_by": "Jean Dupont",
+        "assigned_to": "Jean Dupont"
+      },
+      "client_ip": "172.18.0.12"
+    },
+    {
+      "id": "755a0dbc-2322-4d40-a275-3ce7ae35712b",
+      "timestamp": "2026-05-26T04:09:30.380677+00:00",
+      "action": "KYC_REVIEW_INFO_REQUESTED",
+      "table_name": "kyc_sessions",
+      "record_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "PENDING_INFO",
+        "rationale": "Merci de transmettre un justificatif complementaire lisible.",
+        "agent_name": "Jean Dupont",
+        "access_level": "RESTRICTED"
+      },
+      "client_ip": "172.18.0.12"
+    },
+    {
+      "id": "a6d20ba8-f599-496d-8bb8-813207c514f5",
+      "timestamp": "2026-05-26T04:09:30.631120+00:00",
+      "action": "DOCUMENT_CLASSIFY",
+      "table_name": "documents",
+      "record_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "doc_type": "COMPLEMENTARY",
+        "document_id": "b3b15296-5b67-4819-af1d-07e206af306f"
+      },
+      "new_data": {
+        "doc_type": "ADDRESS_PROOF",
+        "rationale": "Client sent requested complementary address proof via support chat.",
+        "agent_name": "Jean Dupont",
+        "categories": [
+          "ADDRESS_PROOF"
+        ],
+        "document_id": "b3b15296-5b67-4819-af1d-07e206af306f"
+      },
+      "client_ip": "172.18.0.12"
+    },
+    {
+      "id": "bde23e31-e278-4990-9add-08fd8ce7e457",
+      "timestamp": "2026-05-26T04:09:30.700899+00:00",
+      "action": "KYC_REVIEW_APPROVED",
+      "table_name": "kyc_sessions",
+      "record_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "performed_by": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "old_data": {
+        "status": "PENDING_INFO",
+        "access_level": "RESTRICTED"
+      },
+      "new_data": {
+        "status": "APPROVED",
+        "rationale": "Dossier complet apres justificatif complementaire.",
+        "agent_name": "Jean Dupont",
+        "access_level": "LIMITED_ACCESS"
+      },
+      "client_ip": "172.18.0.12"
+    }
+  ],
+  "count": 22
+}

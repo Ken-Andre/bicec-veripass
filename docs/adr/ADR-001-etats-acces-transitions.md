@@ -4,6 +4,8 @@
 **Auteur :** Ken / Junior Product-UX Engineer  
 **Date :** 2026-02-27  
 
+**Note de cadrage 2026-05-28 :** Toute mention de DGI, Sopra Amplitude ou provisioning core banking est obsolète. VeriPass sert au KYC, au stockage de l'identité vérifiée et au garde-fou d'authentification avant redirection vers les applications mobiles BICEC via liens profonds ou stores.
+
 ## Contexte
 La conformité COBAC (R-2023/01) impose une validation humaine ("Human-in-the-Loop") pour toute ouverture de compte. Parallèlement, la loi 2024-017 (Cameroun) exige une souveraineté totale des données.  
 D'un point de vue UX, nous devons gérer la résilience locale (FR6, FR7), la découverte des services post-soumission (FR39-47) et les accès restreints (FR16).
@@ -20,8 +22,8 @@ Nous adoptons un modèle d'états hybride dissociant le **cycle de vie interne**
 | `SUBMITTED` | `RESTRICTED_ACCESS` | Dossier reçu par le serveur, en cours de traitement initial. |
 | `PROCESSING` | `RESTRICTED_ACCESS` | AI Engine (OCR, Biométrie) en cours d'exécution. |
 | `PENDING_AGENT_REVIEW` | `RESTRICTED_ACCESS` | En attente de validation par Jean. Dashboard "Vitrine". |
-| `APPROVED` | `LIMITED_ACCESS` (par défaut) | Validé par Jean. Provisionné dans Amplitude. |
-| `ACCOUNT_CREATED` | `LIMITED_ACCESS` or `FULL_ACCESS` | Statut final basé sur la validité du NIU. |
+| `APPROVED` | `LIMITED_ACCESS` (par défaut) | Validé par Jean. Débloque les actions gardées et la redirection vers les applications mobiles BICEC configurées. |
+| `ACCOUNT_CREATED` | `LIMITED_ACCESS` or `FULL_ACCESS` | Ancien libellé historique. Ne doit pas être compris comme un provisioning DGI, Sopra Amplitude ou core banking. |
 | `REJECTED` | `GUEST` | Dossier refusé. Redirection vers écran de relance (B10_Fail). |
 | `FRAUD_SUSPECT` | `DISABLED` | Alertes Thomas (AML, Collision). Accès bloqué. |
 
@@ -44,7 +46,7 @@ stateDiagram-v2
     PENDING_AGENT_REVIEW --> REJECTED : Jean Reject (Motif requis)
     PENDING_AGENT_REVIEW --> FRAUD_SUSPECT : AML Hit / Collision (Thomas)
 
-    APPROVED --> ACCOUNT_CREATED : Provisioning Automation
+    APPROVED --> ACCOUNT_CREATED : Legacy/local transition label
     
     state ACCOUNT_CREATED {
         LIMITED_ACCESS : NIU Manquant / Déclaratif

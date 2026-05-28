@@ -1,0 +1,58 @@
+{
+  "ok": true,
+  "steps": [
+    {
+      "at": "audit-page",
+      "url": "https://localhost/back-office/admin/audit",
+      "text": "BICEC VeriPass\nCommand Center\nAnalytics\nJournal audit\n\nSylvie Bernard\n\nSYLVIE\n\nDéconnexion\nSylvie Bernard\nJournal d'audit\n\nControle des actions agents, systeme et decisions KYC\n\nRapport COBAC\n\nActions auditees\n\n20\n\nActeurs\n\n2\n\nDecisions\n\n8\n\nActions a risque\n\n0\n\nALL\nDate\tActeur\tAction\tDossier\tTransition\tJustification\n27/05/2026 10:28\tSysteme\tCOMPLIANCE GLOBAL NOTIFICATION\tglobal:R...\t-->-\t-\n26/05/2026 06:09\tJean Dupont\tKYC REVIEW APPROVED\t2c4b5701...\tPENDING_INFO->APPROVED\tDossier complet apres j",
+      "screenshot": "C:\\Users\\yoann\\Documents\\School\\Xp-X5\\Stage\\bicec-veripass\\docs\\test-evidence\\latest\\backoffice\\screens\\cobac-audit-report-ui.png"
+    }
+  ],
+  "console": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    }
+  ],
+  "requests": [
+    {
+      "url": "https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456",
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "download": {
+    "suggestedFilename": "rapport-cobac-audit-2026-05-27.html",
+    "savedAs": "C:\\Users\\yoann\\Documents\\School\\Xp-X5\\Stage\\bicec-veripass\\docs\\test-evidence\\latest\\backoffice\\screens\\rapport-cobac-audit-2026-05-27.html",
+    "firstBytes": "<!doctype html>\n<html lang=\"fr\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Rapport COBAC - Journal d'audit VeriPass</title>\n  <style>\n    @page { size: A4 landscape; margin: 14mm; }\n    * { box-sizing: border-box; }\n    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111827; background: #ffffff; }\n    header { border-bottom: 3px solid #0f172a; padding-bottom: 18px; margin-bottom: 22px; }\n    .eyebrow { color: #475569; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }\n    h1 { margin: 8px 0 6px; font-size: 28px; }\n    .subtitle { margin: "
+  },
+  "report": {
+    "url": "file:///C:/Users/yoann/Documents/School/Xp-X5/Stage/bicec-veripass/docs/test-evidence/latest/backoffice/screens/rapport-cobac-audit-2026-05-27.html",
+    "title": "Rapport COBAC - Journal d'audit VeriPass",
+    "text": "BICEC VERIPASS - CONTROLE PERMANENT\nRapport COBAC du journal d'audit\n\nTrace complete des actions systeme, agents et decisions KYC sur la periode demandee.\n\nPERIODE\n2026-04-27 - 2026-05-27\nACTIONS AUDITEES\n23\nACTEURS DISTINCTS\n6\nDECISIONS CONTROLEES\n9\nSynthese de conformite\nRapport genere le 27/05/2026 09:32 UTC par Sylvie Bernard. Les donnees ci-dessous proviennent de la table d'audit operationnelle VeriPass. Ce document est destine aux controles internes et aux demandes de justification regulateur.\nActions principales\nDOCUMENT_CLASSIFY\n5\nKYC_REVIEW_APPROVED\n5\nKYC_SUBMIT\n4\nDOSSIER_AUTO_ASSIGN\n4\nKYC_REVIEW_INFO_REQUESTED\n4\nCOMPLIANCE_GLOBAL_NOTIFICATION\n1\nObjets impactes\nkyc_sessions\n13\ndocuments\n5\ndossier_assignments\n4\nnotifications\n1\nACTIONS SYSTEME\n4\nACTIONS AML\n0\nACTIONS KYC\n13\nSESSIONS",
+    "screenshot": "C:\\Users\\yoann\\Documents\\School\\Xp-X5\\Stage\\bicec-veripass\\docs\\test-evidence\\latest\\backoffice\\screens\\cobac-audit-report-document.png"
+  }
+}

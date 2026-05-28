@@ -1,0 +1,11 @@
+{
+  "date": "2026-05-27T19:25:16.780Z",
+  "persona": "THOMAS",
+  "routeChecks": {
+    "compliance_dashboard_visible": true,
+    "niu_card_visible": true
+  },
+  "blockers": [],
+  "alertsCount": 1,
+  "conflictsCount": 1
+}
