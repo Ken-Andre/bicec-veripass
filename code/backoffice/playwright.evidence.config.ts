@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 import baseConfig from './playwright.config';
 
 const liveBaseURL = process.env.BASE_URL;
+const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL || undefined;
 
 export default defineConfig({
   ...baseConfig,
@@ -17,6 +18,7 @@ export default defineConfig({
   use: {
     ...baseConfig.use,
     baseURL: liveBaseURL || baseConfig.use?.baseURL,
+    channel: browserChannel,
     ignoreHTTPSErrors: true,
     trace: 'on',
     screenshot: 'on',

@@ -904,6 +904,8 @@ async def agent_login(
 
     # 3. Success: Reset attempts
     await redis.delete(attempts_key)
+    agent.last_activity_at = datetime.now(timezone.utc)
+    await db.commit()
 
     # Create tokens
     access_token = create_access_token(

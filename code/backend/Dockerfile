@@ -31,9 +31,9 @@ ARG INSTALL_DEV_DEPS=false
 # id=uv-pip-cache: stable name so BuildKit reuses the same cache across builds/prunes
 RUN --mount=type=cache,id=uv-pip-cache,target=/root/.cache/uv \
     if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
-        uv sync --frozen --no-install-project; \
+        uv sync --frozen --link-mode=copy; \
     else \
-        uv sync --frozen --no-dev --no-install-project; \
+        uv sync --frozen --link-mode=copy --no-dev; \
     fi && \
     find /app/.venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null ; \
     find /app/.venv -name "wheel*" -exec rm -rf {} + 2>/dev/null ; \
