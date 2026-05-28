@@ -1,11 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { apiGetBlob } from '@/services/api-client';
+function useProtectedDocument(sessionId: string, documentId: string) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const previousUrlRef = useRef<string | null>(null);
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  useEffect(() => {
+    let cancelled = false;
+    setError(false);
+    setUrl(null);
 
-function getToken(): string | null {
-  try { return localStorage.getItem('veripass_access_token'); } catch { return null; }
+    apiGetBlob(`/backoffice/dossier/${sessionId}/documents/${documentId}/file`)
+      .then(({ blob }) => {
+        if (cancelled) return;
+        if (previousUrlRef.current) URL.revokeObjectURL(previousUrlRef.current);
+        const objectUrl = URL.createObjectURL(blob);
+        previousUrlRef.current = objectUrl;
+        setUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(true);
+          setUrl(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, documentId]);
+
+  useEffect(() => {
+    return () => {
+      if (previousUrlRef.current) URL.revokeObjectURL(previousUrlRef.current);
+    };
+  }, []);
+
+  return { url, error };
 }
 
 interface FaceComparisonCardProps {
@@ -35,14 +68,8 @@ export function FaceComparisonCard({
 }: FaceComparisonCardProps) {
   const [selfieError, setSelfieError] = useState(false);
   const [cniError, setCniError] = useState(false);
-  const token = getToken();
-
-  const selfieUrl = token
-    ? `${API_BASE}/backoffice/dossier/${sessionId}/documents/${selfieDocId}/file`
-    : null;
-  const cniUrl = token
-    ? `${API_BASE}/backoffice/dossier/${sessionId}/documents/${cniRectoDocId}/file`
-    : null;
+  const { url: selfieUrl, error: selfieLoadError } = useProtectedDocument(sessionId, selfieDocId);
+  const { url: cniUrl, error: cniLoadError } = useProtectedDocument(sessionId, cniRectoDocId);
 
   const scoreColor = faceMatchScore != null
     ? faceMatchScore >= 0.85 ? 'text-green-600' : faceMatchScore >= 0.6 ? 'text-yellow-600' : 'text-red-600'
@@ -81,7 +108,6 @@ export function FaceComparisonCard({
                   src={selfieUrl}
                   alt="Selfie liveness"
                   className="w-full h-full object-cover"
-                  crossOrigin="use-credentials"
                   onError={() => setSelfieError(true)}
                 />
               ) : (
@@ -99,7 +125,6 @@ export function FaceComparisonCard({
                   src={cniUrl}
                   alt="CNI Recto"
                   className="w-full h-full object-cover"
-                  crossOrigin="use-credentials"
                   onError={() => setCniError(true)}
                 />
               ) : (
@@ -130,6 +155,11 @@ export function FaceComparisonCard({
         )}
 
         <div className="mt-3 grid grid-cols-2 gap-2 rounded-md border bg-muted/30 p-2 text-xs">
+          {(selfieLoadError || cniLoadError) && (
+            <div className="col-span-2 rounded border border-yellow-300 bg-yellow-50 px-2 py-1 text-[11px] text-yellow-800">
+              Un media biometrie n&apos;a pas pu etre charge avec les permissions actuelles.
+            </div>
+          )}
           <div>
             <p className="text-muted-foreground">Statut</p>
             <Badge variant={statusBadge as any} className="mt-1">{faceMatchStatus || 'N/A'}</Badge>

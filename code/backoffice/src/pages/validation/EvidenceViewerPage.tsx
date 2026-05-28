@@ -1,81 +1,163 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDossier, useAuditLog } from '@/hooks/useQueryHooks';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Textarea } from '@/components/ui/Textarea';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
-import { Badge } from '@/components/ui/Badge';
-import { ImageViewer } from '@/components/shared/ImageViewer';
-import { DossierTimeline } from '@/components/shared/DossierTimeline';
-import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
-import { FaceComparisonCard } from '@/components/shared/FaceComparisonCard';
-import { ArrowLeft, Check, X, MessageSquare, Loader2, Send, UserCheck, Pencil, Save, Tags, FileText } from 'lucide-react';
-import { reviewDossier, assignDossier, autoAssignDossier } from '@/services/dossier-service';
-import { apiGet, apiPost } from '@/services/api-client';
+import {
+  ArrowLeft,
+  Check,
+  Download,
+  ExternalLink,
+  Eye,
+  FileText,
+  Loader2,
+  MessageSquare,
+  Pencil,
+  Save,
+  Send,
+  ShieldAlert,
+  Tags,
+  UserCheck,
+  X,
+} from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1';
-const TOKEN_KEY = 'veripass_access_token';
+import { FaceComparisonCard } from '@/components/shared/FaceComparisonCard';
+import { DossierTimeline } from '@/components/shared/DossierTimeline';
+import { ImageViewer } from '@/components/shared/ImageViewer';
+import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { Textarea } from '@/components/ui/Textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAuditLog, useDossier } from '@/hooks/useQueryHooks';
+import { apiGet, apiGetBlob, apiPost } from '@/services/api-client';
+import { assignDossier, autoAssignDossier, reviewDossier } from '@/services/dossier-service';
+
 const IMAGE_PLACEHOLDER =
   'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
-function getToken(): string | null {
-  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
+const EXPECTED_OCR_FIELDS_BY_DOC: Record<string, string[]> = {
+  CNI_RECTO: ['numero_cni', 'nom', 'prenom', 'date_naissance', 'lieu_naissance', 'sexe', 'taille', 'profession'],
+  CNI_VERSO: ['numero_cni', 'adresse', 'date_delivrance', 'date_expiration', 'autorite_nom'],
+};
+
+const CNI_FINAL_FIELDS: Array<{ key: string; label: string; aliases: string[]; sources: string[] }> = [
+  { key: 'numero_cni', label: 'Numero CNI', aliases: ['numero_cni', 'cni_number', 'id_number'], sources: ['CNI_RECTO', 'CNI_VERSO'] },
+  { key: 'nom', label: 'Nom', aliases: ['nom', 'surname', 'last_name'], sources: ['CNI_RECTO'] },
+  { key: 'prenom', label: 'Prenom', aliases: ['prenom', 'first_name', 'given_name'], sources: ['CNI_RECTO'] },
+  { key: 'date_naissance', label: 'Date naissance', aliases: ['date_naissance', 'date_of_birth'], sources: ['CNI_RECTO'] },
+  { key: 'lieu_naissance', label: 'Lieu naissance', aliases: ['lieu_naissance', 'place_of_birth'], sources: ['CNI_RECTO'] },
+  { key: 'sexe', label: 'Sexe', aliases: ['sexe', 'gender', 'sex'], sources: ['CNI_RECTO'] },
+  { key: 'taille', label: 'Taille', aliases: ['taille', 'height'], sources: ['CNI_RECTO'] },
+  { key: 'profession', label: 'Profession', aliases: ['profession', 'occupation'], sources: ['CNI_RECTO'] },
+  { key: 'adresse', label: 'Adresse', aliases: ['adresse', 'address'], sources: ['CNI_VERSO'] },
+  { key: 'date_delivrance', label: 'Date delivrance', aliases: ['date_delivrance', 'issue_date'], sources: ['CNI_VERSO'] },
+  { key: 'date_expiration', label: 'Date expiration', aliases: ['date_expiration', 'expiry_date', 'expiration_date'], sources: ['CNI_VERSO'] },
+  { key: 'autorite_nom', label: 'Autorite', aliases: ['autorite_nom', 'issuing_authority'], sources: ['CNI_VERSO'] },
+];
+
+interface DocumentPayload {
+  id: string;
+  doc_type: string;
+  ocr_fields?: Array<{
+    field_name: string;
+    extracted_value: string;
+    corrected_value?: string;
+    human_corrected?: boolean;
+    corrected_by_agent_id?: string;
+    confidence_score: number;
+  }>;
 }
 
-function useAuthenticatedImage(sessionId: string | undefined, docId: string | undefined): string | null {
+interface CniFinalRow {
+  key: string;
+  label: string;
+  value: string;
+  confidence: number | null;
+  sourceDocumentId: string | null;
+  sourceDocType: string | null;
+  sourceFieldName: string | null;
+  corrected: boolean;
+}
+
+function normalizeFieldName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase();
+}
+
+function useAuthenticatedDocument(sessionId: string | undefined, docId: string | undefined) {
   const [url, setUrl] = useState<string | null>(null);
-  const prevUrlRef = useRef<string | null>(null);
+  const [contentType, setContentType] = useState<string | null>(null);
+  const [filename, setFilename] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const previousUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!sessionId || !docId) return;
+    if (!sessionId || !docId) {
+      setUrl(null);
+      setContentType(null);
+      setFilename(null);
+      setError(null);
+      return;
+    }
     let cancelled = false;
-    const token = getToken();
-    if (!token) return;
+    setLoading(true);
+    setError(null);
 
-    const fetchUrl = `${API_BASE}/backoffice/dossier/${sessionId}/documents/${docId}/file`;
-
-    fetch(fetchUrl, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
+    apiGetBlob(`/backoffice/dossier/${sessionId}/documents/${docId}/file`)
+      .then(({ blob, contentType: fetchedType, filename: fetchedName }) => {
+        if (cancelled) return;
+        if (previousUrlRef.current) URL.revokeObjectURL(previousUrlRef.current);
+        const nextUrl = URL.createObjectURL(blob);
+        previousUrlRef.current = nextUrl;
+        setUrl(nextUrl);
+        setContentType(fetchedType || blob.type || null);
+        setFilename(fetchedName || null);
       })
-      .then((blob) => {
-        if (!cancelled) {
-          // Revoke previous URL to avoid memory leak
-          if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
-          const objectUrl = URL.createObjectURL(blob);
-          prevUrlRef.current = objectUrl;
-          setUrl(objectUrl);
-        }
+      .catch((err: any) => {
+        if (cancelled) return;
+        setUrl(null);
+        setContentType(null);
+        setFilename(null);
+        setError(err?.detail || 'Impossible de charger ce document');
       })
-      .catch(() => {});
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     return () => {
       cancelled = true;
-      // Don't revoke here — let the next fetch or unmount handle it
     };
   }, [sessionId, docId]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current);
+      if (previousUrlRef.current) URL.revokeObjectURL(previousUrlRef.current);
     };
   }, []);
 
-  return url;
+  return { url, contentType, filename, loading, error };
 }
 
-function SupportThreadPanel({ sessionId }: { sessionId: string }) {
+interface SupportThreadPanelProps {
+  sessionId: string;
+  onOpenDocumentFromChat: (documentId: string) => void;
+}
+
+function SupportThreadPanel({ sessionId, onOpenDocumentFromChat }: SupportThreadPanelProps) {
   const [threads, setThreads] = useState<any[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [attachmentLoadingId, setAttachmentLoadingId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadThreads = useCallback(async () => {
@@ -86,7 +168,7 @@ function SupportThreadPanel({ sessionId }: { sessionId: string }) {
         setActiveThreadId(data[0].id);
       }
     } catch {}
-  }, [sessionId, activeThreadId]);
+  }, [activeThreadId, sessionId]);
 
   const loadMessages = useCallback(async (threadId: string) => {
     try {
@@ -95,7 +177,9 @@ function SupportThreadPanel({ sessionId }: { sessionId: string }) {
     } catch {}
   }, []);
 
-  useEffect(() => { loadThreads() }, [loadThreads]);
+  useEffect(() => {
+    loadThreads();
+  }, [loadThreads]);
 
   useEffect(() => {
     if (activeThreadId) loadMessages(activeThreadId);
@@ -108,7 +192,7 @@ function SupportThreadPanel({ sessionId }: { sessionId: string }) {
   const createThread = async () => {
     try {
       const thread = await apiPost('/backoffice/support/threads', { session_id: sessionId });
-      setThreads([thread, ...threads]);
+      setThreads((previous) => [thread, ...previous]);
       setActiveThreadId(thread.id);
     } catch {}
   };
@@ -117,11 +201,31 @@ function SupportThreadPanel({ sessionId }: { sessionId: string }) {
     if (!newMessage.trim() || !activeThreadId) return;
     setSending(true);
     try {
-      const msg = await apiPost(`/backoffice/support/threads/${activeThreadId}/messages`, { content: newMessage });
-      setMessages([...messages, msg]);
+      const message = await apiPost(`/backoffice/support/threads/${activeThreadId}/messages`, { content: newMessage });
+      setMessages((previous) => [...previous, message]);
       setNewMessage('');
     } catch {}
     setSending(false);
+  };
+
+  const openAttachment = async (messageId: string, download: boolean) => {
+    setAttachmentLoadingId(messageId);
+    try {
+      const { blob, filename } = await apiGetBlob(`/backoffice/support/messages/${messageId}/attachment`);
+      const objectUrl = URL.createObjectURL(blob);
+      if (download) {
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename || 'piece-jointe';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      }
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch {}
+    setAttachmentLoadingId(null);
   };
 
   return (
@@ -130,50 +234,89 @@ function SupportThreadPanel({ sessionId }: { sessionId: string }) {
         <CardTitle className="text-sm">Support Client</CardTitle>
         {threads.length === 0 && (
           <Button variant="outline" size="sm" onClick={createThread}>
-            <MessageSquare className="h-3 w-3 mr-1" /> Nouveau thread
+            <MessageSquare className="mr-1 h-3 w-3" /> Nouveau thread
           </Button>
         )}
       </CardHeader>
       <CardContent>
         {threads.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4">
-            Aucun échange avec le client. Créez un thread pour envoyer un message.
+          <p className="py-4 text-center text-xs text-muted-foreground">
+            Aucun echange avec le client. Creez un thread pour envoyer un message.
           </p>
         ) : (
           <div className="space-y-3">
-            {messages.map((msg: any) => (
+            {messages.map((message: any) => (
               <div
-                key={msg.id}
-                className={`p-2 rounded-lg text-sm ${
-                  msg.sender_type === 'JEAN' ? 'bg-primary/10 ml-4' : 'bg-muted mr-4'
-                }`}
+                key={message.id}
+                className={`rounded-lg p-2 text-sm ${message.sender_type === 'JEAN' ? 'ml-4 bg-primary/10' : 'mr-4 bg-muted'}`}
               >
-                <p className="text-xs text-muted-foreground mb-1">
-                  {msg.sender_type === 'JEAN' ? 'Vous' : 'Client'} · {new Date(msg.sent_at).toLocaleTimeString('fr-FR')}
+                <p className="mb-1 text-xs text-muted-foreground">
+                  {message.sender_type === 'JEAN' ? 'Vous' : 'Client'} - {new Date(message.sent_at).toLocaleTimeString('fr-FR')}
                 </p>
-                <p>{msg.content}</p>
-                {(msg.attachment_path || msg.attachment_sha256) && (
-                  <div className="mt-2 rounded-md border bg-background/70 px-2 py-1.5 text-xs">
+                <p>{message.content}</p>
+                {(message.attachment_path || message.attachment_sha256) && (
+                  <div className="mt-2 space-y-2 rounded-md border bg-background/70 px-2 py-1.5 text-xs">
                     <div className="flex items-center gap-1 font-medium">
                       <FileText className="h-3 w-3" />
                       Fichier joint client
                     </div>
-                    {msg.attachment_sha256 && (
-                      <p className="mt-1 break-all text-muted-foreground">SHA-256: {msg.attachment_sha256}</p>
+                    {message.attachment_filename && (
+                      <p className="break-all text-muted-foreground">{message.attachment_filename}</p>
                     )}
+                    {message.attachment_sha256 && (
+                      <p className="break-all text-muted-foreground">SHA-256: {message.attachment_sha256}</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        disabled={attachmentLoadingId === message.id}
+                        onClick={() => openAttachment(message.id, false)}
+                      >
+                        {attachmentLoadingId === message.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="mr-1 h-3 w-3" />}
+                        Ouvrir
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        disabled={attachmentLoadingId === message.id}
+                        onClick={() => openAttachment(message.id, true)}
+                      >
+                        <Download className="mr-1 h-3 w-3" />
+                        Telecharger
+                      </Button>
+                      {message.attachment_document_id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => onOpenDocumentFromChat(message.attachment_document_id)}
+                        >
+                          <ExternalLink className="mr-1 h-3 w-3" />
+                          Ouvrir dans dossier
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             ))}
             <div ref={messagesEndRef} />
 
-            <div className="flex gap-2 pt-2 border-t">
+            <div className="flex gap-2 border-t pt-2">
               <input
                 className="flex-1 rounded-md border px-3 py-1.5 text-sm"
-                placeholder="Écrire un message..."
+                placeholder="Ecrire un message..."
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                onChange={(event) => setNewMessage(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                  }
+                }}
               />
               <Button size="sm" onClick={sendMessage} disabled={sending || !newMessage.trim()}>
                 <Send className="h-3 w-3" />
@@ -186,12 +329,19 @@ function SupportThreadPanel({ sessionId }: { sessionId: string }) {
   );
 }
 
+function scoreLabel(score: number | null): string {
+  if (score == null) return 'N/A';
+  return `${(score * 100).toFixed(0)}%`;
+}
+
 export default function EvidenceViewerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { data: dossier, isLoading } = useDossier(id || '');
   const { data: auditEntries } = useAuditLog(id);
+
   const [activeDocIndex, setActiveDocIndex] = useState(0);
   const [showRequestInfo, setShowRequestInfo] = useState(false);
   const [showReject, setShowReject] = useState(false);
@@ -203,20 +353,112 @@ export default function EvidenceViewerPage() {
   const [ocrEditMode, setOcrEditMode] = useState(false);
   const [ocrEditedFields, setOcrEditedFields] = useState<Record<string, string>>({});
   const [ocrSaving, setOcrSaving] = useState(false);
+  const [showAllOcrFields, setShowAllOcrFields] = useState(false);
+  const [cniEditMode, setCniEditMode] = useState(false);
+  const [cniEditedFields, setCniEditedFields] = useState<Record<string, string>>({});
+  const [cniSaving, setCniSaving] = useState(false);
+
   const [classifyDocType, setClassifyDocType] = useState('CNI_RECTO');
   const [classifyCategories, setClassifyCategories] = useState('CNI_RECTO');
   const [classifyReason, setClassifyReason] = useState('');
   const [classifySaving, setClassifySaving] = useState(false);
 
-  const documents = dossier?.documents || [];
+  const documents: DocumentPayload[] = dossier?.documents || [];
   const currentDoc = documents[activeDocIndex];
-  const imageUrl = useAuthenticatedImage(id, currentDoc?.id);
+  const documentView = useAuthenticatedDocument(id, currentDoc?.id);
 
   useEffect(() => {
     if (!currentDoc?.doc_type) return;
     setClassifyDocType(currentDoc.doc_type);
     setClassifyCategories(currentDoc.doc_type);
-  }, [currentDoc?.doc_type]);
+    setShowAllOcrFields(false);
+  }, [currentDoc?.doc_type, currentDoc?.id]);
+
+  const displayedCurrentDocFields = useMemo(() => {
+    const rawFields = currentDoc?.ocr_fields || [];
+    if (showAllOcrFields || !currentDoc?.doc_type) return rawFields;
+    const expected = EXPECTED_OCR_FIELDS_BY_DOC[currentDoc.doc_type];
+    if (!expected) return rawFields;
+    const expectedSet = new Set(expected);
+    return rawFields.filter((field) => expectedSet.has(normalizeFieldName(field.field_name)));
+  }, [currentDoc?.doc_type, currentDoc?.ocr_fields, showAllOcrFields]);
+
+  const cniFinalRows = useMemo<CniFinalRow[]>(() => {
+    const cniDocs = documents.filter((doc) => doc.doc_type === 'CNI_RECTO' || doc.doc_type === 'CNI_VERSO');
+    if (cniDocs.length === 0) return [];
+
+    return CNI_FINAL_FIELDS.map((definition) => {
+      const aliases = new Set(definition.aliases.map(normalizeFieldName));
+      const candidates = cniDocs
+        .filter((doc) => definition.sources.includes(doc.doc_type))
+        .flatMap((doc) =>
+          (doc.ocr_fields || [])
+            .filter((field) => aliases.has(normalizeFieldName(field.field_name)))
+            .map((field) => ({
+              doc,
+              field,
+              value: field.human_corrected && field.corrected_value ? field.corrected_value : field.extracted_value || '',
+            })),
+        )
+        .sort((left, right) => {
+          const leftHasValue = left.value.trim() ? 1 : 0;
+          const rightHasValue = right.value.trim() ? 1 : 0;
+          if (leftHasValue !== rightHasValue) return rightHasValue - leftHasValue;
+          if ((left.field.human_corrected ? 1 : 0) !== (right.field.human_corrected ? 1 : 0)) {
+            return (right.field.human_corrected ? 1 : 0) - (left.field.human_corrected ? 1 : 0);
+          }
+          return (right.field.confidence_score || 0) - (left.field.confidence_score || 0);
+        });
+
+      const best = candidates[0];
+      if (!best) {
+        return {
+          key: definition.key,
+          label: definition.label,
+          value: '',
+          confidence: null,
+          sourceDocumentId: null,
+          sourceDocType: null,
+          sourceFieldName: null,
+          corrected: false,
+        };
+      }
+
+      return {
+        key: definition.key,
+        label: definition.label,
+        value: best.value,
+        confidence: best.field.confidence_score ?? null,
+        sourceDocumentId: best.doc.id,
+        sourceDocType: best.doc.doc_type,
+        sourceFieldName: best.field.field_name,
+        corrected: Boolean(best.field.human_corrected),
+      };
+    });
+  }, [documents]);
+
+  const handleOpenCurrentDoc = useCallback(() => {
+    if (!documentView.url) return;
+    window.open(documentView.url, '_blank', 'noopener,noreferrer');
+  }, [documentView.url]);
+
+  const handleDownloadCurrentDoc = useCallback(() => {
+    if (!documentView.url) return;
+    const link = document.createElement('a');
+    link.href = documentView.url;
+    link.download = documentView.filename || `${currentDoc?.doc_type || 'document'}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [currentDoc?.doc_type, documentView.filename, documentView.url]);
+
+  const handleOpenDocumentFromChat = useCallback((documentId: string) => {
+    const nextIndex = documents.findIndex((doc) => doc.id === documentId);
+    if (nextIndex >= 0) {
+      setActiveDocIndex(nextIndex);
+      setClassifyReason('Document complementaire charge depuis le support client.');
+    }
+  }, [documents]);
 
   const handleSelfAssign = async () => {
     if (!id) return;
@@ -255,7 +497,10 @@ export default function EvidenceViewerPage() {
       queryClient.invalidateQueries({ queryKey: ['dossier', id] });
       queryClient.invalidateQueries({ queryKey: ['queue'] });
       if (decision === 'APPROVED' || decision === 'REJECTED') {
-        navigate('/validation');
+        navigate(user?.role === 'THOMAS' ? '/compliance' : '/validation');
+      }
+      if (decision === 'FRAUD_SUSPECT') {
+        navigate('/compliance');
       }
       setShowApprove(false);
       setShowReject(false);
@@ -264,7 +509,7 @@ export default function EvidenceViewerPage() {
     setActionLoading(false);
   };
 
-  const handleInfoRequest = async (message: string, _fields: string[]) => {
+  const handleInfoRequest = async (message: string) => {
     if (!id) return;
     try {
       await reviewDossier(id, 'INFO_REQUESTED', message);
@@ -292,6 +537,28 @@ export default function EvidenceViewerPage() {
     setOcrSaving(false);
   };
 
+  const handleCniSave = async () => {
+    if (!id) return;
+    setCniSaving(true);
+    try {
+      for (const row of cniFinalRows) {
+        const nextValue = cniEditedFields[row.key];
+        if (nextValue == null) continue;
+        if (!row.sourceDocumentId || !row.sourceFieldName) continue;
+        if (nextValue === row.value) continue;
+        await apiPost(`/backoffice/dossier/${id}/ocr-correct`, {
+          document_id: row.sourceDocumentId,
+          field_name: row.sourceFieldName,
+          corrected_value: nextValue,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['dossier', id] });
+      setCniEditMode(false);
+      setCniEditedFields({});
+    } catch {}
+    setCniSaving(false);
+  };
+
   const handleClassifyDocument = async () => {
     if (!id || !currentDoc || !classifyReason.trim()) return;
     const categories = classifyCategories
@@ -316,11 +583,20 @@ export default function EvidenceViewerPage() {
 
   const startOcrEdit = () => {
     const initial: Record<string, string> = {};
-    currentDoc?.ocr_fields?.forEach((f: any) => {
-      initial[f.field_name] = f.human_corrected ? f.corrected_value : f.extracted_value;
+    displayedCurrentDocFields.forEach((field) => {
+      initial[field.field_name] = field.human_corrected && field.corrected_value ? field.corrected_value : field.extracted_value;
     });
     setOcrEditedFields(initial);
     setOcrEditMode(true);
+  };
+
+  const startCniEdit = () => {
+    const initial: Record<string, string> = {};
+    cniFinalRows.forEach((row) => {
+      initial[row.key] = row.value;
+    });
+    setCniEditedFields(initial);
+    setCniEditMode(true);
   };
 
   if (isLoading) {
@@ -331,56 +607,60 @@ export default function EvidenceViewerPage() {
     return (
       <Card className="border-destructive">
         <CardContent className="p-8 text-center">
-          <p className="text-destructive font-medium">Dossier introuvable</p>
+          <p className="font-medium text-destructive">Dossier introuvable</p>
           <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate('/validation')}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> Retour
+            <ArrowLeft className="mr-2 h-4 w-4" /> Retour
           </Button>
         </CardContent>
       </Card>
     );
   }
 
-  const isReviewable = dossier.status === 'PENDING_AGENT_REVIEW' || dossier.status === 'PENDING_KYC' || dossier.status === 'FRAUD_SUSPECT';
-  const needsAssign = isReviewable && !dossier.assigned_agent_id;
+  const isReviewable =
+    dossier.status === 'PENDING_AGENT_REVIEW' ||
+    dossier.status === 'PENDING_KYC' ||
+    dossier.status === 'FRAUD_SUSPECT';
+  const isJean = user?.role === 'JEAN';
+  const isThomas = user?.role === 'THOMAS';
+  const backTarget = isThomas ? '/compliance' : '/validation';
+  const canJeanReview = isJean && isReviewable;
+  const canThomasInvestigate = isThomas && dossier.status !== 'REJECTED';
+  const canThomasMarkFraud = canThomasInvestigate && isReviewable && dossier.status !== 'FRAUD_SUSPECT';
+  const canEditKycEvidence = isJean;
+  const needsAssign = canJeanReview && !dossier.assigned_agent_id;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/validation')}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> Retour
+          <Button variant="ghost" size="sm" onClick={() => navigate(backTarget)}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Retour
           </Button>
           <div>
-            <h1 className="text-lg font-bold">
-              {dossier.client_name || dossier.user_phone || 'Dossier'}
-            </h1>
+            <h1 className="text-lg font-bold">{dossier.client_name || dossier.user_phone || 'Dossier'}</h1>
             <p className="text-sm text-muted-foreground">
-              {dossier.agency_code ? `Agence: ${dossier.agency_code}` : ''} · {dossier.session_id?.slice(0, 8)}...
+              {dossier.agency_code ? `Agence: ${dossier.agency_code}` : ''} - {dossier.session_id?.slice(0, 8)}...
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={dossier.status === 'PENDING_AGENT_REVIEW' ? 'warning' : 'default'}>
-            {dossier.status}
-          </Badge>
-        </div>
+        <Badge variant={dossier.status === 'PENDING_AGENT_REVIEW' ? 'warning' : 'default'}>
+          {dossier.status}
+        </Badge>
       </div>
 
-      {assignError && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{assignError}</div>
-      )}
+      {assignError && <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{assignError}</div>}
 
       {needsAssign && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="flex items-center justify-between p-4">
-            <p className="text-sm font-medium text-yellow-800">Dossier non assigné</p>
+            <p className="text-sm font-medium text-yellow-800">Dossier non assigne</p>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={handleAutoAssign} disabled={assignLoading}>
-                {assignLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserCheck className="h-4 w-4 mr-1" />}
+                {assignLoading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UserCheck className="mr-1 h-4 w-4" />}
                 Assigner auto
               </Button>
               <Button size="sm" onClick={handleSelfAssign} disabled={assignLoading}>
-                {assignLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <UserCheck className="h-4 w-4 mr-1" />}
+                {assignLoading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <UserCheck className="mr-1 h-4 w-4" />}
                 Prendre en charge
               </Button>
             </div>
@@ -391,27 +671,83 @@ export default function EvidenceViewerPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-4">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="overflow-hidden pb-3">
               {documents.length > 0 && (
-                <Tabs value={`${activeDocIndex}`} onValueChange={(v) => setActiveDocIndex(Number(v))}>
-                  <TabsList>
-                    {documents.map((doc: any, i: number) => (
-                      <TabsTrigger key={doc.id} value={`${i}`}>{doc.doc_type}</TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
+                <div data-testid="evidence-document-tabs" className="max-w-full overflow-hidden">
+                  <Tabs className="max-w-full" value={`${activeDocIndex}`} onValueChange={(value) => setActiveDocIndex(Number(value))}>
+                    <TabsList className="flex h-auto max-w-full flex-wrap justify-start gap-1 overflow-visible">
+                      {documents.map((doc, index) => (
+                        <TabsTrigger key={doc.id} value={`${index}`} className="shrink-0 px-2 text-xs sm:px-3 sm:text-sm">{doc.doc_type}</TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                </div>
               )}
             </CardHeader>
-            <CardContent>
-              <ImageViewer
-                src={imageUrl || IMAGE_PLACEHOLDER}
-                alt={currentDoc?.doc_type || 'Document'}
-                className="min-h-[300px]"
-              />
+            <CardContent className="space-y-2">
+              {documentView.loading && (
+                <div className="flex min-h-[300px] items-center justify-center rounded-lg border">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              )}
+              {!documentView.loading && documentView.error && (
+                <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg border px-4 text-center text-sm text-muted-foreground">
+                  <p>{documentView.error}</p>
+                </div>
+              )}
+              {!documentView.loading && !documentView.error && (
+                <>
+                  {(documentView.contentType || '').startsWith('image/') && (
+                    <ImageViewer
+                      src={documentView.url || IMAGE_PLACEHOLDER}
+                      alt={currentDoc?.doc_type || 'Document'}
+                      className="min-h-[300px]"
+                      onOpenOriginal={handleOpenCurrentDoc}
+                      onDownload={handleDownloadCurrentDoc}
+                    />
+                  )}
+                  {documentView.contentType === 'application/pdf' && documentView.url && (
+                    <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border px-4 text-center text-sm text-muted-foreground">
+                      <FileText className="h-8 w-8 text-slate-500" />
+                      <p>Apercu PDF desactive dans l&apos;application pour compatibilite CSP.</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={handleOpenCurrentDoc}>
+                          <Eye className="mr-1 h-3 w-3" /> Ouvrir le PDF
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleDownloadCurrentDoc}>
+                          <Download className="mr-1 h-3 w-3" /> Telecharger
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {!documentView.contentType && (
+                    <ImageViewer
+                      src={documentView.url || IMAGE_PLACEHOLDER}
+                      alt={currentDoc?.doc_type || 'Document'}
+                      className="min-h-[300px]"
+                      onOpenOriginal={handleOpenCurrentDoc}
+                      onDownload={handleDownloadCurrentDoc}
+                    />
+                  )}
+                  {documentView.contentType && !(documentView.contentType.startsWith('image/') || documentView.contentType === 'application/pdf') && (
+                    <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border px-4 text-center text-sm text-muted-foreground">
+                      <p>Apercu indisponible pour ce type de fichier.</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={handleOpenCurrentDoc}>
+                          <Eye className="mr-1 h-3 w-3" /> Ouvrir
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleDownloadCurrentDoc}>
+                          <Download className="mr-1 h-3 w-3" /> Telecharger
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {currentDoc && (
+          {currentDoc && canEditKycEvidence && (
             <Card>
               <CardHeader><CardTitle className="flex items-center gap-2"><Tags className="h-4 w-4" /> Classification du document</CardTitle></CardHeader>
               <CardContent className="space-y-3">
@@ -431,7 +767,7 @@ export default function EvidenceViewerPage() {
                     <p className="mb-1 text-xs font-medium text-muted-foreground">Categories</p>
                     <input
                       value={classifyCategories}
-                      onChange={(e) => setClassifyCategories(e.target.value)}
+                      onChange={(event) => setClassifyCategories(event.target.value)}
                       className="h-10 w-full rounded-md border px-3 text-sm"
                       placeholder="CNI_RECTO, ADDRESS_PROOF"
                     />
@@ -439,22 +775,21 @@ export default function EvidenceViewerPage() {
                 </div>
                 <Textarea
                   value={classifyReason}
-                  onChange={(e) => setClassifyReason(e.target.value)}
+                  onChange={(event) => setClassifyReason(event.target.value)}
                   placeholder="Pourquoi ce document couvre ces categories ?"
                   className="min-h-[72px]"
                 />
                 <Button size="sm" onClick={handleClassifyDocument} disabled={classifySaving || !classifyReason.trim()}>
-                  {classifySaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+                  {classifySaving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
                   Assigner le document
                 </Button>
               </CardContent>
             </Card>
           )}
 
-          {/* Face Comparison: Selfie vs CNI Recto */}
           {(() => {
-            const selfieDoc = documents.find((d: any) => d.doc_type === 'SELFIE');
-            const cniRectoDoc = documents.find((d: any) => d.doc_type === 'CNI_RECTO');
+            const selfieDoc = documents.find((doc) => doc.doc_type === 'SELFIE');
+            const cniRectoDoc = documents.find((doc) => doc.doc_type === 'CNI_RECTO');
             if (!selfieDoc || !cniRectoDoc) return null;
             return (
               <FaceComparisonCard
@@ -488,7 +823,7 @@ export default function EvidenceViewerPage() {
               ].map((item: any) => (
                 <div key={item.label} className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">{item.label}</span>
-                  <span className="font-medium text-right">{item.value || 'N/A'}</span>
+                  <span className="text-right font-medium">{item.value || 'N/A'}</span>
                 </div>
               ))}
             </CardContent>
@@ -496,7 +831,7 @@ export default function EvidenceViewerPage() {
 
           {dossier.biometric_result && (
             <Card>
-              <CardHeader><CardTitle>Biométrie</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Biometrie</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {[
                   { label: 'Face Match', score: dossier.biometric_result.face_match_score },
@@ -505,7 +840,7 @@ export default function EvidenceViewerPage() {
                 ].map((item: any) => (
                   <div key={item.label} className="flex items-center justify-between">
                     <span className="text-sm">{item.label}</span>
-                    <span className={`text-sm font-mono ${item.score != null && item.score >= 0.8 ? 'text-green-600' : 'text-yellow-600'}`}>
+                    <span className={`font-mono text-sm ${item.score != null && item.score >= 0.8 ? 'text-green-600' : 'text-yellow-600'}`}>
                       {item.score != null ? `${(item.score * 100).toFixed(0)}%` : 'N/A'}
                     </span>
                   </div>
@@ -521,114 +856,168 @@ export default function EvidenceViewerPage() {
             </CardContent>
           </Card>
 
-          <SupportThreadPanel sessionId={id || ''} />
+          <SupportThreadPanel sessionId={id || ''} onOpenDocumentFromChat={handleOpenDocumentFromChat} />
         </div>
 
         <div className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Champs extraits (OCR)</CardTitle>
-              {currentDoc?.ocr_fields && currentDoc.ocr_fields.length > 0 && (
+                  {(currentDoc?.ocr_fields || []).length > 0 && (
                 <div className="flex gap-2">
-                  {ocrEditMode ? (
+                  {(currentDoc?.doc_type === 'CNI_RECTO' || currentDoc?.doc_type === 'CNI_VERSO') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowAllOcrFields((previous) => !previous)}
+                    >
+                      {showAllOcrFields ? 'Vue ciblee' : 'Voir tout'}
+                    </Button>
+                  )}
+                  {canEditKycEvidence && ocrEditMode ? (
                     <>
                       <Button size="sm" variant="outline" onClick={() => { setOcrEditMode(false); setOcrEditedFields({}); }}>
-                        <X className="h-3 w-3 mr-1" /> Annuler
+                        <X className="mr-1 h-3 w-3" /> Annuler
                       </Button>
                       <Button size="sm" onClick={handleOcrSave} disabled={ocrSaving}>
-                        {ocrSaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+                        {ocrSaving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
                         Enregistrer
                       </Button>
                     </>
-                  ) : (
+                  ) : canEditKycEvidence ? (
                     <Button size="sm" variant="outline" onClick={startOcrEdit}>
-                      <Pencil className="h-3 w-3 mr-1" /> Modifier
+                      <Pencil className="mr-1 h-3 w-3" /> Modifier
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               )}
             </CardHeader>
             <CardContent className="space-y-2">
-              {currentDoc?.ocr_fields?.map((field: any, i: number) => (
-                <div key={i} className="flex items-center gap-3 p-2 rounded-lg border">
-                  <div className="flex-shrink-0 w-12 text-center">
+              {displayedCurrentDocFields.map((field, index) => (
+                <div key={`${field.field_name}-${index}`} className="flex items-center gap-3 rounded-lg border p-2">
+                  <div className="w-12 flex-shrink-0 text-center">
                     <span className={`text-xs font-mono ${
                       field.confidence_score >= 0.9 ? 'text-green-600' :
                       field.confidence_score >= 0.7 ? 'text-yellow-600' : 'text-red-600'
                     }`}>
-                      {(field.confidence_score * 100).toFixed(0)}%
+                      {scoreLabel(field.confidence_score)}
                     </span>
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs text-muted-foreground">{field.field_name}</p>
                     {ocrEditMode ? (
                       <input
                         type="text"
                         value={ocrEditedFields[field.field_name] || ''}
-                        onChange={(e) => setOcrEditedFields({ ...ocrEditedFields, [field.field_name]: e.target.value })}
-                        className="w-full text-sm font-medium border rounded px-2 py-1"
+                        onChange={(event) => setOcrEditedFields({ ...ocrEditedFields, [field.field_name]: event.target.value })}
+                        className="w-full rounded border px-2 py-1 text-sm font-medium"
                       />
                     ) : (
-                      <p className="text-sm font-medium truncate">
-                        {field.human_corrected ? field.corrected_value : field.extracted_value}
+                      <p className="truncate text-sm font-medium">
+                        {field.human_corrected && field.corrected_value ? field.corrected_value : field.extracted_value}
                       </p>
                     )}
                   </div>
                   <div className="flex gap-1">
-                    {field.human_corrected && (
-                      <span className="text-xs text-blue-600 italic">Corrigé</span>
-                    )}
-                    {field.corrected_by_agent_id && (
-                      <span className="text-xs text-purple-600 italic">Agent</span>
-                    )}
-                    {!field.human_corrected && !field.corrected_by_agent_id && field.confidence_score < 0.7 && (
-                      <span className="text-xs text-orange-500">Faible</span>
-                    )}
+                    {field.human_corrected && <span className="text-xs italic text-blue-600">Corrige</span>}
+                    {!field.human_corrected && field.confidence_score < 0.7 && <span className="text-xs text-orange-500">Faible</span>}
                   </div>
                 </div>
               ))}
-              {(!currentDoc?.ocr_fields || currentDoc.ocr_fields.length === 0) && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Aucun champ OCR disponible
-                </p>
+              {displayedCurrentDocFields.length === 0 && (
+                <p className="py-4 text-center text-sm text-muted-foreground">Aucun champ OCR disponible</p>
               )}
             </CardContent>
           </Card>
 
-          {dossier.aml_alerts && dossier.aml_alerts.length > 0 && (
+          {cniFinalRows.length > 0 && (
             <Card>
-              <CardHeader><CardTitle>Alertes AML</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>OCR final CNI (Recto + Verso)</CardTitle>
+                {canEditKycEvidence && cniEditMode ? (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => { setCniEditMode(false); setCniEditedFields({}); }}>
+                      <X className="mr-1 h-3 w-3" /> Annuler
+                    </Button>
+                    <Button size="sm" onClick={handleCniSave} disabled={cniSaving}>
+                      {cniSaving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+                      Enregistrer
+                    </Button>
+                  </div>
+                ) : canEditKycEvidence ? (
+                  <Button size="sm" variant="outline" onClick={startCniEdit}>
+                    <Pencil className="mr-1 h-3 w-3" /> Modifier
+                  </Button>
+                ) : null}
+              </CardHeader>
               <CardContent className="space-y-2">
-                {dossier.aml_alerts.map((alert: any) => (
-                  <div key={alert.id} className="flex items-center justify-between p-2 rounded-lg border border-red-200 bg-red-50">
-                    <div>
-                      <p className="text-sm font-medium">{alert.alert_type}</p>
-                      <p className="text-xs text-muted-foreground">{alert.status}</p>
+                {cniFinalRows.map((row) => (
+                  <div key={row.key} className="space-y-1 rounded-lg border p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">{row.label}</p>
+                      <p className="text-xs text-muted-foreground">{row.sourceDocType || 'SOURCE_MANQUANTE'} - {scoreLabel(row.confidence)}</p>
                     </div>
-                    <span className="text-sm font-mono text-red-600">
-                      {(alert.match_score * 100).toFixed(0)}%
-                    </span>
+                    {cniEditMode ? (
+                      <input
+                        type="text"
+                        value={cniEditedFields[row.key] || ''}
+                        onChange={(event) => setCniEditedFields({ ...cniEditedFields, [row.key]: event.target.value })}
+                        className="w-full rounded border px-2 py-1 text-sm font-medium"
+                        disabled={!row.sourceDocumentId}
+                      />
+                    ) : (
+                      <p className="text-sm font-medium">{row.value || '-'}</p>
+                    )}
+                    {row.corrected && <p className="text-xs italic text-blue-600">Corrige manuellement</p>}
                   </div>
                 ))}
               </CardContent>
             </Card>
           )}
 
-          {isReviewable && (
+          {isThomas && (dossier.aml_alerts || []).length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Alertes AML liees</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {(dossier.aml_alerts || []).map((alert: any) => (
+                  <div key={alert.id} className="flex items-center justify-between gap-3 rounded-lg border p-2">
+                    <div>
+                      <p className="text-sm font-medium">{alert.alert_type}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Score {scoreLabel(alert.match_score)} - {alert.status}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/compliance/alert/${alert.id}`)}>
+                      Traiter
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {(canJeanReview || canThomasInvestigate) && (
             <Card>
               <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
               <CardContent className="flex flex-col gap-3">
-                {dossier.status !== 'FRAUD_SUSPECT' && (
+                {canJeanReview && dossier.status !== 'FRAUD_SUSPECT' && (
                   <Button className="w-full" onClick={() => setShowApprove(true)}>
-                    <Check className="h-4 w-4 mr-2" /> Approuver
+                    <Check className="mr-2 h-4 w-4" /> Approuver
                   </Button>
                 )}
+                {canJeanReview && (
                 <Button variant="destructive" className="w-full" onClick={() => setShowReject(true)}>
-                  <X className="h-4 w-4 mr-2" /> Rejeter
+                  <X className="mr-2 h-4 w-4" /> Rejeter
                 </Button>
-                {dossier.status !== 'FRAUD_SUSPECT' && (
+                )}
+                {canThomasMarkFraud && (
+                  <Button variant="destructive" className="w-full" onClick={() => setShowReject(true)}>
+                    <ShieldAlert className="mr-2 h-4 w-4" /> Marquer fraude
+                  </Button>
+                )}
+                {(canJeanReview || canThomasInvestigate) && dossier.status !== 'FRAUD_SUSPECT' && (
                   <Button variant="outline" className="w-full" onClick={() => setShowRequestInfo(true)}>
-                    <MessageSquare className="h-4 w-4 mr-2" /> Demander des informations
+                    <MessageSquare className="mr-2 h-4 w-4" /> Demander des informations
                   </Button>
                 )}
               </CardContent>
@@ -641,18 +1030,18 @@ export default function EvidenceViewerPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approuver le dossier</DialogTitle>
-            <DialogDescription>Justification obligatoire (traçabilité COBAC).</DialogDescription>
+            <DialogDescription>Justification obligatoire (traçabilite COBAC).</DialogDescription>
           </DialogHeader>
           <Textarea
             value={actionReason}
-            onChange={(e) => setActionReason(e.target.value)}
-            placeholder="Ex: Identité vérifiée, documents conformes..."
+            onChange={(event) => setActionReason(event.target.value)}
+            placeholder="Ex: Identite verifiee, documents conformes..."
             className="min-h-[80px]"
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowApprove(false); setActionReason('') }}>Annuler</Button>
+            <Button variant="outline" onClick={() => { setShowApprove(false); setActionReason(''); }}>Annuler</Button>
             <Button onClick={() => handleReview('APPROVED')} disabled={actionLoading || !actionReason.trim()}>
-              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Confirmer l'approbation
+              {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmer l'approbation
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -661,19 +1050,28 @@ export default function EvidenceViewerPage() {
       <Dialog open={showReject} onOpenChange={setShowReject}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{dossier.status === 'FRAUD_SUSPECT' ? 'Classer sans suite (investigation)' : 'Rejeter le dossier'}</DialogTitle>
-            <DialogDescription>Motif obligatoire pour le rejet.</DialogDescription>
+            <DialogTitle>
+              {isThomas && dossier.status !== 'FRAUD_SUSPECT'
+                ? 'Marquer le dossier comme fraude suspectee'
+                : dossier.status === 'FRAUD_SUSPECT' ? 'Classer sans suite (investigation)' : 'Rejeter le dossier'}
+            </DialogTitle>
+            <DialogDescription>Justification obligatoire pour tracer la decision.</DialogDescription>
           </DialogHeader>
           <Textarea
             value={actionReason}
-            onChange={(e) => setActionReason(e.target.value)}
-            placeholder="Ex: Document flou, identité non vérifiable..."
+            onChange={(event) => setActionReason(event.target.value)}
+            placeholder="Ex: Document flou, identite non verifiable..."
             className="min-h-[100px]"
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowReject(false); setActionReason('') }}>Annuler</Button>
-            <Button variant="destructive" onClick={() => handleReview('REJECTED')} disabled={actionLoading || !actionReason.trim()}>
-              {actionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Confirmer le rejet
+            <Button variant="outline" onClick={() => { setShowReject(false); setActionReason(''); }}>Annuler</Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleReview(canThomasMarkFraud ? 'FRAUD_SUSPECT' : 'REJECTED')}
+              disabled={actionLoading || !actionReason.trim()}
+            >
+              {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {canThomasMarkFraud ? 'Confirmer la fraude suspectee' : 'Confirmer le rejet'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -682,8 +1080,10 @@ export default function EvidenceViewerPage() {
       <RequestInfoModal
         open={showRequestInfo}
         onOpenChange={setShowRequestInfo}
-        onSubmit={handleInfoRequest}
-        fieldNames={currentDoc?.ocr_fields?.filter((f: any) => f.confidence_score < 0.7)?.map((f: any) => f.field_name) || []}
+        onSubmit={(message, _fields) => handleInfoRequest(message)}
+        fieldNames={(displayedCurrentDocFields || [])
+          .filter((field: any) => field.confidence_score < 0.7)
+          .map((field: any) => field.field_name)}
       />
     </div>
   );
