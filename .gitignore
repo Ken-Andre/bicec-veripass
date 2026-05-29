@@ -291,3 +291,8 @@ docs/test-evidence/**/*-html-report/
 # ========================
 docs/test-evidence/latest/kyc-happy-path/
 code/b_logs_utf8.txt
+
+# ========================
+# Temp Word files
+# ========================
+~$*.docx
