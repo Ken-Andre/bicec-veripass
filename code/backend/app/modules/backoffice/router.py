@@ -38,6 +38,7 @@ from app.modules.admin.models import Agency
 from app.modules.kyc.models import (
     KYCSession,
     Document,
+    DuplicateCheck,
     OCRField,
     ValidationDecision,
     DossierAssignment,
@@ -50,6 +51,7 @@ from app.modules.kyc.schemas import (
     AccessTier,
     LIFECYCLE_TO_ACCESS_TIER,
 )
+from app.modules.kyc.service import biometric_manual_review_reasons
 from app.modules.audit.models import AuditLog
 from app.modules.analytics.service import (
     record_ocr_performance_best_effort,
@@ -77,6 +79,8 @@ from app.modules.backoffice.schemas import (
     SupportMessageSchema,
     SupportMessageCreate,
     SupportThreadCreate,
+    PromoteAttachmentRequest,
+    PromoteAttachmentResponse,
 )
 
 router = APIRouter()
@@ -463,6 +467,7 @@ async def list_queue(
             selectinload(KYCSession.user),
             selectinload(KYCSession.agency),
             selectinload(KYCSession.documents).selectinload(Document.ocr_fields),
+            selectinload(KYCSession.biometric_results),
             selectinload(KYCSession.assignments).selectinload(DossierAssignment.agent),
         )
     )
@@ -516,6 +521,7 @@ async def list_queue(
             assigned_agent_name = current.agent.name
 
         overall_confidence = float(session.confidence_score_global) if session.confidence_score_global else None
+        biometric_risk_flags = biometric_manual_review_reasons(session.biometric_results)
 
         items.append(KYCQueueItemSchema(
             id=session.id,
@@ -529,6 +535,7 @@ async def list_queue(
             assigned_agent_name=assigned_agent_name,
             overall_confidence=overall_confidence,
             agency_code=agency_code_val,
+            biometric_risk_flags=biometric_risk_flags,
         ))
 
     total_pages = (total + limit - 1) // limit if total > 0 else 1
@@ -578,7 +585,6 @@ async def get_dossier_detail(
         has_aml = len(session.aml_alerts) > 0
         
         # Query DuplicateCheck to see if a NIU conflict exists
-        from app.modules.kyc.models import DuplicateCheck
         dup_res = await db.execute(
             select(DuplicateCheck).where(
                 (DuplicateCheck.session_id_new == session_id) | 
@@ -612,6 +618,11 @@ async def get_dossier_detail(
             )
             for f in doc.ocr_fields
         ]
+        classification = {}
+        if isinstance(doc.ocr_raw_json, dict):
+            raw_classification = doc.ocr_raw_json.get("backoffice_classification")
+            if isinstance(raw_classification, dict):
+                classification = raw_classification
         doc_briefs.append(
             DossierDocumentBrief(
                 id=doc.id,
@@ -620,6 +631,10 @@ async def get_dossier_detail(
                 ocr_status=doc.ocr_status or "PENDING",
                 ocr_error=doc.ocr_error,
                 ocr_engine=doc.ocr_engine,
+                classification_categories=classification.get("categories") or [],
+                classified_by_name=classification.get("classified_by_name"),
+                classified_at=classification.get("classified_at"),
+                classification_reason=classification.get("reason"),
                 captured_at=doc.captured_at,
                 ocr_fields=ocr_field_briefs,
             )
@@ -663,17 +678,15 @@ async def get_dossier_detail(
         for d in session.decisions
     ]
 
-    aml_briefs = []
-    if _agent.role != AgentRole.JEAN:
-        aml_briefs = [
-            DossierAmlAlertBrief(
-                id=a.id,
-                alert_type=a.alert_type,
-                match_score=float(a.match_score),
-                status=a.status,
-            )
-            for a in session.aml_alerts
-        ]
+    aml_briefs = [
+        DossierAmlAlertBrief(
+            id=a.id,
+            alert_type=a.alert_type,
+            match_score=float(a.match_score),
+            status=a.status,
+        )
+        for a in session.aml_alerts
+    ]
 
     assigned_agent_id: uuid.UUID | None = None
     assigned_agent_name: str | None = None
@@ -714,6 +727,7 @@ async def get_dossier_detail(
         agency_code=agency_code,
         documents=doc_briefs,
         biometric_result=bio_brief,
+        biometric_risk_flags=biometric_manual_review_reasons(session.biometric_results),
         has_consent=session.consent_record is not None,
         consent_method=session.consent_record.consent_method if session.consent_record else None,
         signed_at=session.consent_record.signed_at if session.consent_record else None,
@@ -863,7 +877,11 @@ async def submit_review_decision(
     """Submit a review decision on a KYC dossier."""
     result = await db.execute(
         select(KYCSession)
-        .options(selectinload(KYCSession.assignments))
+        .options(
+            selectinload(KYCSession.assignments),
+            selectinload(KYCSession.biometric_results),
+            selectinload(KYCSession.aml_alerts),
+        )
         .where(KYCSession.id == session_id)
     )
     session = result.scalar_one_or_none()
@@ -909,6 +927,53 @@ async def submit_review_decision(
     if not new_status:
         raise HTTPException(status_code=400, detail=f"Invalid decision: {body.decision}")
 
+    biometric_risk_flags = biometric_manual_review_reasons(session.biometric_results)
+    if new_status == LifecycleState.APPROVED and biometric_risk_flags:
+        if not body.biometric_override_confirmed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "BIOMETRIC_OVERRIDE_REQUIRED",
+                    "message": "Biometric risk flags require explicit approval override.",
+                    "biometric_risk_flags": biometric_risk_flags,
+                },
+            )
+
+    if new_status == LifecycleState.APPROVED:
+        open_aml_statuses = {"OPEN", "CONFIRMED", "ESCALATED", "PENDING"}
+        active_aml_alerts = [
+            alert for alert in session.aml_alerts if str(alert.status) in open_aml_statuses
+        ]
+        if active_aml_alerts:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "AML_CLEARANCE_REQUIRED",
+                    "message": "Open AML alerts must be cleared by compliance before approval.",
+                    "alert_ids": [str(alert.id) for alert in active_aml_alerts],
+                },
+            )
+
+        duplicate_result = await db.execute(
+            select(DuplicateCheck.id).where(
+                (
+                    (DuplicateCheck.session_id_new == session.id)
+                    | (DuplicateCheck.session_id_existing == session.id)
+                ),
+                DuplicateCheck.status == "OPEN",
+            )
+        )
+        active_duplicate_ids = [str(row[0]) for row in duplicate_result.all()]
+        if active_duplicate_ids:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "DUPLICATE_CLEARANCE_REQUIRED",
+                    "message": "Open duplicate checks must be resolved before approval.",
+                    "duplicate_check_ids": active_duplicate_ids,
+                },
+            )
+
     new_access_level = LIFECYCLE_TO_ACCESS_TIER.get(new_status, AccessTier.RESTRICTED)
 
     old_status = session.status
@@ -953,6 +1018,12 @@ async def submit_review_decision(
             "access_level": new_access_level,
             "agent_name": current_agent.name,
             "rationale": body.reason,
+            "biometric_override_confirmed": (
+                bool(body.biometric_override_confirmed)
+                if new_status == LifecycleState.APPROVED and biometric_risk_flags
+                else False
+            ),
+            "biometric_risk_flags": biometric_risk_flags,
         },
         performed_by=current_agent.id,
         performed_at=now,
@@ -1505,7 +1576,138 @@ async def mark_message_read(
     return {"status": "read", "message_id": str(message_id)}
 
 
+@router.post(
+    "/support/messages/{message_id}/promote-to-document",
+    response_model=PromoteAttachmentResponse,
+)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def promote_support_attachment(
+    request: Request,
+    message_id: uuid.UUID,
+    body: PromoteAttachmentRequest,
+    current_agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.SYLVIE)
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Promote a support message's attachment to an official KYC document."""
+    # 1. Load support message
+    result = await db.execute(
+        select(SupportMessage)
+        .options(selectinload(SupportMessage.thread))
+        .where(SupportMessage.id == message_id)
+    )
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Support message not found")
+    if not message.attachment_path:
+        raise HTTPException(
+            status_code=400, detail="This message does not contain any attachment"
+        )
+
+    # 2. Check if already promoted (doublon check)
+    session_id = message.thread.session_id
+    existing_doc_id = await _resolve_attachment_document_id(
+        db,
+        session_id,
+        message.attachment_path,
+        message.attachment_sha256,
+    )
+    if existing_doc_id:
+        raise HTTPException(
+            status_code=400,
+            detail="This attachment is already registered as a document in this session",
+        )
+
+    # 3. Get file info to create Document record
+    resolved_path = _resolve_attachment_path(message.attachment_path)
+    if not resolved_path.exists() or not resolved_path.is_file():
+        raise HTTPException(
+            status_code=404, detail="Attachment file not found on disk"
+        )
+
+    file_size = resolved_path.stat().st_size
+    sha256_hash = message.attachment_sha256 or "unknown_hash"
+
+    # Validate document categories & type
+    categories = [c.strip().upper() for c in body.categories if c.strip()]
+    if not categories:
+        raise HTTPException(status_code=400, detail="At least one category is required")
+    invalid = sorted(set(categories) - ALLOWED_DOC_CATEGORIES)
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid document categories: {', '.join(invalid)}",
+        )
+
+    primary_doc_type = body.doc_type.strip().upper()
+    if primary_doc_type not in ALLOWED_DOC_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Invalid doc_type")
+
+    now = datetime.now(timezone.utc)
+
+    # 4. Create Document entry
+    document_id = uuid.uuid4()
+    document = Document(
+        id=document_id,
+        session_id=session_id,
+        doc_type=primary_doc_type,
+        file_path=message.attachment_path,
+        sha256_hash=sha256_hash,
+        ocr_status="PENDING",
+        captured_at=now,
+        file_size_bytes=file_size,
+        ocr_raw_json={
+            "backoffice_classification": {
+                "categories": categories,
+                "primary_doc_type": primary_doc_type,
+                "classified_by": str(current_agent.id),
+                "classified_by_name": current_agent.name,
+                "classified_at": now.isoformat(),
+                "reason": body.reason,
+                "promoted_from_support_message_id": str(message_id),
+            }
+        }
+    )
+    db.add(document)
+
+    # 5. Create Audit Log
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="DOCUMENT_PROMOTE",
+        table_name="documents",
+        record_id=str(session_id),
+        new_data={
+            "document_id": str(document_id),
+            "doc_type": primary_doc_type,
+            "categories": categories,
+            "agent_name": current_agent.name,
+            "rationale": body.reason,
+            "source_message_id": str(message_id),
+        },
+        performed_by=current_agent.id,
+        performed_at=now,
+        client_ip=request.client.host if request.client else None,
+    )
+    db.add(audit)
+
+    await db.commit()
+
+    logger.info(
+        f"Agent {current_agent.id} promoted attachment from message {message_id} to document {document_id} (type={primary_doc_type})"
+    )
+
+    return PromoteAttachmentResponse(
+        session_id=session_id,
+        document_id=document_id,
+        doc_type=primary_doc_type,
+        categories=categories,
+        promoted_at=now,
+    )
+
+
 # --- OCR Correction ---
+
 
 
 class OcrCorrectRequest(BaseModel):

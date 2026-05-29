@@ -21,6 +21,7 @@ class KYCQueueItemSchema(BaseModel):
     assigned_agent_name: Optional[str] = None
     overall_confidence: Optional[float] = None
     agency_code: Optional[str] = None
+    biometric_risk_flags: list[str] = []
 
     model_config = {"from_attributes": True}
 
@@ -91,6 +92,10 @@ class ReviewDecisionRequest(BaseModel):
         description="Mandatory justification for the decision (audit trail, COBAC R-2023/01)",
         min_length=1,
     )
+    biometric_override_confirmed: bool = Field(
+        False,
+        description="Required when approving a dossier with biometric risk flags.",
+    )
 
 
 class ReviewDecisionResponse(BaseModel):
@@ -133,6 +138,10 @@ class DossierDocumentBrief(BaseModel):
     ocr_status: str = "PENDING"
     ocr_error: Optional[str] = None
     ocr_engine: Optional[str] = None
+    classification_categories: list[str] = []
+    classified_by_name: Optional[str] = None
+    classified_at: Optional[str] = None
+    classification_reason: Optional[str] = None
     captured_at: datetime
     ocr_fields: list["OCRFieldBrief"] = []
 
@@ -228,6 +237,7 @@ class DossierDetailSchema(BaseModel):
     documents: list[DossierDocumentBrief] = []
 
     biometric_result: Optional[DossierBiometricBrief] = None
+    biometric_risk_flags: list[str] = []
 
     has_consent: bool = False
     consent_method: Optional[str] = None
@@ -304,3 +314,22 @@ class DocumentClassifyResponse(BaseModel):
     classified_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PromoteAttachmentRequest(BaseModel):
+    """Promote an attachment sent by the client in support chat to a KYC document."""
+
+    doc_type: str = Field(..., description="Target canonical doc_type (e.g. CNI_RECTO, BILL_ENEO)")
+    categories: list[str] = Field(..., min_length=1, description="E.g. ['CNI_RECTO', 'IDENTITY_PROOF']")
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+class PromoteAttachmentResponse(BaseModel):
+    session_id: UUID
+    document_id: UUID
+    doc_type: str
+    categories: list[str]
+    promoted_at: datetime
+
+    model_config = {"from_attributes": True}
+
