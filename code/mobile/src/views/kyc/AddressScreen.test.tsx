@@ -106,6 +106,7 @@ let originalOnLine: boolean;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sessionStorage.clear();
   originalOnLine = navigator.onLine;
   mockGeoAndApiResponses();
   mockUseKyc.mockReturnValue({
@@ -140,7 +141,7 @@ describe('AddressScreen integration', () => {
       expect(screen.getByText('Centre')).toBeInTheDocument();
     });
 
-    const regionSelect = screen.getByDisplayValue(/-- .*region/i).closest('select')!;
+    const regionSelect = screen.getByLabelText('Region');
     await user.selectOptions(regionSelect, 'CE');
 
     await waitFor(() => {
@@ -156,14 +157,14 @@ describe('AddressScreen integration', () => {
       expect(screen.getByText('Centre')).toBeInTheDocument();
     });
 
-    const regionSelect = screen.getByDisplayValue(/-- .*region/i).closest('select')!;
+    const regionSelect = screen.getByLabelText('Region');
     await user.selectOptions(regionSelect, 'CE');
 
     await waitFor(() => {
       expect(screen.getByText('Yaoundé 1')).toBeInTheDocument();
     });
 
-    const citySelect = screen.getByDisplayValue(/-- .*city/i).closest('select')!;
+    const citySelect = screen.getByLabelText('Ville');
     await user.selectOptions(citySelect, 'YA1');
 
     await waitFor(() => {
@@ -181,15 +182,15 @@ describe('AddressScreen integration', () => {
     await waitFor(() => expect(screen.getByText('Centre')).toBeInTheDocument());
 
     // Fill form
-    const regionSelect = screen.getByDisplayValue(/-- .*region/i).closest('select')!;
+    const regionSelect = screen.getByLabelText('Region');
     await user.selectOptions(regionSelect, 'CE');
 
     await waitFor(() => expect(screen.getByText('Yaoundé 1')).toBeInTheDocument());
-    const citySelect = screen.getByDisplayValue(/-- .*city/i).closest('select')!;
+    const citySelect = screen.getByLabelText('Ville');
     await user.selectOptions(citySelect, 'YA1');
 
     await waitFor(() => expect(screen.getByText(/Bastos/)).toBeInTheDocument());
-    const quartierSelect = screen.getByDisplayValue(/-- .*quartier/i).closest('select')!;
+    const quartierSelect = screen.getByLabelText('Quartier');
     await user.selectOptions(quartierSelect, 'BAS');
 
     // Simulate GPS capture
@@ -203,11 +204,11 @@ describe('AddressScreen integration', () => {
 
     // Wait for GPS to be captured and submit enabled
     await waitFor(() => {
-      const submitBtn = screen.getByText('common.continue');
+      const submitBtn = screen.getByText('Continuer');
       expect(submitBtn).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByText('common.continue'));
+    fireEvent.click(screen.getByText('Continuer'));
 
     await waitFor(() => {
       expect(mockEnqueue).toHaveBeenCalledWith(
@@ -236,15 +237,15 @@ describe('AddressScreen integration', () => {
 
     await waitFor(() => expect(screen.getByText('Centre')).toBeInTheDocument());
 
-    const regionSelect = screen.getByDisplayValue(/-- .*region/i).closest('select')!;
+    const regionSelect = screen.getByLabelText('Region');
     await user.selectOptions(regionSelect, 'CE');
 
     await waitFor(() => expect(screen.getByText('Yaoundé 1')).toBeInTheDocument());
-    const citySelect = screen.getByDisplayValue(/-- .*city/i).closest('select')!;
+    const citySelect = screen.getByLabelText('Ville');
     await user.selectOptions(citySelect, 'YA1');
 
     await waitFor(() => expect(screen.getByText(/Bastos/)).toBeInTheDocument());
-    const quartierSelect = screen.getByDisplayValue(/-- .*quartier/i).closest('select')!;
+    const quartierSelect = screen.getByLabelText('Quartier');
     await user.selectOptions(quartierSelect, 'BAS');
 
     // Simulate GPS capture
@@ -256,11 +257,11 @@ describe('AddressScreen integration', () => {
     fireEvent.click(screen.getByText('Capturer'));
 
     await waitFor(() => {
-      const submitBtn = screen.getByText('common.continue');
+      const submitBtn = screen.getByText('Continuer');
       expect(submitBtn).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByText('common.continue'));
+    fireEvent.click(screen.getByText('Continuer'));
 
     await waitFor(() => {
       expect(mockEnqueue).toHaveBeenCalledWith(
@@ -287,15 +288,15 @@ describe('AddressScreen integration', () => {
 
     await waitFor(() => expect(screen.getByText('Centre')).toBeInTheDocument());
 
-    const regionSelect = screen.getByDisplayValue(/-- .*region/i).closest('select')!;
+    const regionSelect = screen.getByLabelText('Region');
     await user.selectOptions(regionSelect, 'CE');
 
     await waitFor(() => expect(screen.getByText('Yaoundé 1')).toBeInTheDocument());
-    const citySelect = screen.getByDisplayValue(/-- .*city/i).closest('select')!;
+    const citySelect = screen.getByLabelText('Ville');
     await user.selectOptions(citySelect, 'YA1');
 
     await waitFor(() => expect(screen.getByText(/Bastos/)).toBeInTheDocument());
-    const quartierSelect = screen.getByDisplayValue(/-- .*quartier/i).closest('select')!;
+    const quartierSelect = screen.getByLabelText('Quartier');
     await user.selectOptions(quartierSelect, 'BAS');
 
     // Simulate GPS capture
@@ -307,11 +308,11 @@ describe('AddressScreen integration', () => {
     fireEvent.click(screen.getByText('Capturer'));
 
     await waitFor(() => {
-      const submitBtn = screen.getByText('common.continue');
+      const submitBtn = screen.getByText('Continuer');
       expect(submitBtn).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByText('common.continue'));
+    fireEvent.click(screen.getByText('Continuer'));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(

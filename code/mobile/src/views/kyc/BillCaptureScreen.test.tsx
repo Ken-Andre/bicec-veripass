@@ -229,8 +229,9 @@ describe('BillCaptureScreen integration', () => {
       expect(screen.getByText(/Capturer la facture/i)).toBeInTheDocument();
     });
 
-    // Click capture
     fireEvent.click(screen.getByText(/Capturer la facture/i));
+    await waitFor(() => expect(screen.getByText('Confirmer')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Confirmer'));
 
     await waitFor(() => {
       expect(mockEnqueue).toHaveBeenCalledWith(
@@ -262,6 +263,8 @@ describe('BillCaptureScreen integration', () => {
     });
 
     fireEvent.click(screen.getByText(/Capturer la facture/i));
+    await waitFor(() => expect(screen.getByText('Confirmer')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Confirmer'));
 
     await waitFor(() => {
       expect(mockEnqueue).toHaveBeenCalledWith(
@@ -291,6 +294,8 @@ describe('BillCaptureScreen integration', () => {
     });
 
     fireEvent.click(screen.getByText(/Capturer la facture/i));
+    await waitFor(() => expect(screen.getByText('Confirmer')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Confirmer'));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
