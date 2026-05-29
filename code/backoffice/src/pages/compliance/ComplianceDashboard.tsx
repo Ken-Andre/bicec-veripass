@@ -228,9 +228,14 @@ export default function ComplianceDashboard() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Alertes AML actives</CardTitle>
+          <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/compliance/lists')}>
+            Listes AML
+          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/compliance/duplicates')}>
             Conflits NIU →
           </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {alertsLoading ? (

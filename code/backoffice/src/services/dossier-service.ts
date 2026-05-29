@@ -11,6 +11,7 @@ export interface QueueItem {
   overall_confidence: number | null
   agency_code: string | null
   submitted_at: string | null
+  biometric_risk_flags?: string[]
 }
 
 export interface PageResponse<T> {
@@ -60,8 +61,17 @@ export async function fetchAuditLog(sessionId?: string) {
   }))
 }
 
-export async function reviewDossier(sessionId: string, decision: string, reason: string) {
-  return apiPost(`/backoffice/dossier/${sessionId}/review`, { decision, reason })
+export async function reviewDossier(
+  sessionId: string,
+  decision: string,
+  reason: string,
+  options?: { biometricOverrideConfirmed?: boolean },
+) {
+  return apiPost(`/backoffice/dossier/${sessionId}/review`, {
+    decision,
+    reason,
+    biometric_override_confirmed: options?.biometricOverrideConfirmed ?? false,
+  })
 }
 
 export async function assignDossier(sessionId: string, agentId: string) {

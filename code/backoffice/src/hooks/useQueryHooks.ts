@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchQueue, fetchQueueStats, fetchDossier, fetchAuditLog } from '@/services/dossier-service'
-import { fetchAmlAlerts, fetchNiuConflicts, fetchAgencies, fetchBatchJobs, fetchDocumentExpiry } from '@/services/aml-service'
+import { fetchAmlAlerts, fetchAmlLists, fetchNiuConflicts, fetchAgencies, fetchBatchJobs, fetchDocumentExpiry } from '@/services/aml-service'
 import type { QueueItem, QueueStats } from '@/services/dossier-service'
-import type { AmlAlert, NiuConflict, Agency, BatchJob, DocumentExpiryResponse } from '@/types/aml'
+import type { AmlAlert, AmlListRegistryItem, NiuConflict, Agency, BatchJob, DocumentExpiryResponse } from '@/types/aml'
 
 export function useQueue(status?: string) {
   return useQuery<QueueItem[]>({
@@ -73,5 +73,13 @@ export function useDocumentExpiry() {
     queryKey: ['document-expiry'],
     queryFn: fetchDocumentExpiry,
     refetchInterval: 30_000,
+  })
+}
+
+export function useAmlLists() {
+  return useQuery<AmlListRegistryItem[]>({
+    queryKey: ['aml-lists'],
+    queryFn: fetchAmlLists,
+    refetchInterval: 60_000,
   })
 }

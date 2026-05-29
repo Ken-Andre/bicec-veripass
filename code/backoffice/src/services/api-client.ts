@@ -95,8 +95,9 @@ export async function apiGetBlob(
 
 export async function apiPost<T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
   const token = getToken()
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...options?.headers,
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -104,7 +105,7 @@ export async function apiPost<T = any>(path: string, body?: unknown, options?: R
     ...options,
     method: 'POST',
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
   })
   return handleResponse<T>(res)
 }

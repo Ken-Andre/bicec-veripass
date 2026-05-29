@@ -8,6 +8,7 @@ import {
   Command,
   Settings,
   ScrollText,
+  ListChecks,
   LogOut,
   X,
   Menu,
@@ -17,6 +18,7 @@ import { useState } from 'react'
 const navigation = [
   { name: 'Validation KYC', href: '/validation', icon: FileCheck, roles: ['JEAN'] },
   { name: 'Conformité AML', href: '/compliance', icon: Shield, roles: ['THOMAS'] },
+  { name: 'Listes AML', href: '/compliance/lists', icon: ListChecks, roles: ['THOMAS', 'ADMIN_IT'] },
   { name: 'Command Center', href: '/command-center', icon: Command, roles: ['SYLVIE'] },
   { name: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['SYLVIE', 'THOMAS', 'ADMIN_IT'] },
   { name: 'Journal audit', href: '/admin/audit', icon: ScrollText, roles: ['SYLVIE', 'ADMIN_IT'] },
