@@ -1,5 +1,7 @@
 # End-to-End User Flow Diagram — BICEC VeriPass
 
+> Historical note, 2026-05-28: this flow is not current decision authority. It contains old Amplitude provisioning assumptions. Use `docs/documentation-authority.md`, `docs/project-overview.md`, and implemented code for current scope.
+
 **Nom officiel:** Global User Flow Diagram  
 **Version:** 1.0  
 **Date:** 2026-02-26  

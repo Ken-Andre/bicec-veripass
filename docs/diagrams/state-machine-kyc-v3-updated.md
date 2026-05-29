@@ -1,5 +1,7 @@
 # State Machine KYC - Version 3 (Updated)
 
+> Historical note, 2026-05-28: this state machine is not current decision authority. It contains old provisioning and Amplitude assumptions. Use `code/backend/app/modules/kyc/schemas.py`, `docs/documentation-authority.md`, and `docs/data-models.md` for current states and access levels.
+
 **Date:** 2026-03-04  
 **Version:** 3.0  
 **Auteur:** Ken-André  

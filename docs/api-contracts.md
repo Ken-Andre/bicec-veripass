@@ -186,6 +186,10 @@ Prefix: `/aml`
 | GET | `/niu-conflicts` | List duplicate/NIU conflicts |
 | POST | `/niu-conflicts/{conflict_id}/resolve` | Resolve duplicate/NIU conflict |
 | GET | `/document-expiry` | Expiring document report |
+| GET | `/lists` | List AML sources and latest import/sync status |
+| GET | `/lists/template` | Download BICEC internal list CSV template |
+| POST | `/lists/import/dry-run` | Validate an internal AML CSV without writing |
+| POST | `/lists/import` | Import a validated internal AML CSV |
 | POST | `/notify-global` | Send regulatory/global notification |
 | GET | `/agencies` | List agencies |
 | POST | `/agencies` | Create agency |
@@ -193,6 +197,8 @@ Prefix: `/aml`
 | DELETE | `/agencies/{agency_id}` | Delete agency |
 | GET | `/batch-jobs` | List AML/internal batch jobs |
 | POST | `/batch-jobs/trigger` | Trigger batch job |
+
+`/lists` is visible to `THOMAS`, `SYLVIE`, and `ADMIN_IT`. CSV import and template download are limited to `THOMAS` and `ADMIN_IT`.
 
 ## Analytics API
 

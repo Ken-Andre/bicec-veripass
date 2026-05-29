@@ -1,3 +1,5 @@
+> Historical note, 2026-05-28: this sequence diagram is not current decision authority. It contains old DGI mock and Amplitude provisioning assumptions. Use `docs/documentation-authority.md`, `docs/architecture.md`, and implemented code for current scope.
+
 ```mermaid
 sequenceDiagram
   participant Mobile

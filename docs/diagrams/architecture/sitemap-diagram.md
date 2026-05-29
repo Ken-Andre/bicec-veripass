@@ -1,5 +1,7 @@
 # Sitemap Diagram — BICEC VeriPass
 
+> Historical note, 2026-05-28: this sitemap is historical only. Mentions of Amplitude Batch Monitor or other old planning surfaces are not current roadmap authority.
+
 **Version:** 1.0  
 **Date:** 2026-02-26  
 **Auteur:** Ken (UX Designer)

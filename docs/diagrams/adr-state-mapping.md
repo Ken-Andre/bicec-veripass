@@ -1,5 +1,7 @@
 # ADR: Mapping PRD lifecycle states → UX v2 Access States
 
+> Historical note, 2026-05-28: this mapping is not current decision authority. Use `code/backend/app/modules/kyc/schemas.py`, `docs/documentation-authority.md`, and `docs/data-models.md` for current state/access behavior.
+
 Date: 2026-02-23
 
 Decision: Use `ux-design-specification-v2.md` (2026-02-18) as canonical source for post-submission access states and map PRD lifecycle states to these access states. Prototype must be updated to use the mapped enums.

@@ -453,7 +453,7 @@ def add_body(doc):
     for text in intro_paragraphs:
         add_body_paragraph(doc, text)
 
-    doc.add_heading("Chapitre 1 - Réglementation COBAC et problématique KYC", level=1)
+    doc.add_heading("Chapitre 1 : Réglementation COBAC et problématique KYC", level=1)
     add_body_paragraph(
         doc,
         "Ce chapitre établit le cadre dans lequel le projet a été réalisé. Il présente d'abord la BICEC et le contexte du stage, puis analyse les exigences réglementaires liées à la connaissance client. Il met ensuite en évidence les limites du processus manuel d'entrée en relation et formule la problématique à laquelle répond BICEC VeriPass."
@@ -461,13 +461,13 @@ def add_body(doc):
 
     doc.add_heading("1.1 Présentation synthétique de la BICEC et du stage", level=2)
     for text in [
-        "La Banque Internationale du Cameroun pour l'Epargne et le Crédit, plus connue sous le sigle BICEC, est une banque camerounaise opérant sur les marchés des particuliers, des professionnels et des entreprises. D'après sa communication institutionnelle, elle est filiale du Groupe Banque Centrale Populaire et figure parmi les acteurs de référence du secteur bancaire au Cameroun. La banque revendique un réseau national de 40 agences, deux centres d'affaires, un espace PME, plus de 380 000 clients et près de 800 collaborateurs (BICEC, 2026).",
-        "Cette présence nationale donne à la BICEC une double responsabilité. Elle doit continuer à proposer des services accessibles et proches des clients, tout en modernisant son expérience digitale. Ses valeurs institutionnelles - proximité, citoyenneté, performance et innovation - donnent un cadre favorable à un projet comme VeriPass, dont l'objectif est de transformer l'entrée en relation sans dégrader la confiance bancaire.",
+        "La Banque Internationale du Cameroun pour l'Epargne et le Crédit, plus connue sous le sigle BICEC, est une banque camerounaise opérant sur les marchés des particuliers, des professionnels et des entreprises. D'après sa communication institutionnelle, elle est filiale du Groupe Banque Centrale Populaire et figure parmi les acteurs de référence du secteur bancaire au Cameroun. La fiche de validation du sujet de stage indique un effectif d'environ 600 collaborateurs.",
+        "Cette présence nationale donne à la BICEC une double responsabilité. Elle doit continuer à proposer des services accessibles et proches des clients, tout en modernisant son expérience digitale. Ses valeurs institutionnelles (proximité, citoyenneté, performance et innovation) donnent un cadre favorable à un projet comme VeriPass, dont l'objectif est de transformer l'entrée en relation sans dégrader la confiance bancaire.",
         "Le stage s'est déroulé au sein du Département Etude & Développement, sous l'encadrement de M. Jackson Parfait KOMBE LELE. Le sujet validé par l'entreprise porte sur la conception et le développement d'un écosystème intelligent d'acquisition client, avec intégration de mécanismes avancés de vérification pour l'automatisation de la conformité KYC. La période de stage indiquée sur la fiche de validation s'étend du 19 janvier 2026 au 18 juin 2026."
     ]:
         add_body_paragraph(doc, text)
 
-    add_caption_above(doc, "Tableau 3. Fiche signalétique synthétique de la BICEC")
+    add_caption_above(doc, "Tableau 1. Fiche signalétique synthétique de la BICEC")
     table = doc.add_table(rows=1, cols=2)
     table.rows[0].cells[0].text = "Elément"
     table.rows[0].cells[1].text = "Information"
@@ -477,7 +477,7 @@ def add_body(doc):
         ("Boîte postale", "B.P. 1925 Douala"),
         ("Téléphone", "(+237) 233 43 60 00"),
         ("Réseau", "40 agences, 2 centres d'affaires et un espace PME"),
-        ("Clients et collaborateurs", "Plus de 380 000 clients et près de 800 collaborateurs"),
+        ("Clients et collaborateurs", "Plus de 380 000 clients et environ 600 collaborateurs"),
         ("Tuteur entreprise", "M. Jackson Parfait KOMBE LELE"),
         ("Projet de stage", "Digitalisation de l'onboarding client et automatisation contrôlée du KYC"),
     ]
@@ -506,7 +506,7 @@ def add_body(doc):
     ]:
         add_body_paragraph(doc, text)
 
-    add_caption_above(doc, "Tableau 4. Traduction des exigences réglementaires en mécanismes projet")
+    add_caption_above(doc, "Tableau 2. Traduction des exigences réglementaires en mécanismes projet")
     table = doc.add_table(rows=1, cols=3)
     for idx, header in enumerate(["Exigence KYC", "Interprétation pour le projet", "Réponse BICEC VeriPass"]):
         table.rows[0].cells[idx].text = header
@@ -533,7 +533,7 @@ def add_body(doc):
     ]:
         add_body_paragraph(doc, text)
 
-    add_caption_above(doc, "Tableau 5. Limites du processus manuel et réponse attendue du pipeline numérique")
+    add_caption_above(doc, "Tableau 3. Limites du processus manuel et réponse attendue du pipeline numérique")
     table = doc.add_table(rows=1, cols=3)
     for idx, header in enumerate(["Limite observée", "Risque associé", "Réponse attendue"]):
         table.rows[0].cells[idx].text = header
@@ -573,66 +573,12 @@ def add_body(doc):
     p.add_run().add_picture(str(fig_path), width=Inches(6.4))
     add_figure_caption(doc, "Figure 1. Chaîne fonctionnelle du pipeline KYC VeriPass")
 
-    doc.add_heading("1.7 Périmètre et délimitations du MVP", level=2)
-    for text in [
-        "Le périmètre du MVP met l'accent sur la preuve de valeur KYC. La solution démontre la capacité à constituer un dossier numérique complet, à automatiser l'extraction et certains contrôles, à déclencher une revue humaine et à fournir des éléments d'audit. En revanche, elle ne doit pas être présentée comme une application bancaire complète ni comme une intégration production déjà reliée à toutes les API externes.",
-        "Les notes de durcissement les plus récentes du projet indiquent que l'intégration DGI réelle est retirée du périmètre MVP. Le NIU est traité comme une preuve locale selon trois états : absent, déclaratif ou document téléversé. De même, les fonctionnalités bancaires présentes dans l'interface servent de démonstration de parcours et de découverte de services ; les opérations réelles de core banking et les transactions financières complètes relèvent d'une phase ultérieure.",
-        "Cette délimitation renforce la crédibilité du mémoire. Elle montre que le projet ne confond pas prototype avancé, MVP de conformité et système bancaire production. Le résultat attendu du stage est une base technique et fonctionnelle capable de démontrer l'onboarding KYC, d'appuyer la discussion métier et de préparer les prochaines étapes d'intégration."
-    ]:
-        add_body_paragraph(doc, text)
-
-    doc.add_heading("1.8 Synthèse du chapitre", level=2)
+    doc.add_heading("1.7 Synthèse du chapitre", level=2)
     for text in [
         "Ce premier chapitre a montré que BICEC VeriPass répond à un besoin réel : réduire la friction de l'ouverture de compte sans affaiblir les obligations de vigilance. La BICEC évolue dans un environnement où l'expérience digitale devient un facteur concurrentiel, mais où la conformité COBAC impose des exigences fortes de connaissance client, de conservation documentaire, d'approche par les risques et de traçabilité.",
         "La problématique du mémoire consiste donc à concevoir une automatisation utile, mais contrôlée. La technologie doit préparer le dossier, améliorer la qualité de la donnée, guider le client et accélérer la revue, tout en laissant à l'agent la responsabilité de la décision finale. Le chapitre suivant développera l'analyse fonctionnelle et l'architecture de cette réponse."
     ]:
         add_body_paragraph(doc, text)
-
-    doc.add_heading("Chapitre 2 - Analyse, conception et architecture de la solution", level=1)
-    add_body_paragraph(
-        doc,
-        "Ce chapitre sera développé dans la prochaine itération du mémoire. Il présentera les besoins fonctionnels, les cas d'utilisation, les acteurs, l'architecture logique, le modèle de données, les contrats API et les choix techniques retenus pour BICEC VeriPass."
-    )
-
-    doc.add_heading("Chapitre 3 - Implémentation, tests et évaluation", level=1)
-    add_body_paragraph(
-        doc,
-        "Ce chapitre sera développé dans la prochaine itération du mémoire. Il présentera les modules réalisés, les écrans majeurs, les mécanismes OCR et biométriques, les tests unitaires et end-to-end, les preuves de démonstration, les limites et les perspectives d'industrialisation."
-    )
-
-    doc.add_heading("Conclusion générale", level=1)
-    add_body_paragraph(
-        doc,
-        "La conclusion générale sera finalisée après rédaction des chapitres techniques et analyse des résultats. Elle devra positionner le résultat obtenu par rapport aux objectifs du stage, expliciter les apports pour la BICEC, les acquis d'apprentissage et les axes de progrès."
-    )
-
-    doc.add_heading("Références bibliographiques provisoires", level=1)
-    refs = [
-        "BICEC. (2026). A propos de la BICEC. https://www.bicec.com/la-bicec/",
-        "BICEC. (2026). Le réseau de la BICEC. https://www.bicec.com/la-bicec/reseau/",
-        "COBAC. (2023). Règlement COBAC R-2023/01 du 19 décembre 2023 relatif aux diligences des établissements assujettis en matière de LBC/FT et de prolifération.",
-        "Droit Médias Finance. (2024). CEMAC - Le règlement COBAC R-2023/01 relatif aux nouvelles diligences anti-blanchiment entre en vigueur le 1er juillet 2024. https://www.droitmediasfinance.com/",
-        "Base Réglementaire. (2025). Articles du règlement COBAC R-2023/01 : articles 1, 3, 11, 12, 13, 38, 44, 45 et 46. https://basereglementaire.com/",
-        "UCAC-ICAM. (s. d.). Protocole de rédaction du rapport de stage, d'alternance, du MFH et du stage humanitaire.",
-        "UCAC-ICAM. (s. d.). Evaluation du rapport.",
-        "BICEC VeriPass. (2026). Documentation interne du projet : cadrage, PRD, architecture, contrats API, modèles de données, notes de durcissement et preuves de tests.",
-    ]
-    for ref in refs:
-        doc.add_paragraph(ref, style="Bibliographie")
-
-    doc.add_heading("Annexes prévues", level=1)
-    add_list(
-        doc,
-        [
-            "Annexe A : Fiche de validation du sujet de stage en entreprise.",
-            "Annexe B : Architecture conteneurisée de BICEC VeriPass.",
-            "Annexe C : Extraits des contrats API KYC et backoffice.",
-            "Annexe D : Captures des écrans mobile et backoffice.",
-            "Annexe E : Preuves de tests et scénarios de démonstration MVP.",
-        ],
-        numbered=False,
-    )
-
 
 def build_document():
     doc = Document()
@@ -641,7 +587,7 @@ def build_document():
     add_preliminaries(doc)
     add_body(doc)
     doc.core_properties.author = "Andre Yoann KENMOGNE"
-    doc.core_properties.title = "Mémoire de fin d'études - BICEC VeriPass"
+    doc.core_properties.title = "Mémoire de fin d'études : BICEC VeriPass"
     doc.core_properties.subject = "Onboarding digital KYC et conformité bancaire"
     doc.core_properties.keywords = "BICEC, KYC, COBAC, OCR, biométrie, FastAPI, React PWA"
     doc.save(DOCX_PATH)

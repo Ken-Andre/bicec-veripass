@@ -36,7 +36,7 @@ The live project is a multi-part Docker Compose system:
 | Infrastructure | `code/infra` | Nginx TLS proxy, security headers, offline model mounts |
 | Scripts | `code/scripts` | Volume bootstrap, smoke checks, env encryption, backups, pruning, evidence helpers |
 | Documentation | `docs` | Handover docs, ADRs, diagrams, troubleshooting, test evidence |
-| Planning artifacts | `_bmad-output/planning-artifacts` | PRD, architecture plan, UX spec, epics, backlog |
+| Historical planning artifacts | `_bmad-output/planning-artifacts` | Earlier PRD, architecture, UX, epics, and backlog context; not current roadmap or decision authority |
 
 ## Runtime System
 
@@ -109,11 +109,12 @@ The source-of-truth implementation is `code/backend/app/modules/kyc/schemas.py`;
 
 Start with:
 
-1. [Maintainer Handbook](./maintainer-handbook.md)
-2. [Architecture](./architecture.md)
-3. [Development Guide](./development-guide.md)
-4. [API Contracts](./api-contracts.md)
-5. [Data Models](./data-models.md)
-6. [Operations Runbook](./operations-runbook.md)
+1. [Documentation Authority](./documentation-authority.md)
+2. [Maintainer Handbook](./maintainer-handbook.md)
+3. [Architecture](./architecture.md)
+4. [Development Guide](./development-guide.md)
+5. [API Contracts](./api-contracts.md)
+6. [Data Models](./data-models.md)
+7. [Operations Runbook](./operations-runbook.md)
 
-For user flows and product intent, keep `_bmad-output/planning-artifacts/prd.md`, `_bmad-output/planning-artifacts/architecture-bicec-veripass.md`, and `_bmad-output/planning-artifacts/ux-design-specification-v2.md` nearby. They are planning sources; the `code/` directory is the implementation source of truth. If those older artifacts mention DGI, Sopra Amplitude, or core banking provisioning, treat those mentions as obsolete.
+For old user-flow and product-context history, use `_bmad-output/planning-artifacts/prd.md`, `_bmad-output/planning-artifacts/architecture-bicec-veripass.md`, and `_bmad-output/planning-artifacts/ux-design-specification-v2.md` only as historical references. They do not define current product scope or future decisions. The `code/` directory and the canonical docs listed above are the implementation and maintenance source of truth.

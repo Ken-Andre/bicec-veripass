@@ -8,6 +8,7 @@ This index covers the top-level project documentation in `docs/`. Hidden files a
 
 Read this set first for project handover and maintenance:
 
+- **[documentation-authority.md](./documentation-authority.md)** - Defines which docs are current, historical, obsolete, or non-authoritative
 - **[maintainer-handbook.md](./maintainer-handbook.md)** - End-to-end handover guide and source-of-truth map
 - **[project-overview.md](./project-overview.md)** - Product, users, runtime system, and core workflows
 - **[architecture.md](./architecture.md)** - Current implemented architecture for backend, frontends, infrastructure, async jobs, and security boundaries
@@ -19,7 +20,7 @@ Read this set first for project handover and maintenance:
 - **[deployment-guide.md](./deployment-guide.md)** - Docker Compose deployment, environment, volumes, verification, and production-hardening checklist
 - **[operations-runbook.md](./operations-runbook.md)** - Troubleshooting procedures for API, OCR, Celery, frontend routing, auth, backups, and evidence
 
-Scope correction: VeriPass is the KYC onboarding, verified identity storage, and auth/eligibility guardrail for downstream BICEC mobile apps. It is not a DGI, Sopra Amplitude, or core banking integration layer, now or as a planned future path. Older planning artifacts or diagrams that say otherwise are historical and obsolete on this point.
+Authority correction: VeriPass is the KYC onboarding, verified identity storage, and auth/eligibility guardrail for downstream BICEC mobile apps. It is not a DGI, Sopra Amplitude, or core banking integration layer, and no historical document can make it one. Older planning artifacts, diagrams, prototype outputs, and dated reports are historical unless `documentation-authority.md` marks them current.
 
 ## Files
 
@@ -31,6 +32,7 @@ Scope correction: VeriPass is the KYC onboarding, verified identity storage, and
 - **[data-models.md](./data-models.md)** - Database model and storage guide
 - **[deployment-guide.md](./deployment-guide.md)** - Docker Compose deployment guide
 - **[development-guide.md](./development-guide.md)** - Local development and test guide
+- **[documentation-authority.md](./documentation-authority.md)** - Documentation authority and obsolete-source policy
 - **[maintainer-handbook.md](./maintainer-handbook.md)** - Primary handover handbook
 - **[operations-runbook.md](./operations-runbook.md)** - Operations and incident response runbook
 - **[project-overview.md](./project-overview.md)** - Project overview and workflow summary
@@ -51,12 +53,14 @@ Scope correction: VeriPass is the KYC onboarding, verified identity storage, and
 - **[stage-final-delivery-tracker.md](./stage-final-delivery-tracker.md)** - Final stage proof tracker
 - **[stage-final-truth-audit-2026-05-23.md](./stage-final-truth-audit-2026-05-23.md)** - Final delivery truth audit
 
-### Integration Planning
+### Historical / Non-Authoritative Integration Planning
 
-- **[consultant-integration-prompt.md](./consultant-integration-prompt.md)** - Consultant integration prompt
-- **[integration-analysis](./integration-analysis)** - Integration progress report
-- **[integration-analysis-gatekeeper.md](./integration-analysis-gatekeeper.md)** - Gatekeeper integration analysis
-- **[stitch-prompts.md](./stitch-prompts.md)** - Stitch prompt collection
+These files are historical prototype/planning inputs. Do not use them as current product scope, future roadmap, or architecture authority.
+
+- **[consultant-integration-prompt.md](./consultant-integration-prompt.md)** - Historical consultant/prototype integration prompt
+- **[integration-analysis](./integration-analysis)** - Historical integration progress report
+- **[integration-analysis-gatekeeper.md](./integration-analysis-gatekeeper.md)** - Historical gatekeeper integration analysis
+- **[stitch-prompts.md](./stitch-prompts.md)** - Historical UI prompt collection
 
 ### Issue And Test Reports
 
@@ -101,6 +105,8 @@ Scope correction: VeriPass is the KYC onboarding, verified identity storage, and
 
 ### agents_output/
 
+Historical prototype consolidation outputs. Useful for tracing earlier work only; not current architecture or roadmap authority.
+
 - **[00_INTEGRATION_MASTER_PLAN.md](./agents_output/00_INTEGRATION_MASTER_PLAN.md)** - Prototype migration master plan
 - **[01_mobile_gap_analysis.md](./agents_output/01_mobile_gap_analysis.md)** - Mobile prototype gap analysis
 - **[02_backoffice_gap_analysis.md](./agents_output/02_backoffice_gap_analysis.md)** - Backoffice prototype gap analysis
@@ -122,6 +128,9 @@ Scope correction: VeriPass is the KYC onboarding, verified identity storage, and
 
 ### diagrams/
 
+Historical diagrams. Some contain old DGI/Sopra/Amplitude/core-banking flows or old state names. Use `architecture.md`, `data-models.md`, and `api-contracts.md` for current truth.
+
+- **[README.md](./diagrams/README.md)** - Historical-diagram warning and current-doc pointers
 - **[adr-state-mapping.md](./diagrams/adr-state-mapping.md)** - Lifecycle to access mapping
 - **[empathy-maps.md](./diagrams/empathy-maps.md)** - User empathy maps
 - **[er-application-mermaid.md](./diagrams/er-application-mermaid.md)** - Application entity relationship diagram
@@ -162,6 +171,8 @@ Scope correction: VeriPass is the KYC onboarding, verified identity storage, and
 - **[ocr-beta-loop/report.md](./test-evidence/ocr-beta-loop/report.md)** - CNI OCR beta evidence
 
 ### test_tmp_trash/
+
+Scratch/prototype material. Do not use for maintenance decisions.
 
 - **[completion_certificate.pdf](./test_tmp_trash/completion_certificate.pdf)** - Temporary completion certificate artifact
 - **[onboarding-system-design-wireframe/README.md](./test_tmp_trash/onboarding-system-design-wireframe/README.md)** - Temporary onboarding wireframe project

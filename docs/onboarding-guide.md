@@ -16,7 +16,7 @@ BICEC VeriPass is a sovereign digital KYC onboarding platform for BICEC. The MVP
 - Human backoffice validation for Jean, Thomas, Sylvie, and Admin IT.
 - Auditability, notifications, Celery workers, and local Docker execution.
 
-The MVP does not claim to be a complete core banking system. DGI integration, Sopra Amplitude integration, and transactional core banking are outside the VeriPass product scope now and should not be treated as a future roadmap path. Approved KYC should instead unlock a guarded handoff toward configured BICEC mobile apps such as BI PAY, BICEC Mobile-Banking, or BICEC Wallet.
+The MVP does not claim to be a complete core banking system. DGI integration, Sopra Amplitude integration, and transactional core banking are outside the VeriPass product scope and should not be treated as a roadmap path. Approved KYC should instead unlock a guarded handoff toward configured BICEC mobile apps such as BI PAY, BICEC Mobile-Banking, or BICEC Wallet.
 
 ## Repository Map
 

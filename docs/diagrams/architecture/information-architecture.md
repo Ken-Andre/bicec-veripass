@@ -1,5 +1,7 @@
 # Information Architecture — BICEC VeriPass
 
+> Historical note, 2026-05-28: this information architecture is historical only. It may mention old Flutter, Grafana Phase 2, or Amplitude assumptions. Use the current React/Vite implementation and `docs/component-inventory.md` for current UI structure.
+
 **Version:** 1.0  
 **Date:** 2026-02-26  
 **Auteur:** Ken (UX Designer)

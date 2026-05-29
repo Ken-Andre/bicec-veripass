@@ -1,5 +1,7 @@
 # Diagrammes de Cas d'Utilisation — BICEC VeriPass
 
+> Historical note, 2026-05-28: this diagram is not current decision authority. It contains old DGI/Sopra Amplitude/provisioning assumptions. Use `docs/documentation-authority.md`, `docs/architecture.md`, and implemented code for current scope.
+
 **Date :** 2026-02-25  
 **Source :** PRD v1 (2026-02-23), UX Design Specification v2.1 (2026-02-24)
 

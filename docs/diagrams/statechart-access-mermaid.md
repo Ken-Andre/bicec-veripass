@@ -1,3 +1,5 @@
+> Historical note, 2026-05-28: this statechart is not current decision authority. It contains old account/provisioning states. Use `code/backend/app/modules/kyc/schemas.py`, `docs/documentation-authority.md`, and `docs/data-models.md` for current behavior.
+
 ```mermaid
 stateDiagram-v2
   %% Access & Dossier Statechart — canonical from UX Spec v2 (2026-02-18)

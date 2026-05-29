@@ -19,17 +19,18 @@ The project is not just screens. It is a regulated workflow. The important invar
 
 Read in this order for a complete handover:
 
-1. [Project Overview](./project-overview.md)
-2. [Architecture](./architecture.md)
-3. [Source Tree Analysis](./source-tree-analysis.md)
-4. [Development Guide](./development-guide.md)
-5. [API Contracts](./api-contracts.md)
-6. [Data Models](./data-models.md)
-7. [Component Inventory](./component-inventory.md)
-8. [Deployment Guide](./deployment-guide.md)
-9. [Operations Runbook](./operations-runbook.md)
+1. [Documentation Authority](./documentation-authority.md)
+2. [Project Overview](./project-overview.md)
+3. [Architecture](./architecture.md)
+4. [Source Tree Analysis](./source-tree-analysis.md)
+5. [Development Guide](./development-guide.md)
+6. [API Contracts](./api-contracts.md)
+7. [Data Models](./data-models.md)
+8. [Component Inventory](./component-inventory.md)
+9. [Deployment Guide](./deployment-guide.md)
+10. [Operations Runbook](./operations-runbook.md)
 
-Then read the historical/product context only where useful:
+Then read historical context only where useful. These files can explain old thinking, but they do not define current behavior, product scope, or future decisions:
 
 - `_bmad-output/planning-artifacts/prd.md`
 - `_bmad-output/planning-artifacts/architecture-bicec-veripass.md`
@@ -48,9 +49,10 @@ Then read the historical/product context only where useful:
 | What route exists in backoffice? | `code/backoffice/src/App.tsx` |
 | What services run locally? | `code/docker-compose.yml` |
 | What public path routes where? | `code/infra/nginx/nginx.conf` |
-| Why was a decision made? | ADRs and planning artifacts |
+| Which docs are authoritative? | `docs/documentation-authority.md` |
+| Why was a decision made? | Current ADRs, code history, and dated reports, after checking `documentation-authority.md` |
 
-Planning docs explain intent. Code explains current behavior.
+Planning docs explain historical intent only. Code explains current behavior. Future decisions must come from a new explicit requirement, issue, ADR, or code change, not from old Markdown.
 
 ## Main Workflows
 
@@ -110,7 +112,7 @@ flowchart LR
 - Device tags matter after a mobile user has active registered devices.
 - `OTP_MODE=dev_local` must not be used in production.
 - `OCR_ONLINE=false` is the normal sovereign/offline demo setting.
-- VeriPass is not a DGI, Sopra Amplitude, or core banking integration layer, now or as a planned future path.
+- VeriPass is not a DGI, Sopra Amplitude, or core banking integration layer, and no historical document can make it one.
 - Approved KYC should serve as the eligibility guardrail for BI PAY, BICEC Mobile-Banking, or BICEC Wallet handoff through configured app links/deep links and store fallbacks.
 - Historical planning artifacts or diagrams that mention DGI, Sopra Amplitude, or core banking provisioning are obsolete on that point.
 - The static `openapi-spec.json` may be stale; runtime FastAPI docs are more reliable.
@@ -181,7 +183,7 @@ cd code\backoffice; bun run test; bunx tsc --noEmit; bun run build
 
 ### Is this a production banking core?
 
-No. It is a KYC onboarding and verified-identity guardrail. Its job is to capture, verify, store, and audit the user's KYC dossier, then let approved users continue toward configured BICEC mobile apps. DGI, Sopra Amplitude, and core banking integration are out of scope and should not be planned as the product's future direction.
+No. It is a KYC onboarding and verified-identity guardrail. Its job is to capture, verify, store, and audit the user's KYC dossier, then let approved users continue toward configured BICEC mobile apps. DGI, Sopra Amplitude, and core banking integration are out of scope and should not be planned as the product direction.
 
 ### How should VeriPass connect to BI PAY or BICEC Wallet?
 

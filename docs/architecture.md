@@ -255,6 +255,7 @@ Use these files when implementation and old docs disagree:
 
 | Topic | Source |
 | --- | --- |
+| Documentation authority | `docs/documentation-authority.md` |
 | API router registration | `code/backend/app/api/v1/router.py` |
 | KYC states/access tiers | `code/backend/app/modules/kyc/schemas.py` |
 | Backoffice decisions/RBAC | `code/backend/app/modules/backoffice/router.py` |
@@ -264,3 +265,5 @@ Use these files when implementation and old docs disagree:
 | Mobile routes | `code/mobile/src/App.tsx` |
 | Backoffice routes | `code/backoffice/src/App.tsx` |
 | DB schema | `code/backend/app/modules/*/models.py` and `code/backend/alembic/versions/` |
+
+Historical planning diagrams, `_bmad-output` files, prototype integration prompts, and agent-output analyses are not architecture authority. They can explain older thinking, but they cannot define current behavior or future roadmap decisions.

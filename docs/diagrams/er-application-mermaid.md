@@ -1,3 +1,5 @@
+> Historical note, 2026-05-28: this ER diagram is historical. Use `docs/data-models.md`, SQLAlchemy models, and Alembic migrations for current database truth.
+
 ```mermaid
 erDiagram
   APPLICATIONS {
