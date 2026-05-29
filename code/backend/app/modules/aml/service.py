@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -12,11 +14,11 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.logging import logger
 from app.modules.admin.models import Agency
-from app.modules.aml.models import BatchJob
+from app.modules.aml.models import AmlListImport, BatchJob
 from app.modules.audit.models import AuditLog
 from app.modules.analytics.service import track_event_best_effort
 from app.modules.auth.models import Agent
-from app.modules.kyc.models import AmlAlert, AmlAlertStatus, DuplicateCheck, KYCSession
+from app.modules.kyc.models import AmlAlert, AmlAlertStatus, DuplicateCheck, KYCSession, PEPSanctions
 from app.modules.notifications.service import (
     create_global_notification,
     create_user_notification,
@@ -54,6 +56,113 @@ def _alert_hits(alert: AmlAlert) -> list[dict]:
             "details": f"Programs: {', '.join(programs)}" if programs else None,
         }
     ]
+
+
+AML_IMPORT_TEMPLATE_HEADERS = [
+    "source",
+    "list_type",
+    "entity_type",
+    "full_name",
+    "aliases",
+    "date_of_birth",
+    "nationality",
+    "programs",
+    "is_active",
+]
+
+AML_LIST_TYPES = {"PEP", "SANCTIONS", "ADVERSE_MEDIA"}
+
+
+def aml_import_template_csv() -> str:
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=AML_IMPORT_TEMPLATE_HEADERS)
+    writer.writeheader()
+    writer.writerow(
+        {
+            "source": "BICEC_INTERNAL",
+            "list_type": "PEP",
+            "entity_type": "INDIVIDUAL",
+            "full_name": "EXAMPLE NAME",
+            "aliases": "EXAMPLE ALIAS;OTHER ALIAS",
+            "date_of_birth": "1970-01-31",
+            "nationality": "CM",
+            "programs": "Internal watchlist",
+            "is_active": "true",
+        }
+    )
+    return output.getvalue()
+
+
+def _split_csv_values(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [part.strip() for part in value.replace("|", ";").split(";") if part.strip()]
+
+
+def _parse_import_date(value: str | None):
+    if not value:
+        return None
+    raw = value.strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(raw[:10], fmt).date()
+        except ValueError:
+            continue
+    raise ValueError("date_of_birth must use YYYY-MM-DD or DD/MM/YYYY")
+
+
+def _parse_bool(value: str | None) -> bool:
+    if value is None or value == "":
+        return True
+    return value.strip().lower() in {"1", "true", "yes", "y", "oui", "active"}
+
+
+def _read_aml_csv(csv_text: str) -> tuple[list[dict], list[dict]]:
+    reader = csv.DictReader(io.StringIO(csv_text))
+    missing_headers = sorted(set(AML_IMPORT_TEMPLATE_HEADERS) - set(reader.fieldnames or []))
+    if missing_headers:
+        return [], [{"row": 1, "message": f"Missing columns: {', '.join(missing_headers)}"}]
+
+    rows: list[dict] = []
+    errors: list[dict] = []
+    for row_number, row in enumerate(reader, start=2):
+        try:
+            source = (row.get("source") or "BICEC_INTERNAL").strip() or "BICEC_INTERNAL"
+            list_type = (row.get("list_type") or "PEP").strip().upper()
+            if list_type not in AML_LIST_TYPES:
+                raise ValueError("list_type must be PEP, SANCTIONS, or ADVERSE_MEDIA")
+            full_name = (row.get("full_name") or "").strip()
+            if not full_name:
+                raise ValueError("full_name is required")
+            entity_type = (row.get("entity_type") or "INDIVIDUAL").strip().upper()
+            programs = _split_csv_values(row.get("programs"))
+            if list_type not in programs:
+                programs.insert(0, list_type)
+            rows.append(
+                {
+                    "source": source,
+                    "list_type": list_type,
+                    "entity_type": entity_type,
+                    "full_name": full_name,
+                    "aliases": _split_csv_values(row.get("aliases")) or None,
+                    "date_of_birth": _parse_import_date(row.get("date_of_birth")),
+                    "nationality": (row.get("nationality") or "").strip() or None,
+                    "programs": programs or None,
+                    "is_active": _parse_bool(row.get("is_active")),
+                }
+            )
+        except ValueError as exc:
+            errors.append({"row": row_number, "message": str(exc)})
+    return rows, errors
+
+
+def _list_type_from_programs(programs: list[str] | None) -> str:
+    program_text = " ".join(programs or []).upper()
+    if "ADVERSE" in program_text:
+        return "ADVERSE_MEDIA"
+    if "SANCTION" in program_text:
+        return "SANCTIONS"
+    return "PEP"
 
 
 def _alert_response(alert: AmlAlert, session: KYCSession | None) -> dict:
@@ -202,6 +311,170 @@ async def get_batch_jobs(db: AsyncSession) -> list[dict]:
         }
         for job in result.scalars().all()
     ]
+
+
+async def get_aml_list_registry(db: AsyncSession) -> list[dict]:
+    logger.info("Fetching AML list registry")
+    source_rows = await db.execute(
+        select(
+            PEPSanctions.source,
+            func.count(PEPSanctions.id),
+            func.max(PEPSanctions.last_synced_at),
+        )
+        .where(PEPSanctions.is_active == True)  # noqa: E712
+        .group_by(PEPSanctions.source)
+        .order_by(PEPSanctions.source.asc())
+    )
+    registry_by_source: dict[str, dict] = {}
+    for source, active_count, latest_synced_at in source_rows.all():
+        import_result = await db.execute(
+            select(AmlListImport)
+            .where(AmlListImport.source == source)
+            .order_by(AmlListImport.created_at.desc())
+            .limit(1)
+        )
+        latest_import = import_result.scalar_one_or_none()
+
+        type_result = await db.execute(
+            select(PEPSanctions.programs)
+            .where(
+                PEPSanctions.source == source,
+                PEPSanctions.is_active == True,  # noqa: E712
+            )
+            .limit(1)
+        )
+        programs = type_result.scalar_one_or_none()
+        registry_by_source[source] = {
+            "source": source,
+            "listType": latest_import.list_type if latest_import else _list_type_from_programs(programs),
+            "activeCount": int(active_count or 0),
+            "latestSyncedAt": latest_synced_at.isoformat() if latest_synced_at else None,
+            "latestImportId": str(latest_import.id) if latest_import else None,
+            "latestImportStatus": latest_import.status if latest_import else None,
+            "latestImportAt": latest_import.created_at if latest_import else None,
+            "importedBy": str(latest_import.created_by) if latest_import and latest_import.created_by else None,
+        }
+
+    import_rows = await db.execute(
+        select(AmlListImport).order_by(AmlListImport.created_at.desc())
+    )
+    for import_record in import_rows.scalars().all():
+        if import_record.source in registry_by_source:
+            continue
+        registry_by_source[import_record.source] = {
+            "source": import_record.source,
+            "listType": import_record.list_type,
+            "activeCount": 0,
+            "latestSyncedAt": None,
+            "latestImportId": str(import_record.id),
+            "latestImportStatus": import_record.status,
+            "latestImportAt": import_record.created_at,
+            "importedBy": str(import_record.created_by) if import_record.created_by else None,
+        }
+    return sorted(registry_by_source.values(), key=lambda item: item["source"].lower())
+
+
+async def import_aml_list_csv(
+    db: AsyncSession,
+    *,
+    csv_text: str,
+    filename: str | None,
+    dry_run: bool,
+    agent: Agent | None,
+) -> dict:
+    parsed_rows, errors = _read_aml_csv(csv_text)
+    sources = {row["source"] for row in parsed_rows}
+    list_types = {row["list_type"] for row in parsed_rows}
+    if len(sources) > 1:
+        errors.append({"row": 1, "message": "CSV must contain exactly one source per import"})
+    if len(list_types) > 1:
+        errors.append({"row": 1, "message": "CSV must contain exactly one list_type per import"})
+    total_rows = len(parsed_rows) + len(errors)
+    failed_rows = len(errors)
+    imported_rows = 0 if dry_run or errors else len(parsed_rows)
+
+    source = parsed_rows[0]["source"] if parsed_rows else "BICEC_INTERNAL"
+    list_type = parsed_rows[0]["list_type"] if parsed_rows else "PEP"
+    status_value = "DRY_RUN" if dry_run else ("FAILED" if errors else "IMPORTED")
+    import_record: AmlListImport | None = None
+    now = datetime.now(timezone.utc)
+
+    if not dry_run:
+        import_record = AmlListImport(
+            id=uuid.uuid4(),
+            source=source,
+            list_type=list_type,
+            filename=filename,
+            status=status_value,
+            total_rows=total_rows,
+            imported_rows=imported_rows,
+            failed_rows=failed_rows,
+            error_report=errors or None,
+            created_by=agent.id if agent else None,
+            completed_at=now,
+        )
+        db.add(import_record)
+
+        if not errors:
+            synced_date = now.date()
+            for row in parsed_rows:
+                result = await db.execute(
+                    select(PEPSanctions).where(
+                        PEPSanctions.source == row["source"],
+                        PEPSanctions.full_name == row["full_name"],
+                    )
+                )
+                entry = result.scalar_one_or_none()
+                if entry is None:
+                    entry = PEPSanctions(
+                        id=uuid.uuid4(),
+                        source=row["source"],
+                        entity_type=row["entity_type"],
+                        full_name=row["full_name"],
+                    )
+                    db.add(entry)
+
+                entry.entity_type = row["entity_type"]
+                entry.aliases = row["aliases"]
+                entry.date_of_birth = row["date_of_birth"]
+                entry.nationality = row["nationality"]
+                entry.programs = row["programs"]
+                entry.is_active = row["is_active"]
+                entry.last_synced_at = synced_date
+
+        db.add(
+            AuditLog(
+                id=uuid.uuid4(),
+                action="AML_LIST_IMPORT",
+                table_name="pep_sanctions",
+                record_id=str(import_record.id),
+                old_data={},
+                new_data={
+                    "source": source,
+                    "list_type": list_type,
+                    "status": status_value,
+                    "total_rows": total_rows,
+                    "imported_rows": imported_rows,
+                    "failed_rows": failed_rows,
+                    "filename": filename,
+                },
+                performed_by=agent.id if agent else None,
+                performed_at=now,
+            )
+        )
+        await db.commit()
+
+    return {
+        "importId": str(import_record.id) if import_record else None,
+        "source": source,
+        "listType": list_type,
+        "dryRun": dry_run,
+        "status": status_value,
+        "totalRows": total_rows,
+        "importedRows": imported_rows,
+        "failedRows": failed_rows,
+        "errors": errors,
+    }
 
 
 async def clear_aml_alert(

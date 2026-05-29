@@ -206,3 +206,35 @@ class GlobalNotificationResponse(BaseModel):
     event_key: str = Field(alias="eventKey")
 
     model_config = {"populate_by_name": True}
+
+
+class AmlListRegistryItem(BaseModel):
+    source: str
+    list_type: AmlListType = Field(alias="listType")
+    active_count: int = Field(alias="activeCount", ge=0)
+    latest_synced_at: str | None = Field(None, alias="latestSyncedAt")
+    latest_import_id: str | None = Field(None, alias="latestImportId")
+    latest_import_status: str | None = Field(None, alias="latestImportStatus")
+    latest_import_at: datetime | None = Field(None, alias="latestImportAt")
+    imported_by: str | None = Field(None, alias="importedBy")
+
+    model_config = {"populate_by_name": True}
+
+
+class AmlListImportError(BaseModel):
+    row: int
+    message: str
+
+
+class AmlListImportReport(BaseModel):
+    import_id: str | None = Field(None, alias="importId")
+    source: str
+    list_type: AmlListType = Field(alias="listType")
+    dry_run: bool = Field(alias="dryRun")
+    status: str
+    total_rows: int = Field(alias="totalRows", ge=0)
+    imported_rows: int = Field(alias="importedRows", ge=0)
+    failed_rows: int = Field(alias="failedRows", ge=0)
+    errors: list[AmlListImportError] = []
+
+    model_config = {"populate_by_name": True}

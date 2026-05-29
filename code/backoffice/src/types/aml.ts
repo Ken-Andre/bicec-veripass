@@ -98,3 +98,26 @@ export interface DocumentExpiryResponse {
   page: number;
   limit: number;
 }
+
+export interface AmlListRegistryItem {
+  source: string;
+  listType: 'PEP' | 'SANCTIONS' | 'ADVERSE_MEDIA';
+  activeCount: number;
+  latestSyncedAt?: string | null;
+  latestImportId?: string | null;
+  latestImportStatus?: string | null;
+  latestImportAt?: string | null;
+  importedBy?: string | null;
+}
+
+export interface AmlListImportReport {
+  importId?: string | null;
+  source: string;
+  listType: 'PEP' | 'SANCTIONS' | 'ADVERSE_MEDIA';
+  dryRun: boolean;
+  status: string;
+  totalRows: number;
+  importedRows: number;
+  failedRows: number;
+  errors: Array<{ row: number; message: string }>;
+}

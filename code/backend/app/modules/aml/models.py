@@ -6,7 +6,7 @@ This file only contains AML-specific extensions if needed.
 from __future__ import annotations
 from uuid import uuid4
 from sqlalchemy import Column, Text, TIMESTAMP, ForeignKey, func, Integer
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from app.db.base_class import Base
 
 
@@ -26,3 +26,22 @@ class BatchJob(Base):
     completed_at = Column(TIMESTAMP(timezone=True), nullable=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+
+class AmlListImport(Base):
+    """Audited AML list import run for internal BICEC CSV sources."""
+
+    __tablename__ = "aml_list_imports"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    source = Column(Text, nullable=False)
+    list_type = Column(Text, nullable=False)
+    filename = Column(Text, nullable=True)
+    status = Column(Text, nullable=False, server_default="DRY_RUN")
+    total_rows = Column(Integer, nullable=False, server_default="0")
+    imported_rows = Column(Integer, nullable=False, server_default="0")
+    failed_rows = Column(Integer, nullable=False, server_default="0")
+    error_report = Column(JSONB, nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    completed_at = Column(TIMESTAMP(timezone=True), nullable=True)

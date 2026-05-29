@@ -1,6 +1,7 @@
 """AML/CFT API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -15,6 +16,8 @@ from app.modules.aml.schemas import (
     AmlAlertAction,
     AmlAlertResponse,
     AmlEscalation,
+    AmlListImportReport,
+    AmlListRegistryItem,
     BatchJobResponse,
     DocumentExpiryListResponse,
     GlobalNotificationRequest,
@@ -22,7 +25,7 @@ from app.modules.aml.schemas import (
     NiuConflictResolve,
     NiuConflictResponse,
 )
-from app.modules.auth.models import AgentRole
+from app.modules.auth.models import Agent, AgentRole
 
 router = APIRouter()
 
@@ -150,6 +153,65 @@ async def list_document_expiry(
     _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE)),
 ):
     return await service.get_document_expiry_alerts(db, page=page, limit=limit)
+
+
+@router.get("/lists", response_model=list[AmlListRegistryItem])
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def list_aml_lists(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT)),
+):
+    return await service.get_aml_list_registry(db)
+
+
+@router.get("/lists/template")
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def download_aml_list_template(
+    request: Request,
+    _agent=Depends(require_agent_role(AgentRole.THOMAS, AgentRole.ADMIN_IT)),
+):
+    return Response(
+        content=service.aml_import_template_csv(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="bicec_aml_list_template.csv"'},
+    )
+
+
+@router.post("/lists/import/dry-run", response_model=AmlListImportReport)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def dry_run_aml_list_import(
+    request: Request,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    agent: Agent = Depends(require_agent_role(AgentRole.THOMAS, AgentRole.ADMIN_IT)),
+):
+    content = (await file.read()).decode("utf-8-sig")
+    return await service.import_aml_list_csv(
+        db,
+        csv_text=content,
+        filename=file.filename,
+        dry_run=True,
+        agent=agent,
+    )
+
+
+@router.post("/lists/import", response_model=AmlListImportReport)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def confirm_aml_list_import(
+    request: Request,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    agent: Agent = Depends(require_agent_role(AgentRole.THOMAS, AgentRole.ADMIN_IT)),
+):
+    content = (await file.read()).decode("utf-8-sig")
+    return await service.import_aml_list_csv(
+        db,
+        csv_text=content,
+        filename=file.filename,
+        dry_run=False,
+        agent=agent,
+    )
 
 
 @router.post("/notify-global", response_model=GlobalNotificationResponse)
