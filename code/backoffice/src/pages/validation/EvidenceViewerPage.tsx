@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   ArrowLeft,
   Check,
   Download,
@@ -26,6 +27,7 @@ import { RequestInfoModal } from '@/components/shared/RequestInfoModal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
@@ -58,9 +60,25 @@ const CNI_FINAL_FIELDS: Array<{ key: string; label: string; aliases: string[]; s
   { key: 'autorite_nom', label: 'Autorite', aliases: ['autorite_nom', 'issuing_authority'], sources: ['CNI_VERSO'] },
 ];
 
+const DOCUMENT_CATEGORY_OPTIONS = [
+  'CNI_RECTO',
+  'CNI_VERSO',
+  'BILL_ENEO',
+  'BILL_CAMWATER',
+  'NIU',
+  'SELFIE',
+  'IDENTITY_PROOF',
+  'ADDRESS_PROOF',
+  'OTHER',
+];
+
 interface DocumentPayload {
   id: string;
   doc_type: string;
+  classification_categories?: string[];
+  classified_by_name?: string | null;
+  classified_at?: string | null;
+  classification_reason?: string | null;
   ocr_fields?: Array<{
     field_name: string;
     extracted_value: string;
@@ -89,6 +107,16 @@ function normalizeFieldName(value: string): string {
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
     .toLowerCase();
+}
+
+function formatActionError(error: any, fallback: string): string {
+  const detail = error?.detail;
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object') {
+    if (typeof detail.message === 'string') return detail.message;
+    if (typeof detail.code === 'string') return detail.code;
+  }
+  return typeof error?.message === 'string' ? error.message : fallback;
 }
 
 function useAuthenticatedDocument(sessionId: string | undefined, docId: string | undefined) {
@@ -149,9 +177,10 @@ function useAuthenticatedDocument(sessionId: string | undefined, docId: string |
 interface SupportThreadPanelProps {
   sessionId: string;
   onOpenDocumentFromChat: (documentId: string) => void;
+  onPromoteAttachment?: (message: any) => void;
 }
 
-function SupportThreadPanel({ sessionId, onOpenDocumentFromChat }: SupportThreadPanelProps) {
+function SupportThreadPanel({ sessionId, onOpenDocumentFromChat, onPromoteAttachment }: SupportThreadPanelProps) {
   const [threads, setThreads] = useState<any[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -298,6 +327,17 @@ function SupportThreadPanel({ sessionId, onOpenDocumentFromChat }: SupportThread
                           Ouvrir dans dossier
                         </Button>
                       )}
+                      {!message.attachment_document_id && onPromoteAttachment && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium gap-1"
+                          onClick={() => onPromoteAttachment(message)}
+                        >
+                          <Tags className="h-3 w-3" />
+                          Assigner au dossier
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -347,7 +387,9 @@ export default function EvidenceViewerPage() {
   const [showReject, setShowReject] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
   const [actionReason, setActionReason] = useState('');
+  const [confirmBiometricOverride, setConfirmBiometricOverride] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [ocrEditMode, setOcrEditMode] = useState(false);
@@ -362,17 +404,30 @@ export default function EvidenceViewerPage() {
   const [classifyCategories, setClassifyCategories] = useState('CNI_RECTO');
   const [classifyReason, setClassifyReason] = useState('');
   const [classifySaving, setClassifySaving] = useState(false);
+  const [classificationPanelOpen, setClassificationPanelOpen] = useState(false);
+
+  // Attachment promotion states
+  const [promotingMessage, setPromotingMessage] = useState<any | null>(null);
+  const [promoteDocType, setPromoteDocType] = useState('CNI_RECTO');
+  const [promoteCategories, setPromoteCategories] = useState('CNI_RECTO');
+  const [promoteReason, setPromoteReason] = useState('');
+  const [promoteSaving, setPromoteSaving] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
+
 
   const documents: DocumentPayload[] = dossier?.documents || [];
+  const biometricRiskFlags: string[] = dossier?.biometric_risk_flags || [];
+  const approvalNeedsBiometricOverride = biometricRiskFlags.length > 0;
   const currentDoc = documents[activeDocIndex];
   const documentView = useAuthenticatedDocument(id, currentDoc?.id);
 
   useEffect(() => {
     if (!currentDoc?.doc_type) return;
     setClassifyDocType(currentDoc.doc_type);
-    setClassifyCategories(currentDoc.doc_type);
+    setClassifyCategories((currentDoc.classification_categories || [currentDoc.doc_type]).join(', '));
     setShowAllOcrFields(false);
-  }, [currentDoc?.doc_type, currentDoc?.id]);
+    setClassificationPanelOpen(false);
+  }, [currentDoc?.classification_categories, currentDoc?.doc_type, currentDoc?.id]);
 
   const displayedCurrentDocFields = useMemo(() => {
     const rawFields = currentDoc?.ocr_fields || [];
@@ -437,6 +492,22 @@ export default function EvidenceViewerPage() {
     });
   }, [documents]);
 
+  const currentClassificationCategories = useMemo(() => {
+    if (!currentDoc) return [];
+    const categories = currentDoc.classification_categories?.length
+      ? currentDoc.classification_categories
+      : [currentDoc.doc_type];
+    return categories.filter(Boolean);
+  }, [currentDoc]);
+
+  const classificationNeedsAttention = Boolean(
+    currentDoc && (!currentDoc.doc_type || currentDoc.doc_type === 'OTHER' || currentClassificationCategories.length === 0),
+  );
+  const secondaryClassificationCategories = currentClassificationCategories.filter(
+    (category) => category !== currentDoc?.doc_type,
+  );
+  const showClassificationForm = classificationPanelOpen || classificationNeedsAttention;
+
   const handleOpenCurrentDoc = useCallback(() => {
     if (!documentView.url) return;
     window.open(documentView.url, '_blank', 'noopener,noreferrer');
@@ -492,8 +563,11 @@ export default function EvidenceViewerPage() {
   const handleReview = async (decision: string) => {
     if (!id || !actionReason.trim()) return;
     setActionLoading(true);
+    setActionError(null);
     try {
-      await reviewDossier(id, decision, actionReason.trim());
+      await reviewDossier(id, decision, actionReason.trim(), {
+        biometricOverrideConfirmed: decision === 'APPROVED' && confirmBiometricOverride,
+      });
       queryClient.invalidateQueries({ queryKey: ['dossier', id] });
       queryClient.invalidateQueries({ queryKey: ['queue'] });
       if (decision === 'APPROVED' || decision === 'REJECTED') {
@@ -505,7 +579,10 @@ export default function EvidenceViewerPage() {
       setShowApprove(false);
       setShowReject(false);
       setActionReason('');
-    } catch {}
+      setConfirmBiometricOverride(false);
+    } catch (err: any) {
+      setActionError(formatActionError(err, 'Impossible de traiter la decision.'));
+    }
     setActionLoading(false);
   };
 
@@ -577,9 +654,44 @@ export default function EvidenceViewerPage() {
       queryClient.invalidateQueries({ queryKey: ['dossier', id] });
       queryClient.invalidateQueries({ queryKey: ['audit', id] });
       setClassifyReason('');
+      setClassificationPanelOpen(false);
     } catch {}
     setClassifySaving(false);
   };
+
+  const startPromoteAttachment = (message: any) => {
+    setPromotingMessage(message);
+    setPromoteDocType('CNI_RECTO');
+    setPromoteCategories('CNI_RECTO');
+    setPromoteReason('Fichier complementaire transmis par chat de support client.');
+    setPromoteError(null);
+  };
+
+  const handlePromoteAttachment = async () => {
+    if (!promotingMessage || !promoteDocType || !promoteReason.trim()) return;
+    setPromoteSaving(true);
+    setPromoteError(null);
+    try {
+      const categories = promoteCategories
+        .split(',')
+        .map((c) => c.trim().toUpperCase())
+        .filter(Boolean);
+
+      await apiPost(`/backoffice/support/messages/${promotingMessage.id}/promote-to-document`, {
+        doc_type: promoteDocType,
+        categories,
+        reason: promoteReason.trim(),
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['dossier', id] });
+      setPromotingMessage(null);
+      setPromoteReason('');
+    } catch (err: any) {
+      setPromoteError(err?.detail || 'Erreur lors de la promotion du document');
+    }
+    setPromoteSaving(false);
+  };
+
 
   const startOcrEdit = () => {
     const initial: Record<string, string> = {};
@@ -668,16 +780,16 @@ export default function EvidenceViewerPage() {
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">
           <Card>
             <CardHeader className="overflow-hidden pb-3">
               {documents.length > 0 && (
                 <div data-testid="evidence-document-tabs" className="max-w-full overflow-hidden">
                   <Tabs className="max-w-full" value={`${activeDocIndex}`} onValueChange={(value) => setActiveDocIndex(Number(value))}>
-                    <TabsList className="flex h-auto max-w-full flex-wrap justify-start gap-1 overflow-visible">
+                    <TabsList className="flex h-auto max-w-full flex-nowrap justify-start gap-1 overflow-x-auto whitespace-nowrap scrollbar-none pb-1">
                       {documents.map((doc, index) => (
-                        <TabsTrigger key={doc.id} value={`${index}`} className="shrink-0 px-2 text-xs sm:px-3 sm:text-sm">{doc.doc_type}</TabsTrigger>
+                        <TabsTrigger key={doc.id} value={`${index}`} className="shrink-0 px-2.5 py-1.5 text-xs font-medium sm:px-3 sm:text-sm">{doc.doc_type}</TabsTrigger>
                       ))}
                     </TabsList>
                   </Tabs>
@@ -685,6 +797,86 @@ export default function EvidenceViewerPage() {
               )}
             </CardHeader>
             <CardContent className="space-y-2">
+              {currentDoc && canEditKycEvidence && (
+                <div className="border-b pb-3 mb-3">
+                  {!showClassificationForm ? (
+                    <div data-testid="document-classification-compact" className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          <Tags className="h-3.5 w-3.5" /> Classification :
+                        </span>
+                        <Badge variant="secondary" className="font-semibold">{currentDoc.doc_type}</Badge>
+                        {secondaryClassificationCategories.map((category) => (
+                          <Badge key={category} variant="default" className="bg-slate-500/10 text-slate-700 hover:bg-slate-500/20">{category}</Badge>
+                        ))}
+                        {currentDoc.classified_by_name && (
+                          <span className="text-[10px] text-muted-foreground italic">
+                            (Par {currentDoc.classified_by_name})
+                          </span>
+                        )}
+                      </div>
+                      <Button size="2xs" variant="outline" className="h-7 text-2xs px-2.5 font-medium" onClick={() => setClassificationPanelOpen(true)}>
+                        <Pencil className="mr-1 h-3 w-3" /> Reclasser
+                      </Button>
+                    </div>
+                  ) : (
+                    <div data-testid="document-classification-form" className="space-y-3 rounded-lg bg-slate-50/50 p-3 border border-slate-100">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-gray-700 flex items-center gap-1.5 uppercase tracking-wider">
+                          <Tags className="h-3.5 w-3.5 text-blue-500" />
+                          {classificationNeedsAttention ? 'Assigner ce fichier' : 'Reclasser le document'}
+                        </h4>
+                        {!classificationNeedsAttention && (
+                          <Button size="2xs" variant="ghost" className="h-6 text-[10px] px-1.5" onClick={() => setClassificationPanelOpen(false)}>
+                            <X className="h-3 w-3 mr-1" /> Fermer
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Type principal</label>
+                          <Select value={classifyDocType} onValueChange={setClassifyDocType}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
+                            <SelectContent>
+                              {DOCUMENT_CATEGORY_OPTIONS.map((type) => (
+                                <SelectItem key={type} value={type} className="text-xs">{type}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Categories</label>
+                          <input
+                            value={classifyCategories}
+                            onChange={(event) => setClassifyCategories(event.target.value)}
+                            className="h-8 w-full rounded-md border px-3 text-xs"
+                            placeholder="CNI_RECTO, ADDRESS_PROOF"
+                          />
+                        </div>
+                      </div>
+                      <Textarea
+                        value={classifyReason}
+                        onChange={(event) => setClassifyReason(event.target.value)}
+                        placeholder="Justification COBAC obligatoire..."
+                        className="min-h-[50px] text-xs py-1.5 px-2"
+                        spellCheck={false}
+                      />
+                      <div className="flex gap-2 justify-end">
+                        {classificationNeedsAttention && !classificationPanelOpen && (
+                          <span className="text-[10px] text-amber-600 flex items-center font-medium mr-auto">
+                            Classification requise pour ce document
+                          </span>
+                        )}
+                        <Button size="xs" className="h-7 text-2xs" onClick={handleClassifyDocument} disabled={classifySaving || !classifyReason.trim() || !classifyCategories.trim()}>
+                          {classifySaving ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
+                          Enregistrer la classification
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {documentView.loading && (
                 <div className="flex min-h-[300px] items-center justify-center rounded-lg border">
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -747,46 +939,6 @@ export default function EvidenceViewerPage() {
             </CardContent>
           </Card>
 
-          {currentDoc && canEditKycEvidence && (
-            <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><Tags className="h-4 w-4" /> Classification du document</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">Type principal</p>
-                    <Select value={classifyDocType} onValueChange={setClassifyDocType}>
-                      <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                      <SelectContent>
-                        {['CNI_RECTO', 'CNI_VERSO', 'BILL_ENEO', 'BILL_CAMWATER', 'NIU', 'SELFIE', 'IDENTITY_PROOF', 'ADDRESS_PROOF', 'OTHER'].map((type) => (
-                          <SelectItem key={type} value={type}>{type}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">Categories</p>
-                    <input
-                      value={classifyCategories}
-                      onChange={(event) => setClassifyCategories(event.target.value)}
-                      className="h-10 w-full rounded-md border px-3 text-sm"
-                      placeholder="CNI_RECTO, ADDRESS_PROOF"
-                    />
-                  </div>
-                </div>
-                <Textarea
-                  value={classifyReason}
-                  onChange={(event) => setClassifyReason(event.target.value)}
-                  placeholder="Pourquoi ce document couvre ces categories ?"
-                  className="min-h-[72px]"
-                />
-                <Button size="sm" onClick={handleClassifyDocument} disabled={classifySaving || !classifyReason.trim()}>
-                  {classifySaving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
-                  Assigner le document
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
           {(() => {
             const selfieDoc = documents.find((doc) => doc.doc_type === 'SELFIE');
             const cniRectoDoc = documents.find((doc) => doc.doc_type === 'CNI_RECTO');
@@ -833,6 +985,21 @@ export default function EvidenceViewerPage() {
             <Card>
               <CardHeader><CardTitle>Biometrie</CardTitle></CardHeader>
               <CardContent className="space-y-3">
+                {biometricRiskFlags.length > 0 && (
+                  <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900">
+                    <div className="mb-2 flex items-center gap-2 font-semibold">
+                      <AlertTriangle className="h-4 w-4" />
+                      Revue biometrie obligatoire
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {biometricRiskFlags.map((flag) => (
+                        <Badge key={flag} className="bg-orange-100 text-orange-800">
+                          {flag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {[
                   { label: 'Face Match', score: dossier.biometric_result.face_match_score },
                   { label: 'Liveness', score: dossier.biometric_result.liveness_score },
@@ -856,79 +1023,85 @@ export default function EvidenceViewerPage() {
             </CardContent>
           </Card>
 
-          <SupportThreadPanel sessionId={id || ''} onOpenDocumentFromChat={handleOpenDocumentFromChat} />
+          <SupportThreadPanel
+            sessionId={id || ''}
+            onOpenDocumentFromChat={handleOpenDocumentFromChat}
+            onPromoteAttachment={startPromoteAttachment}
+          />
         </div>
 
         <div className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Champs extraits (OCR)</CardTitle>
-                  {(currentDoc?.ocr_fields || []).length > 0 && (
-                <div className="flex gap-2">
-                  {(currentDoc?.doc_type === 'CNI_RECTO' || currentDoc?.doc_type === 'CNI_VERSO') && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowAllOcrFields((previous) => !previous)}
-                    >
-                      {showAllOcrFields ? 'Vue ciblee' : 'Voir tout'}
-                    </Button>
-                  )}
-                  {canEditKycEvidence && ocrEditMode ? (
-                    <>
-                      <Button size="sm" variant="outline" onClick={() => { setOcrEditMode(false); setOcrEditedFields({}); }}>
-                        <X className="mr-1 h-3 w-3" /> Annuler
+          {(!currentDoc || (currentDoc.doc_type !== 'CNI_RECTO' && currentDoc.doc_type !== 'CNI_VERSO')) && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Champs extraits (OCR)</CardTitle>
+                {(currentDoc?.ocr_fields || []).length > 0 && (
+                  <div className="flex gap-2">
+                    {(currentDoc?.doc_type === 'CNI_RECTO' || currentDoc?.doc_type === 'CNI_VERSO') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowAllOcrFields((previous) => !previous)}
+                      >
+                        {showAllOcrFields ? 'Vue ciblee' : 'Voir tout'}
                       </Button>
-                      <Button size="sm" onClick={handleOcrSave} disabled={ocrSaving}>
-                        {ocrSaving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
-                        Enregistrer
-                      </Button>
-                    </>
-                  ) : canEditKycEvidence ? (
-                    <Button size="sm" variant="outline" onClick={startOcrEdit}>
-                      <Pencil className="mr-1 h-3 w-3" /> Modifier
-                    </Button>
-                  ) : null}
-                </div>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {displayedCurrentDocFields.map((field, index) => (
-                <div key={`${field.field_name}-${index}`} className="flex items-center gap-3 rounded-lg border p-2">
-                  <div className="w-12 flex-shrink-0 text-center">
-                    <span className={`text-xs font-mono ${
-                      field.confidence_score >= 0.9 ? 'text-green-600' :
-                      field.confidence_score >= 0.7 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {scoreLabel(field.confidence_score)}
-                    </span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-muted-foreground">{field.field_name}</p>
-                    {ocrEditMode ? (
-                      <input
-                        type="text"
-                        value={ocrEditedFields[field.field_name] || ''}
-                        onChange={(event) => setOcrEditedFields({ ...ocrEditedFields, [field.field_name]: event.target.value })}
-                        className="w-full rounded border px-2 py-1 text-sm font-medium"
-                      />
-                    ) : (
-                      <p className="truncate text-sm font-medium">
-                        {field.human_corrected && field.corrected_value ? field.corrected_value : field.extracted_value}
-                      </p>
                     )}
+                    {canEditKycEvidence && ocrEditMode ? (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => { setOcrEditMode(false); setOcrEditedFields({}); }}>
+                          <X className="mr-1 h-3 w-3" /> Annuler
+                        </Button>
+                        <Button size="sm" onClick={handleOcrSave} disabled={ocrSaving}>
+                          {ocrSaving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+                          Enregistrer
+                        </Button>
+                      </>
+                    ) : canEditKycEvidence ? (
+                      <Button size="sm" variant="outline" onClick={startOcrEdit}>
+                        <Pencil className="mr-1 h-3 w-3" /> Modifier
+                      </Button>
+                    ) : null}
                   </div>
-                  <div className="flex gap-1">
-                    {field.human_corrected && <span className="text-xs italic text-blue-600">Corrige</span>}
-                    {!field.human_corrected && field.confidence_score < 0.7 && <span className="text-xs text-orange-500">Faible</span>}
+                )}
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {displayedCurrentDocFields.map((field, index) => (
+                  <div key={`${field.field_name}-${index}`} className="flex items-center gap-3 rounded-lg border p-2">
+                    <div className="w-12 flex-shrink-0 text-center">
+                      <span className={`text-xs font-mono ${
+                        field.confidence_score >= 0.9 ? 'text-green-600' :
+                        field.confidence_score >= 0.7 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {scoreLabel(field.confidence_score)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-muted-foreground">{field.field_name}</p>
+                      {ocrEditMode ? (
+                        <input
+                          type="text"
+                          value={ocrEditedFields[field.field_name] || ''}
+                          onChange={(event) => setOcrEditedFields({ ...ocrEditedFields, [field.field_name]: event.target.value })}
+                          className="w-full rounded border px-2 py-1 text-sm font-medium"
+                        />
+                      ) : (
+                        <p className="truncate text-sm font-medium">
+                          {field.human_corrected && field.corrected_value ? field.corrected_value : field.extracted_value}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      {field.human_corrected && <span className="text-xs italic text-blue-600">Corrige</span>}
+                      {!field.human_corrected && field.confidence_score < 0.7 && <span className="text-xs text-orange-500">Faible</span>}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {displayedCurrentDocFields.length === 0 && (
-                <p className="py-4 text-center text-sm text-muted-foreground">Aucun champ OCR disponible</p>
-              )}
-            </CardContent>
-          </Card>
+                ))}
+                {displayedCurrentDocFields.length === 0 && (
+                  <p className="py-4 text-center text-sm text-muted-foreground">Aucun champ OCR disponible</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {cniFinalRows.length > 0 && (
             <Card>
@@ -975,7 +1148,7 @@ export default function EvidenceViewerPage() {
             </Card>
           )}
 
-          {isThomas && (dossier.aml_alerts || []).length > 0 && (
+          {(dossier.aml_alerts || []).length > 0 && (
             <Card>
               <CardHeader><CardTitle>Alertes AML liees</CardTitle></CardHeader>
               <CardContent className="space-y-2">
@@ -987,9 +1160,13 @@ export default function EvidenceViewerPage() {
                         Score {scoreLabel(alert.match_score)} - {alert.status}
                       </p>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/compliance/alert/${alert.id}`)}>
-                      Traiter
-                    </Button>
+                    {canThomasInvestigate ? (
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/compliance/alert/${alert.id}`)}>
+                        Traiter
+                      </Button>
+                    ) : (
+                      <Badge variant="outline">Suivi Thomas</Badge>
+                    )}
                   </div>
                 ))}
               </CardContent>
@@ -1001,17 +1178,17 @@ export default function EvidenceViewerPage() {
               <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
               <CardContent className="flex flex-col gap-3">
                 {canJeanReview && dossier.status !== 'FRAUD_SUSPECT' && (
-                  <Button className="w-full" onClick={() => setShowApprove(true)}>
+                  <Button className="w-full" onClick={() => { setActionError(null); setShowApprove(true); }}>
                     <Check className="mr-2 h-4 w-4" /> Approuver
                   </Button>
                 )}
                 {canJeanReview && (
-                <Button variant="destructive" className="w-full" onClick={() => setShowReject(true)}>
+                <Button variant="destructive" className="w-full" onClick={() => { setActionError(null); setShowReject(true); }}>
                   <X className="mr-2 h-4 w-4" /> Rejeter
                 </Button>
                 )}
                 {canThomasMarkFraud && (
-                  <Button variant="destructive" className="w-full" onClick={() => setShowReject(true)}>
+                  <Button variant="destructive" className="w-full" onClick={() => { setActionError(null); setShowReject(true); }}>
                     <ShieldAlert className="mr-2 h-4 w-4" /> Marquer fraude
                   </Button>
                 )}
@@ -1026,12 +1203,41 @@ export default function EvidenceViewerPage() {
         </div>
       </div>
 
-      <Dialog open={showApprove} onOpenChange={setShowApprove}>
+      <Dialog
+        open={showApprove}
+        onOpenChange={(open) => {
+          setShowApprove(open);
+          if (!open) setActionError(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approuver le dossier</DialogTitle>
             <DialogDescription>Justification obligatoire (traçabilite COBAC).</DialogDescription>
           </DialogHeader>
+          {approvalNeedsBiometricOverride && (
+            <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900">
+              <div className="mb-2 flex items-center gap-2 font-semibold">
+                <AlertTriangle className="h-4 w-4" />
+                Signal biometrie a arbitrer
+              </div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {biometricRiskFlags.map((flag) => (
+                  <Badge key={flag} className="bg-orange-100 text-orange-800">
+                    {flag}
+                  </Badge>
+                ))}
+              </div>
+              <label className="flex items-start gap-2">
+                <Checkbox
+                  checked={confirmBiometricOverride}
+                  onChange={(event) => setConfirmBiometricOverride(event.target.checked)}
+                />
+                <span>Je confirme avoir arbitre manuellement le risque biometrie avant approbation.</span>
+              </label>
+            </div>
+          )}
+          {actionError && <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{actionError}</div>}
           <Textarea
             value={actionReason}
             onChange={(event) => setActionReason(event.target.value)}
@@ -1039,15 +1245,24 @@ export default function EvidenceViewerPage() {
             className="min-h-[80px]"
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowApprove(false); setActionReason(''); }}>Annuler</Button>
-            <Button onClick={() => handleReview('APPROVED')} disabled={actionLoading || !actionReason.trim()}>
+            <Button variant="outline" onClick={() => { setShowApprove(false); setActionReason(''); setConfirmBiometricOverride(false); setActionError(null); }}>Annuler</Button>
+            <Button
+              onClick={() => handleReview('APPROVED')}
+              disabled={actionLoading || !actionReason.trim() || (approvalNeedsBiometricOverride && !confirmBiometricOverride)}
+            >
               {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmer l'approbation
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showReject} onOpenChange={setShowReject}>
+      <Dialog
+        open={showReject}
+        onOpenChange={(open) => {
+          setShowReject(open);
+          if (!open) setActionError(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -1057,6 +1272,7 @@ export default function EvidenceViewerPage() {
             </DialogTitle>
             <DialogDescription>Justification obligatoire pour tracer la decision.</DialogDescription>
           </DialogHeader>
+          {actionError && <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{actionError}</div>}
           <Textarea
             value={actionReason}
             onChange={(event) => setActionReason(event.target.value)}
@@ -1064,7 +1280,7 @@ export default function EvidenceViewerPage() {
             className="min-h-[100px]"
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowReject(false); setActionReason(''); }}>Annuler</Button>
+            <Button variant="outline" onClick={() => { setShowReject(false); setActionReason(''); setActionError(null); }}>Annuler</Button>
             <Button
               variant="destructive"
               onClick={() => handleReview(canThomasMarkFraud ? 'FRAUD_SUSPECT' : 'REJECTED')}
@@ -1085,6 +1301,64 @@ export default function EvidenceViewerPage() {
           .filter((field: any) => field.confidence_score < 0.7)
           .map((field: any) => field.field_name)}
       />
+
+      <Dialog
+        open={Boolean(promotingMessage)}
+        onOpenChange={(open) => {
+          if (!open) setPromotingMessage(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assigner la pièce jointe au dossier</DialogTitle>
+            <DialogDescription>
+              Ce fichier va être importé comme document officiel dans le dossier KYC.
+            </DialogDescription>
+          </DialogHeader>
+          {promoteError && <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{promoteError}</div>}
+          <div className="space-y-3">
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Type de document attendu</p>
+              <Select value={promoteDocType} onValueChange={(val) => { setPromoteDocType(val); setPromoteCategories(val); }}>
+                <SelectTrigger><SelectValue placeholder="Choisir un type" /></SelectTrigger>
+                <SelectContent>
+                  {DOCUMENT_CATEGORY_OPTIONS.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Catégories d'indexation</p>
+              <input
+                value={promoteCategories}
+                onChange={(event) => setPromoteCategories(event.target.value)}
+                className="h-10 w-full rounded-md border px-3 text-sm"
+                placeholder="CNI_RECTO, ADDRESS_PROOF"
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Justification (traçabilité COBAC)</p>
+              <Textarea
+                value={promoteReason}
+                onChange={(event) => setPromoteReason(event.target.value)}
+                placeholder="Ex: Facture d'électricité fournie pour justificatif de domicile..."
+                className="min-h-[80px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPromotingMessage(null); setPromoteReason(''); setPromoteError(null); }}>Annuler</Button>
+            <Button
+              onClick={handlePromoteAttachment}
+              disabled={promoteSaving || !promoteReason.trim() || !promoteCategories.trim()}
+            >
+              {promoteSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmer l'assignation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

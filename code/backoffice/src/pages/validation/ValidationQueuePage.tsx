@@ -10,7 +10,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/Select';
-import { Eye, Filter, Search, Loader2, UserCheck } from 'lucide-react';
+import { AlertTriangle, Eye, Filter, Search, Loader2, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useMemo } from 'react';
 import type { QueueItem } from '@/services/dossier-service';
@@ -200,10 +200,25 @@ export default function ValidationQueuePage() {
                 </TableCell>
               </TableRow>
             ) : (
-              (pageData as QueueItem[]).map((session) => (
-                <TableRow key={session.id}>
+              (pageData as QueueItem[]).map((session) => {
+                const biometricRiskFlags = session.biometric_risk_flags || [];
+                return (
+                <TableRow key={session.id} className={biometricRiskFlags.length > 0 ? 'bg-orange-50/40' : undefined}>
                   <TableCell className="font-medium">
-                    {session.client_name || session.client_phone || '—'}
+                    <div className="space-y-1">
+                      <div>{session.client_name || session.client_phone || '—'}</div>
+                      {(session.priority_flag || biometricRiskFlags.length > 0) && (
+                        <div className="flex flex-wrap gap-1">
+                          {session.priority_flag && <Badge variant="warning">Prioritaire</Badge>}
+                          {biometricRiskFlags.length > 0 && (
+                            <Badge variant="warning" className="gap-1 border border-orange-200 bg-orange-100 text-orange-800">
+                              <AlertTriangle className="h-3 w-3" />
+                              Biometrie
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(session.status)}
@@ -228,7 +243,8 @@ export default function ValidationQueuePage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>

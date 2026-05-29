@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Maximize2, RotateCw, ZoomIn, ZoomOut } from 'lucide-react';
+import { AlertTriangle, Maximize2, RotateCw, ZoomIn, ZoomOut, Sun, Contrast } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,11 @@ export function ImageViewer({
   const [dragOrigin, setDragOrigin] = useState({ x: 0, y: 0 });
   const [hasError, setHasError] = useState(false);
 
+  // Advanced legibility filters state
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [invert, setInvert] = useState(false);
+
   const zoomIn = useCallback(() => setScale((value) => Math.min(value + 0.25, 4)), []);
   const zoomOut = useCallback(() => setScale((value) => Math.max(value - 0.25, 0.5)), []);
   const rotate = useCallback(() => setRotation((value) => (value + 90) % 360), []);
@@ -42,6 +47,9 @@ export function ImageViewer({
     setScale(1);
     setRotation(0);
     setTranslate({ x: 0, y: 0 });
+    setBrightness(100);
+    setContrast(100);
+    setInvert(false);
   }, []);
 
   const focusOn = useCallback((region: FocusRegion) => {
@@ -91,12 +99,13 @@ export function ImageViewer({
 
   return (
     <div className={cn('relative overflow-hidden rounded-lg border border-border bg-muted/30', className)}>
-      <div className="absolute right-2 top-2 z-10 flex gap-1">
+      <div className="absolute right-2 top-2 z-10 flex flex-wrap items-center gap-1">
         <Button
           variant="secondary"
           size="sm"
           className="h-7 w-7 bg-card/80 p-0 backdrop-blur-sm"
           onClick={zoomIn}
+          title="Zoom +"
         >
           <ZoomIn className="h-3.5 w-3.5" />
         </Button>
@@ -105,6 +114,7 @@ export function ImageViewer({
           size="sm"
           className="h-7 w-7 bg-card/80 p-0 backdrop-blur-sm"
           onClick={zoomOut}
+          title="Zoom -"
         >
           <ZoomOut className="h-3.5 w-3.5" />
         </Button>
@@ -113,6 +123,7 @@ export function ImageViewer({
           size="sm"
           className="h-7 w-7 bg-card/80 p-0 backdrop-blur-sm"
           onClick={rotate}
+          title="Faire pivoter"
         >
           <RotateCw className="h-3.5 w-3.5" />
         </Button>
@@ -121,9 +132,61 @@ export function ImageViewer({
           size="sm"
           className="h-7 w-7 bg-card/80 p-0 backdrop-blur-sm"
           onClick={reset}
+          title="Réinitialiser"
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </Button>
+
+        <div className="h-6 w-[1px] bg-border/80 mx-1 hidden sm:block" />
+
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-7 px-1.5 bg-card/80 text-[10px] font-mono backdrop-blur-sm flex items-center gap-0.5"
+          onClick={() => setBrightness((b) => Math.max(b - 15, 40))}
+          title="Luminosité -"
+        >
+          <Sun className="h-3.5 w-3.5 text-muted-foreground" />-
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-7 px-1.5 bg-card/80 text-[10px] font-mono backdrop-blur-sm flex items-center gap-0.5"
+          onClick={() => setBrightness((b) => Math.min(b + 15, 200))}
+          title="Luminosité +"
+        >
+          <Sun className="h-3.5 w-3.5" />+
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-7 px-1.5 bg-card/80 text-[10px] font-mono backdrop-blur-sm flex items-center gap-0.5"
+          onClick={() => setContrast((c) => Math.max(c - 15, 40))}
+          title="Contraste -"
+        >
+          <Contrast className="h-3.5 w-3.5 text-muted-foreground" />-
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-7 px-1.5 bg-card/80 text-[10px] font-mono backdrop-blur-sm flex items-center gap-0.5"
+          onClick={() => setContrast((c) => Math.min(c + 15, 200))}
+          title="Contraste +"
+        >
+          <Contrast className="h-3.5 w-3.5" />+
+        </Button>
+
+        <Button
+          variant={invert ? "default" : "secondary"}
+          size="sm"
+          className={cn("h-7 px-2 text-[10px] font-medium backdrop-blur-sm flex items-center", invert ? "bg-blue-600 text-white" : "bg-card/80")}
+          onClick={() => setInvert((i) => !i)}
+          title="Inverser les couleurs"
+        >
+          Inverser
+        </Button>
+
         {onOpenOriginal && (
           <Button
             variant="secondary"
@@ -175,6 +238,7 @@ export function ImageViewer({
               className="max-w-full select-none transition-transform duration-200"
               style={{
                 transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale}) rotate(${rotation}deg)`,
+                filter: `brightness(${brightness}%) contrast(${contrast}%) ${invert ? 'invert(1)' : ''}`,
               }}
               draggable={false}
               onError={() => setHasError(true)}
@@ -194,8 +258,11 @@ export function ImageViewer({
         )}
       </div>
 
-      <div className="absolute bottom-2 left-2 rounded bg-card/80 px-2 py-0.5 font-mono text-xs text-muted-foreground backdrop-blur-sm">
-        {Math.round(scale * 100)}%
+      <div className="absolute bottom-2 left-2 flex gap-2 rounded bg-card/80 px-2 py-0.5 font-mono text-2xs text-muted-foreground backdrop-blur-sm">
+        <span>Zoom: {Math.round(scale * 100)}%</span>
+        {brightness !== 100 && <span>Lumière: {brightness}%</span>}
+        {contrast !== 100 && <span>Contraste: {contrast}%</span>}
+        {invert && <span>Négatif</span>}
       </div>
     </div>
   );
