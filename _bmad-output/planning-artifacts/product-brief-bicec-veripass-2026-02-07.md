@@ -26,6 +26,8 @@
 
 # Product Brief: bicec-veripass
 
+> Historical note, 2026-05-28: this product brief is an early planning artifact. It is not current product scope, architecture, or roadmap authority.
+
 <!-- Content will be appended sequentially through collaborative workflow steps -->
 ## Executive Summary
 

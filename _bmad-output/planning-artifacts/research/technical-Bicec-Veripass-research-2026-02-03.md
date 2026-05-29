@@ -26,6 +26,8 @@
 
 # Research Report: technical
 
+> Historical note, 2026-05-28: this technical research report is background material only. It is not current implementation, architecture, or roadmap authority.
+
 **Date:** 2026-02-07
 **Author:** Ken-Andre
 **Research Type:** technical

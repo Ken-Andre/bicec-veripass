@@ -1,5 +1,7 @@
 # BICEC VeriPass - Backlog Complet (154 Issues)
 
+> Historical note, 2026-05-28: this backlog is a historical planning snapshot. It is not current scope or future roadmap authority.
+
 ## Sprint 0 - Infrastructure Foundation
 
 ### [INFRA-01] Initialiser le monorepo et la structure de projet

@@ -77,9 +77,9 @@ describe('pushNotificationService', () => {
     vi.stubEnv('VITE_VAPID_PUBLIC_KEY', 'QUFB');
 
     const { enablePushNotifications } = await import('./pushNotificationService');
-    const enabled = await enablePushNotifications();
+    const result = await enablePushNotifications();
 
-    expect(enabled).toBe(true);
+    expect(result).toEqual(expect.objectContaining({ enabled: true, code: 'enabled' }));
     expect(mockPost).toHaveBeenCalledWith('/notifications/subscriptions', expect.objectContaining({
       endpoint: 'https://push.example/sub/2',
       keys: { p256dh: 'client-key', auth: 'auth-secret' },
