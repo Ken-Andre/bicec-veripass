@@ -40,6 +40,7 @@ from app.modules.kyc.service import (
     process_document_ocr_pipeline,
     compute_anti_spoofing_score_from_landmarks,
     compute_face_match_for_session,
+    biometric_manual_review_reasons,
     is_liveness_challenge_passed,
     FACE_MATCH_MODEL_NAME,
     FACE_MATCH_STATUS_ERROR,
@@ -84,6 +85,14 @@ from app.modules.kyc import geo_data
 router = APIRouter()
 SHA256_HEX_RE = re.compile(r"^[a-fA-F0-9]{64}$")
 VALID_CAPTURE_SIDES = {"RECTO", "VERSO"}
+SUPPORTED_DOCUMENT_UPLOAD_TYPES = {
+    "CNI_RECTO",
+    "CNI_VERSO",
+    "SELFIE",
+    "BILL_ENEO",
+    "BILL_CAMWATER",
+    "NIU",
+}
 LIVENESS_LOCKOUT_COOLDOWN_SECONDS = 60
 LIVENESS_LOCKOUT_WINDOW_HOURS = 24
 MAX_LIVENESS_LOCKOUTS_PER_WINDOW = 3
@@ -132,6 +141,16 @@ def _normalize_capture_side(side: str) -> str:
         raise HTTPException(
             status_code=400,
             detail="Invalid side. Expected RECTO or VERSO.",
+        )
+    return normalized
+
+
+def _normalize_supported_doc_type(doc_type: str) -> str:
+    normalized = doc_type.strip().upper()
+    if normalized not in SUPPORTED_DOCUMENT_UPLOAD_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Document type is not supported.",
         )
     return normalized
 
@@ -225,6 +244,8 @@ async def _store_document_and_create_record(
     client_sha256: str | None = None,
 ) -> DocumentResponse:
     from app.modules.kyc.storage import document_storage
+
+    doc_type = _normalize_supported_doc_type(doc_type)
 
     if client_sha256 and not _is_valid_sha256(client_sha256):
         raise HTTPException(
@@ -1392,15 +1413,8 @@ async def _compute_kyc_readiness(
     if not has_ocr_review:
         blocking_reasons.append("OCR review not completed. Please confirm identity fields first.")
 
-    face_match_status = biometric.face_match_status if biometric else None
-    face_match_attempted = face_match_status in {
-        FACE_MATCH_STATUS_PASSED,
-        FACE_MATCH_STATUS_FAILED,
-    }
     if not has_biometric_result:
         blocking_reasons.append("Liveness step not completed")
-    elif not face_match_attempted:
-        blocking_reasons.append("Face match not completed")
 
     confidence_score_global: float | None = None
     if biometric and ocr_scores:
@@ -1414,12 +1428,11 @@ async def _compute_kyc_readiness(
         if face_match_score is not None:
             score_components.append(face_match_score)
         confidence_score_global = float(mean(score_components))
-        if face_match_status == FACE_MATCH_STATUS_FAILED or (
-            face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE
-        ):
-            warnings.append("Face match below threshold: priority manual review will be applied.")
-        if anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE:
-            warnings.append("Anti-spoofing below threshold: priority manual review will be applied.")
+        biometric_risk_reasons = biometric_manual_review_reasons(biometric)
+        if any(reason.startswith("FACE_MATCH") for reason in biometric_risk_reasons):
+            warnings.append("Face match requires priority manual review.")
+        if "ANTI_SPOOFING_BELOW_THRESHOLD" in biometric_risk_reasons:
+            warnings.append("Anti-spoofing requires priority manual review.")
 
     return KYCReadinessResponse(
         can_submit=len(blocking_reasons) == 0,
@@ -1467,17 +1480,8 @@ async def submit_kyc(
     biometric = result.scalar_one_or_none()
     if not biometric:
         raise HTTPException(status_code=400, detail="Liveness step not completed")
-    raw_face_match = biometric.face_match_score
-    face_match_score = float(raw_face_match) if raw_face_match is not None else None
-    anti_spoofing_score = float(biometric.anti_spoofing_score or 0.0)
-
-    # Flag for stronger manual review, but keep submission path available.
-    # Only check face_match if it was actually computed (not None).
-    low_face_match = biometric.face_match_status == FACE_MATCH_STATUS_FAILED or (
-        face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE
-    )
-    low_anti_spoofing = anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
-    if low_face_match or low_anti_spoofing:
+    biometric_risk_reasons = biometric_manual_review_reasons(biometric)
+    if biometric_risk_reasons:
         session.priority_flag = True
 
     session.confidence_score_global = readiness.confidence_score_global
@@ -1495,17 +1499,37 @@ async def submit_kyc(
     session.last_step_completed = "submission"
 
     # Audit log
+    new_data = {"status": new_status, "access_level": new_access_level}
+    if biometric_risk_reasons:
+        new_data["biometric_manual_review_reasons"] = biometric_risk_reasons
+
     audit = AuditLog(
         id=uuid.uuid4(),
         action="KYC_RESUBMIT" if old_status == LifecycleState.PENDING_INFO else "KYC_SUBMIT",
         table_name="kyc_sessions",
         record_id=str(session.id),
         old_data={"status": old_status, "access_level": old_access_level},
-        new_data={"status": new_status, "access_level": new_access_level},
+        new_data=new_data,
         performed_by=current_user.id,
         performed_at=now,
     )
     db.add(audit)
+    if biometric_risk_reasons:
+        db.add(
+            AuditLog(
+                id=uuid.uuid4(),
+                action="KYC_BIOMETRIC_RISK_FLAGGED",
+                table_name="kyc_sessions",
+                record_id=str(session.id),
+                old_data={},
+                new_data={
+                    "biometric_manual_review_reasons": biometric_risk_reasons,
+                    "priority_flag": True,
+                },
+                performed_by=current_user.id,
+                performed_at=now,
+            )
+        )
     await track_event_best_effort(
         db,
         event_type="KYC_SUBMITTED",
@@ -1516,6 +1540,7 @@ async def submit_kyc(
         step="submission",
         status=new_status,
         request_id=_request_uuid(request),
+        metadata={"biometric_manual_review_reasons": biometric_risk_reasons},
     )
     await db.commit()
 

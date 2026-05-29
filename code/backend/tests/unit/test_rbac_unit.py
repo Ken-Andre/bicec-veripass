@@ -198,6 +198,40 @@ class TestAmlAlertsAccess:
         assert response.status_code not in (401, 403)
 
 
+class TestAmlListManagementAccess:
+    """AML list registry is visible to compliance/ops; imports are Thomas/Admin only."""
+
+    @pytest.mark.asyncio
+    async def test_jean_cannot_view_aml_lists(self, client: AsyncClient):
+        token = _agent_token(AgentRole.JEAN)
+        response = await client.get(
+            "/api/v1/aml/lists",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_thomas_can_view_aml_lists(self, client: AsyncClient):
+        token = _agent_token(AgentRole.THOMAS)
+        with patch("app.modules.aml.router.service.get_aml_list_registry", new_callable=AsyncMock) as mock_lists:
+            mock_lists.return_value = []
+            response = await client.get(
+                "/api/v1/aml/lists",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_admin_it_can_download_template(self, client: AsyncClient):
+        token = _agent_token(AgentRole.ADMIN_IT)
+        response = await client.get(
+            "/api/v1/aml/lists/template",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        assert "full_name" in response.text
+
+
 class TestAnalyticsDashboardAccess:
     """GET /api/v1/analytics/dashboard - SYLVIE, ADMIN_IT, THOMAS only."""
 

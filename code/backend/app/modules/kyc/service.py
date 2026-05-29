@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.modules.kyc.models import Document, OCRField
+from app.modules.kyc.models import BiometricResult, Document, OCRField
 from app.modules.kyc.storage import document_storage
 from app.services.glm_utils import (
     DEFAULT_GLM_RECTO_PROMPT,
@@ -65,6 +65,34 @@ FACE_MATCH_STATUS_PASSED = "PASSED"
 FACE_MATCH_STATUS_FAILED = "FAILED"
 FACE_MATCH_STATUS_NOT_PERFORMED = "NOT_PERFORMED"
 FACE_MATCH_STATUS_ERROR = "ERROR"
+
+
+def biometric_manual_review_reasons(
+    biometric: BiometricResult | None,
+) -> list[str]:
+    """Return biometric risk flags that require explicit human adjudication."""
+    if biometric is None:
+        return []
+
+    reasons: list[str] = []
+    raw_face_match = biometric.face_match_score
+    face_match_score = float(raw_face_match) if raw_face_match is not None else None
+    face_match_status = biometric.face_match_status
+    anti_spoofing_score = float(biometric.anti_spoofing_score or 0.0)
+
+    if face_match_status == FACE_MATCH_STATUS_FAILED:
+        reasons.append("FACE_MATCH_FAILED")
+    elif face_match_status != FACE_MATCH_STATUS_PASSED:
+        reasons.append("FACE_MATCH_MISSING")
+    elif face_match_score is None:
+        reasons.append("FACE_MATCH_SCORE_MISSING")
+    elif face_match_score < settings.FACE_MATCH_MIN_SCORE:
+        reasons.append("FACE_MATCH_BELOW_THRESHOLD")
+
+    if anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE:
+        reasons.append("ANTI_SPOOFING_BELOW_THRESHOLD")
+
+    return reasons
 
 
 @dataclass(frozen=True)

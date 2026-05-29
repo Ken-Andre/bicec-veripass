@@ -8,11 +8,12 @@ import hashlib
 from sqlalchemy import select
 
 from app.main import app
-from app.core.security import get_current_user
+from app.core.security import get_current_agent, get_current_user
 from app.db.session import get_db
-from app.modules.auth.models import User
+from app.modules.auth.models import Agent, AgentRole, User
 from app.modules.kyc.models import KYCSession, Document, BiometricResult
 from app.modules.kyc.service import FaceMatchComputation, FACE_MATCH_STATUS_FAILED
+from app.modules.kyc.schemas import AccessTier, LifecycleState
 
 
 @pytest.fixture
@@ -121,6 +122,27 @@ class TestKYCRouter:
         assert data["sha256_hash"] == valid_hash
         mock_ocr.assert_called_once()
         mock_storage.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_document_upload_rejects_unsupported_doc_type(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        mock_storage,
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        file_content = b"test image content"
+
+        response = await client.post(
+            "/api/v1/kyc/document/upload",
+            data={"doc_type": "PASSPORT"},
+            files={"file": ("passport.jpg", file_content, "image/jpeg")},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Document type is not supported."
+        mock_storage.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_ocr_review_update(self, client: AsyncClient, override_auth, db_session):
@@ -242,3 +264,59 @@ class TestKYCRouter:
         assert data["face_match_status"] == FACE_MATCH_STATUS_FAILED
         await db_session.refresh(session)
         assert session.priority_flag is True
+
+    @pytest.mark.asyncio
+    async def test_review_approval_requires_biometric_override_for_risk(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        mock_user,
+    ):
+        agent = Agent(
+            id=uuid.uuid4(),
+            email=f"jean.override.{uuid.uuid4()}@example.test",
+            name="Jean Override",
+            role=AgentRole.JEAN,
+            password_hash="x",
+        )
+        session = KYCSession(
+            id=uuid.uuid4(),
+            user_id=mock_user.id,
+            status=LifecycleState.PENDING_AGENT_REVIEW,
+            access_level=AccessTier.RESTRICTED,
+        )
+        biometric = BiometricResult(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            face_match_status=FACE_MATCH_STATUS_FAILED,
+            face_match_score=0.62,
+            anti_spoofing_score=0.92,
+        )
+        db_session.add_all([agent, session, biometric])
+        await db_session.commit()
+
+        async def override_get_current_agent():
+            return agent
+
+        app.dependency_overrides[get_current_agent] = override_get_current_agent
+        try:
+            response = await client.post(
+                f"/api/v1/backoffice/dossier/{session.id}/review",
+                json={"decision": "APPROVED", "reason": "Identite validee en agence."},
+            )
+            assert response.status_code == 409
+            assert response.json()["detail"]["code"] == "BIOMETRIC_OVERRIDE_REQUIRED"
+
+            response = await client.post(
+                f"/api/v1/backoffice/dossier/{session.id}/review",
+                json={
+                    "decision": "APPROVED",
+                    "reason": "Identite validee en agence apres comparaison manuelle.",
+                    "biometric_override_confirmed": True,
+                },
+            )
+            assert response.status_code == 200
+            assert response.json()["new_status"] == LifecycleState.APPROVED
+        finally:
+            app.dependency_overrides.pop(get_current_agent, None)
