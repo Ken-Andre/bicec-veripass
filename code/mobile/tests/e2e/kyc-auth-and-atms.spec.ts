@@ -1,15 +1,6 @@
 import { test, expect } from '@playwright/test';
-import * as fs from 'fs';
-import * as path from 'path';
 
 test.describe('Client KYC, Secure Auth & Offline ATMs E2E Journeys (ATDD)', () => {
-  const phoneNumber = '69' + Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
-  const pin = '111111';
-
-  // Paths to CNI images for OCR simulation
-  const rectoPath = path.resolve(process.cwd(), '../../paddleocr_test/notebooks/output/pdf_pages/trybeg/6.png');
-  const versoPath = path.resolve(process.cwd(), '../../paddleocr_test/notebooks/output/pdf_pages/trybeg/3.png');
-
   test.beforeEach(async ({ page }) => {
     // Basic test setup or local database simulation
     await page.addInitScript(() => {

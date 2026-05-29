@@ -25,14 +25,14 @@ export const AppBar: React.FC<AppBarProps> = ({
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 safe-top border-b',
+        'sticky top-0 z-30 safe-top border-b backdrop-blur-xl',
         transparent
           ? 'bg-transparent border-transparent'
-          : 'glass-strong border-white/40',
+          : 'bg-background/92 border-border/60 shadow-sm',
         className
       )}
     >
-      <div className="flex items-center gap-3 h-16 px-4">
+      <div className="flex items-center gap-3 h-14 px-4">
         {showBack && (
           <button
             onClick={onBack ?? (() => navigate(-1))}

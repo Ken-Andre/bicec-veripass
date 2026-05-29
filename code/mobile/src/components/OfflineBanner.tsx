@@ -46,7 +46,7 @@ export const OfflineBanner = () => {
   // Online with pending items — show sync progress
   if (isOnline && (hasPending || hasIssues || justCameOnline)) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between gap-2 text-sm font-medium safe-top shadow-md">
+      <div className="sticky top-0 z-50 bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between gap-2 text-sm font-medium safe-top shadow-sm">
         <div className="flex items-center gap-2 min-w-0">
           {isSyncing ? (
             <RefreshCw className="w-4 h-4 shrink-0 animate-spin" />
@@ -91,7 +91,7 @@ export const OfflineBanner = () => {
 
   // Offline — show offline banner
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-2.5 flex items-center justify-between gap-2 text-sm font-medium safe-top shadow-md">
+    <div className="sticky top-0 z-50 bg-amber-500 text-white px-4 py-2.5 flex items-center justify-between gap-2 text-sm font-medium safe-top shadow-sm">
       <div className="flex items-center gap-2 min-w-0">
         <WifiOff className="w-4 h-4 shrink-0" />
         <span className="truncate">

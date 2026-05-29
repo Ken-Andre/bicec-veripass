@@ -12,6 +12,7 @@ export function KycResumeBanner() {
   const [needsReupload, setNeedsReupload] = useState(false);
   const normalizedPath = location.pathname.replace(/^\/mobile/, '') || '/';
   const isAuthRoute = normalizedPath === '/auth' || normalizedPath.startsWith('/auth/');
+  const isDashboardRoute = normalizedPath === '/dashboard';
 
   const showMessage = useMemo(() => {
     if (needsReupload) {
@@ -72,10 +73,10 @@ export function KycResumeBanner() {
 
   const isOnTargetPath = targetPath && location.pathname.endsWith(targetPath);
   const isOnKycRoute = location.pathname.includes('/kyc/');
-  if (isAuthRoute || !visible || !targetPath || isOnTargetPath || isOnKycRoute) return null;
+  if (isAuthRoute || !isDashboardRoute || !visible || !targetPath || isOnTargetPath || isOnKycRoute) return null;
 
   return (
-    <div className="fixed top-16 left-4 right-4 z-[100] bg-white border border-slate-200 text-slate-800 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl shadow-xl animate-in slide-in-from-top-5 fade-in duration-300">
+    <div className="bg-white border border-slate-200 text-slate-800 p-4 flex flex-col gap-4 rounded-2xl shadow-sm animate-in fade-in duration-300">
       <div className="flex items-center gap-4">
         <div className="h-10 w-10 bg-blue-50 text-primary-bicec-blue rounded-full flex items-center justify-center flex-shrink-0 border border-blue-100">
           <RotateCcw className="w-5 h-5" />
@@ -87,7 +88,7 @@ export function KycResumeBanner() {
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="grid grid-cols-[1fr_1.2fr] items-center gap-2">
         <button
           onClick={() => setVisible(false)}
           className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold transition-all text-xs"

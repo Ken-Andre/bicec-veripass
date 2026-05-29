@@ -43,7 +43,7 @@ export default function DocumentChoiceScreen() {
           <div className="flex items-start gap-3">
             <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-600" />
             <p className="text-sm font-semibold text-warning">
-              Pour cette version, seules les CNI camerounaises sont prises en charge.
+              Seules les CNI camerounaises sont prises en charge.
             </p>
           </div>
         </div>

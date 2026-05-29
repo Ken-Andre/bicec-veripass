@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { useKyc } from '../../contexts/KycContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { KycResumeBanner } from '../../components/KycResumeBanner';
 import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
 import type { AccountInfo, Transaction, SavingsPocket } from '../../types';
@@ -158,6 +159,8 @@ export function DashboardPage() {
       </div>
 
       <div className="px-6 mt-6 space-y-6">
+        <KycResumeBanner />
+
         {/* KYC Banner (if not full access) */}
         {!isKycDone && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn('glass rounded-2xl p-5 border-l-4', tier.borderColor, tier.bgColor)}>

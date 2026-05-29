@@ -1,12 +1,11 @@
-import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { KycProvider } from "./contexts/KycContext";
 import { KycHydrationGate } from "./components/KycHydrationGate";
 import { KycStepGuard } from "./hooks/useKycFlow";
-import { KycResumeBanner } from "./components/KycResumeBanner";
 import { OfflineBanner } from "./components/OfflineBanner";
 import { PageLoader } from "./components/PageLoader";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -188,12 +187,6 @@ function AuthenticatedKycProvider({ children }: { children: ReactNode }) {
   return <KycProvider>{children}</KycProvider>;
 }
 
-function AuthenticatedKycResumeBanner() {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) return null;
-  return <KycResumeBanner />;
-}
-
 function LockGuard({ children }: { children: React.ReactNode }) {
   const { isLocked } = useAuth();
   const sessionLocked = sessionStorage.getItem("vp_is_locked") === "true";
@@ -216,6 +209,25 @@ function CniVersoCapture() {
   return <CniCaptureScreen side="verso" nextRoute="/kyc/ocr-review" />;
 }
 
+function MetaThemeColor() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) return;
+
+    const path = location.pathname;
+    const color = path.includes("capture")
+      ? "#000000"
+      : path === "/dashboard"
+        ? "#E37B03"
+        : "#FBF8F3";
+    meta.setAttribute("content", color);
+  }, [location.pathname]);
+
+  return null;
+}
+
 function App() {
   const { needsRefresh, updateSW, dismiss } = useServiceWorker();
 
@@ -223,11 +235,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <BrowserRouter basename="/mobile">
+          <MetaThemeColor />
           <AuthProvider>
             <AuthenticatedKycProvider>
               <OfflineBanner />
               {needsRefresh && (
-                <div className="fixed inset-x-4 top-4 z-[100] mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-white px-4 py-3 text-sm shadow-xl">
+                <div className="fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-[100] mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-white px-4 py-3 text-sm shadow-xl">
                   <span className="font-semibold text-foreground">Nouvelle version disponible</span>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={dismiss} className="text-xs font-bold text-muted-foreground">
@@ -239,7 +252,6 @@ function App() {
                   </div>
                 </div>
               )}
-              <AuthenticatedKycResumeBanner />
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>

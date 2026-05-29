@@ -87,6 +87,11 @@ export function HomePage() {
     return () => clearTimeout(timer);
   }, [loading, isAuthenticated, user, navigate]);
 
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    meta?.setAttribute('content', showOnboarding ? '#FBF8F3' : '#1A0F00');
+  }, [showOnboarding]);
+
   // Auto-advance carousel
   useEffect(() => {
     if (!showOnboarding) return;

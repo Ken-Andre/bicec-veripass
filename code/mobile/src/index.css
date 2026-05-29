@@ -142,7 +142,15 @@
   }
 
   .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 16px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   .gradient-primary {
