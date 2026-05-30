@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type CSSProperties, type MouseEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Lock, Smartphone, ArrowRight } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { setViewportChromeColor } from '../lib/appChrome';
 
 const ONBOARDING_SLIDES = [
   {
@@ -31,7 +32,7 @@ const ONBOARDING_SLIDES = [
 ];
 
 const SLIDE_DURATION = 5000;
-const SPLASH_DURATION = 2500;
+const SPLASH_DURATION = 900;
 
 function FloatingParticles() {
   const particles = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
@@ -39,24 +40,26 @@ function FloatingParticles() {
     size: 4 + ((i * 7 + 3) % 8),
     left: `${(i * 17 + 11) % 100}%`,
     top: `${(i * 23 + 7) % 100}%`,
-    duration: 8 + ((i * 13 + 5) % 12),
-    delay: (i * 3) % 5,
+    duration: 11 + ((i * 13 + 5) % 14),
+    delay: -((i * 3) % 9),
+    opacity: 0.09 + (((i * 5) % 8) / 100),
   })), []);
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
       {particles.map((p) => (
         <div
           key={p.id}
-          className="absolute rounded-full bg-white/10 animate-float-particle"
+          className="splash-fleck absolute rounded-full"
           style={{
             width: p.size,
             height: p.size,
             left: p.left,
             top: p.top,
+            opacity: p.opacity,
             animationDuration: `${p.duration}s`,
             animationDelay: `${p.delay}s`,
-          }}
+          } as CSSProperties}
         />
       ))}
     </div>
@@ -88,14 +91,13 @@ export function HomePage() {
   }, [loading, isAuthenticated, user, navigate]);
 
   useEffect(() => {
-    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    meta?.setAttribute('content', showOnboarding ? '#FBF8F3' : '#1A0F00');
+    setViewportChromeColor(showOnboarding ? '#FBF8F3' : '#1A0F00');
   }, [showOnboarding]);
 
   // Auto-advance carousel
   useEffect(() => {
     if (!showOnboarding) return;
-    let start = performance.now() - (progress / 100) * SLIDE_DURATION;
+    const start = performance.now();
     let frame: number;
 
     const animate = (timestamp: number) => {
@@ -104,14 +106,14 @@ export function HomePage() {
       setProgress(p);
       if (elapsed >= SLIDE_DURATION) {
         setCurrentSlide(prev => (prev + 1) % ONBOARDING_SLIDES.length);
-        start = timestamp;
         setProgress(0);
+        return;
       }
       frame = requestAnimationFrame(animate);
     };
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
-  }, [showOnboarding, progress]);
+  }, [showOnboarding, currentSlide]);
 
   const goToSlide = (index: number) => {
     setCurrentSlide(((index % ONBOARDING_SLIDES.length) + ONBOARDING_SLIDES.length) % ONBOARDING_SLIDES.length);
@@ -120,7 +122,7 @@ export function HomePage() {
   const goNext = () => goToSlide(currentSlide + 1);
   const goPrev = () => goToSlide(currentSlide - 1);
 
-  const toggleLanguage = (e: React.MouseEvent) => {
+  const toggleLanguage = (e: MouseEvent) => {
     e.stopPropagation();
     setLanguage(language === 'fr' ? 'en' : 'fr');
   };
@@ -128,9 +130,8 @@ export function HomePage() {
   // Splash screen
   if (!showOnboarding) {
     return (
-      <div className="fixed inset-0 min-h-[100dvh] bg-gradient-to-br from-[#1a0f00] via-[#2d1b05] to-[#001d45] flex items-center justify-center overflow-hidden">
+      <div className="app-viewport-fill splash-viewport flex items-center justify-center overflow-hidden">
         <FloatingParticles />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,140,0,0.12),transparent_60%)]" />
 
         <motion.div
           initial={{ opacity: 0, scale: 0.8, y: 30 }}
@@ -153,7 +154,7 @@ export function HomePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="text-4xl font-black text-white tracking-tight mb-2"
+            className="text-4xl font-black text-white tracking-normal mb-2"
           >
             VeriPass
           </motion.h1>
@@ -163,7 +164,7 @@ export function HomePage() {
             transition={{ delay: 0.9 }}
             className="text-sm font-bold text-orange-300/80 tracking-[0.2em] uppercase"
           >
-            L'identité numérique BICEC
+            L&apos;identit&eacute; num&eacute;rique BICEC
           </motion.p>
         </motion.div>
       </div>
@@ -184,7 +185,7 @@ export function HomePage() {
               alt="BICEC"
               className="w-9 h-9 object-contain rounded-xl shadow-lg bg-white"
             />
-            <span className="font-black text-foreground text-lg tracking-tight">VeriPass</span>
+            <span className="font-black text-foreground text-lg tracking-normal">VeriPass</span>
           </div>
           <button
             onClick={toggleLanguage}
@@ -227,7 +228,7 @@ export function HomePage() {
               <div className={`w-32 h-32 rounded-[2rem] bg-gradient-to-tr ${slide.color} flex items-center justify-center shadow-xl mb-8`}>
                 <Icon className="w-14 h-14 text-white" />
               </div>
-              <h2 className="text-3xl font-black text-foreground tracking-tighter leading-tight mb-3 max-w-xs">
+              <h2 className="text-3xl font-black text-foreground tracking-normal leading-tight mb-3 max-w-xs">
                 {t(slide.titleKey)}
               </h2>
               <p className="text-muted-foreground font-medium text-base leading-snug max-w-xs">
@@ -267,17 +268,6 @@ export function HomePage() {
         </div>
       </div>
 
-      <style>{`
-        @keyframes float-particle {
-          0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
-          25% { transform: translateY(-20px) translateX(10px); opacity: 0.6; }
-          50% { transform: translateY(-40px) translateX(-10px); opacity: 0.4; }
-          75% { transform: translateY(-20px) translateX(5px); opacity: 0.5; }
-        }
-        .animate-float-particle {
-          animation: float-particle ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }

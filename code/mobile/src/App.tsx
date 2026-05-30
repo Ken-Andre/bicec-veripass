@@ -11,6 +11,7 @@ import { PageLoader } from "./components/PageLoader";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { useServiceWorker } from "./hooks/use-service-worker";
+import { setViewportChromeColor } from "./lib/appChrome";
 
 const queryClient = new QueryClient();
 
@@ -213,16 +214,15 @@ function MetaThemeColor() {
   const location = useLocation();
 
   useEffect(() => {
-    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (!meta) return;
-
     const path = location.pathname;
+    if (path === "/") return;
+
     const color = path.includes("capture")
       ? "#000000"
       : path === "/dashboard"
         ? "#E37B03"
         : "#FBF8F3";
-    meta.setAttribute("content", color);
+    setViewportChromeColor(color);
   }, [location.pathname]);
 
   return null;

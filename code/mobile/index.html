@@ -4,15 +4,124 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/jpeg" href="/mobile/bicec_logo.jpg" />
     <link rel="apple-touch-icon" href="/mobile/bicec_logo.jpg" />
+    <link rel="preload" as="image" href="/mobile/bicec_logo.jpg" fetchpriority="high" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-1152x2496.png" media="(device-width: 384px) and (device-height: 832px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/mobile/startup/apple-splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#FBF8F3" />
+    <meta name="theme-color" content="#1A0F00" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>BICEC VeriPass</title>
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        min-height: 100%;
+        min-height: 100dvh;
+        background: #1A0F00;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- HTML Splash Screen visible instantly before JS is parsed -->
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at center, #261600 0%, #1A0F00 100%);
+        z-index: 9999;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      ">
+        <!-- Glow effect -->
+        <div style="
+          position: absolute;
+          width: 250px;
+          height: 250px;
+          background: rgba(249, 115, 22, 0.15);
+          filter: blur(80px);
+          border-radius: 50%;
+        "></div>
+
+        <!-- Logo Container -->
+        <div style="
+          position: relative;
+          width: 112px;
+          height: 112px;
+          border-radius: 28px;
+          background: linear-gradient(135deg, #f97316 0%, #d97706 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 20px 40px rgba(249, 115, 22, 0.3);
+          margin-bottom: 32px;
+          animation: splashPulse 2s infinite ease-in-out;
+        ">
+          <!-- Inner White Logo area -->
+          <div style="
+            width: 96px;
+            height: 96px;
+            border-radius: 20px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+          ">
+            <img src="/mobile/bicec_logo.jpg" alt="BICEC" style="
+              width: 80px;
+              height: 80px;
+              object-fit: contain;
+            " />
+          </div>
+        </div>
+
+        <!-- App Name -->
+        <h1 style="
+          font-size: 36px;
+          font-weight: 900;
+          color: white;
+          margin: 0 0 8px 0;
+          letter-spacing: 0;
+          animation: splashFadeIn 0.8s ease-out;
+        ">VeriPass</h1>
+
+        <!-- Subtitle -->
+        <p style="
+          font-size: 14px;
+          font-weight: 700;
+          color: rgba(253, 186, 116, 0.8);
+          margin: 0;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          animation: splashFadeIn 1s ease-out;
+        ">L&#39;identit&eacute; num&eacute;rique BICEC</p>
+      </div>
+
+      <!-- Keyframe Animations -->
+      <style>
+        @keyframes splashPulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 20px 40px rgba(249, 115, 22, 0.3); }
+          50% { transform: scale(1.03); box-shadow: 0 25px 50px rgba(249, 115, 22, 0.45); }
+        }
+        @keyframes splashFadeIn {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      </style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

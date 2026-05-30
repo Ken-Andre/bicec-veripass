@@ -5,21 +5,27 @@ import { useKyc } from '../../contexts/KycContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { Button } from '../../components/ui/button';
 import { CheckCircle, XCircle, Loader2, Camera } from 'lucide-react';
-import { initFaceLandmarker, detectForVideo, isFacePresent, computeSmileScore, computeEAR, computeYawAngle } from '../../services/mediapipeService';
+import { initFaceLandmarker, detectForVideo, isFacePresent } from '../../services/mediapipeService';
 import type { LivenessResult } from '../../types';
 import { enqueueOfflineLivenessCapture, runKycSyncNow, safeSubmitLiveness } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
 import { captureKycException, captureKycMessage } from '../../services/sentry';
+import {
+  CHALLENGES,
+  HOLD_FRAMES,
+  MIN_CHALLENGE_VISIBLE_MS,
+  createBlinkValidationState,
+  evaluateChallenge,
+  type BlinkValidationState,
+  type ChallengeType,
+} from './livenessChallenge';
 
-type ChallengeType = 'smile' | 'blink' | 'turn_left' | 'turn_right';
 type SelfieUploadResult = {
   ok: boolean;
   networkLike: boolean;
   message?: string;
 };
 
-const CHALLENGES: ChallengeType[] = ['smile', 'blink', 'turn_left'];
-const HOLD_FRAMES = 8;
 const NO_FACE_TIMEOUT_MS = 5000;
 const MAX_LANDMARK_FRAMES = 48;
 
@@ -38,10 +44,12 @@ export default function LivenessScreen() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'challenge' | 'success' | 'fail' | 'locked'>('loading');
   const [currentChallenge, setCurrentChallenge] = useState(0);
   const holdCountRef = useRef(0);
-  const [holdCount, setHoldCount] = useState(0); // Mirror of holdCountRef for re-renders
+  const [challengeProgress, setChallengeProgress] = useState(0);
   const [message, setMessage] = useState('');
+  const [guidance, setGuidance] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [validationPulse, setValidationPulse] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -52,10 +60,29 @@ export default function LivenessScreen() {
   const selfieDataUrlRef = useRef<string | null>(null);
   const challengeCompleteRef = useRef(false);
   const sessionIdRef = useRef(sessionId);
+  const challengeStartedAtRef = useRef(0);
+  const blinkStateRef = useRef<BlinkValidationState>(createBlinkValidationState());
+  const guidanceRef = useRef('');
+  const validationPulseTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  const setGuidanceIfChanged = useCallback((nextGuidance: string) => {
+    if (guidanceRef.current === nextGuidance) return;
+    guidanceRef.current = nextGuidance;
+    setGuidance(nextGuidance);
+  }, []);
+
+  const resetChallengeTracking = useCallback(() => {
+    holdCountRef.current = 0;
+    setChallengeProgress(0);
+    blinkStateRef.current = createBlinkValidationState();
+    challengeStartedAtRef.current = performance.now();
+    setValidationPulse(false);
+    setGuidanceIfChanged('');
+  }, [setGuidanceIfChanged]);
 
   const toHex = (buffer: ArrayBuffer): string =>
     Array.from(new Uint8Array(buffer))
@@ -114,7 +141,7 @@ export default function LivenessScreen() {
       return {
         ok: false,
         networkLike: false,
-        message: 'Selfie non capture. Veuillez recommencer la verification.',
+        message: 'Selfie non capturé. Veuillez recommencer la vérification.',
       };
     }
 
@@ -174,23 +201,36 @@ export default function LivenessScreen() {
     switch (type) {
       case 'smile': return t('liveness.challenge.smile') !== 'liveness.challenge.smile' ? t('liveness.challenge.smile') : 'Souriez naturellement';
       case 'blink': return t('liveness.challenge.blink') !== 'liveness.challenge.blink' ? t('liveness.challenge.blink') : 'Clignez des yeux';
-      case 'turn_left': return t('liveness.challenge.turn') !== 'liveness.challenge.turn' ? t('liveness.challenge.turn') : 'Tournez la tete a gauche';
-      case 'turn_right': return 'Tournez la tete a droite';
+      case 'turn_left': return t('liveness.challenge.turn_left') !== 'liveness.challenge.turn_left' ? t('liveness.challenge.turn_left') : 'Tournez la tête à gauche';
+      case 'turn_right': return t('liveness.challenge.turn_right') !== 'liveness.challenge.turn_right' ? t('liveness.challenge.turn_right') : 'Tournez la tête à droite';
     }
   };
 
-  const checkChallenge = useCallback((type: ChallengeType, landmarks: unknown): boolean => {
-    if (!landmarks || !Array.isArray(landmarks)) return false;
-    switch (type) {
-      case 'smile': return computeSmileScore(landmarks) > 0.3;
-      case 'blink': return computeEAR(landmarks) < 0.2;
-      case 'turn_left': return computeYawAngle(landmarks) > 15;
-      case 'turn_right': return computeYawAngle(landmarks) < -15;
+  const translateGuidance = useCallback((key: string) => {
+    const translated = t(key);
+    if (translated !== key) return translated;
+    switch (key) {
+      case 'liveness.guidance.blink':
+        return 'Gardez les yeux ouverts, puis clignez une fois.';
+      case 'liveness.guidance.turn.left':
+        return 'Tournez la tête vers votre gauche.';
+      case 'liveness.guidance.turn.more':
+        return 'Encore un peu vers votre gauche.';
+      case 'liveness.guidance.turn.other_side':
+        return "Tournez de l'autre côté, vers votre gauche.";
+      case 'liveness.guidance.validating':
+        return "Validation de l'action en cours...";
+      default:
+        return '';
     }
-  }, []);
+  }, [t]);
 
   const stopCamera = useCallback(() => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (validationPulseTimerRef.current) {
+      window.clearTimeout(validationPulseTimerRef.current);
+      validationPulseTimerRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -216,9 +256,13 @@ export default function LivenessScreen() {
       setStatus('challenge');
       setCurrentChallenge(0);
       holdCountRef.current = 0;
-      setHoldCount(0);
+      setChallengeProgress(0);
+      blinkStateRef.current = createBlinkValidationState();
+      challengeStartedAtRef.current = performance.now();
+      setValidationPulse(false);
       challengeCompleteRef.current = false;
       setMessage('');
+      setGuidanceIfChanged('');
       lastFaceTimeRef.current = Date.now();
       capturedLandmarksRef.current = [];
       selfieDataUrlRef.current = null;
@@ -230,10 +274,10 @@ export default function LivenessScreen() {
         step: 'liveness',
         operation: 'liveness_camera_init',
       });
-      setMessage(`${t('liveness.camera.error') !== 'liveness.camera.error' ? t('liveness.camera.error') : 'Erreur camera'} - ${error.message}`);
+      setMessage(`${t('liveness.camera.error') !== 'liveness.camera.error' ? t('liveness.camera.error') : 'Erreur caméra'} - ${error.message}`);
       setStatus('fail');
     }
-  }, [t]);
+  }, [t, setGuidanceIfChanged]);
 
   const submitLiveness = useCallback(async (
     landmarks: Array<Record<string, unknown>>,
@@ -291,14 +335,31 @@ export default function LivenessScreen() {
           }
           const type = CHALLENGES[currentChallenge];
 
-          if (checkChallenge(type, landmarks)) {
+          const challengeVisibleLongEnough = performance.now() - challengeStartedAtRef.current >= MIN_CHALLENGE_VISIBLE_MS;
+          const nowMs = performance.now();
+          const { evaluation, blinkState } = evaluateChallenge(type, landmarks, blinkStateRef.current, nowMs);
+          blinkStateRef.current = blinkState;
+          setChallengeProgress(evaluation.progress);
+
+          if (type === 'blink') {
+            setGuidanceIfChanged(translateGuidance('liveness.guidance.blink'));
+          } else if (evaluation.guidanceKey) {
+            setGuidanceIfChanged(translateGuidance(evaluation.guidanceKey));
+          } else {
+            setGuidanceIfChanged('');
+          }
+
+          if (challengeVisibleLongEnough && evaluation.matched && !validationPulseTimerRef.current) {
             holdCountRef.current += 1;
-            setHoldCount(holdCountRef.current);
             if (holdCountRef.current >= HOLD_FRAMES) {
+              setValidationPulse(true);
+              if (validationPulseTimerRef.current) window.clearTimeout(validationPulseTimerRef.current);
               if (currentChallenge < CHALLENGES.length - 1) {
-                holdCountRef.current = 0;
-                setHoldCount(0);
-                setCurrentChallenge(c => c + 1);
+                validationPulseTimerRef.current = window.setTimeout(() => {
+                  validationPulseTimerRef.current = null;
+                  setCurrentChallenge(c => c + 1);
+                  resetChallengeTracking();
+                }, 220);
               } else if (!challengeCompleteRef.current) {
                 // All challenges done — capture selfie and stop camera (once)
                 challengeCompleteRef.current = true;
@@ -309,14 +370,15 @@ export default function LivenessScreen() {
             }
           } else {
             holdCountRef.current = Math.max(0, holdCountRef.current - 1);
-            setHoldCount(holdCountRef.current);
           }
         } else {
           holdCountRef.current = 0;
-          setHoldCount(0);
+          setChallengeProgress(0);
+          blinkStateRef.current = createBlinkValidationState();
           if (lastFaceTimeRef.current !== 0 && Date.now() - lastFaceTimeRef.current > NO_FACE_TIMEOUT_MS) {
-            setMessage(t('liveness.face.not_detected') !== 'liveness.face.not_detected' ? t('liveness.face.not_detected') : 'Visage non detecte. Placez-vous dans le cercle.');
+            setMessage(t('liveness.face.not_detected') !== 'liveness.face.not_detected' ? t('liveness.face.not_detected') : "Visage non détecté. Placez-vous dans l'ovale.");
           }
+          setGuidanceIfChanged('');
         }
       } catch {
         // Mediapipe not ready or frame skipped
@@ -327,7 +389,13 @@ export default function LivenessScreen() {
 
     animFrameRef.current = requestAnimationFrame(detect);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [status, currentChallenge, checkChallenge, stopCamera, t, captureSelfieFrame]);
+  }, [status, currentChallenge, stopCamera, t, captureSelfieFrame, resetChallengeTracking, setGuidanceIfChanged, translateGuidance]);
+
+  useEffect(() => {
+    if (status === 'challenge') {
+      challengeStartedAtRef.current = performance.now();
+    }
+  }, [status, currentChallenge]);
 
   useEffect(() => {
     const startTimer = window.setTimeout(() => {
@@ -350,7 +418,7 @@ export default function LivenessScreen() {
   const handleSubmit = async () => {
     const payload = capturedLandmarksRef.current.slice(-40);
     if (payload.length === 0) {
-      setMessage('Aucune donnee biometrie capturee. Veuillez recommencer la verification.');
+      setMessage('Aucune donnée biométrique capturée. Veuillez recommencer la vérification.');
       setStatus('fail');
       return;
     }
@@ -368,11 +436,11 @@ export default function LivenessScreen() {
         });
         completeStep('liveness');
         resetLivenessAttempts();
-        setMessage('Connexion indisponible. La verification sera synchronisee automatiquement au retour reseau.');
+        setMessage('Connexion indisponible. La vérification sera synchronisée automatiquement au retour réseau.');
         navigate('/kyc/address');
         return;
       }
-      setMessage('Selfie non accepte. Veuillez recommencer la verification faciale.');
+      setMessage('Selfie non accepté. Veuillez recommencer la vérification faciale.');
       setStatus('fail');
       return;
     }
@@ -383,7 +451,7 @@ export default function LivenessScreen() {
 
       if (result.is_locked || result.strikes_remaining === 0) {
         setCooldownSeconds(result.cooldown_seconds ?? 60);
-        setMessage('Session verrouillee temporairement apres 3 echecs. Vous pouvez recommencer ou aller en agence.');
+        setMessage('Session verrouillée temporairement après 3 échecs. Vous pouvez recommencer ou aller en agence.');
         setStatus('locked');
         stopCamera();
         return;
@@ -414,7 +482,7 @@ export default function LivenessScreen() {
         });
         completeStep('liveness');
         resetLivenessAttempts();
-        setMessage('Connexion indisponible. La verification sera synchronisee automatiquement au retour reseau.');
+        setMessage('Connexion indisponible. La vérification sera synchronisée automatiquement au retour réseau.');
         navigate('/kyc/address');
         return;
       }
@@ -423,7 +491,7 @@ export default function LivenessScreen() {
         step: 'liveness',
         operation: 'liveness_submit',
       });
-      setMessage('Erreur lors de la verification liveness. Veuillez reessayer.');
+      setMessage('Erreur lors de la vérification liveness. Veuillez réessayer.');
       setStatus('fail');
     }
   };
@@ -431,10 +499,10 @@ export default function LivenessScreen() {
   const handleRetry = async () => {
     incrementLivenessAttempt();
     if (livenessAttempts >= 3) {
-      setMessage('Plusieurs tentatives echouees. Verifiez votre connexion ou continuez en agence.');
+      setMessage('Plusieurs tentatives échouées. Vérifiez votre connexion ou continuez en agence.');
     }
 
-    setMessage('Tentative relancee. Veuillez recommencer le challenge.');
+    setMessage('Tentative relancée. Veuillez recommencer le challenge.');
     capturedLandmarksRef.current = [];
     startCamera();
     await runKycSyncNow().catch(() => {
@@ -463,11 +531,13 @@ export default function LivenessScreen() {
 
   const getOvalBorderColor = () => {
     if (!faceDetected) return 'border-destructive';
-    if (holdCount > 0) return 'border-success';
+    if (validationPulse) return 'border-success';
     return 'border-warning';
   };
 
-  const holdProgressPercent = Math.min((holdCount / HOLD_FRAMES) * 100, 100);
+  const holdProgressPercent = validationPulse ? 100 : Math.min(challengeProgress * 100, 100);
+  const currentStepNumber = currentChallenge + 1;
+  const totalStepCount = CHALLENGES.length;
   const ensureSessionId = () => {
     if (sessionId) return sessionId;
     const generated = `offline-${Date.now()}`;
@@ -476,7 +546,7 @@ export default function LivenessScreen() {
   };
 
   return (
-    <ScreenLayoutV2 title={t('liveness.intro.title') !== 'liveness.intro.title' ? t('liveness.intro.title') : 'Verification Faciale'} showBack>
+    <ScreenLayoutV2 title={t('liveness.intro.title') !== 'liveness.intro.title' ? t('liveness.intro.title') : 'Vérification de vie'} showBack>
       <div className="flex flex-col items-center gap-6 py-6 w-full max-w-sm mx-auto h-full justify-center">
 
         {(status === 'loading' || status === 'ready') && (
@@ -484,7 +554,7 @@ export default function LivenessScreen() {
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
               <Loader2 className="w-10 h-10 animate-spin text-primary" />
             </div>
-            <p className="text-lg text-muted-foreground font-medium text-center">Initialisation de la camera<br />et du modele biometrique...</p>
+            <p className="text-lg text-muted-foreground font-medium text-center">Initialisation de la caméra<br />et du modèle biométrique...</p>
           </div>
         )}
 
@@ -514,23 +584,46 @@ export default function LivenessScreen() {
               </p>
             </div>
 
-            <div className="flex gap-3 mt-2">
-              {CHALLENGES.map((_, i) => (
-                <div key={i} className={`w-3 h-3 rounded-full transition-all duration-300 ${i < currentChallenge ? 'bg-success scale-110' : i === currentChallenge ? 'bg-primary ring-4 ring-primary/30' : 'bg-muted'}`} />
+            <div className="flex gap-3 mt-2" aria-label={`Étape ${currentStepNumber} sur ${totalStepCount}`}>
+              {CHALLENGES.map((challenge, i) => (
+                <div
+                  key={challenge}
+                  aria-label={`${getChallengeInstruction(challenge)} - ${i < currentChallenge ? 'validée' : i === currentChallenge ? 'en cours' : 'à venir'}`}
+                  className={`w-4 h-4 rounded-full transition-all duration-300 ${i < currentChallenge ? 'bg-success scale-110' : i === currentChallenge ? 'bg-primary ring-4 ring-primary/30' : 'bg-muted'}`}
+                />
               ))}
             </div>
 
-            <div className="w-full h-3 bg-muted rounded-full overflow-hidden mt-2 border border-black/5">
+            <div
+              className="w-full h-3 bg-muted rounded-full overflow-hidden mt-2 border border-black/5"
+              role="progressbar"
+              aria-label={translateGuidance('liveness.guidance.validating')}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(holdProgressPercent)}
+            >
               <div
                 className="h-full bg-success transition-all duration-200"
                 style={{ width: `${holdProgressPercent}%` }}
               ></div>
             </div>
+            <p className="text-xs font-medium text-muted-foreground">
+              {validationPulse
+                ? t('liveness.guidance.step_validated') !== 'liveness.guidance.step_validated'
+                  ? t('liveness.guidance.step_validated')
+                  : 'Étape validée'
+                : `Étape ${currentStepNumber}/${totalStepCount} · ${Math.round(holdProgressPercent)}%`}
+            </p>
 
             {message && (
               <div className="animate-in slide-in-from-bottom flex items-start gap-2 bg-destructive/10 text-destructive px-4 py-3 rounded-xl text-sm font-semibold text-left border border-destructive/20 shadow-sm w-full">
                 <XCircle className="w-5 h-5 shrink-0" />
                 <p>{message}</p>
+              </div>
+            )}
+            {!message && guidance && faceDetected && (
+              <div className="animate-in slide-in-from-bottom bg-primary/10 text-primary px-4 py-3 rounded-xl text-sm font-semibold text-center border border-primary/20 shadow-sm w-full">
+                {guidance}
               </div>
             )}
             {!message && !faceDetected && (
@@ -545,8 +638,12 @@ export default function LivenessScreen() {
               <CheckCircle className="w-16 h-16 text-success" />
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground">Verification reussie</h2>
-              <p className="text-muted-foreground mt-2">Votre identite a ete confirmee.</p>
+              <h2 className="text-2xl font-bold text-foreground">
+                {t('liveness.success.title') !== 'liveness.success.title' ? t('liveness.success.title') : 'Vérification réussie'}
+              </h2>
+              <p className="text-muted-foreground mt-2">
+                {t('liveness.success.subtitle') !== 'liveness.success.subtitle' ? t('liveness.success.subtitle') : 'Votre identité a été confirmée.'}
+              </p>
             </div>
             <Button onClick={handleSubmit} className="w-full h-14 mt-8">
               Continuer
@@ -560,12 +657,12 @@ export default function LivenessScreen() {
               <XCircle className="w-16 h-16 text-destructive" />
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground">Echec</h2>
+              <h2 className="text-2xl font-bold text-foreground">Échec</h2>
               <p className="text-sm text-destructive font-medium mt-2 max-w-[250px]">{message}</p>
             </div>
             <Button onClick={handleRetry} variant="secondary" className="w-full h-14 mt-8 gap-2">
               <Camera className="w-5 h-5" />
-              Reessayer
+              Réessayer
             </Button>
           </div>
         )}
@@ -576,7 +673,7 @@ export default function LivenessScreen() {
               <XCircle className="w-16 h-16 text-destructive" />
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground">Session verrouillee</h2>
+              <h2 className="text-2xl font-bold text-foreground">Session verrouillée</h2>
               <p className="text-sm text-destructive font-medium mt-2 max-w-[280px]">{message}</p>
               <p className="text-sm text-muted-foreground mt-3">Nouvelle tentative possible dans {cooldownSeconds}s</p>
             </div>
