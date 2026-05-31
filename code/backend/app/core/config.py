@@ -87,6 +87,12 @@ class Settings(BaseSettings):
     FACE_MATCH_MIN_SCORE: float = 0.8
     ANTI_SPOOFING_MIN_SCORE: float = 0.7
     DEEPFACE_DETECTOR_BACKEND: str = "opencv"  # opencv for MVP RAM budget; retinaface can be enabled on larger hosts
+    MINIFASNET_ENABLED: bool = True
+    MINIFASNET_MODEL_PATH: str = "/opt/models-offline/minifasnet/MiniFASNetV2.onnx"
+    MINIFASNET_MODEL_SHA256: str = ""
+    MINIFASNET_CROP_SCALE: float = 2.7
+    MINIFASNET_INPUT_SIZE: int = 80
+    MINIFASNET_LIVE_CLASS_INDEX: int = 1
 
     # Orange SMS API
     ORANGE_CLIENT_ID: str = ""

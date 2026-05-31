@@ -3,17 +3,26 @@
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
+import numpy as np
 import pytest
+from PIL import Image
 
+from app.core.config import settings
 from app.modules.kyc.service import (
     FACE_MATCH_STATUS_ERROR,
     FACE_MATCH_STATUS_FAILED,
     FACE_MATCH_STATUS_NOT_PERFORMED,
     FACE_MATCH_STATUS_PASSED,
+    MINIFASNET_STATUS_ERROR,
+    MINIFASNET_STATUS_FAILED,
+    MINIFASNET_STATUS_NOT_PERFORMED,
+    MINIFASNET_STATUS_PASSED,
     FaceMatchComputation,
     _deepface_verify_if_available,
+    _minifasnet_verify_if_available,
     compute_anti_spoofing_score_from_landmarks,
     compute_face_match_for_session,
+    compute_minifasnet_for_session,
     is_liveness_challenge_passed,
 )
 
@@ -45,6 +54,143 @@ def test_liveness_challenge_requires_motion():
 
     assert is_liveness_challenge_passed(static_frames, "turn_left") is False
     assert is_liveness_challenge_passed(dynamic_frames, "turn_left") is True
+
+
+def _write_selfie(path: Path) -> None:
+    image = np.full((120, 120, 3), 160, dtype=np.uint8)
+    Image.fromarray(image).save(path)
+
+
+def _install_minifasnet_fakes(monkeypatch, logits, *, faces=None):
+    from app.modules.kyc import service as kyc_service
+
+    class DummyInput:
+        name = "input"
+        shape = [1, 3, 80, 80]
+
+    class DummyOutput:
+        name = "output"
+
+    class DummySession:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def get_inputs(self):
+            return [DummyInput()]
+
+        def get_outputs(self):
+            return [DummyOutput()]
+
+        def run(self, _outputs, _inputs):
+            return [np.array(logits, dtype=np.float32)]
+
+    class DummyDeepFace:
+        @staticmethod
+        def extract_faces(**_kwargs):
+            if faces is not None:
+                return faces
+            return [{"facial_area": {"x": 20, "y": 20, "w": 60, "h": 60}}]
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "onnxruntime",
+        SimpleNamespace(InferenceSession=DummySession),
+    )
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "deepface",
+        SimpleNamespace(DeepFace=DummyDeepFace),
+    )
+    monkeypatch.setattr(kyc_service, "_shared_minifasnet_session", None)
+    monkeypatch.setattr(kyc_service, "_shared_minifasnet_model_path", None)
+
+
+def test_minifasnet_model_missing_returns_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "MINIFASNET_ENABLED", True)
+    monkeypatch.setattr(settings, "MINIFASNET_MODEL_PATH", str(tmp_path / "missing.onnx"))
+
+    result = _minifasnet_verify_if_available(tmp_path / "selfie.jpg")
+
+    assert result.status == MINIFASNET_STATUS_ERROR
+    assert result.reason == "minifasnet_model_missing"
+
+
+def test_minifasnet_live_score_passes(monkeypatch, tmp_path):
+    model_path = tmp_path / "MiniFASNetV2.onnx"
+    selfie_path = tmp_path / "selfie.jpg"
+    model_path.write_bytes(b"dummy-model")
+    _write_selfie(selfie_path)
+    monkeypatch.setattr(settings, "MINIFASNET_ENABLED", True)
+    monkeypatch.setattr(settings, "MINIFASNET_MODEL_PATH", str(model_path))
+    monkeypatch.setattr(settings, "MINIFASNET_MODEL_SHA256", "")
+    monkeypatch.setattr(settings, "MINIFASNET_LIVE_CLASS_INDEX", 1)
+    monkeypatch.setattr(settings, "ANTI_SPOOFING_MIN_SCORE", 0.7)
+    _install_minifasnet_fakes(monkeypatch, [[0.1, 4.0, 0.2]])
+
+    result = _minifasnet_verify_if_available(selfie_path)
+
+    assert result.status == MINIFASNET_STATUS_PASSED
+    assert result.label == "live"
+    assert result.score is not None and result.score > 0.9
+
+
+def test_minifasnet_spoof_score_fails(monkeypatch, tmp_path):
+    model_path = tmp_path / "MiniFASNetV2.onnx"
+    selfie_path = tmp_path / "selfie.jpg"
+    model_path.write_bytes(b"dummy-model")
+    _write_selfie(selfie_path)
+    monkeypatch.setattr(settings, "MINIFASNET_ENABLED", True)
+    monkeypatch.setattr(settings, "MINIFASNET_MODEL_PATH", str(model_path))
+    monkeypatch.setattr(settings, "MINIFASNET_MODEL_SHA256", "")
+    monkeypatch.setattr(settings, "MINIFASNET_LIVE_CLASS_INDEX", 1)
+    monkeypatch.setattr(settings, "ANTI_SPOOFING_MIN_SCORE", 0.7)
+    _install_minifasnet_fakes(monkeypatch, [[0.1, 0.2, 4.0]])
+
+    result = _minifasnet_verify_if_available(selfie_path)
+
+    assert result.status == MINIFASNET_STATUS_FAILED
+    assert result.label == "spoof"
+    assert result.score is not None and result.score < 0.1
+
+
+def test_minifasnet_no_face_fails(monkeypatch, tmp_path):
+    model_path = tmp_path / "MiniFASNetV2.onnx"
+    selfie_path = tmp_path / "selfie.jpg"
+    model_path.write_bytes(b"dummy-model")
+    _write_selfie(selfie_path)
+    monkeypatch.setattr(settings, "MINIFASNET_ENABLED", True)
+    monkeypatch.setattr(settings, "MINIFASNET_MODEL_PATH", str(model_path))
+    monkeypatch.setattr(settings, "MINIFASNET_MODEL_SHA256", "")
+    _install_minifasnet_fakes(monkeypatch, [[0.1, 4.0, 0.2]], faces=[])
+
+    result = _minifasnet_verify_if_available(selfie_path)
+
+    assert result.status == MINIFASNET_STATUS_FAILED
+    assert result.reason == "face_not_detected"
+    assert result.score == 0.0
+
+
+@pytest.mark.asyncio
+async def test_minifasnet_missing_selfie_document_is_not_performed():
+    class FakeScalarResult:
+        def first(self):
+            return None
+
+    class FakeResult:
+        def scalars(self):
+            return FakeScalarResult()
+
+    class FakeDb:
+        async def execute(self, _query):
+            return FakeResult()
+
+    result = await compute_minifasnet_for_session(
+        session_id=__import__("uuid").uuid4(),
+        db=FakeDb(),
+    )
+
+    assert result.status == MINIFASNET_STATUS_NOT_PERFORMED
+    assert result.reason == "missing_selfie"
 
 
 def test_deepface_match_pass(monkeypatch):

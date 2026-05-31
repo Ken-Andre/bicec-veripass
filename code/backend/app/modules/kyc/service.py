@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -65,6 +66,14 @@ FACE_MATCH_STATUS_PASSED = "PASSED"
 FACE_MATCH_STATUS_FAILED = "FAILED"
 FACE_MATCH_STATUS_NOT_PERFORMED = "NOT_PERFORMED"
 FACE_MATCH_STATUS_ERROR = "ERROR"
+MINIFASNET_MODEL_NAME = "minifasnet_v2_onnx"
+LIVENESS_MODEL_VERSION = "landmarks_v2+minifasnet_v2_onnx"
+MINIFASNET_STATUS_PASSED = "PASSED"
+MINIFASNET_STATUS_FAILED = "FAILED"
+MINIFASNET_STATUS_NOT_PERFORMED = "NOT_PERFORMED"
+MINIFASNET_STATUS_ERROR = "ERROR"
+_shared_minifasnet_session: Any | None = None
+_shared_minifasnet_model_path: str | None = None
 
 
 def biometric_manual_review_reasons(
@@ -108,6 +117,21 @@ class FaceMatchComputation:
     @property
     def attempted(self) -> bool:
         return self.status in {FACE_MATCH_STATUS_PASSED, FACE_MATCH_STATUS_FAILED}
+
+
+@dataclass(frozen=True)
+class MiniFASNetComputation:
+    status: str
+    reason: str
+    score: float | None = None
+    label: str | None = None
+    detector: str | None = None
+    threshold: float | None = None
+    model: str = MINIFASNET_MODEL_NAME
+
+    @property
+    def passed(self) -> bool:
+        return self.status == MINIFASNET_STATUS_PASSED
 
 
 def _threshold_ratio() -> float:
@@ -631,6 +655,13 @@ def _clamp_01(value: float) -> float:
     return max(0.0, min(1.0, value))
 
 
+def _anti_spoofing_threshold() -> float:
+    threshold = float(settings.ANTI_SPOOFING_MIN_SCORE)
+    if threshold > 1:
+        threshold = threshold / 100.0
+    return _clamp_01(threshold)
+
+
 def compute_anti_spoofing_score_from_landmarks(
     landmarks_json: list[dict[str, Any]],
     challenge_type: str,
@@ -729,6 +760,311 @@ def is_liveness_challenge_passed(
     challenge_type: str,
 ) -> bool:
     return compute_liveness_motion_score(landmarks_json, challenge_type) > 0.35
+
+
+def _minifasnet_result(
+    status: str,
+    reason: str,
+    *,
+    score: float | None = None,
+    label: str | None = None,
+    detector: str | None = None,
+) -> MiniFASNetComputation:
+    return MiniFASNetComputation(
+        status=status,
+        reason=reason,
+        score=score,
+        label=label,
+        detector=detector,
+        threshold=_anti_spoofing_threshold(),
+    )
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _get_minifasnet_session(model_path: Path) -> Any:
+    global _shared_minifasnet_session, _shared_minifasnet_model_path
+
+    resolved = str(model_path.resolve())
+    if (
+        _shared_minifasnet_session is not None
+        and _shared_minifasnet_model_path == resolved
+    ):
+        return _shared_minifasnet_session
+
+    try:
+        import onnxruntime as ort  # type: ignore
+    except Exception as exc:
+        raise RuntimeError(f"onnxruntime_unavailable:{type(exc).__name__}") from exc
+
+    expected_sha = (settings.MINIFASNET_MODEL_SHA256 or "").strip().lower()
+    actual_sha = _file_sha256(model_path)
+    if expected_sha and actual_sha.lower() != expected_sha:
+        raise RuntimeError("minifasnet_checksum_mismatch")
+
+    _shared_minifasnet_session = ort.InferenceSession(
+        resolved,
+        providers=["CPUExecutionProvider"],
+    )
+    _shared_minifasnet_model_path = resolved
+    logger.info(
+        "MiniFASNet ONNX loaded (path=%s, sha256=%s)",
+        resolved,
+        actual_sha[:12],
+    )
+    return _shared_minifasnet_session
+
+
+def _minifasnet_input_size(session: Any) -> tuple[int, int]:
+    fallback = int(settings.MINIFASNET_INPUT_SIZE)
+    try:
+        shape = list(session.get_inputs()[0].shape)
+        height = shape[2] if len(shape) > 2 and isinstance(shape[2], int) else fallback
+        width = shape[3] if len(shape) > 3 and isinstance(shape[3], int) else fallback
+        return int(height), int(width)
+    except Exception:
+        return fallback, fallback
+
+
+def _extract_selfie_face_bbox(selfie_path: Path) -> tuple[list[int] | None, str | None, str | None]:
+    _configure_deepface_home()
+    try:
+        from deepface import DeepFace  # type: ignore
+    except Exception as exc:
+        return None, None, f"deepface_unavailable:{type(exc).__name__}"
+
+    detector = (settings.DEEPFACE_DETECTOR_BACKEND or "").strip() or "opencv"
+    detectors = list(dict.fromkeys([detector, "opencv"]))
+    last_error: Exception | None = None
+
+    for backend in detectors:
+        try:
+            faces = DeepFace.extract_faces(
+                img_path=str(selfie_path),
+                detector_backend=backend,
+                enforce_detection=False,
+                align=False,
+            )
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "MiniFASNet face extraction failed with detector=%s: %s",
+                backend,
+                exc,
+            )
+            continue
+
+        for face in faces or []:
+            if not isinstance(face, dict):
+                continue
+            area = face.get("facial_area") or {}
+            try:
+                x = int(area.get("x", 0))
+                y = int(area.get("y", 0))
+                w = int(area.get("w", 0))
+                h = int(area.get("h", 0))
+            except Exception:
+                continue
+            if w > 0 and h > 0:
+                return [x, y, w, h], backend, None
+
+    if last_error is not None:
+        return None, None, f"face_detector_failed:{type(last_error).__name__}"
+    return None, None, "face_not_detected"
+
+
+def _crop_minifasnet_face(
+    image: Any,
+    bbox: list[int],
+    *,
+    input_height: int,
+    input_width: int,
+) -> Any:
+    import cv2  # type: ignore
+
+    src_h, src_w = image.shape[:2]
+    x, y, box_w, box_h = bbox
+    if box_w <= 0 or box_h <= 0:
+        raise ValueError("invalid_face_bbox")
+
+    scale = min(
+        (src_h - 1) / box_h,
+        (src_w - 1) / box_w,
+        float(settings.MINIFASNET_CROP_SCALE),
+    )
+    new_w = box_w * scale
+    new_h = box_h * scale
+    center_x = x + box_w / 2
+    center_y = y + box_h / 2
+    x1 = max(0, int(center_x - new_w / 2))
+    y1 = max(0, int(center_y - new_h / 2))
+    x2 = min(src_w - 1, int(center_x + new_w / 2))
+    y2 = min(src_h - 1, int(center_y + new_h / 2))
+    cropped = image[y1 : y2 + 1, x1 : x2 + 1]
+    if cropped.size == 0:
+        raise ValueError("empty_face_crop")
+    return cv2.resize(cropped, (input_width, input_height))
+
+
+def _minifasnet_probabilities(raw_output: Any) -> Any:
+    import numpy as np  # type: ignore
+
+    logits = np.asarray(raw_output, dtype=np.float32)
+    if logits.ndim == 1:
+        logits = logits.reshape(1, -1)
+    if logits.ndim > 2:
+        logits = logits.reshape(logits.shape[0], -1)
+    if logits.shape[1] < 2:
+        raise ValueError("invalid_minifasnet_output")
+
+    row = logits[0]
+    row_sum = float(row.sum())
+    if np.all(row >= 0.0) and np.all(row <= 1.0) and abs(row_sum - 1.0) <= 1e-3:
+        return row
+
+    exp = np.exp(row - np.max(row))
+    return exp / exp.sum()
+
+
+def _minifasnet_verify_if_available(selfie_path: Path) -> MiniFASNetComputation:
+    if not settings.MINIFASNET_ENABLED:
+        return _minifasnet_result(
+            MINIFASNET_STATUS_PASSED,
+            "minifasnet_disabled",
+            score=1.0,
+            label="disabled",
+        )
+
+    model_path = Path(settings.MINIFASNET_MODEL_PATH)
+    if not model_path.is_file():
+        logger.error("MiniFASNet model missing: %s", model_path)
+        return _minifasnet_result(
+            MINIFASNET_STATUS_ERROR,
+            "minifasnet_model_missing",
+        )
+
+    try:
+        import cv2  # type: ignore
+        import numpy as np  # type: ignore
+    except Exception as exc:
+        return _minifasnet_result(
+            MINIFASNET_STATUS_ERROR,
+            f"minifasnet_dependency_missing:{type(exc).__name__}",
+        )
+
+    image = cv2.imread(str(selfie_path))
+    if image is None:
+        return _minifasnet_result(
+            MINIFASNET_STATUS_NOT_PERFORMED,
+            "selfie_unreadable",
+        )
+
+    bbox, detector, face_error = _extract_selfie_face_bbox(selfie_path)
+    if bbox is None:
+        if face_error == "face_not_detected":
+            return _minifasnet_result(
+                MINIFASNET_STATUS_FAILED,
+                "face_not_detected",
+                score=0.0,
+                label="no_face",
+                detector=detector,
+            )
+        return _minifasnet_result(
+            MINIFASNET_STATUS_ERROR,
+            face_error or "face_detector_failed",
+            detector=detector,
+        )
+
+    try:
+        session = _get_minifasnet_session(model_path)
+        input_cfg = session.get_inputs()[0]
+        output_cfg = session.get_outputs()[0]
+        input_height, input_width = _minifasnet_input_size(session)
+        face = _crop_minifasnet_face(
+            image,
+            bbox,
+            input_height=input_height,
+            input_width=input_width,
+        )
+        tensor = face.astype(np.float32)
+        tensor = np.transpose(tensor, (2, 0, 1))
+        tensor = np.expand_dims(tensor, axis=0)
+        outputs = session.run([output_cfg.name], {input_cfg.name: tensor})
+        probabilities = _minifasnet_probabilities(outputs[0])
+    except Exception as exc:
+        logger.warning("MiniFASNet verification failed: %s", exc, exc_info=True)
+        return _minifasnet_result(
+            MINIFASNET_STATUS_ERROR,
+            f"minifasnet_inference_failed:{type(exc).__name__}",
+            detector=detector,
+        )
+
+    live_index = int(settings.MINIFASNET_LIVE_CLASS_INDEX)
+    if live_index < 0 or live_index >= len(probabilities):
+        return _minifasnet_result(
+            MINIFASNET_STATUS_ERROR,
+            "minifasnet_live_class_out_of_range",
+            detector=detector,
+        )
+
+    predicted_index = int(np.argmax(probabilities))
+    live_score = _clamp_01(float(probabilities[live_index]))
+    label = "live" if predicted_index == live_index else "spoof"
+    threshold = _anti_spoofing_threshold()
+    status = (
+        MINIFASNET_STATUS_PASSED
+        if live_score >= threshold
+        else MINIFASNET_STATUS_FAILED
+    )
+    reason = "score_above_threshold" if status == MINIFASNET_STATUS_PASSED else "score_below_threshold"
+    logger.info(
+        "MiniFASNet verify OK (detector=%s, live_score=%.4f, label=%s, status=%s)",
+        detector,
+        live_score,
+        label,
+        status,
+    )
+    return _minifasnet_result(
+        status,
+        reason,
+        score=live_score,
+        label=label,
+        detector=detector,
+    )
+
+
+async def compute_minifasnet_for_session(
+    *,
+    session_id: UUID,
+    db: AsyncSession,
+) -> MiniFASNetComputation:
+    result = await db.execute(
+        select(Document).where(
+            Document.session_id == session_id,
+            Document.doc_type == "SELFIE",
+        )
+    )
+    selfie = result.scalars().first()
+    if not selfie:
+        return _minifasnet_result(
+            MINIFASNET_STATUS_NOT_PERFORMED,
+            "missing_selfie",
+        )
+
+    selfie_path = _resolve_document_path(selfie)
+    if not selfie_path.exists():
+        return _minifasnet_result(
+            MINIFASNET_STATUS_NOT_PERFORMED,
+            "missing_document_file:selfie",
+        )
+
+    return await asyncio.to_thread(_minifasnet_verify_if_available, selfie_path)
 
 
 def _face_match_error(reason: str) -> FaceMatchComputation:

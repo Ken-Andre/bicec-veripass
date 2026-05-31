@@ -38,15 +38,18 @@ from app.modules.kyc.models import (
 )
 from app.modules.kyc.service import (
     process_document_ocr_pipeline,
-    compute_anti_spoofing_score_from_landmarks,
     compute_face_match_for_session,
+    compute_liveness_motion_score,
+    compute_minifasnet_for_session,
     biometric_manual_review_reasons,
     is_liveness_challenge_passed,
     FACE_MATCH_MODEL_NAME,
     FACE_MATCH_STATUS_ERROR,
     FACE_MATCH_STATUS_FAILED,
     FACE_MATCH_STATUS_NOT_PERFORMED,
-    FACE_MATCH_STATUS_PASSED,
+    LIVENESS_MODEL_VERSION,
+    MINIFASNET_STATUS_ERROR,
+    MINIFASNET_STATUS_NOT_PERFORMED,
 )
 from app.modules.audit.models import AuditLog
 from app.modules.analytics.service import (
@@ -939,20 +942,37 @@ async def submit_liveness(
         await db.commit()
         return _locked_liveness_response(current_user.liveness_lockout_count_24h or 0)
 
-    anti_spoofing_score = compute_anti_spoofing_score_from_landmarks(
-        body.landmarks_json,
-        body.challenge_type,
-    )
-
+    liveness_score = compute_liveness_motion_score(body.landmarks_json, body.challenge_type)
     challenge_passed = is_liveness_challenge_passed(
         body.landmarks_json,
         body.challenge_type,
     )
-    is_alive = (
-        anti_spoofing_score >= settings.ANTI_SPOOFING_MIN_SCORE
-        and challenge_passed
+    minifasnet_result = await compute_minifasnet_for_session(
+        session_id=session.id,
+        db=db,
     )
-    confidence = anti_spoofing_score
+    if minifasnet_result.status == MINIFASNET_STATUS_NOT_PERFORMED:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "FACE_MATCH_EVIDENCE_MISSING",
+                "message": "Selfie evidence is required before liveness can be completed.",
+                "reason": minifasnet_result.reason,
+            },
+        )
+    if minifasnet_result.status == MINIFASNET_STATUS_ERROR:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "ANTI_SPOOFING_ERROR",
+                "message": "MiniFASNet anti-spoofing engine unavailable. Please retry liveness.",
+                "reason": minifasnet_result.reason,
+            },
+        )
+
+    anti_spoofing_score = minifasnet_result.score
+    is_alive = challenge_passed and minifasnet_result.passed
+    confidence = liveness_score
 
     if not is_alive:
         session.liveness_strike_count += 1
@@ -969,7 +989,14 @@ async def submit_liveness(
                 agency_id=session.agency_id,
                 step="liveness",
                 status=session.status,
-                metadata={"locked": True, "anti_spoofing_score": anti_spoofing_score},
+                metadata={
+                    "locked": True,
+                    "liveness_score": liveness_score,
+                    "anti_spoofing_score": anti_spoofing_score,
+                    "anti_spoofing_reason": minifasnet_result.reason,
+                    "anti_spoofing_model": minifasnet_result.model,
+                    "challenge_passed": challenge_passed,
+                },
                 request_id=_request_uuid(request),
             )
             await db.commit()
@@ -983,7 +1010,14 @@ async def submit_liveness(
             agency_id=session.agency_id,
             step="liveness",
             status=session.status,
-            metadata={"locked": False, "anti_spoofing_score": anti_spoofing_score},
+            metadata={
+                "locked": False,
+                "liveness_score": liveness_score,
+                "anti_spoofing_score": anti_spoofing_score,
+                "anti_spoofing_reason": minifasnet_result.reason,
+                "anti_spoofing_model": minifasnet_result.model,
+                "challenge_passed": challenge_passed,
+            },
             request_id=_request_uuid(request),
         )
         await db.commit()
@@ -1047,7 +1081,7 @@ async def submit_liveness(
             face_match_detector=face_match_result.detector,
             anti_spoofing_score=anti_spoofing_score,
             model_version_face=FACE_MATCH_MODEL_NAME,
-            model_version_liveness="landmarks_v1",
+            model_version_liveness=LIVENESS_MODEL_VERSION,
             processed_at=datetime.now(timezone.utc),
         )
         db.add(biometric)
@@ -1061,7 +1095,7 @@ async def submit_liveness(
         biometric.face_match_detector = face_match_result.detector
         biometric.anti_spoofing_score = anti_spoofing_score
         biometric.model_version_face = FACE_MATCH_MODEL_NAME
-        biometric.model_version_liveness = "landmarks_v1"
+        biometric.model_version_liveness = LIVENESS_MODEL_VERSION
         biometric.processed_at = datetime.now(timezone.utc)
 
     if face_match_result.status == FACE_MATCH_STATUS_ERROR:
@@ -1086,7 +1120,9 @@ async def submit_liveness(
         step="liveness",
         status=session.status,
         metadata={
+            "liveness_score": liveness_score,
             "anti_spoofing_score": anti_spoofing_score,
+            "anti_spoofing_model": minifasnet_result.model,
             "face_match_status": face_match_result.status,
         },
         request_id=_request_uuid(request),

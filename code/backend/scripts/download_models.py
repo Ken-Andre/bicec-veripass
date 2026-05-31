@@ -16,6 +16,8 @@ Compatible with PaddleOCR >= 3.x (new parameter names).
 import os
 import sys
 import tempfile
+import hashlib
+import urllib.request
 from pathlib import Path
 
 # Disable connectivity check noise
@@ -25,6 +27,12 @@ MODELS_PATH = os.environ.get("MODELS_PATH", "/data/models")
 PADDLE_CACHE = os.environ.get("PADDLE_CACHE_DIR", "/tmp/paddle-cache")
 DEEPFACE_HOME = os.environ.get("DEEPFACE_HOME", MODELS_PATH)
 DEEPFACE_DETECTOR = os.environ.get("DEEPFACE_DETECTOR_BACKEND", "opencv")
+MINIFASNET_MODEL_PATH = os.environ.get(
+    "MINIFASNET_MODEL_PATH",
+    f"{MODELS_PATH}/minifasnet/MiniFASNetV2.onnx",
+)
+MINIFASNET_MODEL_URL = os.environ.get("MINIFASNET_MODEL_URL", "")
+MINIFASNET_MODEL_SHA256 = os.environ.get("MINIFASNET_MODEL_SHA256", "").strip().lower()
 
 os.environ.setdefault("PADDLE_HOME", PADDLE_CACHE)
 os.environ.setdefault("DEEPFACE_HOME", DEEPFACE_HOME)
@@ -37,6 +45,29 @@ print("PaddleOCR Model Pre-downloader (v3.x compatible)")
 print("=" * 60)
 print(f"  Models root → {PADDLE_MODEL_DIR}")
 print()
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _verify_sha256(path: Path, expected: str) -> bool:
+    actual = _sha256(path)
+    print(f"  SHA-256: {actual}")
+    if not expected:
+        print("  WARNING: MINIFASNET_MODEL_SHA256 not set; pin it before pilot/prod.")
+        return True
+    if actual.lower() != expected.lower():
+        print("ERROR: MiniFASNet checksum mismatch.")
+        print(f"   expected: {expected}")
+        print(f"   actual:   {actual}")
+        return False
+    print("  MiniFASNet checksum verified")
+    return True
+
 
 # Check that PaddleOCR can be imported
 try:
@@ -161,3 +192,29 @@ except ImportError as e:
 except Exception as e:
     print(f"⚠️  DeepFace pre-download failed: {e}")
     print("   Face match will report ERROR until DeepFace is available.")
+
+# -- MiniFASNet ONNX verification/download ---------------------------------
+print()
+print("=" * 60)
+print("MiniFASNet ONNX Model")
+print("=" * 60)
+minifasnet_path = Path(MINIFASNET_MODEL_PATH)
+print(f"  Model path -> {minifasnet_path}")
+
+if minifasnet_path.exists():
+    print("  MiniFASNet model already present.")
+    if not _verify_sha256(minifasnet_path, MINIFASNET_MODEL_SHA256):
+        sys.exit(1)
+elif MINIFASNET_MODEL_URL:
+    print(f"  Downloading MiniFASNet from: {MINIFASNET_MODEL_URL}")
+    minifasnet_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        urllib.request.urlretrieve(MINIFASNET_MODEL_URL, minifasnet_path)
+    except Exception as e:
+        print(f"ERROR: MiniFASNet download failed: {e}")
+        sys.exit(1)
+    if not _verify_sha256(minifasnet_path, MINIFASNET_MODEL_SHA256):
+        sys.exit(1)
+else:
+    print("  WARNING: MiniFASNet model missing and MINIFASNET_MODEL_URL is empty.")
+    print("   Place MiniFASNetV2.onnx under the offline model bundle before enabling PAD.")

@@ -32,6 +32,7 @@ dependencies = [
     "Pillow>=10.0",
     # Biometrics
     "deepface>=0.0.89",
+    "onnxruntime>=1.18",
     "tf-keras>=2.16",  # Required by retinaface (DeepFace detector) with TensorFlow 2.16+
 ]
 

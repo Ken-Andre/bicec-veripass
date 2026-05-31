@@ -12,7 +12,15 @@ from app.core.security import get_current_agent, get_current_user
 from app.db.session import get_db
 from app.modules.auth.models import Agent, AgentRole, User
 from app.modules.kyc.models import KYCSession, Document, BiometricResult
-from app.modules.kyc.service import FaceMatchComputation, FACE_MATCH_STATUS_FAILED
+from app.modules.kyc.service import (
+    FACE_MATCH_STATUS_FAILED,
+    FACE_MATCH_STATUS_NOT_PERFORMED,
+    LIVENESS_MODEL_VERSION,
+    MINIFASNET_STATUS_FAILED,
+    MINIFASNET_STATUS_PASSED,
+    FaceMatchComputation,
+    MiniFASNetComputation,
+)
 from app.modules.kyc.schemas import AccessTier, LifecycleState
 
 
@@ -249,7 +257,17 @@ class TestKYCRouter:
                 detector="opencv",
             )
 
+        async def fake_minifasnet(*, session_id, db):
+            return MiniFASNetComputation(
+                status=MINIFASNET_STATUS_PASSED,
+                reason="score_above_threshold",
+                score=0.94,
+                label="live",
+                detector="opencv",
+            )
+
         monkeypatch.setattr("app.modules.kyc.router.compute_face_match_for_session", fake_face_match)
+        monkeypatch.setattr("app.modules.kyc.router.compute_minifasnet_for_session", fake_minifasnet)
         frames = [
             {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
             for i in range(40)
@@ -262,8 +280,62 @@ class TestKYCRouter:
         assert response.status_code == 200
         data = response.json()
         assert data["face_match_status"] == FACE_MATCH_STATUS_FAILED
+        assert data["anti_spoofing_score"] == 0.94
         await db_session.refresh(session)
         assert session.priority_flag is True
+        biometric = (
+            await db_session.execute(select(BiometricResult).where(BiometricResult.session_id == session.id))
+        ).scalar_one()
+        assert biometric.model_version_liveness == LIVENESS_MODEL_VERSION
+
+    @pytest.mark.asyncio
+    async def test_liveness_minifasnet_failure_blocks_face_match(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        monkeypatch,
+        mock_user,
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        session = (
+            await db_session.execute(
+                select(KYCSession)
+                .where(KYCSession.user_id == mock_user.id)
+                .order_by(KYCSession.started_at.desc())
+            )
+        ).scalars().first()
+
+        async def fake_minifasnet(*, session_id, db):
+            return MiniFASNetComputation(
+                status=MINIFASNET_STATUS_FAILED,
+                reason="score_below_threshold",
+                score=0.31,
+                label="spoof",
+                detector="opencv",
+            )
+
+        async def fail_face_match(*, session_id, db):
+            raise AssertionError("face match must not run after MiniFASNet PAD failure")
+
+        monkeypatch.setattr("app.modules.kyc.router.compute_minifasnet_for_session", fake_minifasnet)
+        monkeypatch.setattr("app.modules.kyc.router.compute_face_match_for_session", fail_face_match)
+        frames = [
+            {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
+            for i in range(40)
+        ]
+        response = await client.post(
+            "/api/v1/kyc/capture/liveness",
+            json={"landmarks_json": frames, "challenge_type": "turn_left"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_alive"] is False
+        assert data["face_match_status"] == FACE_MATCH_STATUS_NOT_PERFORMED
+        assert data["anti_spoofing_score"] == 0.31
+        await db_session.refresh(session)
+        assert session.liveness_strike_count == 1
 
     @pytest.mark.asyncio
     async def test_review_approval_requires_biometric_override_for_risk(
