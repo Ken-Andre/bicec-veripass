@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Weekly recap (2026-05-25 to 2026-05-29)
+
+- Added FaceMatch v2 and biometric review metadata across backend and backoffice, including manual review reasons, queue risk flags, dossier metadata, and expanded KYC/router test coverage.
+- Expanded AML and compliance operations with AML list imports, dry-run CSV validation, registry/backoffice page support, agency CRUD, batch jobs, global notifications, and COBAC audit report evidence.
+- Improved backoffice workflows with `/back-office/` base-path support, analytics tabs and filters, connected command-center status, EvidenceViewer v2/v3 document classification, image downloads, and system-log refactors.
+- Enhanced mobile KYC and notification flows with cascading address selection, GPS and utility-provider capture, liveness upload feedback, NIU/PDF handling fixes, notification toggles, push subscription refactors, and MediaPipe CDN/local-mode documentation.
+- Strengthened infrastructure and evidence with DWH analytics endpoints, Cloudflare/Tailscale and public 8081 entrypoint configuration, DeepFace model storage/proxy updates, maintainer documentation, stage report artifacts, and regression/demo screenshots.
+- PR references: none recorded in commit history or merged GitHub PR metadata for this period.
+
 ### Weekly recap (2026-05-18 to 2026-05-24)
 
 - Added major mobile enhancements: auth entry and guard flows, lock-screen/biometric and device auto-registration, push notifications, support chat attachments, and an offline ATM finder flow.
