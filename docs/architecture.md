@@ -137,9 +137,16 @@ OCR is split into fast local extraction and fallback extraction:
 Biometrics are handled through:
 
 - MediaPipe landmark data from mobile liveness screens.
-- Backend liveness scoring from landmarks.
+- Backend liveness scoring from landmarks for active challenge completion.
+- MiniFASNetV2 ONNX server-side PAD on the uploaded SELFIE document for anti-spoofing.
 - DeepFace verification where model dependencies are available.
 - `biometric_results` table stores face match score, status, detector, threshold, liveness, and anti-spoofing metadata.
+
+MiniFASNet is offline-first. The API expects
+`/opt/models-offline/minifasnet/MiniFASNetV2.onnx` by default, validates
+`MINIFASNET_MODEL_SHA256` when provided, crops the selfie face with the configured
+DeepFace detector, and records `model_version_liveness` as
+`landmarks_v2+minifasnet_v2_onnx`.
 
 ## Async Jobs
 

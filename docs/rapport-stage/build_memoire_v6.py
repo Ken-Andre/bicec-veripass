@@ -304,7 +304,7 @@ def write_chapter1(doc):
         "sur les parcours traditionnels d'acquisition client. Cette double analyse met en lumière la complexité réglementaire imposée "
         "par le règlement COBAC R-2023/01 relatif aux diligences KYC et la Loi camerounaise n° 2024/017 de protection des données. "
         "La confrontation de ces contraintes permet de formuler une problématique d'ingénierie robuste et d'esquisser les réponses "
-        "apportées par le pipeline numérique souverain BICEC VeriPass, validé sous un modèle économique de haute rentabilité."
+        "souveraines apportées par le pipeline numérique autonome BICEC VeriPass, validé sous un modèle économique de haute rentabilité."
     )
     add_para(marker, t_intro)
 
@@ -318,7 +318,7 @@ def write_chapter1(doc):
         "(BICEC, 2026). Cette présence territoriale solide lui confère une responsabilité double : elle doit continuer à proposer des "
         "services financiers de proximité tout en modernisant de manière décisive son expérience bancaire digitale pour l'adapter aux standards modernes.",
         "Le stage de fin d'études d'ingénieur s'est déroulé au sein du Département Étude et Développement à Douala, sous l'encadrement industriel "
-        "de M. Jackson Parfait KOMBE LELE, Chef de Département. Ce département joue le rôle stratégique de incubateur de solutions internes, "
+        "de M. Jackson Parfait KOMBE LELE, Chef de Département. Ce département joue le rôle stratégique d'incubateur de solutions internes, "
         "orientant la transition RegTech de la banque face aux défis du marché financier. La mission confiée consistait en la conception et le "
         "développement de BICEC VeriPass, un écosystème intelligent et souverain d'acquisition client destiné à automatiser la conformité "
         "réglementaire KYC (Know Your Customer) à travers l'intégration de technologies avancées d'OCR, de liveness detection et de face matching. "
@@ -394,8 +394,8 @@ def write_chapter1(doc):
         "inhérente au déplacement : le client doit se déplacer en agence pour signer des formulaires physiques et fournir des photocopies "
         "de ses pièces d'identité. La deuxième limite concerne le taux d'erreur élevé : environ 30% à 40% des dossiers papier soumis sont "
         "incomplets ou comportent des fautes de frappe commises par les chargés de clientèle lors de la recopie manuelle des documents "
-        "d'identité dans le système bancaire central Sopra Banking Amplitude. La troisième limite concerne la sécurité et le risque de "
-        "fraude : sans outils biométriques locaux, les agents peinent à identifier visuellement les faux papiers ou les usurpations faciale complexes.",
+        "d'identité dans le système bancaire. La troisième limite concerne la sécurité et le risque de fraude : sans outils biométriques locaux, "
+        "les agents peinent à identifier visuellement les faux papiers ou les usurpations faciale complexes.",
         "La quatrième limite réside dans la surcharge administrative et l'absence d'un audit trail robuste. Les agents consacrent plus de "
         "20 minutes par dossier à des tâches répétitives de saisie de données à faible valeur ajoutée, créant un backlog de validation en "
         "agence pouvant atteindre deux semaines. De plus, les modifications ou corrections sur les dossiers papier ne font l'objet d'aucun "
@@ -451,8 +451,10 @@ def write_chapter1(doc):
         "Le principe directeur est celui de l'automatisation contrôlée (Human-in-the-Loop) : les moteurs d'intelligence artificielle "
         "(PaddleOCR pour l'extraction rapide, GLM-OCR pour les factures non structurées, DeepFace et MiniFASNet pour la biométrie et la "
         "vivacité) effectuent les contrôles fastidieux et calculent un score de confiance global pour pré-remplir les données, mais l'agent "
-        "conserve l'entière responsabilité de la validation finale et de l'activation du compte. Ce choix préserve la responsabilité civile "
-        "de la banque tout en éliminant 80% de sa charge administrative de saisie."
+        "conserve l'entière responsabilité de la validation finale et de l'activation du compte. VeriPass agit ainsi comme un puissant "
+        "garde barrière d'authentification et de conformité KYC, autorisant les utilisateurs validés à accéder aux applications bancaires BICEC "
+        "via des redirections applicatives sécurisées (deep-linking), tout en maintenant hors de son périmètre l'intégration directe ou le "
+        "provisionnement dans les bases transactionnelles Amplitude, délimitées comme hors scope pour préserver l'intégrité du Core Banking."
     ]:
         add_para(marker, t)
         
@@ -523,8 +525,8 @@ def write_chapter2(doc):
         "biométrique en temps réel, recueillir son consentement et transmettre un dossier chiffré et immuable au back-office central.",
         "Le périmètre fonctionnel du MVP couvre le parcours client mobile (authentification par mot de passe à usage unique OTP, capture de la "
         "CNI recto/verso, liveness challenge, saisie de l'adresse avec GPS ou facture ENEO/CAMWATER, consentement Loi n° 2024/017 et signature tactile), "
-        "la file d'attente de validation des agents de conformité, et la passerelle technique simulée avec Sopra Banking Amplitude. De façon stratégique, "
-        "pour limiter l'abandon client pendant la phase de validation administrative (état RESTRICTED_ACCESS), l'application mobile intègre des "
+        "la file d'attente de validation des agents de conformité, et la passerelle technique vers les applications cibles de la BICEC. De façon stratégique, "
+        "pour limiter l'abandon client pendant la phase de validation administrative (état RESTRICTED), l'application mobile intègre des "
         "démonstrations de fonctionnalités bancaires adaptées au statut d'accès du compte (Plan Premium/Standard, Everyday Needs, Cards management "
         "et linked accounts). Ces modules engagent l'utilisateur et intègrent un Single Sign-On (SSO) deep-link vers l'application de micro-crédit Bi-Cresco."
     ]:
@@ -583,7 +585,7 @@ def write_chapter2(doc):
     add_para(marker, "2.4 Données KYC collectées et critères de qualité", "Heading 2")
     for t in [
         "Le pipeline traite plusieurs données hautement sensibles. Pour chaque utilisateur, il collecte : (1) l'identité déclarative civile ; "
-        "(2) les photos haute-résolution de la CNI recto/verso (ou Passeport) ; (3) la capture du selfie biométrique avec vidéo de liveness active ; "
+        "(2) les photos haute-résolution de la CNI recto/verso ; (3) la capture du selfie biométrique avec vidéo de liveness active ; "
         "(4) la facture ENEO ou CAMWATER comme preuve de domicile ; (5) l'attestation NIU fiscale ; (6) les consentements Loi n° 2024/017 ; (7) la "
         "signature sur écran tactile et les adresses IP avec horodatage pour l'audit trail.",
         "La qualité des données est validée à la source. Côté client, la PWA réalise des pré-contrôles d'image locaux (détection de flou, de reflets, "
@@ -634,22 +636,22 @@ def write_chapter2(doc):
     for t in [
         "Les exigences fonctionnelles (FR1 à FR19) cadrent précisément les flux applicatifs du système : authentification OTP, capture guidée, "
         "liveness challenge, validation locale du format de Numéro d'Identifiant Unique (NIU) via regex (^[A-Z][0-9]{12}[A-Z]$) et clé de contrôle "
-        "algorithmique Modulo 23/26, consentement Loi n° 2024/017, signature tactile, file de validation assistée, et activation du compte.",
-        "Pour la conformité réglementaire BEAC, le pipeline intègre également un simulateur d'Identifiant Bancaire Unique (IBU) basé sur la norme "
+        "algorithmique Modulo 23/26, consentement Loi n° 2024/017, signature tactile, file de validation assistée par agent KYC, et activation "
+        "du dossier. Pour la conformité de modélisation, le pipeline intègre un simulateur d'Identifiant Bancaire Unique (IBU) basé sur la norme "
         "ISO 17442 (CM + segment BICEC 00001 + identifiant unique + clé de contrôle calculée selon l'algorithme Modulo 97-10 : Cle = 98 - (Number % 97)), "
-        "permettant un développement et un test réalistes avant l'intégration finale de l'API BEAC. De plus, un mécanisme de sécurité robuste "
-        "bloque l'accès après 3 échecs consécutifs au liveness challenge pour éviter les attaques de présentation par brute force."
+        "permettant un développement et un test réalistes des interfaces. De plus, un mécanisme de sécurité robuste bloque l'accès "
+        "(status LOCKED_LIVENESS) après 3 échecs consécutifs au liveness challenge pour éviter les attaques de présentation par brute force."
     ]:
         add_para(marker, t)
 
     add_para(marker, "2.7 Exigences non fonctionnelles", "Heading 2")
     for t in [
-        "Les exigences non fonctionnelles (NFR1 à NFR14) imposent des critères de performance et de volume stricts. L'inférence locale de l'IA "
-        "(OCR et biométrie) doit s'exécuter en moins de 15 secondes pour garantir un parcours total fluide. Pour valider scientifiquement ces "
-        "moteurs, le projet s'appuie sur la constitution progressive d'un dataset d'entraînement local anonymisé (conformément aux principes de "
-        "minimisation de la Loi n° 2024/017) : un jeu de données de 5 000 spécimens de CNI camerounaises pour le fine-tuning de PaddleOCR, et un "
-        "jeu de test de 300 à 500 paires de visages pour l'évaluation de la similarité DeepFace (FAR < 2%). La sécurité au repos impose le "
-        "chiffrement AES-256 de tous les fichiers originaux sur le volume de stockage Docker centralisé."
+        "Les exigences non fonctionnelles (NFR11 à NFR16 selon la normalisation de conduite de projet) imposent des critères de performance "
+        "et de volume stricts. L'inférence locale de l'IA (OCR et biométrie) doit s'exécuter en moins de 15 secondes pour garantir un parcours total "
+        "fluide. Pour valider scientifiquement ces moteurs, le projet s'appuie sur la constitution progressive d'un dataset d'entraînement local "
+        "anonymisé (conformément aux principes de minimisation de la Loi n° 2024/017) : un jeu de données de 5 000 spécimens de CNI camerounaises "
+        "pour le fine-tuning de PaddleOCR (NFR11), et un jeu de test de 300 à 500 paires de visages pour l'évaluation de la similarité DeepFace "
+        "(NFR12, FAR < 2%). La sécurité au repos impose le chiffrement AES-256 de tous les fichiers originaux sur le volume de stockage Docker centralisé."
     ]:
         add_para(marker, t)
 
@@ -657,8 +659,8 @@ def write_chapter2(doc):
     add_table(doc, marker, ["Domaine d'exigence", "Spécification technique mise en œuvre", "Seuil de conformité académique et technique"], [
         ["Inférence locale IA", "PaddleOCR v5 local + DeepFace / MiniFASNet", "Latence totale IA < 15s (OCR <5s, Liveness <10s) sur machine cible"],
         ["Chiffrement au repos", "Volume de stockage Docker crypté AES-256", "100% de conformité de stockage Loi n° 2024/017"],
-        ["Dataset d'entraînement", "Fine-tuning PaddleOCR sur CNI locales", "Dataset de 5 000 images de CNI anonymisées (ground truth)"],
-        ["Calibrage biométrique", "Seuil de similarité DeepFace (comparaison CNI/selfie)", "Reconnaissance faciale à 98.5% (FAR < 2%)"],
+        ["Dataset d'entraînement", "Fine-tuning PaddleOCR sur CNI locales", "Dataset de 5 000 CNI anonymisées (NFR11 - ground truth)"],
+        ["Calibrage biométrique", "Seuil de similarité DeepFace (comparaison CNI/selfie)", "Reconnaissance faciale à 98.5% (NFR12 - FAR < 2%)"],
         ["Format NIU fiscal", "Regex syntaxique locale + vérification visuelle", "Format 14 caractères (1 lettre + 12 chiffres + 1 lettre)"],
         ["Format IBU bancaire", "Simulateur ISO 17442 calculé Modulo 97-10", "Structure 20-22 caractères, validation mathématique"]
     ], [1.8, 2.7, 2.7])
@@ -678,9 +680,9 @@ def write_chapter2(doc):
         "Pour la réalisation logicielle, l'équipe adopte la démarche itérative Agile/Scrum. Le projet est découpé en sprints de deux semaines, "
         "rythmés par des réunions de planification, des revues régulières et la tenue d'un product backlog prioritaire.",
         "Cette agilité garantit une rapidité de développement et permet d'intégrer les retours continus des encadreurs de la BICEC. Les livrables "
-        "techniques (contrats API FastAPI, modèles relationnels PostgreSQL, PWA, back-office, logs de sécurité, proofs d'exécution) sont produits "
-        "par petits incréments testés localement sous le budget de ressources matérielles contraint (RAM de la machine hôte limitée à 16 Go, WSL 2 "
-        "plafonné à 8 Go de RAM), assurant la résilience et la viabilité de la solution avant sa démonstration finale."
+        "techniques (contrats API FastAPI, modèles relationnels PostgreSQL, PWA React/Vite, back-office, logs de sécurité, proofs d'exécution) "
+        "sont produits par petits incréments testés localement sous le budget de ressources matérielles contraint (RAM de la machine hôte limitée "
+        "à 16 Go, WSL 2 plafonné à 8 Go de RAM), assurant la résilience et la viabilité de la solution avant sa démonstration finale."
     ]:
         add_para(marker, t)
 
@@ -696,9 +698,9 @@ def write_chapter2(doc):
     caption(marker, "Tableau 9. Planning de conduite, risques et modes de collaboration")
     add_table(doc, marker, ["Phase de stage", "Livrables attendus et jalons", "Risque opérationnel suivi", "Mode de collaboration interne"], [
         ["M1 (Semaines 1-3)", "Cadrage, dataset 5k CNI, dev env Docker", "Dataset incomplet, specs floues", "Ateliers réguliers avec M. Jackson KOMBE LELE"],
-        ["M2 (Semaines 4-7)", "Backend FastAPI, PWA client, local OCR", "Latences élevées de l'OCR sur machine cible", "Revues hebdomadaires avec le Département Étude"],
+        ["M2 (Semaines 4-7)", "Backend FastAPI, PWA React/Vite, local OCR", "Latences élevées de l'OCR sur machine cible", "Revues hebdomadaires avec le Département Étude"],
         ["M3 (Semaines 8-11)", "Liveness, face matching, back-office agent", "Taux de faux rejets biométriques > 2%", "Ajustements de calibrage avec la sécurité IT"],
-        ["M4 (Semaines 12-15)", "Intégration Amplitude, DGI, analytics", "Indisponibilité API DGI en production", "Ateliers techniques avec l'équipe Core Banking"],
+        ["M4 (Semaines 12-15)", "SSO link, product discovery, notifications", "Bugs d'IndexedDB lors des délestages", "Ateliers d'intégration PWA avec équipes client"],
         ["M5 (Semaines 16-20)", "Tests Playwright E2E, pilote 50, audit trail", "Rejet de conformité lors de l'audit", "Simulation de contrôle avec les auditeurs KYC"]
     ], [1.4, 2.3, 2.0, 1.8])
     source(marker, "Source : synthèse de l'auteur, d'après le calendrier de stage et la roadmap agile VeriPass.")

@@ -86,7 +86,7 @@ Prefix: `/kyc`
 | POST | `/ocr/review` | Submit user-reviewed OCR fields |
 | POST | `/ocr/confirm` | Confirm or correct OCR fields |
 | POST | `/ocr/merge` | Merge OCR fields from document sides |
-| POST | `/liveness/submit` | Submit landmark-based liveness result |
+| POST | `/liveness/submit` | Submit landmark challenge result; server verifies MiniFASNet PAD from SELFIE |
 | POST | `/capture/liveness` | Capture selfie/liveness image path |
 | POST | `/address/submit` | Store address and GPS metadata |
 | POST | `/consent/submit` | Store CGU/privacy/data-processing consent |

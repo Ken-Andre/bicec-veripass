@@ -180,6 +180,12 @@ services:
       - DEEPFACE_HOME=${DEEPFACE_HOME:-/data/models}
       - DEEPFACE_DETECTOR_BACKEND=${DEEPFACE_DETECTOR_BACKEND:-opencv}
       - ANTI_SPOOFING_MIN_SCORE=${ANTI_SPOOFING_MIN_SCORE:-0.7}
+      - MINIFASNET_ENABLED=${MINIFASNET_ENABLED:-true}
+      - MINIFASNET_MODEL_PATH=${MINIFASNET_MODEL_PATH:-/opt/models-offline/minifasnet/MiniFASNetV2.onnx}
+      - MINIFASNET_MODEL_SHA256=${MINIFASNET_MODEL_SHA256:-}
+      - MINIFASNET_CROP_SCALE=${MINIFASNET_CROP_SCALE:-2.7}
+      - MINIFASNET_INPUT_SIZE=${MINIFASNET_INPUT_SIZE:-80}
+      - MINIFASNET_LIVE_CLASS_INDEX=${MINIFASNET_LIVE_CLASS_INDEX:-1}
       - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
       - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
       - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/opt/models-offline/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
@@ -262,6 +268,9 @@ services:
       - PADDLEX_HOME=/home/vpuser/.paddlex
       - DEEPFACE_HOME=${DEEPFACE_HOME:-/data/models}
       - DEEPFACE_DETECTOR_BACKEND=${DEEPFACE_DETECTOR_BACKEND:-opencv}
+      - MINIFASNET_MODEL_PATH=${MINIFASNET_MODEL_INIT_PATH:-/data/models/minifasnet/MiniFASNetV2.onnx}
+      - MINIFASNET_MODEL_URL=${MINIFASNET_MODEL_URL:-}
+      - MINIFASNET_MODEL_SHA256=${MINIFASNET_MODEL_SHA256:-}
     volumes:
       - models_storage:/data/models
       - models_paddlex_storage:/home/vpuser/.paddlex
