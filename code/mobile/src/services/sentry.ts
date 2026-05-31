@@ -16,6 +16,10 @@ interface KycErrorContext {
   extra?: Record<string, unknown>;
 }
 
+const MOBILE_SENTRY_DSN =
+  import.meta.env.VITE_SENTRY_DSN ??
+  'https://1b4659211a1efab3936b4d3706dc9aa2@o4511113586409472.ingest.de.sentry.io/4511114011410512';
+
 // Sentry proxy endpoint - avoids tracking prevention blockers
 // Events are sent to our backend which forwards to Sentry server-side
 const SENTRY_PROXY_URL = import.meta.env.VITE_API_URL
@@ -53,11 +57,12 @@ export function shouldDropMobileSentryEventForNoise(event: Sentry.Event): boolea
     'bill_upload_client_timeout',
     'bill_capture_504_gateway_timeout',
     'bill_capture_client_timeout',
+    'internal error',
   ].some((fragment) => text.includes(fragment));
 }
 
 export function initMobileSentry(): void {
-  if (!import.meta.env.VITE_SENTRY_DSN) return;
+  if (!MOBILE_SENTRY_DSN) return;
 
   const isProd = import.meta.env.MODE === 'production';
 
@@ -111,10 +116,13 @@ export function initMobileSentry(): void {
     });
 
   Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
+    dsn: MOBILE_SENTRY_DSN,
+    sendDefaultPii: true,
     transport: makeProxyTransport as Parameters<typeof Sentry.init>[0]['transport'],
-    integrations: [Sentry.browserTracingIntegration()],
+    integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
     tracesSampleRate: isProd ? 0.1 : 0,
+    replaysSessionSampleRate: isProd ? 0.1 : 1.0,
+    replaysOnErrorSampleRate: 1.0,
     environment: import.meta.env.MODE,
     release: `veripass-mobile@${import.meta.env.VITE_APP_VERSION || '0.1.0'}`,
     beforeSend(event) {
@@ -131,7 +139,7 @@ export function captureKycException(
   eventName: KycEventName,
   ctx: KycErrorContext = {},
 ): void {
-  if (!import.meta.env.VITE_SENTRY_DSN) return;
+  if (!MOBILE_SENTRY_DSN) return;
   Sentry.withScope((scope) => {
     scope.setTag('domain', 'kyc');
     scope.setTag('event_name', eventName);
@@ -156,7 +164,7 @@ export function captureKycMessage(
   eventName: KycEventName,
   ctx: KycErrorContext = {},
 ): void {
-  if (!import.meta.env.VITE_SENTRY_DSN) return;
+  if (!MOBILE_SENTRY_DSN) return;
   Sentry.withScope((scope) => {
     scope.setTag('domain', 'kyc');
     scope.setTag('event_name', eventName);

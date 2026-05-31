@@ -112,7 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(false);
     setIsLocked(false);
     clearTimer();
-    void clearPersistedKycState();
+    clearPersistedKycState().catch((err) => {
+      console.warn('Failed to clear persisted KYC state on logout', err);
+    });
   }, [clearTimer]);
 
   const expireAuthenticatedSession = useCallback(() => {
@@ -290,7 +292,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLocked(false);
     setBiometricEnabled(false);
     clearTimer();
-    void clearPersistedKycState();
+    clearPersistedKycState().catch((err) => {
+      console.warn('Failed to clear persisted KYC state on reset', err);
+    });
   }, [clearTimer]);
 
   const handleSetBiometric = useCallback(async (enabled: boolean): Promise<boolean> => {
@@ -328,7 +332,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setIsLocked(false);
     clearTimer();
-    void clearPersistedKycState();
+    clearPersistedKycState().catch((err) => {
+      console.warn('Failed to clear persisted KYC state on delete', err);
+    });
   };
 
   return (

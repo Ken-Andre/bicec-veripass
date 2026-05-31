@@ -33,17 +33,21 @@ export function KycResumeBanner() {
     }
 
     const refresh = async () => {
-      const online = typeof navigator === 'undefined' ? true : navigator.onLine;
-      if (online) {
-        await runKycSyncNow();
+      try {
+        const online = typeof navigator === 'undefined' ? true : navigator.onLine;
+        if (online) {
+          await runKycSyncNow();
+        }
+        const [summary, path] = await Promise.all([getKycSyncSummary(), getResumeTargetPath()]);
+        if (!mounted) return;
+        setTargetPath(path);
+        setPendingCount(summary.pendingCount);
+        setNeedsReupload(summary.needsReuploadCount > 0);
+        const shouldShow = Boolean(path) && (summary.hasResumeData || summary.pendingCount > 0 || summary.needsReuploadCount > 0);
+        setVisible(online && shouldShow);
+      } catch (err) {
+        console.warn('[KycResumeBanner] Refresh failed:', err);
       }
-      const [summary, path] = await Promise.all([getKycSyncSummary(), getResumeTargetPath()]);
-      if (!mounted) return;
-      setTargetPath(path);
-      setPendingCount(summary.pendingCount);
-      setNeedsReupload(summary.needsReuploadCount > 0);
-      const shouldShow = Boolean(path) && (summary.hasResumeData || summary.pendingCount > 0 || summary.needsReuploadCount > 0);
-      setVisible(online && shouldShow);
     };
 
     const onOnline = () => {
