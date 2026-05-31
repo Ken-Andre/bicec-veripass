@@ -1,0 +1,4 @@
+interface:
+  display_name: "Academic Writing"
+  short_description: "Review and draft academic writing"
+  default_prompt: "Use $academic-writing to review my thesis chapter for logic, prose, citations, and LaTeX consistency."
