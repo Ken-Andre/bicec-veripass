@@ -1,0 +1,1668 @@
+{
+  "generated_at": "2026-05-26T04:08:27.655124+00:00",
+  "base_url": "https://localhost",
+  "client_phone": "+237699040827",
+  "session_handle": "4408ac7d8b5a9f2c0a00a1a835c62078041cec932a60aa243f849a1b35e334a1",
+  "raw_session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+  "input_images": {
+    "cni_recto": "docs/test-evidence/latest/kyc-happy-path/input-images/cni_recto.jpg",
+    "cni_verso": "docs/test-evidence/latest/kyc-happy-path/input-images/cni_verso.jpg"
+  },
+  "generated_documents": {
+    "bill_pdf": "docs/test-evidence/latest/kyc-happy-path/generated-documents/bill_eneo_acceptance.pdf",
+    "support_address_proof_pdf": "docs/test-evidence/latest/kyc-happy-path/generated-documents/support_address_proof_acceptance.pdf"
+  },
+  "source_image_hashes": {
+    "cni_recto_sha256": "c4b1c187ce879724fcee42cd809483ca66f2877b0e4ac09625404f9b4818b313",
+    "cni_verso_sha256": "0a0c76cc1356862d2ca0e8700eaf2884930d3c29fbe966b522cb4c5fc9c977fc",
+    "bill_pdf_sha256": "b29ca8926797cececc0488e0c2667322dc86abde4de77b6c8b7f85230b9dd4c6",
+    "support_address_proof_pdf_sha256": "f2f437bca24ce3f652bea72be844f61ac1eb075283997ac2f7569ea04daef5be"
+  },
+  "key_results": {
+    "health": {
+      "status": "ok",
+      "version": "0.1.0",
+      "db": "ok",
+      "redis": "ok"
+    },
+    "recto_doc": {
+      "id": "dc3345e9eaf052a5308415b2397fc714f2e09df1e1ba734be7708b06c90933f9",
+      "ocr_status": "PARTIAL"
+    },
+    "verso_doc": {
+      "id": "3e6e7d689c7032eec728cf99454aca97067f557e93a8ecede4d12678250083a8",
+      "ocr_status": "PARTIAL"
+    },
+    "bill_doc": {
+      "id": "9f2895eb94a773d33b9c75220cb3102fc6b5a0215ea0861a171030b7c6f48cea",
+      "ocr_status": "PARTIAL"
+    },
+    "selfie_doc": {
+      "id": "aff329c7a673da3932da4f104701622bc9d6defa862386b8d6c5372ab98b0af2",
+      "sha256_hash": "c4b1c187ce879724fcee42cd809483ca66f2877b0e4ac09625404f9b4818b313"
+    },
+    "liveness": {
+      "is_alive": true,
+      "confidence": 0.935408302626953,
+      "attempts_remaining": 3,
+      "strikes_remaining": 3,
+      "face_match_score": 0.0,
+      "face_match_status": "FAILED",
+      "face_match_reason": "score_below_threshold",
+      "anti_spoofing_score": 0.935408302626953,
+      "is_locked": false,
+      "cooldown_seconds": null,
+      "lockout_count_24h": 0,
+      "branch_fallback_available": false
+    },
+    "readiness": {
+      "can_submit": true,
+      "blocking_reasons": [],
+      "warnings": [
+        "Face match below threshold: priority manual review will be applied."
+      ],
+      "required_missing_documents": [],
+      "has_ocr_review": true,
+      "has_ocr_review_confirmed": true,
+      "has_consent": true,
+      "has_biometric_result": true,
+      "has_bill_document": true,
+      "confidence_score_global": 0.6058590277777778
+    },
+    "submitted": {
+      "session_id": "4408ac7d8b5a9f2c0a00a1a835c62078041cec932a60aa243f849a1b35e334a1",
+      "status": "PENDING_AGENT_REVIEW",
+      "message": "Dossier soumis avec succès et marqué en revue prioritaire (vérification biométrique renforcée).",
+      "access_level": "RESTRICTED"
+    },
+    "auto_assign": {
+      "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "agent_name": "Jean Dupont",
+      "assigned_at": "2026-05-26T04:09:30.337958Z",
+      "assignment_method": "auto"
+    },
+    "info_request": {
+      "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "decision": "INFO_REQUESTED",
+      "new_status": "PENDING_INFO",
+      "new_access_level": "RESTRICTED",
+      "decided_at": "2026-05-26T04:09:30.380677Z",
+      "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "reason": "Merci de transmettre un justificatif complementaire lisible."
+    },
+    "review_status_info": {
+      "status": "PENDING_INFO",
+      "access_level": "RESTRICTED",
+      "submitted_at": "2026-05-26T04:09:29.692161+00:00",
+      "completed_at": null,
+      "decision": null,
+      "unread_notifications": [
+        {
+          "id": "5d69d4bd-a3e0-40a2-866e-ba16120db87c",
+          "type": "KYC_INFO_REQUESTED",
+          "message": "Des informations supplémentaires sont requises : Merci de transmettre un justificatif complementaire lisible.. Veuillez vous connecter.",
+          "sent_at": "2026-05-26T04:09:30.380677+00:00"
+        }
+      ]
+    },
+    "support_limits": {
+      "max_size_mb": 10,
+      "hard_max_size_mb": 10,
+      "image_max_size_mb": 4,
+      "pdf_max_size_mb": 6,
+      "pdf_max_pages": 5,
+      "max_message_chars": 4000,
+      "allowed_content_types": [
+        "application/pdf",
+        "image/jpeg",
+        "image/png"
+      ],
+      "allowed_extensions": [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".pdf"
+      ]
+    },
+    "support_message": {
+      "id": "f8ccfeb1-826e-46a7-8c1d-d0ba6985cc28",
+      "thread_id": "e40ce7be-e236-4087-8dc7-927378d3981d",
+      "sender": "user",
+      "content": "Bonjour, je transmets le justificatif complementaire demande.",
+      "attachment_path": null,
+      "attachment_sha256": null,
+      "attachment_filename": null,
+      "attachment_document_id": null,
+      "created_at": "2026-05-26T04:09:30.533883Z"
+    },
+    "support_attachment": {
+      "id": "57d03e83-b4e6-4057-aa43-7e4e7f6c1aa0",
+      "thread_id": "e40ce7be-e236-4087-8dc7-927378d3981d",
+      "sender": "user",
+      "content": "Justificatif complementaire joint.",
+      "attachment_path": "/data/documents/support/858c3460-220a-495a-91c2-d2d52d312bca/78efbf38-669a-419d-b8ae-c3e56ac11720_support_address_proof_acceptance.pdf",
+      "attachment_sha256": "f2f437bca24ce3f652bea72be844f61ac1eb075283997ac2f7569ea04daef5be",
+      "attachment_filename": "support_address_proof_acceptance.pdf",
+      "attachment_document_id": "b3b15296-5b67-4819-af1d-07e206af306f",
+      "created_at": "2026-05-26T04:09:30.603996Z"
+    },
+    "classify": {
+      "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "document_id": "b3b15296-5b67-4819-af1d-07e206af306f",
+      "doc_type": "ADDRESS_PROOF",
+      "categories": [
+        "ADDRESS_PROOF"
+      ],
+      "classified_at": "2026-05-26T04:09:30.631120Z"
+    },
+    "approval": {
+      "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "decision": "APPROVED",
+      "new_status": "APPROVED",
+      "new_access_level": "LIMITED_ACCESS",
+      "decided_at": "2026-05-26T04:09:30.700899Z",
+      "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+      "reason": "Dossier complet apres justificatif complementaire."
+    },
+    "final_status": {
+      "status": "APPROVED",
+      "access_level": "LIMITED_ACCESS",
+      "submitted_at": "2026-05-26T04:09:29.692161+00:00",
+      "completed_at": "2026-05-26T04:09:30.700899+00:00",
+      "decision": {
+        "decision": "APPROVED",
+        "reason": "Dossier complet apres justificatif complementaire.",
+        "decided_at": "2026-05-26T04:09:30.700899+00:00"
+      },
+      "unread_notifications": [
+        {
+          "id": "5bbc0a17-55ed-478e-8b9b-2003127c7e00",
+          "type": "KYC_APPROVED",
+          "message": "Votre dossier KYC a été approuvé ! Vous pouvez désormais accéder à vos services.",
+          "sent_at": "2026-05-26T04:09:30.700899+00:00"
+        },
+        {
+          "id": "5d69d4bd-a3e0-40a2-866e-ba16120db87c",
+          "type": "KYC_INFO_REQUESTED",
+          "message": "Des informations supplémentaires sont requises : Merci de transmettre un justificatif complementaire lisible.. Veuillez vous connecter.",
+          "sent_at": "2026-05-26T04:09:30.380677+00:00"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "step": "health",
+      "method": "GET",
+      "url": "https://localhost/api/health",
+      "status": 200,
+      "elapsed_ms": 93,
+      "ok": true,
+      "body": {
+        "status": "ok",
+        "version": "0.1.0",
+        "db": "ok",
+        "redis": "ok"
+      }
+    },
+    {
+      "step": "mobile otp send",
+      "method": "POST",
+      "url": "https://localhost/api/v1/auth/otp/send",
+      "status": 200,
+      "elapsed_ms": 740,
+      "ok": true,
+      "body": {
+        "message": "OTP request received and is being processed",
+        "otp_debug": "***"
+      }
+    },
+    {
+      "step": "mobile otp verify",
+      "method": "POST",
+      "url": "https://localhost/api/v1/auth/otp/verify",
+      "status": 200,
+      "elapsed_ms": 361,
+      "ok": true,
+      "body": {
+        "access_token": "***",
+        "refresh_token": "***",
+        "token_type": "***",
+        "expires_in": 86400,
+        "session_handle": "4408ac7d8b5a9f2c0a00a1a835c62078041cec932a60aa243f849a1b35e334a1"
+      }
+    },
+    {
+      "step": "device register",
+      "method": "POST",
+      "url": "https://localhost/api/v1/devices/register",
+      "status": 200,
+      "elapsed_ms": 54,
+      "ok": true,
+      "body": {
+        "id": "92b9eb02-5c6f-46d0-b515-8241861613b1",
+        "device_tag": "vp_dev_7fa1e91fa56c0f42865805da35679c61d95fd5b0b45f1064",
+        "created_at": "2026-05-26T04:08:28.875247Z",
+        "last_seen_at": "2026-05-26T04:08:28.875247Z"
+      }
+    },
+    {
+      "step": "kyc session start",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/session/start",
+      "status": 200,
+      "elapsed_ms": 61,
+      "ok": true,
+      "body": {
+        "session_id": "4408ac7d8b5a9f2c0a00a1a835c62078041cec932a60aa243f849a1b35e334a1",
+        "status": "DRAFT",
+        "message": "Existing session found"
+      }
+    },
+    {
+      "step": "upload cni recto notebook image",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/capture/cni",
+      "status": 200,
+      "elapsed_ms": 18342,
+      "ok": true,
+      "body": {
+        "id": "dc3345e9eaf052a5308415b2397fc714f2e09df1e1ba734be7708b06c90933f9",
+        "doc_type": "CNI_RECTO",
+        "file_path": "2c4b5701-2dff-4edf-b380-458a20ecb8d9/CNI_RECTO/20260526_040829_c4b1c187_cni_0_recto.jpg",
+        "sha256_hash": "c4b1c187ce879724fcee42cd809483ca66f2877b0e4ac09625404f9b4818b313",
+        "ocr_status": "PARTIAL",
+        "ocr_error": null,
+        "ocr_engine": "paddleocr",
+        "confidence_per_field": {
+          "nom": 0.9998427629470825,
+          "prenom": 0.9734193086624146,
+          "numero_cni": 0.0,
+          "date_naissance": 0.9968563914299011,
+          "lieu_naissance": 0.9996664524078369,
+          "sexe": 0.9998648166656494,
+          "taille": 0.9934476017951965,
+          "profession": 0.9985274076461792,
+          "date_delivrance": 0.0,
+          "date_expiration": 0.0,
+          "sp": 0.0,
+          "adresse": 0.0,
+          "autorite_nom": 0.0,
+          "poste_identification": 0.0,
+          "pere": 0.0,
+          "mere": 0.0
+        },
+        "capture_quality_metrics": null,
+        "captured_at": "2026-05-26T04:08:29.186517Z",
+        "ocr_fields": [
+          {
+            "id": "f80d7b0563831f30cc71fd3ef669858d3862df02f2816067f509df1f4f375d50",
+            "field_name": "nom",
+            "extracted_value": "EYEBE",
+            "confidence_score": 0.9998,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "619e8b9e3d435e9afdf36bad2633600b50d3aa5ee054c027ba791177f4f17a86",
+            "field_name": "prenom",
+            "extracted_value": "SIMPLICE NADGE",
+            "confidence_score": 0.9734,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "028ebcea35d7438f5a911eac1f88d46e64a9892312374fe88a3f1532db567f62",
+            "field_name": "numero_cni",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "4cd3152c961403aa78561eed293b62dca0b5790e73d51b0eda0b0149ce563ca3",
+            "field_name": "date_naissance",
+            "extracted_value": "06/10/1978",
+            "confidence_score": 0.9969,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "85b846ee2bd9a818c9db596199cfa5198dbf03f1c45ff98c047df51315a6fd78",
+            "field_name": "lieu_naissance",
+            "extracted_value": "MAROUA",
+            "confidence_score": 0.9997,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "5aaa69b25133637b5492729053956f5a9150be735b1da44428cd049dad0f476b",
+            "field_name": "sexe",
+            "extracted_value": "M",
+            "confidence_score": 0.9999,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "6cae87513daf07de257d989b6b2c1e4ed5a74addb9ea179f5f9abc63c7368ca2",
+            "field_name": "taille",
+            "extracted_value": "1.76m",
+            "confidence_score": 0.9934,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "7a1343db25d7a5aee327947be3c75cc6220db9dca753b5ee18632eb7d3d27dd6",
+            "field_name": "profession",
+            "extracted_value": "ETUDIANT",
+            "confidence_score": 0.9985,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "68d8e8f35bb663eb47c4d55d462e4b29acb7e13e80da2a8c5548d07400db1ae1",
+            "field_name": "date_delivrance",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "5f15113c4df1fa274d4e7902d006e76096bd7f0ca3a1079db209706f3fe2f3ca",
+            "field_name": "date_expiration",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "37b7edd97e520b6b12c5f88dd4876681f05c2b31ba506fe230a8f99a8fbbba99",
+            "field_name": "sp",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "13ede2207167b7f97ca3b38a5699591f115365f01cd7a80772d6da18b43ea189",
+            "field_name": "adresse",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "e3adf3ad29f50aaa35253bd25b1fa58e67c6a7c013ae85b71978ffe94b3c41c3",
+            "field_name": "autorite_nom",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "84f9cd186dd0e5030c40101dc78ad074e25fe197a1b927aa42fc7fe1cc21a5d1",
+            "field_name": "poste_identification",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "b49bc14db209d3b0c754abbe93cb30f5265cd9bdb2d0a6242faa82c1c8f0cdc5",
+            "field_name": "pere",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "beace05042a65d72748d0f985e939beeee0072904e1c9a53f07af30e6ebf15f5",
+            "field_name": "mere",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          }
+        ]
+      }
+    },
+    {
+      "step": "upload cni verso notebook image",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/capture/cni",
+      "status": 200,
+      "elapsed_ms": 19217,
+      "ok": true,
+      "body": {
+        "id": "3e6e7d689c7032eec728cf99454aca97067f557e93a8ecede4d12678250083a8",
+        "doc_type": "CNI_VERSO",
+        "file_path": "2c4b5701-2dff-4edf-b380-458a20ecb8d9/CNI_VERSO/20260526_040847_0a0c76cc_cni_0_verso.jpg",
+        "sha256_hash": "0a0c76cc1356862d2ca0e8700eaf2884930d3c29fbe966b522cb4c5fc9c977fc",
+        "ocr_status": "PARTIAL",
+        "ocr_error": null,
+        "ocr_engine": "paddleocr",
+        "confidence_per_field": {
+          "nom": 0.0,
+          "prenom": 0.0,
+          "numero_cni": 0.9998283386230469,
+          "date_naissance": 0.0,
+          "lieu_naissance": 0.0,
+          "sexe": 0.0,
+          "taille": 0.0,
+          "profession": 0.0,
+          "date_delivrance": 0.9581359028816223,
+          "date_expiration": 0.9995259046554565,
+          "sp": 0.999943733215332,
+          "adresse": 0.9991364479064941,
+          "autorite_nom": 0.9796463251113892,
+          "poste_identification": 0.9999021887779236,
+          "pere": 0.9997931122779846,
+          "mere": 0.9976227283477783
+        },
+        "capture_quality_metrics": null,
+        "captured_at": "2026-05-26T04:08:47.535961Z",
+        "ocr_fields": [
+          {
+            "id": "0c7c528428999d1ea5335a3d217ee1bcc31ffab7c0f326d1f0db5c491bbed064",
+            "field_name": "nom",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "c4b8c600d9c178f05cd0718495152f3df6fa4cb4d5ed072fc04587fb143391bf",
+            "field_name": "prenom",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "0b4662691e4e912dd5cb317f63c80f8b9c9953970b0f0e69bb65c150e220f51f",
+            "field_name": "numero_cni",
+            "extracted_value": "20242523751060686",
+            "confidence_score": 0.9998,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "06a29bcf64a6d3af2d33c9e1c93c0f73d1a8e7e00902fa3ab179fdaade76626d",
+            "field_name": "date_naissance",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "08899c114b0adba4ddd96259a40ea45eaa8095bae4a5dbde6e590814150da491",
+            "field_name": "lieu_naissance",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "b5656a334ced9730789fa9fdf5e0c9c4bd3a031ef19181582fbfcb8c2e7eee8d",
+            "field_name": "sexe",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "9d996d4839c54402e83cce3f2591371a1156d19ca188dc415a19d639e288c262",
+            "field_name": "taille",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "9f3d91435f58d7b19f74236c0ab53c4d6d5b0e24eb8cbf4dec966bfd02bd94ec",
+            "field_name": "profession",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "67667d4b492eeaeb1e341917d741f0328a579bff5b821e23a69a8d97f4c18262",
+            "field_name": "date_delivrance",
+            "extracted_value": "19/06/2024",
+            "confidence_score": 0.9581,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "760a9d98f2c3e3ed94691da552087125a1073fcd1c39d1f78b1644c23259e636",
+            "field_name": "date_expiration",
+            "extracted_value": "19/06/2034",
+            "confidence_score": 0.9995,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "7957ff91a782262663e708f356aa408398d80eea52b4b5b74e28f2c13213d9f1",
+            "field_name": "sp",
+            "extracted_value": "965496",
+            "confidence_score": 0.9999,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "65ad9901899ed6bb51cdaeb8964ae5eac2b114ee7078c1fe88a6dd6433fc278d",
+            "field_name": "adresse",
+            "extracted_value": "GAROUA",
+            "confidence_score": 0.9991,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "4135f1b9542c7a29c53f0487daf477585b3ac53e040909c5dda73e50e8272b7e",
+            "field_name": "autorite_nom",
+            "extracted_value": "MARTIN MBARGA AGUÈLE",
+            "confidence_score": 0.9796,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "30a9896927fc99fcfdf802d55445ea8910cbf07f8cbceab49a1d106cae8b0b22",
+            "field_name": "poste_identification",
+            "extracted_value": "ES40",
+            "confidence_score": 0.9999,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "dfea982e705c6a357e0698f6a2a6442d2b61d57ecbb1b6e9099af1191063a4fb",
+            "field_name": "pere",
+            "extracted_value": "TANDENT YANG BENOIT",
+            "confidence_score": 0.9998,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "000e06e740e1f0a40e4df10150b899e76e8c4e984482cd8193220feff5076724",
+            "field_name": "mere",
+            "extracted_value": "EYEBE HERVE",
+            "confidence_score": 0.9976,
+            "human_corrected": false,
+            "corrected_value": null
+          }
+        ]
+      }
+    },
+    {
+      "step": "upload bill acceptance pdf",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/capture/bill",
+      "status": 200,
+      "elapsed_ms": 169,
+      "ok": true,
+      "body": {
+        "id": "9f2895eb94a773d33b9c75220cb3102fc6b5a0215ea0861a171030b7c6f48cea",
+        "doc_type": "BILL_ENEO",
+        "file_path": "2c4b5701-2dff-4edf-b380-458a20ecb8d9/BILL_ENEO/20260526_040906_b29ca892_bill_eneo_acceptance.pdf",
+        "sha256_hash": "b29ca8926797cececc0488e0c2667322dc86abde4de77b6c8b7f85230b9dd4c6",
+        "ocr_status": "PARTIAL",
+        "ocr_error": null,
+        "ocr_engine": "UNSUPPORTED_FILE_TYPE",
+        "confidence_per_field": {
+          "contrat_number": 0.0,
+          "compteur_number": 0.0,
+          "date_releve": 0.0,
+          "date_facturation": 0.0,
+          "date_limite_paiement": 0.0,
+          "agence": 0.0,
+          "ville": 0.0,
+          "total_ttc": 0.0,
+          "kwh_consommes": 0.0,
+          "categorie": 0.0
+        },
+        "capture_quality_metrics": null,
+        "captured_at": "2026-05-26T04:09:06.710343Z",
+        "ocr_fields": [
+          {
+            "id": "ce39a7c984b158a946ef6acff03948f38195a25abd0ca18b51970e52fa6c5b4c",
+            "field_name": "contrat_number",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "70df6336a587218986dd3018a2d73d340d3aa79fe06490a849ca23d31e87286c",
+            "field_name": "compteur_number",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "275d027558aea62f39165ccf87a2caaa447f3d265a2ef7f45b754b6b50abc7b7",
+            "field_name": "date_releve",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "ec5200a236e9851d2179a733e6fcf02b3feb004f0d71a0ae0f47dde492aad7c4",
+            "field_name": "date_facturation",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "825162d5f8ebd7b1a25b6829d67e265714b33a69ef95d7facbaf03324d04fe40",
+            "field_name": "date_limite_paiement",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "6dc7257680e5e90f21e7b2ee33a437a3013ce44f25fab82ef7a8376b00ddebd5",
+            "field_name": "agence",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "44f2b97725c81a30cbd74aaf11aaaa4da7eaf65d6bce1e1004d96892c1224e60",
+            "field_name": "ville",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "9a49713d793fae9e1fd7bd8d946b9a3c32315354135e11645ea69488435bad0d",
+            "field_name": "total_ttc",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "53b26ce2cabcbf3ff9398785f66bbe62158be40fb5ce4bc362174076231fdd21",
+            "field_name": "kwh_consommes",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          },
+          {
+            "id": "e347e5ab4f0e8f675499a65f89730eabb94dbb150375789fd6d8a3878ad8a978",
+            "field_name": "categorie",
+            "extracted_value": null,
+            "confidence_score": 0.0,
+            "human_corrected": false,
+            "corrected_value": null
+          }
+        ]
+      }
+    },
+    {
+      "step": "upload selfie evidence",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/document/upload",
+      "status": 200,
+      "elapsed_ms": 67,
+      "ok": true,
+      "body": {
+        "id": "aff329c7a673da3932da4f104701622bc9d6defa862386b8d6c5372ab98b0af2",
+        "doc_type": "SELFIE",
+        "file_path": "2c4b5701-2dff-4edf-b380-458a20ecb8d9/SELFIE/20260526_040906_c4b1c187_cni_0_recto.jpg",
+        "sha256_hash": "c4b1c187ce879724fcee42cd809483ca66f2877b0e4ac09625404f9b4818b313",
+        "ocr_status": "PENDING",
+        "ocr_error": null,
+        "ocr_engine": null,
+        "confidence_per_field": null,
+        "capture_quality_metrics": null,
+        "captured_at": "2026-05-26T04:09:06.829714Z",
+        "ocr_fields": []
+      }
+    },
+    {
+      "step": "ocr correction review",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/ocr/review",
+      "status": 200,
+      "elapsed_ms": 109,
+      "ok": true,
+      "body": {
+        "status": "success",
+        "message": "OCR review submitted"
+      }
+    },
+    {
+      "step": "liveness submit",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/liveness/submit",
+      "status": 200,
+      "elapsed_ms": 22380,
+      "ok": true,
+      "body": {
+        "is_alive": true,
+        "confidence": 0.935408302626953,
+        "attempts_remaining": 3,
+        "strikes_remaining": 3,
+        "face_match_score": 0.0,
+        "face_match_status": "FAILED",
+        "face_match_reason": "score_below_threshold",
+        "anti_spoofing_score": 0.935408302626953,
+        "is_locked": false,
+        "cooldown_seconds": null,
+        "lockout_count_24h": 0,
+        "branch_fallback_available": false
+      }
+    },
+    {
+      "step": "address submit",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/address/submit",
+      "status": 200,
+      "elapsed_ms": 68,
+      "ok": true,
+      "body": {
+        "status": "success",
+        "message": "Address and GPS validated",
+        "address_city": "Yaounde",
+        "address_commune": "Yaounde I",
+        "address_quartier": "Bastos",
+        "address_lieu_dit": "BICEC acceptance",
+        "gps_validated": true
+      }
+    },
+    {
+      "step": "consent submit",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/consent/submit",
+      "status": 200,
+      "elapsed_ms": 61,
+      "ok": true,
+      "body": {
+        "id": "fe8440967d3018856d5ec8bdbc73bbfda279c259b7f5dd13d71323ef087bbba0",
+        "cgu_accepted": true,
+        "privacy_accepted": true,
+        "data_processing_accepted": true,
+        "consent_method": "ACCEPTANCE_SCRIPT",
+        "cgu_version": "1.0.0",
+        "privacy_version": "1.0.0",
+        "signed_at": "2026-05-26T04:09:29.438575Z"
+      }
+    },
+    {
+      "step": "niu submit",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/niu/submit",
+      "status": 200,
+      "elapsed_ms": 58,
+      "ok": true,
+      "body": {
+        "status": "success",
+        "niu_type": "DECLARATIVE",
+        "niu_number": "M20260526040827",
+        "niu_declarative": true
+      }
+    },
+    {
+      "step": "signature submit",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/signature/submit",
+      "status": 200,
+      "elapsed_ms": 67,
+      "ok": true,
+      "body": {
+        "status": "success",
+        "message": "Signature recorded"
+      }
+    },
+    {
+      "step": "readiness before submit",
+      "method": "GET",
+      "url": "https://localhost/api/v1/kyc/readiness",
+      "status": 200,
+      "elapsed_ms": 61,
+      "ok": true,
+      "body": {
+        "can_submit": true,
+        "blocking_reasons": [],
+        "warnings": [
+          "Face match below threshold: priority manual review will be applied."
+        ],
+        "required_missing_documents": [],
+        "has_ocr_review": true,
+        "has_ocr_review_confirmed": true,
+        "has_consent": true,
+        "has_biometric_result": true,
+        "has_bill_document": true,
+        "confidence_score_global": 0.6058590277777778
+      }
+    },
+    {
+      "step": "kyc submit",
+      "method": "POST",
+      "url": "https://localhost/api/v1/kyc/submit",
+      "status": 200,
+      "elapsed_ms": 83,
+      "ok": true,
+      "body": {
+        "session_id": "4408ac7d8b5a9f2c0a00a1a835c62078041cec932a60aa243f849a1b35e334a1",
+        "status": "PENDING_AGENT_REVIEW",
+        "message": "Dossier soumis avec succès et marqué en revue prioritaire (vérification biométrique renforcée).",
+        "access_level": "RESTRICTED"
+      }
+    },
+    {
+      "step": "jean agent login",
+      "method": "POST",
+      "url": "https://localhost/api/v1/auth/agent/login",
+      "status": 200,
+      "elapsed_ms": 452,
+      "ok": true,
+      "body": {
+        "access_token": "***",
+        "refresh_token": "***",
+        "token_type": "***",
+        "expires_in": 86400,
+        "session_handle": null
+      }
+    },
+    {
+      "step": "jean queue lookup",
+      "method": "GET",
+      "url": "https://localhost/api/v1/backoffice/queue?status=PENDING_AGENT_REVIEW&limit=100&client_name=%2B237699040827",
+      "status": 200,
+      "elapsed_ms": 68,
+      "ok": true,
+      "body": {
+        "items": [
+          {
+            "id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+            "status": "PENDING_AGENT_REVIEW",
+            "access_level": "RESTRICTED",
+            "priority_flag": true,
+            "started_at": "2026-05-26T04:08:28.834912Z",
+            "submitted_at": "2026-05-26T04:09:29.692161Z",
+            "client_name": "+237699040827",
+            "client_phone": "+237699040827",
+            "assigned_agent_name": null,
+            "overall_confidence": 0.6059,
+            "agency_code": null
+          }
+        ],
+        "total": 1,
+        "page": 1,
+        "pages": 1,
+        "limit": 100
+      }
+    },
+    {
+      "step": "jean dossier open",
+      "method": "GET",
+      "url": "https://localhost/api/v1/backoffice/dossier/2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+      "status": 200,
+      "elapsed_ms": 57,
+      "ok": true,
+      "body": {
+        "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+        "status": "PENDING_AGENT_REVIEW",
+        "access_level": "RESTRICTED",
+        "priority_flag": true,
+        "confidence_score_global": 0.6059,
+        "started_at": "2026-05-26T04:08:28.834912Z",
+        "submitted_at": "2026-05-26T04:09:29.692161Z",
+        "completed_at": null,
+        "last_step_completed": "submission",
+        "niu_type": "DECLARATIVE",
+        "niu_number": "M20260526040827",
+        "niu_declarative": true,
+        "address_city": "Yaounde",
+        "address_commune": "Yaounde I",
+        "address_quartier": "Bastos",
+        "address_lieu_dit": "BICEC acceptance",
+        "address_details": "Centre",
+        "gps_latitude": 3.8792,
+        "gps_longitude": 11.5037,
+        "utility_provider": null,
+        "utility_bill_date": null,
+        "user_phone": "+237699040827",
+        "client_name": null,
+        "agency_code": null,
+        "documents": [
+          {
+            "id": "0a7c0b5b-2c9b-4bf8-8c0e-6bbdd6151801",
+            "doc_type": "SELFIE",
+            "sha256_hash": "c4b1c187ce879724fcee42cd809483ca66f2877b0e4ac09625404f9b4818b313",
+            "ocr_status": "PENDING",
+            "ocr_error": null,
+            "ocr_engine": null,
+            "captured_at": "2026-05-26T04:09:06.829714Z",
+            "ocr_fields": []
+          },
+          {
+            "id": "53248dc1-5a61-4c59-b5ac-915feb2b10de",
+            "doc_type": "CNI_RECTO",
+            "sha256_hash": "c4b1c187ce879724fcee42cd809483ca66f2877b0e4ac09625404f9b4818b313",
+            "ocr_status": "PARTIAL",
+            "ocr_error": null,
+            "ocr_engine": "paddleocr",
+            "captured_at": "2026-05-26T04:08:29.186517Z",
+            "ocr_fields": [
+              {
+                "id": "7102fe8c-a084-45bc-8e7c-068194c5c245",
+                "field_name": "nom",
+                "extracted_value": "EYEBE",
+                "confidence_score": 0.9998,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "54c9170e-9f36-42e3-880d-02c2da6041e5",
+                "field_name": "prenom",
+                "extracted_value": "SIMPLICE NADGE",
+                "confidence_score": 0.9734,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "6a76df8a-db6f-47e2-b324-0f003837dff7",
+                "field_name": "numero_cni",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "8da68211-0e70-420e-993f-b0cd67ee89c5",
+                "field_name": "date_naissance",
+                "extracted_value": "06/10/1978",
+                "confidence_score": 0.9969,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "4e949ffb-9ca4-4551-ba9d-5950572b2291",
+                "field_name": "lieu_naissance",
+                "extracted_value": "MAROUA",
+                "confidence_score": 0.9997,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "32c2df2c-bade-4d8f-b12b-1bbab0e7a387",
+                "field_name": "sexe",
+                "extracted_value": "M",
+                "confidence_score": 0.9999,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "f2985375-a1df-4341-8729-cd330f8fbf10",
+                "field_name": "taille",
+                "extracted_value": "1.76m",
+                "confidence_score": 0.9934,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "e0630f2c-7824-4735-af9d-3e1162ee903d",
+                "field_name": "profession",
+                "extracted_value": "ETUDIANT",
+                "confidence_score": 0.9985,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "5ddfbd12-be5f-4f55-8bf8-719b10434f4f",
+                "field_name": "date_delivrance",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "187495c9-4d21-451a-8033-bc0a6f41aa8d",
+                "field_name": "date_expiration",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "2a494085-67b2-4415-b7e5-bd0ef7618eb6",
+                "field_name": "sp",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "4f037cd6-6712-4df8-936f-870039433f6a",
+                "field_name": "adresse",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "12164760-fa87-4f31-9ed7-1abe70a0a971",
+                "field_name": "autorite_nom",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "5f7e6611-d4e4-4293-a791-1f6117d4b028",
+                "field_name": "poste_identification",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "39842bbe-7980-462c-b5b6-312f917a199e",
+                "field_name": "pere",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "887876c6-49b6-49cd-8287-415135e72eab",
+                "field_name": "mere",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              }
+            ]
+          },
+          {
+            "id": "ffe2d35e-e638-4d50-9aad-404bdd76e6c9",
+            "doc_type": "CNI_VERSO",
+            "sha256_hash": "0a0c76cc1356862d2ca0e8700eaf2884930d3c29fbe966b522cb4c5fc9c977fc",
+            "ocr_status": "PARTIAL",
+            "ocr_error": null,
+            "ocr_engine": "paddleocr",
+            "captured_at": "2026-05-26T04:08:47.535961Z",
+            "ocr_fields": [
+              {
+                "id": "4931fdb3-ebc3-4a15-a397-ab9ab65e2688",
+                "field_name": "nom",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "5ac01b9b-f33f-4dbf-95b2-58d4e598a4f0",
+                "field_name": "prenom",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "517520f7-0783-4429-953e-237055d20d3f",
+                "field_name": "numero_cni",
+                "extracted_value": "20242523751060686",
+                "confidence_score": 0.9998,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "d4a612bb-26eb-4bc9-92ed-edc3772b90b5",
+                "field_name": "date_naissance",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "d7c82c2b-6683-4eaa-9039-48fd492b6d73",
+                "field_name": "lieu_naissance",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "959e891b-ffb2-49ca-a735-95f52af5c755",
+                "field_name": "sexe",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "0c4f45d8-2a3c-4928-9c15-df55a9403353",
+                "field_name": "taille",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "8e1dc63b-a363-4c24-bb68-4e407bfc1c25",
+                "field_name": "profession",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "04bcb401-9b33-4d3f-bda3-9cfcc1c82912",
+                "field_name": "date_delivrance",
+                "extracted_value": "19/06/2024",
+                "confidence_score": 0.9581,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "faec087a-c392-493a-b8d8-44fa1ffa0e3e",
+                "field_name": "date_expiration",
+                "extracted_value": "19/06/2034",
+                "confidence_score": 0.9995,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "f54e949d-16a3-4e11-a39c-b9e9fc077e53",
+                "field_name": "sp",
+                "extracted_value": "965496",
+                "confidence_score": 0.9999,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "4a162132-f87e-465c-963e-cc97e10202ba",
+                "field_name": "adresse",
+                "extracted_value": "GAROUA",
+                "confidence_score": 0.9991,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "43cee26b-da52-49fc-b1d7-586f61c7326e",
+                "field_name": "autorite_nom",
+                "extracted_value": "MARTIN MBARGA AGUÈLE",
+                "confidence_score": 0.9796,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "cec16f8e-b58f-45bf-901a-76b4e68c1e77",
+                "field_name": "poste_identification",
+                "extracted_value": "ES40",
+                "confidence_score": 0.9999,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "5670ccdc-5c45-444d-8091-74dbaf4a1d28",
+                "field_name": "pere",
+                "extracted_value": "TANDENT YANG BENOIT",
+                "confidence_score": 0.9998,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "7e932e22-4c94-4b96-a799-368b35297fe0",
+                "field_name": "mere",
+                "extracted_value": "EYEBE HERVE",
+                "confidence_score": 0.9976,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "22b1522d-a1ea-4224-b481-33a804829a20",
+                "field_name": "full_name",
+                "extracted_value": "Marie Acceptance",
+                "confidence_score": 1.0,
+                "human_corrected": true,
+                "corrected_value": "Marie Acceptance",
+                "corrected_by_agent_id": null,
+                "corrected_at": "2026-05-26T04:09:06.944538Z"
+              },
+              {
+                "id": "4a4f0b97-114b-47bf-af4f-835f07b003de",
+                "field_name": "document_number",
+                "extracted_value": "CNI-20260526040827",
+                "confidence_score": 1.0,
+                "human_corrected": true,
+                "corrected_value": "CNI-20260526040827",
+                "corrected_by_agent_id": null,
+                "corrected_at": "2026-05-26T04:09:06.945796Z"
+              },
+              {
+                "id": "5d7ce43e-7185-447a-819b-1ac3f443d350",
+                "field_name": "birth_date",
+                "extracted_value": "01/01/1995",
+                "confidence_score": 1.0,
+                "human_corrected": true,
+                "corrected_value": "01/01/1995",
+                "corrected_by_agent_id": null,
+                "corrected_at": "2026-05-26T04:09:06.946854Z"
+              },
+              {
+                "id": "4664cd20-2b2a-4cdb-83b6-51730cc80e82",
+                "field_name": "expiry_date",
+                "extracted_value": "31/12/2030",
+                "confidence_score": 1.0,
+                "human_corrected": true,
+                "corrected_value": "31/12/2030",
+                "corrected_by_agent_id": null,
+                "corrected_at": "2026-05-26T04:09:06.948079Z"
+              }
+            ]
+          },
+          {
+            "id": "0ed384ce-eb12-47a0-beff-fffe14182519",
+            "doc_type": "BILL_ENEO",
+            "sha256_hash": "b29ca8926797cececc0488e0c2667322dc86abde4de77b6c8b7f85230b9dd4c6",
+            "ocr_status": "PARTIAL",
+            "ocr_error": null,
+            "ocr_engine": "UNSUPPORTED_FILE_TYPE",
+            "captured_at": "2026-05-26T04:09:06.710343Z",
+            "ocr_fields": [
+              {
+                "id": "4703155b-9f5e-485e-9602-9ca0e211a164",
+                "field_name": "contrat_number",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "0aee8802-9d58-421e-acec-4d74aed92462",
+                "field_name": "compteur_number",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "12e66f01-56a9-4a6a-946e-6fc0c4011e57",
+                "field_name": "date_releve",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "b46c31b7-d3d4-447f-bdb0-1dd82cc0f1ed",
+                "field_name": "date_facturation",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "ae59d894-5ddc-4046-a902-9d6b476de903",
+                "field_name": "date_limite_paiement",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "c8709723-29cb-402a-a163-9d9d8ddc870f",
+                "field_name": "agence",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "72e6eb1c-4a24-42dd-841c-0cb97587244c",
+                "field_name": "ville",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "96a8c696-538f-4312-b1f8-a889481f9041",
+                "field_name": "total_ttc",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "66f90481-94a2-433d-9e33-4d7fc639e9ef",
+                "field_name": "kwh_consommes",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              },
+              {
+                "id": "8e0a09f0-38d8-4ac6-8aa3-b0d038e29884",
+                "field_name": "categorie",
+                "extracted_value": null,
+                "confidence_score": 0.0,
+                "human_corrected": false,
+                "corrected_value": null,
+                "corrected_by_agent_id": null,
+                "corrected_at": null
+              }
+            ]
+          }
+        ],
+        "biometric_result": {
+          "id": "4cd9469c-59d1-4889-9a21-1afcd54b4091",
+          "face_match_score": 0.0,
+          "face_match_status": "FAILED",
+          "face_match_reason": "score_below_threshold",
+          "face_match_distance": 1.0,
+          "face_match_threshold": 0.8,
+          "face_match_detector": "opencv",
+          "liveness_score": 0.9354,
+          "anti_spoofing_score": 0.9354,
+          "model_version_face": "Facenet512",
+          "model_version_liveness": "landmarks_v1",
+          "processed_at": "2026-05-26T04:09:29.299734Z"
+        },
+        "has_consent": true,
+        "consent_method": "ACCEPTANCE_SCRIPT",
+        "signed_at": "2026-05-26T04:09:29.438575Z",
+        "decisions": [],
+        "aml_alerts": [],
+        "assigned_agent_id": null,
+        "assigned_agent_name": null
+      }
+    },
+    {
+      "step": "jean auto assign",
+      "method": "POST",
+      "url": "https://localhost/api/v1/backoffice/dossier/2c4b5701-2dff-4edf-b380-458a20ecb8d9/auto-assign",
+      "status": 200,
+      "elapsed_ms": 54,
+      "ok": true,
+      "body": {
+        "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+        "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+        "agent_name": "Jean Dupont",
+        "assigned_at": "2026-05-26T04:09:30.337958Z",
+        "assignment_method": "auto"
+      }
+    },
+    {
+      "step": "jean request complementary file",
+      "method": "POST",
+      "url": "https://localhost/api/v1/backoffice/dossier/2c4b5701-2dff-4edf-b380-458a20ecb8d9/review",
+      "status": 200,
+      "elapsed_ms": 41,
+      "ok": true,
+      "body": {
+        "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+        "decision": "INFO_REQUESTED",
+        "new_status": "PENDING_INFO",
+        "new_access_level": "RESTRICTED",
+        "decided_at": "2026-05-26T04:09:30.380677Z",
+        "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+        "reason": "Merci de transmettre un justificatif complementaire lisible."
+      }
+    },
+    {
+      "step": "client sees info requested",
+      "method": "GET",
+      "url": "https://localhost/api/v1/kyc/review-status",
+      "status": 200,
+      "elapsed_ms": 37,
+      "ok": true,
+      "body": {
+        "status": "PENDING_INFO",
+        "access_level": "RESTRICTED",
+        "submitted_at": "2026-05-26T04:09:29.692161+00:00",
+        "completed_at": null,
+        "decision": null,
+        "unread_notifications": [
+          {
+            "id": "5d69d4bd-a3e0-40a2-866e-ba16120db87c",
+            "type": "KYC_INFO_REQUESTED",
+            "message": "Des informations supplémentaires sont requises : Merci de transmettre un justificatif complementaire lisible.. Veuillez vous connecter.",
+            "sent_at": "2026-05-26T04:09:30.380677+00:00"
+          }
+        ]
+      }
+    },
+    {
+      "step": "support attachment limits",
+      "method": "GET",
+      "url": "https://localhost/api/v1/support/attachment-limits",
+      "status": 200,
+      "elapsed_ms": 13,
+      "ok": true,
+      "body": {
+        "max_size_mb": 10,
+        "hard_max_size_mb": 10,
+        "image_max_size_mb": 4,
+        "pdf_max_size_mb": 6,
+        "pdf_max_pages": 5,
+        "max_message_chars": 4000,
+        "allowed_content_types": [
+          "application/pdf",
+          "image/jpeg",
+          "image/png"
+        ],
+        "allowed_extensions": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".pdf"
+        ]
+      }
+    },
+    {
+      "step": "support current thread",
+      "method": "GET",
+      "url": "https://localhost/api/v1/support/threads/current",
+      "status": 200,
+      "elapsed_ms": 62,
+      "ok": true,
+      "body": {
+        "id": "e40ce7be-e236-4087-8dc7-927378d3981d",
+        "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+        "status": "OPEN",
+        "created_at": "2026-05-26T04:09:30.487934Z"
+      }
+    },
+    {
+      "step": "support text message",
+      "method": "POST",
+      "url": "https://localhost/api/v1/support/threads/e40ce7be-e236-4087-8dc7-927378d3981d/messages",
+      "status": 201,
+      "elapsed_ms": 43,
+      "ok": true,
+      "body": {
+        "id": "f8ccfeb1-826e-46a7-8c1d-d0ba6985cc28",
+        "thread_id": "e40ce7be-e236-4087-8dc7-927378d3981d",
+        "sender": "user",
+        "content": "Bonjour, je transmets le justificatif complementaire demande.",
+        "attachment_path": null,
+        "attachment_sha256": null,
+        "attachment_filename": null,
+        "attachment_document_id": null,
+        "created_at": "2026-05-26T04:09:30.533883Z"
+      }
+    },
+    {
+      "step": "support attachment upload address proof pdf",
+      "method": "POST",
+      "url": "https://localhost/api/v1/support/threads/e40ce7be-e236-4087-8dc7-927378d3981d/attachments",
+      "status": 201,
+      "elapsed_ms": 53,
+      "ok": true,
+      "body": {
+        "id": "57d03e83-b4e6-4057-aa43-7e4e7f6c1aa0",
+        "thread_id": "e40ce7be-e236-4087-8dc7-927378d3981d",
+        "sender": "user",
+        "content": "Justificatif complementaire joint.",
+        "attachment_path": "/data/documents/support/858c3460-220a-495a-91c2-d2d52d312bca/78efbf38-669a-419d-b8ae-c3e56ac11720_support_address_proof_acceptance.pdf",
+        "attachment_sha256": "f2f437bca24ce3f652bea72be844f61ac1eb075283997ac2f7569ea04daef5be",
+        "attachment_filename": "support_address_proof_acceptance.pdf",
+        "attachment_document_id": "b3b15296-5b67-4819-af1d-07e206af306f",
+        "created_at": "2026-05-26T04:09:30.603996Z"
+      }
+    },
+    {
+      "step": "jean classify complementary file",
+      "method": "POST",
+      "url": "https://localhost/api/v1/backoffice/dossier/2c4b5701-2dff-4edf-b380-458a20ecb8d9/documents/b3b15296-5b67-4819-af1d-07e206af306f/classify",
+      "status": 200,
+      "elapsed_ms": 48,
+      "ok": true,
+      "body": {
+        "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+        "document_id": "b3b15296-5b67-4819-af1d-07e206af306f",
+        "doc_type": "ADDRESS_PROOF",
+        "categories": [
+          "ADDRESS_PROOF"
+        ],
+        "classified_at": "2026-05-26T04:09:30.631120Z"
+      }
+    },
+    {
+      "step": "jean approve dossier",
+      "method": "POST",
+      "url": "https://localhost/api/v1/backoffice/dossier/2c4b5701-2dff-4edf-b380-458a20ecb8d9/review",
+      "status": 200,
+      "elapsed_ms": 74,
+      "ok": true,
+      "body": {
+        "session_id": "2c4b5701-2dff-4edf-b380-458a20ecb8d9",
+        "decision": "APPROVED",
+        "new_status": "APPROVED",
+        "new_access_level": "LIMITED_ACCESS",
+        "decided_at": "2026-05-26T04:09:30.700899Z",
+        "agent_id": "2a973900-7be8-4924-a42e-4dbc8dcc56c4",
+        "reason": "Dossier complet apres justificatif complementaire."
+      }
+    },
+    {
+      "step": "client sees approved status",
+      "method": "GET",
+      "url": "https://localhost/api/v1/kyc/review-status",
+      "status": 200,
+      "elapsed_ms": 58,
+      "ok": true,
+      "body": {
+        "status": "APPROVED",
+        "access_level": "LIMITED_ACCESS",
+        "submitted_at": "2026-05-26T04:09:29.692161+00:00",
+        "completed_at": "2026-05-26T04:09:30.700899+00:00",
+        "decision": {
+          "decision": "APPROVED",
+          "reason": "Dossier complet apres justificatif complementaire.",
+          "decided_at": "2026-05-26T04:09:30.700899+00:00"
+        },
+        "unread_notifications": [
+          {
+            "id": "5bbc0a17-55ed-478e-8b9b-2003127c7e00",
+            "type": "KYC_APPROVED",
+            "message": "Votre dossier KYC a été approuvé ! Vous pouvez désormais accéder à vos services.",
+            "sent_at": "2026-05-26T04:09:30.700899+00:00"
+          },
+          {
+            "id": "5d69d4bd-a3e0-40a2-866e-ba16120db87c",
+            "type": "KYC_INFO_REQUESTED",
+            "message": "Des informations supplémentaires sont requises : Merci de transmettre un justificatif complementaire lisible.. Veuillez vous connecter.",
+            "sent_at": "2026-05-26T04:09:30.380677+00:00"
+          }
+        ]
+      }
+    }
+  ]
+}
