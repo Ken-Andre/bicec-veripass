@@ -1,6 +1,6 @@
 ---
 name: academic-writing
-description: Academic writing assistant for research papers, theses, and LaTeX projects. Use when the user asks to review, draft, polish, or prepare academic writing; check logic, prose, consistency, citations, bibliography, math, figures, tables, or LaTeX layout; survey literature; assess research positioning; or adapt Claude academic-writing-agents workflows for Codex.
+description: Academic writing assistant for research papers, theses, and LaTeX projects. Use when the user asks to review, draft, polish, or prepare academic writing; check logic, prose, consistency, citations, bibliography, math, figures, tables, or LaTeX layout; survey literature; assess research positioning; preserve authorial voice; handle AI-detector false-positive concerns ethically; or adapt Claude academic-writing-agents workflows for Codex.
 ---
 
 # Academic Writing
@@ -17,15 +17,17 @@ Adapted from Haiwen Huang's MIT-licensed `academic-writing-agents` Claude plugin
 - Review before editing for any broad polish, submission-readiness, or revision task. Diagnose the issues, prioritize them, then edit only the changes the request authorizes.
 - Preserve authorial intent, technical claims, citations, labels, macros, and notation unless the task is explicitly to change them.
 - Never invent citations or bibliography entries. Mark unresolved citation needs with a clear placeholder such as `[CITE: description]`.
+- Do not optimize text to evade AI detectors, bypass academic integrity checks, or misrepresent authorship. Redirect those requests to writing quality, authorial voice, permitted AI-use disclosure, process evidence, and false-positive resilience using `references/writing-integrity.md`.
 
 ## First Move
 
-1. Classify the request: review, polish, draft, bibliography audit, figure/layout work, research positioning, literature survey, or submission readiness.
+1. Classify the request: review, polish, draft, bibliography audit, figure/layout work, research positioning, literature survey, writing integrity, or submission readiness.
 2. Load `references/principles.md` for non-trivial writing or review work.
-3. Load `references/role-cards.md` when selecting specialist lenses or preparing subagent prompts.
-4. Read project conventions when present: `AGENTS.md`, `.claude/CLAUDE.md`, `CLAUDE.md`, `GEMINI.md`, `README.md`, LaTeX headers, makefiles, and nearby sections.
-5. Discover relevant files with `rg --files`, especially `.tex`, `.bib`, `.cls`, `.sty`, figures, tables, PDFs, and build logs.
-6. For broad work, state a compact deployment plan and proceed unless the user objects. For narrow edits, act directly.
+3. Load `references/writing-integrity.md` when the request mentions AI detectors, AI flags, human-sounding prose, authorial voice, style calibration, false positives, permitted AI use, or process evidence.
+4. Load `references/role-cards.md` when selecting specialist lenses or preparing subagent prompts.
+5. Read project conventions when present: `AGENTS.md`, `.claude/CLAUDE.md`, `CLAUDE.md`, `GEMINI.md`, `README.md`, LaTeX headers, makefiles, and nearby sections.
+6. Discover relevant files with `rg --files`, especially `.tex`, `.bib`, `.cls`, `.sty`, figures, tables, PDFs, and build logs.
+7. For broad work, state a compact deployment plan and proceed unless the user objects. For narrow edits, act directly.
 
 ## Role Selection
 
@@ -42,6 +44,7 @@ Use the smallest set of roles that covers the request.
 - Draft a section, paragraph, abstract, caption, or transition: section-drafter.
 - Research positioning or novelty: research-analyst plus brainstormer when useful.
 - Literature survey or paper collection: paper-crawler, then research-analyst.
+- AI-detector flag, false-positive risk, "humanize" phrasing, or authorial voice: authorship-integrity-advisor plus writing-reviewer and prose-polisher. Use style calibration and scientific clarity passes; do not target detector scores.
 - Submission readiness: all review roles, bibliography-auditor, latex-layout-auditor, then targeted action roles and verification.
 
 ## Review Workflow
@@ -62,10 +65,11 @@ Before editing academic text:
 
 1. Identify which findings the edit pass will address.
 2. Read adjacent sections to preserve voice, tense, depth, and notation.
-3. Make targeted edits. Avoid broad rewrites that change meaning.
-4. Do not change LaTeX labels, macro names, bibliography keys, math symbols, or figure paths unless required.
-5. Re-run relevant checks after edits: `rg` for labels/citations, LaTeX build if available, and a focused review of changed text.
-6. Summarize changed files, principles addressed, and remaining author decisions.
+3. If authorial voice matters, calibrate from the user's own prior writing samples using `references/writing-integrity.md`.
+4. Make targeted edits. Avoid broad rewrites that change meaning.
+5. Do not change LaTeX labels, macro names, bibliography keys, math symbols, or figure paths unless required.
+6. Re-run relevant checks after edits: `rg` for labels/citations, LaTeX build if available, and a focused review of changed text.
+7. Summarize changed files, principles addressed, and remaining author decisions.
 
 ## Drafting Workflow
 
@@ -103,6 +107,18 @@ For literature surveys or paper crawling:
 3. Deduplicate by normalized title and DOI.
 4. Separate collection from analysis: raw candidate papers first, then relevance classification and research synthesis.
 5. Cite or link sources in the final answer when web research is used.
+
+## Writing Integrity Workflow
+
+Use this when the user worries about AI-detector flags, asks for authorial voice, or wants text that reflects their genuine writing process.
+
+1. State the boundary: improve writing quality and authorship evidence; do not bypass detectors or hide prohibited AI use.
+2. Check the applicable policy when available: course, journal, conference, supervisor, institution, or funder rules.
+3. Collect legitimate inputs: the user's draft, notes, outline, source annotations, earlier revisions, and optional prior writing samples.
+4. Build a style profile only from writing the user authored. Use it as a soft guide beneath discipline and journal conventions.
+5. Run scientific clarity passes: clutter, voice/verbs, sentence architecture, terminology consistency, numerical consistency, and citation integrity.
+6. Remove formulaic prose because it is weak writing, not because a detector might flag it.
+7. If needed, create a process-evidence summary: sources used, drafts reviewed, AI assistance disclosed, edits made, and remaining author decisions.
 
 ## Synthesis Format
 

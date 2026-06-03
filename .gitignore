@@ -296,3 +296,22 @@ code/b_logs_utf8.txt
 # Temp Word files
 # ========================
 ~$*.docx
+# ========================
+# AI Agent Plans
+# ========================
+.opencode/plans/
+
+# ========================
+# Docker stack backups
+# ========================
+code/backups/docker-stack/
+
+# ========================
+# Generated test results
+# ========================
+test-results/
+
+# ========================
+# Incorrectly placed git hooks
+# ========================
+dev/null/

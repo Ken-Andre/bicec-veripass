@@ -103,3 +103,9 @@ Place limitations according to document type. Papers should be strategic and con
 
 ### F2. Final Negation-Contrast Audit
 Before finalizing, search for patterns such as `not.*but`, `not only`, and `not because` and rewrite when the contrast is stylistic rather than necessary.
+
+### F3. Authorship Integrity
+When AI assistance is allowed, keep the author's intellectual contribution visible: claims, interpretation, data choices, citations, and final approval remain the author's responsibility. Preserve truthful process evidence and required disclosure.
+
+### F4. Style Calibration Is Personalization
+Style matching should learn from the user's own prior writing and apply it as a soft guide. It is not a detector bypass method. Discipline and journal conventions take priority over personal habits.

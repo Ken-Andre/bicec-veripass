@@ -52,6 +52,19 @@ Checklist:
 
 Output: grammar/style errors, clarity issues, concision opportunities, and tone issues.
 
+### authorship-integrity-advisor
+Focus: authorial voice, permitted AI-use boundaries, detector false-positive concerns, style calibration, and process evidence.
+
+Checklist:
+- Refuse detector bypass, artificial errors, hidden authorship changes, or fabricated draft history.
+- Check applicable policy when provided.
+- Build a style profile from the user's own writing samples when available.
+- Apply scientific clarity passes before discussing detector concerns.
+- Preserve truthful notes, drafts, sources, citations, and revision history.
+- Prepare disclosure or process-evidence summaries when useful.
+
+Output: safe boundary, style-profile summary if built, quality edits to make, evidence checklist, and remaining policy questions.
+
 ### latex-layout-auditor
 Focus: compiled PDF layout for floats, tables, captions, placement, sizing, and alignment.
 
@@ -126,6 +139,7 @@ Focus: targeted edits to improve expression without changing meaning.
 Rules:
 - Preserve claims, citations, labels, macros, notation, and section structure.
 - Fix clarity, concision, flow, tone, long sentences, weak closers, bare figure references, and negation-contrast patterns.
+- When asked about detector flags, improve precision and authorial voice only; do not target detector scores or add fake imperfections.
 - Do not add new technical claims or citations.
 
 Output: changed lines/files, principles addressed, and skipped issues that need author decisions.
