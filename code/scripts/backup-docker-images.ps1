@@ -4,6 +4,13 @@
 # Sauvegarde toutes les images du docker-compose.yml dans un archive .tar.gz
 # datee, puis supprime les backups de plus de 90 jours.
 #
+# IMPORTANT:
+#   Ce script sauvegarde uniquement les images Docker.
+#   Il ne sauvegarde pas les volumes, la base PostgreSQL, Redis, les documents,
+#   les caches modeles, le projet Docker Desktop, ni les fichiers Compose.
+#   Pour remettre un environnement runnable a un encadreur, utiliser plutot:
+#     powershell -File scripts/export-docker-stack.ps1 -IncludeEnv
+#
 # Usage :
 #   powershell -File scripts/backup-docker-images.ps1
 #
@@ -24,17 +31,30 @@ New-Item -ItemType Directory -Path $BACKUP_DIR -Force | Out-Null
 
 Write-Output "=== Backup des images Docker - $DATE ==="
 
-$IMAGES = @(
-    "code-api:latest"
-    "code-pwa:latest"
-    "code-backoffice:latest"
-    "code-nginx:latest"
-    "postgres:17-bookworm"
-    "redis:7-bookworm"
-    "mher/flower:2.0"
-    "axllent/mailpit:latest"
-    "nginxinc/nginx-unprivileged:1.27-alpine"
-)
+$IMAGES = @()
+if (Test-Path $COMPOSE_FILE) {
+    $IMAGES = @(docker compose -f $COMPOSE_FILE --project-name code config --images | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+    } | Sort-Object -Unique)
+}
+
+if ($LASTEXITCODE -ne 0 -or $IMAGES.Count -eq 0) {
+    Write-Output "Impossible de lire les images via docker compose config; fallback statique."
+    $IMAGES = @(
+        "postgres:17-bookworm"
+        "redis:7-bookworm"
+        "code-api"
+        "code-celery_ocr"
+        "code-celery_notifications"
+        "code-celery_beat"
+        "code-backoffice"
+        "code-pwa"
+        "mher/flower:2.0"
+        "axllent/mailpit"
+        "code-storage_init"
+        "code-nginx"
+    )
+}
 
 $OUTPUT = Join-Path $BACKUP_DIR "veripass-images-$DATE.tar.gz"
 

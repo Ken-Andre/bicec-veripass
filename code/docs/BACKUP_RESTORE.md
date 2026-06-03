@@ -1,5 +1,17 @@
 # PostgreSQL Backup & Restore — bicec-veripass
 
+## Full Docker handoff is a separate procedure
+
+This document covers PostgreSQL backup and restore.
+
+For a runnable Docker Desktop handoff to another machine, use `code/docs/DOCKER_HANDOFF.md` and the scripts below:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File code\scripts\export-docker-stack.ps1 -IncludeEnv
+```
+
+`docker load -i archive.tar.gz` is not a full restore. It restores images only. It does not restore Docker volumes, uploaded documents, PostgreSQL data, Redis data, model caches, Compose networks, the `code` Docker Desktop project, service healthchecks, or startup ordering.
+
 ## Architecture
 
 ```

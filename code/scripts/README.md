@@ -2,6 +2,34 @@
 
 Ce dossier contient les scripts utilitaires pour la maintenance et l'administration du projet.
 
+## Remise Docker complete a un encadreur
+
+Utiliser ce flux quand il faut remettre une stack VeriPass runnable sur une autre machine Docker Desktop.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File code\scripts\export-docker-stack.ps1 -IncludeEnv
+```
+
+Le paquet genere contient les images Docker, les volumes Docker, les fichiers Compose, les assets montes en bind mount, et un script de restauration.
+
+Sur la machine destinataire :
+
+```powershell
+tar -xzf .\veripass-stack-YYYYMMDD-HHMMSS.tar.gz
+cd .\veripass-stack-YYYYMMDD-HHMMSS
+powershell -ExecutionPolicy Bypass -File .\import-docker-stack.ps1
+```
+
+Ne pas restaurer uniquement avec `docker load`. `docker load` remet les images, mais pas les volumes, pas le projet Compose `code`, pas les reseaux, pas les variables d'environnement, et pas l'ordre de demarrage.
+
+Runbook detaille : `code/docs/DOCKER_HANDOFF.md`.
+
+## backup-docker-images.ps1 / backup-docker-images.sh
+
+Sauvegarde uniquement les images Docker dans `code/backups/docker-images`.
+
+Ce script est utile pour conserver les couches d'images localement, mais il ne produit pas une application restaurable. Il ne contient pas PostgreSQL, Redis, les documents KYC, les caches modeles, ni la configuration Compose runtime. Pour une remise complete, utiliser `export-docker-stack.ps1`.
+
 ## docker_prune.sh / docker_prune.ps1
 
 Scripts de gestion automatique de l'espace disque Docker.

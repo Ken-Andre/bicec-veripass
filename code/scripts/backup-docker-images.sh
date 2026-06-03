@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-# BICEC VeriPass — Backup mensuel des images Docker
+# BICEC VeriPass - Backup mensuel des images Docker
 #
-# Sauvegarde toutes les images du docker-compose.yml dans un archive .tar.gz
-# datée, puis supprime les backups de plus de 90 jours.
+# Sauvegarde uniquement les images Docker du docker-compose.yml dans une archive
+# .tar.gz datee, puis supprime les backups de plus de 90 jours.
+#
+# IMPORTANT:
+#   Ce script sauvegarde uniquement les images Docker.
+#   Il ne sauvegarde pas les volumes, la base PostgreSQL, Redis, les documents,
+#   les caches modeles, le projet Docker Desktop, ni les fichiers Compose.
+#   Pour remettre un environnement runnable a un encadreur, utiliser plutot:
+#     powershell -File scripts/export-docker-stack.ps1 -IncludeEnv
 #
 # Usage :
 #   bash scripts/backup-docker-images.sh
 #
-# Automation (cron — 1er jour du mois à 2h) :
+# Automation (cron - 1er jour du mois a 2h) :
 #   0 2 1 * * /chemin/vers/code/scripts/backup-docker-images.sh
 # =============================================================================
 set -euo pipefail
@@ -21,72 +28,56 @@ COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 
 mkdir -p "$BACKUP_DIR"
 
-echo "=== Backup des images Docker — $DATE ==="
+echo "=== Backup des images Docker - $DATE ==="
 
-# Extraire la liste des images du docker-compose.yml
-# (images buildées + images externes référencées)
-IMAGES=()
+mapfile -t IMAGES < <(docker compose -f "$COMPOSE_FILE" --project-name code config --images | sort -u || true)
 
-# Images buildées localement (section build:)
-while IFS= read -r line; do
-    if [[ "$line" =~ image:\ +([^#]+) ]]; then
-        img="${BASH_REMATCH[1]}"
-        img="${img//\$\{*\}/}"  # Skip template variables
-        if [ -n "$img" ]; then
-            IMAGES+=("$img")
-        fi
-    fi
-done < <(grep -E '^\s+image:\s+' "$COMPOSE_FILE" | sort -u)
-
-# Ajouter les images externes explicites
-EXTERNAL_IMAGES=(
-    "code-api:latest"
-    "code-pwa:latest"
-    "code-backoffice:latest"
-    "code-nginx:latest"
-    "postgres:17-bookworm"
-    "redis:7-bookworm"
-    "mher/flower:2.0"
-    "axllent/mailpit:latest"
-    "nginxinc/nginx-unprivileged:1.27-alpine"
-)
+if [ ${#IMAGES[@]} -eq 0 ]; then
+    echo "Impossible de lire les images via docker compose config; fallback statique."
+    IMAGES=(
+        "postgres:17-bookworm"
+        "redis:7-bookworm"
+        "code-api"
+        "code-celery_ocr"
+        "code-celery_notifications"
+        "code-celery_beat"
+        "code-backoffice"
+        "code-pwa"
+        "mher/flower:2.0"
+        "axllent/mailpit"
+        "code-storage_init"
+        "code-nginx"
+    )
+fi
 
 OUTPUT="$BACKUP_DIR/veripass-images-$DATE.tar.gz"
 
-echo "Images à sauvegarder :"
-for img in "${EXTERNAL_IMAGES[@]}"; do
-    if docker image inspect "$img" &>/dev/null; then
-        echo "  ✅ $img"
-    else
-        echo "  ⚠️  $img — introuvable, ignorée"
-    fi
-done
-
-echo ""
-echo "Création de l'archive : $OUTPUT"
-
-# Sauvegarder uniquement les images qui existent
+echo "Images a sauvegarder :"
 AVAILABLE_IMAGES=()
-for img in "${EXTERNAL_IMAGES[@]}"; do
+for img in "${IMAGES[@]}"; do
     if docker image inspect "$img" &>/dev/null; then
+        echo "  [OK] $img"
         AVAILABLE_IMAGES+=("$img")
+    else
+        echo "  [--] $img - introuvable, ignoree"
     fi
 done
 
 if [ ${#AVAILABLE_IMAGES[@]} -eq 0 ]; then
-    echo "❌ Aucune image trouvée à sauvegarder"
+    echo "Aucune image trouvee a sauvegarder"
     exit 1
 fi
 
+echo ""
+echo "Creation de l'archive : $OUTPUT"
 docker save "${AVAILABLE_IMAGES[@]}" | gzip > "$OUTPUT"
 
 SIZE=$(du -h "$OUTPUT" | cut -f1)
-echo "✅ Backup terminé — $SIZE"
+echo "Backup termine - $SIZE"
 
-# Nettoyage des backups de plus de 90 jours
 echo ""
 echo "Nettoyage des backups > 90 jours..."
 find "$BACKUP_DIR" -name "veripass-images-*.tar.gz" -type f -mtime +90 -delete
-echo "✅ Terminé"
+echo "Termine"
 
-echo "=== Backup terminé avec succès ==="
+echo "=== Backup termine avec succes ==="
