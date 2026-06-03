@@ -1161,7 +1161,7 @@ sequenceDiagram
     actor M as Marie (mobile)
     participant APP as PWA VeriPass
     participant OS as OS detection
-    participant LINK as App link / Universal link
+    participant APPLNK as App link / Universal link
     participant STORE as App Store / Google Play
     participant BANK as App aval<br/>(BI PAY / Wallet)
 
@@ -1170,14 +1170,14 @@ sequenceDiagram
     APP->>OS: navigator.userAgent
     OS-->>APP: iOS / Android / Desktop
     alt iOS
-        APP->>LINK: window.location = BIPAY_IOS_APP_LINK<br/>(si configuré)
-        LINK-->>BANK: ouvre l'app si installée
-        LINK-->>APP: fallback si non installée
+        APP->>APPLNK: window.location = BIPAY_IOS_APP_LINK<br/>(si configuré)
+        APPLNK-->>BANK: ouvre l'app si installée
+        APPLNK-->>APP: fallback si non installée
         APP->>STORE: window.location = BIPAY_IOS_STORE_URL
     else Android
-        APP->>LINK: window.location = BIPAY_ANDROID_APP_LINK<br/>(si configuré)
-        LINK-->>BANK: ouvre l'app si installée
-        LINK-->>APP: fallback si non installée
+        APP->>APPLNK: window.location = BIPAY_ANDROID_APP_LINK<br/>(si configuré)
+        APPLNK-->>BANK: ouvre l'app si installée
+        APPLNK-->>APP: fallback si non installée
         APP->>STORE: window.location = BIPAY_ANDROID_STORE_URL
     else Desktop
         APP->>APP: render landing page

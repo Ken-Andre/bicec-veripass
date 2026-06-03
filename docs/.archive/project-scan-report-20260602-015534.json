@@ -1,0 +1,133 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {
+    "started": "2026-05-28T06:48:29+02:00",
+    "last_updated": "2026-05-28T06:48:29+02:00",
+    "completed": "2026-05-28T06:48:29+02:00"
+  },
+  "mode": "full_rescan",
+  "scan_level": "deep",
+  "project_root": "C:\\Users\\yoann\\Documents\\School\\Xp-X5\\Stage\\bicec-veripass",
+  "project_knowledge": "C:\\Users\\yoann\\Documents\\School\\Xp-X5\\Stage\\bicec-veripass\\docs",
+  "completed_steps": [
+    {
+      "step": "step_1",
+      "status": "completed",
+      "timestamp": "2026-05-28T06:48:29+02:00",
+      "summary": "Classified repository as a multi-part Docker Compose system with backend, mobile, backoffice, infrastructure, scripts, docs, and planning artifacts."
+    },
+    {
+      "step": "step_2",
+      "status": "completed",
+      "timestamp": "2026-05-28T06:48:29+02:00",
+      "summary": "Inventoried existing docs under docs, code/docs, and _bmad-output/planning-artifacts; existing docs were mostly onboarding, historical audits, diagrams, ADRs, and evidence."
+    },
+    {
+      "step": "step_3",
+      "status": "completed",
+      "timestamp": "2026-05-28T06:48:29+02:00",
+      "summary": "Extracted technology stack from pyproject.toml, package.json files, docker-compose.yml, Dockerfiles, Nginx config, FastAPI routers, SQLAlchemy models, Alembic migrations, React route maps, and scripts."
+    },
+    {
+      "step": "step_4",
+      "status": "completed",
+      "timestamp": "2026-05-28T06:48:29+02:00",
+      "summary": "Scanned backend modules, API namespaces, KYC workflow, auth/RBAC, data models, Celery jobs, mobile routes, backoffice routes, deployment paths, and operations scripts."
+    },
+    {
+      "step": "step_9",
+      "status": "completed",
+      "timestamp": "2026-05-28T06:48:29+02:00",
+      "summary": "Generated project overview, architecture, source tree, API, data model, component inventory, development, deployment, operations, and maintainer handbook documents."
+    },
+    {
+      "step": "step_10",
+      "status": "completed",
+      "timestamp": "2026-05-28T06:48:29+02:00",
+      "summary": "Updated docs/index.md with a primary maintainer documentation section and generated project-parts.json metadata."
+    },
+    {
+      "step": "step_11",
+      "status": "completed",
+      "timestamp": "2026-05-28T06:48:29+02:00",
+      "summary": "Validated JSON metadata, generated Markdown link targets, generated file sizes, and ASCII-only content for newly generated Markdown and JSON artifacts."
+    },
+    {
+      "step": "step_12",
+      "status": "completed",
+      "timestamp": "2026-05-28T06:48:29+02:00",
+      "summary": "Workflow documentation generation completed."
+    }
+  ],
+  "current_step": "completed",
+  "findings": {
+    "project_classification": {
+      "repository_type": "multi-part",
+      "parts_count": 5,
+      "parts": ["backend", "mobile", "backoffice", "infra", "scripts"],
+      "primary_tech": ["FastAPI", "React", "Vite", "PostgreSQL", "Redis", "Celery", "Docker Compose", "Nginx"]
+    },
+    "scan_counts": {
+      "backend_files": 195,
+      "mobile_files": 180,
+      "backoffice_files": 105,
+      "infra_and_script_files": 68,
+      "docs_files_before_generation": 183,
+      "fastapi_route_decorators": 143,
+      "sqlalchemy_tables": 32,
+      "alembic_migration_files": 24,
+      "test_and_evidence_source_files": 80
+    },
+    "technology_stack": {
+      "backend": "Python 3.11, FastAPI, Pydantic, SQLAlchemy async, asyncpg, Alembic, Redis, Celery, SlowAPI, Sentry, PaddleOCR, DeepFace",
+      "mobile": "React 19, TypeScript, Vite, TanStack Query, React Router, Workbox PWA, MediaPipe, Sentry, Vitest, Playwright",
+      "backoffice": "React 19, TypeScript, Vite, TanStack Query, React Router, Recharts, Sentry, Vitest, Playwright",
+      "infrastructure": "Docker Compose, Nginx TLS reverse proxy, PostgreSQL 17, Redis 7, Mailpit, Flower"
+    },
+    "product_scope": "VeriPass is a KYC onboarding, verified identity storage, and auth/eligibility guardrail for downstream BICEC mobile apps. DGI, Sopra Amplitude, and core banking integration are out of scope now and are not a planned future path. Downstream access should use OS-aware app links or app-store redirects.",
+    "existing_documentation": "Existing docs included onboarding-guide.md, ADRs, diagrams, delivery trackers, audit reports, test evidence, troubleshooting notes, and BMAD planning artifacts. The generated set adds a handover-grade maintainer documentation layer."
+  },
+  "project_types": [
+    {
+      "part_id": "backend",
+      "project_type_id": "backend",
+      "display_name": "FastAPI backend"
+    },
+    {
+      "part_id": "mobile",
+      "project_type_id": "web",
+      "display_name": "Mobile PWA"
+    },
+    {
+      "part_id": "backoffice",
+      "project_type_id": "web",
+      "display_name": "Backoffice SPA"
+    },
+    {
+      "part_id": "infra",
+      "project_type_id": "infra",
+      "display_name": "Docker/Nginx infrastructure"
+    },
+    {
+      "part_id": "scripts",
+      "project_type_id": "cli",
+      "display_name": "Operational scripts"
+    }
+  ],
+  "outputs_generated": [
+    "project-overview.md",
+    "architecture.md",
+    "source-tree-analysis.md",
+    "api-contracts.md",
+    "data-models.md",
+    "component-inventory.md",
+    "development-guide.md",
+    "deployment-guide.md",
+    "operations-runbook.md",
+    "maintainer-handbook.md",
+    "project-parts.json",
+    "project-scan-report.json",
+    "index.md"
+  ],
+  "resume_instructions": "Workflow is complete. Use docs/index.md as the entry point and docs/maintainer-handbook.md as the primary handover guide."
+}
