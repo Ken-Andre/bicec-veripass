@@ -7,6 +7,7 @@ from pathlib import Path
 from docx import Document
 from docx.enum.text import WD_BREAK
 from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 from docx.table import Table
 
@@ -137,6 +138,27 @@ def replace_between_paragraphs(document: Document, start_text: str, end_text: st
         cur = insert_after(cur, entry, style)
 
 
+def insert_toc_after(paragraph: Paragraph) -> None:
+    p = insert_after(paragraph, "", "Normal")
+    run = p.add_run()
+    fld_begin = OxmlElement("w:fldChar")
+    fld_begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = 'TOC \\o "1-3" \\h \\z \\u'
+    fld_sep = OxmlElement("w:fldChar")
+    fld_sep.set(qn("w:fldCharType"), "separate")
+    placeholder = OxmlElement("w:t")
+    placeholder.text = "Table des matières générée par Word"
+    fld_end = OxmlElement("w:fldChar")
+    fld_end.set(qn("w:fldCharType"), "end")
+    run._r.append(fld_begin)
+    run._r.append(instr)
+    run._r.append(fld_sep)
+    run._r.append(placeholder)
+    run._r.append(fld_end)
+
+
 def style_major_headings(document: Document) -> None:
     major = (
         "Introduction générale",
@@ -188,6 +210,7 @@ def main() -> None:
     remove_tables_by_header(
         doc,
         (
+            "Partie |",
             "Elément | Information",
             "Exigence KYC |",
             "Limite observée |",
@@ -223,6 +246,8 @@ def main() -> None:
             remove_block(p)
     for p in list(doc.paragraphs):
         if p.text.strip() in {"2.11 Synthèse du chapitre"}:
+            remove_block(p)
+        if p.text.strip() in {"Tableau 1. Structure du mémoire", "Tableau 1. Structure prévue du mémoire"}:
             remove_block(p)
 
     for table in doc.tables:
@@ -505,12 +530,11 @@ def main() -> None:
         "Liste des tableaux",
         "Liste des figures",
         [
-            "Tableau 1. Structure du mémoire",
-            "Tableau 2. Abréviations utilisées",
-            "Tableau 3. Fiche signalétique synthétique de la BICEC et du stage",
-            "Tableau 4. Limites du processus manuel et réponses du pipeline numérique",
-            "Tableau 5. Architecture logique et responsabilités techniques",
-            "Tableau 6. Gestion des échecs OCR et biométriques",
+            "Tableau 1. Abréviations utilisées",
+            "Tableau 2. Fiche signalétique synthétique de la BICEC et du stage",
+            "Tableau 3. Limites du processus manuel et réponses du pipeline numérique",
+            "Tableau 4. Architecture logique et responsabilités techniques",
+            "Tableau 5. Gestion des échecs OCR et biométriques",
         ],
         "Front Matter",
     )
@@ -525,7 +549,11 @@ def main() -> None:
         ],
         "Front Matter",
     )
-    replace_paragraph(doc, "Tableau 1. Structure prévue du mémoire", "Tableau 1. Structure du mémoire")
+    replace_paragraph(doc, "Tableau 2. Abréviations utilisées", "Tableau 1. Abréviations utilisées")
+    replace_paragraph(doc, "Tableau 3. Fiche signalétique synthétique de la BICEC et du stage", "Tableau 2. Fiche signalétique synthétique de la BICEC et du stage")
+    replace_paragraph(doc, "Tableau 4. Limites du processus manuel et réponses attendues du pipeline numérique", "Tableau 3. Limites du processus manuel et réponses attendues du pipeline numérique")
+    replace_paragraph(doc, "Tableau 5. Architecture logique et responsabilités techniques", "Tableau 4. Architecture logique et responsabilités techniques")
+    replace_paragraph(doc, "Tableau 6. Gestion des échecs OCR et biométriques", "Tableau 5. Gestion des échecs OCR et biométriques")
     replace_paragraph(doc, "Figure 2. Architecture logique simplifiée de BICEC VeriPass", "Figure 1. Architecture logique simplifiée de BICEC VeriPass")
     replace_paragraph(doc, "Figure 3. Pipeline de données et états principaux du dossier KYC", "Figure 2. Pipeline de données et états principaux du dossier KYC")
     replace_paragraph(doc, "Figure 4. MLD simplifié des entités KYC principales", "Figure 3. MLD simplifié des entités KYC principales")
@@ -592,6 +620,10 @@ def main() -> None:
 
     # Page breaks for major parts.
     style_major_headings(doc)
+    for p in doc.paragraphs:
+        if p.text.strip() == "TABLE DES MATIÈRES":
+            insert_toc_after(p)
+            break
 
     # Basic text hygiene.
     for p in doc.paragraphs:
