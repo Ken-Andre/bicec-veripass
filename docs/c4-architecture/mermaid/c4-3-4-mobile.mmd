@@ -1,0 +1,41 @@
+
+flowchart TB
+    APP["src/App.tsx<br/>Route map + providers<br/>+ lazy screens"] --> ROUTES
+
+    subgraph ROUTES["Groupes de routes"]
+        R1["/auth/*<br/>PhoneEntry, OtpVerify,<br/>EmailEntry, EmailOtpVerify,<br/>PinSetup, PinLogin, LockScreen,<br/>BiometricOptIn"]
+        R2["/kyc/progress<br/>ProgressTimeline"]
+        R3["/kyc/*<br/>BasicProfile, DocumentChoice,<br/>KycIntro, CniRecto, CniVerso,<br/>OcrProcessing, OcrReview,<br/>LivenessIntro, BiometricConsent,<br/>LivenessScreen,<br/>BillTypeSelect, BillCapture,<br/>Address, Niu,<br/>Consent, Signature,<br/>Review, SubmitSuccess,<br/>Rejection, InfoRequested"]
+        R4["/dashboard, /cards, /transfers,<br/>/savings, /transactions,<br/>/notifications, /support,<br/>/settings, /more"]
+    end
+
+    APP --> GUARDS
+
+    subgraph GUARDS["Guards"]
+        G1["AuthGuard<br/>(redirige si pas auth)"]
+        G2["LockGuard<br/>(redirige si locked)"]
+        G3["KycHydrationGate<br/>(attend l'état KYC)"]
+        G4["KycStepGuard (useKycFlow)<br/>(empêche step invalide)"]
+    end
+
+    APP --> CTX
+
+    subgraph CTX["Contexts"]
+        C1["AuthContext<br/>token, refresh, lock, PIN"]
+        C2["KycContext<br/>session, hydration,<br/>reconciliation backend"]
+        C3["LanguageContext<br/>i18n FR/EN"]
+    end
+
+    APP --> SVC
+
+    subgraph SVC["Services"]
+        S1["apiClient.ts<br/>fetch + correlation ID<br/>+ token + X-Device-Tag"]
+        S2["kycOfflineStore.ts<br/>IndexedDB queue"]
+        S3["kycSyncService.ts<br/>replay + submit blocker"]
+        S4["deviceRegistrationService.ts"]
+        S5["passkeyService.ts<br/>WebAuthn client"]
+        S6["pushNotificationService.ts"]
+        S7["mediapipeService.ts<br/>landmarks liveness"]
+        S8["sentry.ts<br/>(via proxy)"]
+        S9["atmLocator.ts, cniValidator.ts,<br/>imageCompression.ts"]
+    end

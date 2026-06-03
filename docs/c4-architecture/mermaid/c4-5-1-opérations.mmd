@@ -1,0 +1,22 @@
+
+flowchart TB
+    HOST["Hôte (Windows + WSL2<br/>ou Linux)"] --> DC["Docker Desktop / Engine"]
+    DC --> COMPOSE["docker compose -f code/docker-compose.yml"]
+
+    COMPOSE --> NGX[vp_nginx]
+    COMPOSE --> PWA[vp_pwa]
+    COMPOSE --> BO[vp_backoffice]
+    COMPOSE --> API[vp_api]
+    COMPOSE --> PG[vp_postgres]
+    COMPOSE --> RD[vp_redis]
+    COMPOSE --> OCR[vp_celery_ocr]
+    COMPOSE --> NOT[vp_celery_notif]
+    COMPOSE --> BEAT[vp_celery_beat]
+    COMPOSE --> MP[vp_mailpit]
+    COMPOSE --> FWR[vp_flower]
+    COMPOSE --> SI[vp_storage_init]
+
+    SI --> DBV[(code_db_storage)]
+    SI --> DBB[(code_db_backups)]
+    SI --> DOCV[(code_documents_storage)]
+    SI --> MODV[(code_models_storage)]

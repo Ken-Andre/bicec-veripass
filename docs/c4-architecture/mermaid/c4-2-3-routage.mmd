@@ -1,0 +1,19 @@
+
+flowchart LR
+    CLIENT["Navigateur<br/>(HTTPS)"] --> NGX{"vp_nginx<br/>:443 → :8443"}
+
+    NGX -->|/health| HCHECK["API /api/health"]
+    NGX -->|/api/v1/auth-ALL- / -rate-limit strict-| AUTHR["vp_api<br/>(module auth)"]
+    NGX -->|/api/v1-ALL- / -rate-limit normal-| APIR["vp_api<br/>(modules)"]
+    NGX -->|/api/v1/sentry-proxy-ALL-| SEN["vp_api<br/>(proxy Sentry)"]
+    NGX -->|/sentry-proxy-ALL-| SEN
+
+    NGX -->|/mobile-ALL- / /assets-ALL- / /icons-ALL- / /manifest.json| PWA["vp_pwa<br/>(fallback SPA index.html)"]
+    NGX -->|/back-office-ALL- / /backoffice-ALL- -> 301| BO["vp_backoffice<br/>(fallback SPA index.html)"]
+    NGX -->|-ALL- -non app-| REDIR["301 → /back-office/"]
+
+    NGX -->|/flower-ALL-| FL["vp_flower<br/>(auth basic)"]
+    NGX -->|/ -> /api/v1/docs / /api/docs| DOCS["vp_api<br/>(Swagger UI)"]
+
+    classDef strict fill:#FFEBEE,stroke:#C62828
+    class AUTHR strict

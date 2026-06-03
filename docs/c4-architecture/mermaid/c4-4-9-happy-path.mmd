@@ -1,0 +1,26 @@
+
+flowchart TB
+    A["Marie ouvre /mobile/"] --> B["Phone OTP"]
+    B --> C["Email OTP (optionnel)"]
+    C --> D["PIN setup / login"]
+    D --> E["/kyc/session/start<br/>(status=DRAFT)"]
+    E --> F["Capture CNI recto + verso<br/>(OCR Paddle → GLM si besoin)"]
+    F --> G["OCR review (Marie confirme)"]
+    G --> H["Liveness + selfie<br/>(MiniFASNet PAD)"]
+    H --> I["Adresse + justificatif"]
+    I --> J["NIU"]
+    J --> K["Consent + signature"]
+    K --> L["/kyc/readiness → can_submit=true"]
+    L --> M["/kyc/submit<br/>(status=PENDING_AGENT_REVIEW)"]
+    M --> N["Notification push 'En cours de revue'"]
+    N --> O["Jean/Thomas/Sylvie examine<br/>EvidenceViewerPage"]
+    O --> P{Décision}
+    P -->|APPROVED| Q["status=APPROVED<br/>access_level=LIMITED_ACCESS<br/>Notification 'Validé'"]
+    P -->|INFO_REQUESTED| R["status=PENDING_INFO<br/>Marie peut re-soumettre"]
+    R --> O
+    P -->|REJECTED| S["status=REJECTED<br/>Notification 'Rejeté' + motif"]
+    P -->|FRAUD_SUSPECT| T["status=FRAUD_SUSPECT<br/>access_level=DISABLED"]
+
+    Q --> U["Handoff mobile :<br/>app-link BI PAY / Wallet<br/>ou App Store / Google Play"]
+    S --> V["Dossier terminé"]
+    T --> W["Conformité prend le relais"]

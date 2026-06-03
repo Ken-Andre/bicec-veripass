@@ -1,0 +1,18 @@
+
+flowchart LR
+    API[vp_api] -->|enqueue| RD[(vp_redis<br/>broker)]
+
+    RD -->|glm_ocr_jobs| OCR[vp_celery_ocr<br/>1 worker, 1 job/fois]
+    RD -->|otp_queue / email_queue / push_queue / internal_batch| NOT[vp_celery_notif]
+    RD -->|scheduled| BEAT[vp_celery_beat<br/>schedule]
+
+    BEAT -->|cron| MAINT[backup_postgres]
+    BEAT -->|cron| KIMG[backup_kyc_images]
+    BEAT -->|cron| CATCH[check_and_catchup_backup]
+    BEAT -->|cron| ABAN[detect_abandoned_sessions]
+    BEAT -->|cron| EXP[check_document_expiry]
+    BEAT -->|cron| SCR[screen_active_clients]
+    BEAT -->|cron| SAN[sync_sanctions]
+    BEAT -->|cron| STAL[check_sanctions_staleness]
+
+    FWR[vp_flower] -.->|monitoring| RD

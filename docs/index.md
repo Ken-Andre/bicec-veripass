@@ -1,8 +1,20 @@
 # Directory Index
 
-Updated: 2026-05-28
+Updated: 2026-06-02
 
 This index covers the top-level project documentation in `docs/`. Hidden files are skipped. Large generated evidence and temporary artifact folders are summarized instead of expanded file-by-file.
+
+## Start Here
+
+> **Pour prendre en main le projet en un seul document, commencez par :**
+>
+> ### [BICEC-VERIPASS-VUE-ENSEMBLE.md](./BICEC-VERIPASS-VUE-ENSEMBLE.md) — *Architecture consolidée C4 (Context → Container → Component → Code)*
+>
+> Document maître en français, ~20 diagrammes Mermaid, lecture de haut en bas. Couvre tout le système (contexte, conteneurs, composants, parcours critiques, opérations, handover).
+>
+> Versions exportées : [`c4-architecture/diagrams/*.svg`](./c4-architecture/diagrams/) (SVG par diagramme) et [`c4-architecture/BICEC-VERIPASS-VUE-ENSEMBLE.pdf`](./c4-architecture/BICEC-VERIPASS-VUE-ENSEMBLE.pdf) (PDF imprimable A4).
+>
+> **Pour la doc de référence détaillée**, voir la liste ci-dessous.
 
 ## Primary Maintainer Documentation
 

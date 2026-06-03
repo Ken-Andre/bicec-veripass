@@ -1,0 +1,48 @@
+
+sequenceDiagram
+    autonumber
+    actor M as Marie (mobile)
+    participant NGX as Nginx
+    participant API as FastAPI
+    participant DB as PostgreSQL
+    participant RD as Redis
+    participant OCR as Celery OCR
+    participant BIO as Service biométrie
+
+    M->>NGX: POST /api/v1/auth/otp/send (phone)
+    NGX->>API: proxy
+    API->>RD: store OTP hash (TTL 5min)
+    API-->>M: 200 OK
+    M->>NGX: POST /api/v1/auth/otp/verify
+    API->>DB: get_or_create user
+    API->>RD: issue access + refresh tokens
+    API-->>M: tokens + X-Correlation-ID
+    M->>NGX: POST /api/v1/kyc/session/start
+    API->>DB: create kyc_session(status=DRAFT)
+    API-->>M: session_id + readiness[]
+    M->>NGX: POST /api/v1/kyc/capture/cni (recto multipart)
+    API->>DB: insert document (file=path, sha256)
+    API->>OCR: enqueue run_paddle_ocr (sync first pass)
+    OCR-->>API: fields + confidence
+    alt confidence < seuil
+        API->>RD: enqueue run_glm_ocr_fallback
+        RD-->>OCR: consume
+        OCR-->>API: corrected fields
+    end
+    API-->>M: OCR preview + fields[]
+    M->>NGX: POST /api/v1/kyc/ocr/review
+    API->>DB: update ocr_fields (user_confirmed=true)
+    M->>NGX: POST /api/v1/kyc/liveness/submit (landmarks)
+    API->>BIO: pad_check via MiniFASNet (ONNX)
+    BIO-->>API: liveness score, anti-spoofing
+    API->>DB: upsert biometric_results
+    M->>NGX: POST /api/v1/kyc/address/submit
+    M->>NGX: POST /api/v1/kyc/niu/submit
+    M->>NGX: POST /api/v1/kyc/consent/submit
+    M->>NGX: POST /api/v1/kyc/signature/submit
+    M->>NGX: GET /api/v1/kyc/readiness
+    API-->>M: can_submit=true, blocking_reasons=[]
+    M->>NGX: POST /api/v1/kyc/submit
+    API->>DB: kyc_session.status=PENDING_AGENT_REVIEW
+    API->>RD: enqueue notification Marie
+    API-->>M: 200 OK (submitted)

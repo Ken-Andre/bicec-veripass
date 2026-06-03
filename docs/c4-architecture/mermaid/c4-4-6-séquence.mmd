@@ -1,0 +1,30 @@
+
+sequenceDiagram
+    autonumber
+    actor J as Jean (backoffice)
+    participant BO as SPA Backoffice
+    participant API as FastAPI
+    participant DB as PostgreSQL
+    participant NOT as Service notifications
+    participant M as Marie (mobile)
+
+    J->>BO: GET /validation (queue)
+    BO->>API: GET /api/v1/backoffice/queue
+    API->>DB: SELECT dossiers WHERE status=PENDING_AGENT_REVIEW
+    API-->>BO: queue[]
+    J->>BO: Click dossier #abc-123
+    BO->>API: GET /api/v1/backoffice/dossier/abc-123
+    API->>DB: join kyc_sessions + documents + ocr_fields + biometric_results
+    API-->>BO: dossier_detail
+    BO->>API: GET /api/v1/backoffice/dossier/abc-123/documents/doc-1/file
+    API-->>BO: image bytes (signed, role-checked)
+    J->>BO: Click "Demander info complémentaire"
+    BO->>API: POST /api/v1/backoffice/dossier/abc-123/review {decision:INFO_REQUESTED,reason}
+    API->>DB: BEGIN TRANSACTION
+    API->>DB: INSERT validation_decisions
+    API->>DB: UPDATE kyc_sessions SET status=PENDING_INFO
+    API->>DB: INSERT notification (Marie)
+    API->>DB: COMMIT
+    API->>NOT: enqueue send_kyc_result
+    NOT-->>M: push/in-app (request info)
+    API-->>BO: 200 OK

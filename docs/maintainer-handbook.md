@@ -1,8 +1,18 @@
 # Maintainer Handbook
 
-Updated: 2026-05-28
+Updated: 2026-06-02
 
 This is the handover document to read when you inherit responsibility for the project. Its goal is to make the codebase understandable before you touch code, even if you did not build it and have no prior context.
+
+> ## Start here
+>
+> Pour une **vue d'ensemble en un seul document** avec diagrammes C4 (Context → Container → Component → Code), commencez par :
+>
+> ### [BICEC-VERIPASS-VUE-ENSEMBLE.md](./BICEC-VERIPASS-VUE-ENSEMBLE.md)
+>
+> Ce document maître couvre tout le système de haut en bas : acteurs, conteneurs, modules backend, frontends mobile et backoffice, machine d'état KYC, pipeline OCR/biométrie, topologie Celery, modèle de données, RBAC, happy-path, handoff aval, opérations, handover.
+>
+> Le présent *Maintainer Handbook* reste la **référence de détail** pour les invariants, les recettes de changement, et les questions courantes.
 
 ## One-Page Mental Model
 

@@ -1,0 +1,92 @@
+
+flowchart LR
+    subgraph M_AUTH["modules/auth"]
+        A1["OTP (phone, email)"]
+        A2["PIN setup/verify"]
+        A3["Passkey / WebAuthn"]
+        A4["Agent login + refresh"]
+        A5["Refresh tokens + révocation jti"]
+        A6["Soft-delete compte client"]
+    end
+
+    subgraph M_KYC["modules/kyc"]
+        K1["Sessions KYC"]
+        K2["Capture CNI / bill / selfie"]
+        K3["OCR review / confirm / merge"]
+        K4["Liveness / biométrie"]
+        K5["Address / NIU / consent / signature"]
+        K6["Readiness + submit"]
+        K7["ATM catalog"]
+    end
+
+    subgraph M_BO["modules/backoffice"]
+        B1["Queue + dossier detail"]
+        B2["Décisions (approve/reject/info/fraud)"]
+        B3["Assign / auto-assign"]
+        B4["Support threads"]
+        B5["OCR correction"]
+    end
+
+    subgraph M_AML["modules/aml"]
+        L1["Alerts AML (PEP/sanctions)"]
+        L2["Conflits NIU / doublons"]
+        L3["Document expiry"]
+        L4["Agencies CRUD"]
+        L5["Listes internes (CSV)"]
+        L6["Batch jobs"]
+        L7["Notify-global"]
+    end
+
+    subgraph M_ANA["modules/analytics"]
+        N1["Dashboard (role-aware)"]
+        N2["Funnel / documents / fraud"]
+        N3["Compliance / operations"]
+        N4["Marketing / QA / technical"]
+    end
+
+    subgraph M_AUD["modules/audit"]
+        U1["Audit log listing"]
+        U2["Export COBAC"]
+    end
+
+    subgraph M_ADM["modules/admin"]
+        D1["Agent CRUD + reset password"]
+        D2["Users list"]
+    end
+
+    subgraph M_BAN["modules/banking"]
+        G1["Cards freeze"]
+        G2["Transfers + ISO 20022"]
+        G3["Transactions + savings pockets"]
+    end
+
+    subgraph M_DEV["modules/devices"]
+        V1["Device registration + tag"]
+        V2["X-Device-Tag enforcement"]
+    end
+
+    subgraph M_NOT["modules/notifications"]
+        O1["In-app inbox"]
+        O2["Preferences + push subscriptions"]
+    end
+
+    subgraph M_SUP["modules/support"]
+        S1["Threads + messages"]
+        S2["Attachments (limites)"]
+    end
+
+    M_AUTH --> M_DEV
+    M_AUTH --> M_KYC
+    M_KYC --> M_AML
+    M_KYC --> M_SUP
+    M_BO --> M_KYC
+    M_BO --> M_AML
+    M_AML --> M_KYC
+    M_ANA --> M_KYC
+    M_ANA --> M_AML
+    M_ANA --> M_BO
+    M_AUD --> M_BO
+    M_ADM --> M_AUTH
+    M_BAN --> M_DEV
+    M_BAN --> M_KYC
+    M_NOT --> M_AUTH

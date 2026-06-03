@@ -1,0 +1,42 @@
+
+erDiagram
+    USERS ||--o{ KYC_SESSIONS : "ouvre"
+    USERS ||--o{ DEVICE_REGISTRATIONS : "possède"
+    USERS ||--o{ BANK_CARDS : "possède"
+    USERS ||--o{ TRANSFERS : "initie"
+    USERS ||--o{ TRANSACTIONS : "a"
+    USERS ||--o{ SAVINGS_POCKETS : "possède"
+    USERS ||--o{ NOTIFICATIONS : "reçoit"
+    USERS ||--o{ PUSH_SUBSCRIPTIONS : "possède"
+    USERS ||--o{ NOTIFICATION_PREFERENCES : "configure"
+    USERS ||--o{ OTP_SESSIONS : "reçoit"
+    USERS ||--o{ TOKEN_REVOCATIONS : "révoque"
+    USERS ||--o{ WEBAUTHN_CREDENTIALS : "possède"
+
+    AGENTS ||--o{ DOSSIER_ASSIGNMENTS : "assigné"
+    AGENTS ||--o{ VALIDATION_DECISIONS : "décide"
+    AGENCIES ||--o{ AGENTS : "emploie"
+    AGENCIES ||--o{ KYC_SESSIONS : "reçoit"
+
+    KYC_SESSIONS ||--o{ DOCUMENTS : "contient"
+    KYC_SESSIONS ||--o{ VALIDATION_DECISIONS : "revue"
+    KYC_SESSIONS ||--o{ DOSSIER_ASSIGNMENTS : "assigné"
+    KYC_SESSIONS ||--o{ AML_ALERTS : "déclenche"
+    KYC_SESSIONS ||--o{ DUPLICATE_CHECKS : "comparé"
+    KYC_SESSIONS ||--o| BIOMETRIC_RESULTS : "a"
+    KYC_SESSIONS ||--o| CONSENT_RECORDS : "a"
+    KYC_SESSIONS ||--o{ SUPPORT_THREADS : "discute"
+    KYC_SESSIONS ||--o{ NOTIFICATIONS : "reçoit"
+
+    DOCUMENTS ||--o{ OCR_FIELDS : "extrait"
+    DOCUMENTS ||--o{ SUPPORT_MESSAGES : "attaché"
+
+    SUPPORT_THREADS ||--o{ SUPPORT_MESSAGES : "contient"
+
+    PEP_SANCTIONS ||--o{ AML_ALERTS : "matche"
+
+    PROVISIONING_BATCHES ||--o{ PROVISIONING_BATCH_ITEMS : "contient"
+    KYC_SESSIONS ||--o{ PROVISIONING_BATCH_ITEMS : "tracké"
+
+    AUDIT_LOG ||--o{ USERS : "acteur"
+    AUDIT_LOG ||--o{ AGENTS : "acteur"

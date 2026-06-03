@@ -1,0 +1,18 @@
+
+flowchart LR
+    BEAT[vp_celery_beat] -->|01:00 UTC| PG_BAK["pg_dump → /backups/db<br/>(code_db_backups)"]
+    BEAT -->|Dimanche 02:00 UTC| KYC_BAK["Archive chiffrée<br/>(code_documents_storage)"]
+    BEAT -->|03:30 UTC| CATCH["check_and_catchup_backup<br/>(déclenche KYC_BAK si manquant)"]
+
+    PG_BAK -->|Rétention locale| POL1["Politique: voir retention-policy.md"]
+    KYC_BAK -->|Chiffrement AES| KEY["BACKUP_ENCRYPTION_KEY"]
+
+    subgraph RESTORE["Restauration (procédure manuelle)"]
+        R1["1. Stop api + workers"]
+        R2["2. Charger archive pg_dump"]
+        R3["3. pg_restore"]
+        R4["4. Restart api + workers"]
+    end
+
+    PG_BAK -.-> RESTORE
+    KYC_BAK -.-> RESTORE

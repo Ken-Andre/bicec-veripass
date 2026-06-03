@@ -1,0 +1,41 @@
+
+flowchart TB
+    subgraph ZU["Zone utilisateur (non fiable)"]
+        NB["Navigateur Marie<br/>+ WebAuthn + Device tag"]
+        NAG["Navigateur Agent<br/>(Jean/Thomas/Sylvie/Admin)"]
+    end
+
+    subgraph ZVP["Zone VeriPass (Docker Compose)"]
+        NGX["Nginx TLS<br/>(frontière HTTPS)"]
+        PWA["PWA statique"]
+        BO["Backoffice statique"]
+        API["API FastAPI"]
+        DB["PostgreSQL"]
+        REDIS["Redis"]
+        W1["Celery OCR"]
+        W2["Celery Notif"]
+        W3["Celery Beat"]
+    end
+
+    subgraph ZE["Zone externe (tiers de confiance limitée)"]
+        SMS["Orange SMS / SMTP"]
+        OS["OpenSanctions"]
+        OC["Oracle Cloud OCR<br/>(si activé)"]
+        ST["App Store / Google Play"]
+    end
+
+    NB -->|HTTPS, JWT, / X-Device-Tag| NGX
+    NAG -->|HTTPS, JWT, / cookies session| NGX
+    NGX --> PWA
+    NGX --> BO
+    NGX --> API
+    API --> DB
+    API --> REDIS
+    REDIS --> W1
+    REDIS --> W2
+    REDIS --> W3
+    W2 --> SMS
+    W3 --> OS
+    W1 -.-> OC
+    VP_OK["VeriPass<br/>(handoff app-link)"] --> ST
+    API --> VP_OK

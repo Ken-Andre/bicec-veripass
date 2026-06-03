@@ -1,0 +1,52 @@
+
+flowchart TB
+    APP["src/App.tsx<br/>Route map + role guards"] --> ROUTES
+
+    subgraph ROUTES["Routes par rôle"]
+        R1["/validation<br/>(JEAN)"]
+        R2["/validation/dossier/:id<br/>(JEAN, THOMAS)"]
+        R3["/compliance<br/>(THOMAS)"]
+        R4["/compliance/alert/:id<br/>(THOMAS)"]
+        R5["/compliance/duplicates<br/>(THOMAS)"]
+        R6["/command-center<br/>(SYLVIE)"]
+        R7["/analytics<br/>(SYLVIE, THOMAS, ADMIN_IT)"]
+        R8["/admin<br/>(ADMIN_IT)"]
+        R9["/admin/audit<br/>(ADMIN_IT, SYLVIE)"]
+        R10["/profile, /unauthorized, /login"]
+    end
+
+    APP --> CTX
+
+    subgraph CTX["Contexts"]
+        C1["AuthContext<br/>(agent login + refresh)"]
+        C2["ToastContext"]
+    end
+
+    APP --> GUARDS
+
+    subgraph GUARDS["Guards"]
+        G1["ProtectedRoute<br/>(auth + role)"]
+        G2["RoleRedirect<br/>(landing par rôle)"]
+    end
+
+    APP --> SVC
+
+    subgraph SVC["Services"]
+        S1["api-client.ts<br/>fetch + json + blob"]
+        S2["dossier-service.ts<br/>queue / dossier / review / assign"]
+        S3["aml-service.ts<br/>alerts / conflits / agencies / batch"]
+        S4["sentry.ts<br/>(via proxy)"]
+    end
+
+    APP --> PAGES
+
+    subgraph PAGES["Pages"]
+        P1["validation/<br/>ValidationQueuePage,<br/>EvidenceViewerPage"]
+        P2["compliance/<br/>ComplianceDashboard,<br/>AmlAlertDetailPage,<br/>ConflictResolverPage"]
+        P3["command-center/<br/>CommandCenterPage"]
+        P4["analytics/<br/>AnalyticsPage"]
+        P5["admin/<br/>AdminPage, SystemLogsPage"]
+    end
+
+    SVC --> PAGES
+    CTX --> PAGES

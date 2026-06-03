@@ -1,0 +1,44 @@
+
+flowchart TB
+    subgraph CORE["app/core/*"]
+        CONF["config.py<br/>Pydantic Settings<br/>+ env validation"]
+        SEC["security.py<br/>JWT (HS256) + bcrypt<br/>get_current_user / get_current_agent<br/>require_agent_role(...)"]
+        CEL["celery_config.py<br/>Celery app<br/>+ task includes<br/>+ beat schedule"]
+        RED["redis.py<br/>get_redis()"]
+        RL["rate_limit.py<br/>SlowAPI limiter"]
+        LOG["logging.py<br/>JSON structured"]
+        EXC["exceptions.py<br/>Handlers FastAPI"]
+    end
+
+    subgraph DB["app/db/*"]
+        SES["session.py<br/>AsyncSessionLocal<br/>get_db()"]
+        BAS["base.py<br/>SQLAlchemy Base<br/>+ model imports"]
+        SD["seed_data.py<br/>seed_dev.py<br/>seed_banking.py<br/>(ENVIRONMENT=development)"]
+    end
+
+    subgraph SVC["app/services/*"]
+        OCRS["ocr_service.py<br/>preprocessing, helpers"]
+        GLM["glm_utils.py<br/>GLM-OCR local"]
+        ISO["iso20022_service.py<br/>XML virements"]
+    end
+
+    subgraph TASKS["app/tasks/*"]
+        OCRT["tasks/ocr.py<br/>run_glm_ocr_fallback<br/>run_cloud_ocr"]
+        KYCT["tasks/kyc.py<br/>detect_abandoned_sessions<br/>check_document_expiry<br/>screen_active_clients"]
+        MAINT["tasks/maintenance.py<br/>backup_postgres<br/>backup_kyc_images<br/>check_and_catchup_backup"]
+        SANCT["tasks/sanctions.py<br/>sync_sanctions<br/>check_sanctions_staleness"]
+        AUTHT["modules/auth/tasks.py<br/>send_otp<br/>cleanup_otp_sessions"]
+        DEMOT["tasks_demo.py"]
+    end
+
+    CONF --> SEC
+    SEC --> RL
+    SES --> BAS
+    CEL --> RED
+    CEL --> TASKS
+    OCRT --> GLM
+    OCRT --> OCRS
+    KYCT --> SES
+    MAINT --> SES
+    SANCT --> SES
+    AUTHT --> SES

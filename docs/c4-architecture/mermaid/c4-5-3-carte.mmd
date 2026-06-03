@@ -1,0 +1,29 @@
+
+flowchart TB
+    subgraph HEALTH["Health endpoints"]
+        H1["GET /api/health (Nginx)"]
+        H2["GET /api/v1/auth/health"]
+        H3["GET /api/v1/sentry-proxy/health"]
+    end
+
+    subgraph LOGS["Logs"]
+        L1["JSON structured (app/core/logging.py)"]
+        L2["docker compose logs --tail api"]
+        L3["docker compose logs celery_*"]
+    end
+
+    subgraph MON["Monitoring"]
+        F["Flower (vp_flower)<br/>https://localhost/flower/"]
+    end
+
+    subgraph ERR["Error tracking"]
+        S1["Sentry backend (SENTRY_DSN_BACKEND)"]
+        S2["Sentry mobile (VITE_SENTRY_DSN_MOBILE)"]
+        S3["Sentry backoffice (VITE_SENTRY_DSN_BACKOFFICE)"]
+        SP["/api/v1/sentry-proxy<br/>(same-origin)"]
+    end
+
+    HEALTH --> ONCALL["On-call / Mainteneur"]
+    LOGS --> ONCALL
+    F --> ONCALL
+    ERR --> ONCALL
