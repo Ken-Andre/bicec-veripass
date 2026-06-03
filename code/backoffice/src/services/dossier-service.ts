@@ -65,12 +65,13 @@ export async function reviewDossier(
   sessionId: string,
   decision: string,
   reason: string,
-  options?: { biometricOverrideConfirmed?: boolean },
+  options?: { biometricOverrideConfirmed?: boolean; reviewDurationMs?: number },
 ) {
   return apiPost(`/backoffice/dossier/${sessionId}/review`, {
     decision,
     reason,
     biometric_override_confirmed: options?.biometricOverrideConfirmed ?? false,
+    review_duration_ms: options?.reviewDurationMs,
   })
 }
 

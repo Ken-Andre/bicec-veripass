@@ -413,6 +413,7 @@ export default function EvidenceViewerPage() {
   const [promoteReason, setPromoteReason] = useState('');
   const [promoteSaving, setPromoteSaving] = useState(false);
   const [promoteError, setPromoteError] = useState<string | null>(null);
+  const reviewStartedAtRef = useRef<number>(Date.now());
 
 
   const documents: DocumentPayload[] = dossier?.documents || [];
@@ -420,6 +421,14 @@ export default function EvidenceViewerPage() {
   const approvalNeedsBiometricOverride = biometricRiskFlags.length > 0;
   const currentDoc = documents[activeDocIndex];
   const documentView = useAuthenticatedDocument(id, currentDoc?.id);
+
+  useEffect(() => {
+    reviewStartedAtRef.current = Date.now();
+  }, [id, dossier?.session_id]);
+
+  const currentReviewDurationMs = useCallback(() => {
+    return Math.max(0, Date.now() - reviewStartedAtRef.current);
+  }, []);
 
   useEffect(() => {
     if (!currentDoc?.doc_type) return;
@@ -567,6 +576,7 @@ export default function EvidenceViewerPage() {
     try {
       await reviewDossier(id, decision, actionReason.trim(), {
         biometricOverrideConfirmed: decision === 'APPROVED' && confirmBiometricOverride,
+        reviewDurationMs: currentReviewDurationMs(),
       });
       queryClient.invalidateQueries({ queryKey: ['dossier', id] });
       queryClient.invalidateQueries({ queryKey: ['queue'] });
@@ -589,7 +599,9 @@ export default function EvidenceViewerPage() {
   const handleInfoRequest = async (message: string) => {
     if (!id) return;
     try {
-      await reviewDossier(id, 'INFO_REQUESTED', message);
+      await reviewDossier(id, 'INFO_REQUESTED', message, {
+        reviewDurationMs: currentReviewDurationMs(),
+      });
       queryClient.invalidateQueries({ queryKey: ['dossier', id] });
       queryClient.invalidateQueries({ queryKey: ['queue'] });
     } catch {}
@@ -1361,4 +1373,3 @@ export default function EvidenceViewerPage() {
     </div>
   );
 }
-

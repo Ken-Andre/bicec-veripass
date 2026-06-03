@@ -110,6 +110,22 @@ export async function apiPost<T = any>(path: string, body?: unknown, options?: R
   return handleResponse<T>(res)
 }
 
+export async function apiPut<T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  const token = getToken()
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options?.headers,
+  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    method: 'PUT',
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  return handleResponse<T>(res)
+}
+
 export async function apiDownload(
   path: string,
   body?: unknown,
