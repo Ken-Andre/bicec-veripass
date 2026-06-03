@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
+from html import escape
 from typing import Any
 
+from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -21,6 +24,7 @@ from app.db.session import check_db_connection
 from app.core.redis import check_redis_connection
 from app.modules.admin.models import Agency
 from app.modules.aml.models import BatchJob
+from app.modules.analytics.models import BusinessMetricBaseline
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import Agent, AgentRole, User
 from app.modules.kyc.models import (
@@ -39,6 +43,8 @@ from app.modules.kyc.models import (
 
 TERMINAL_STATUSES = {"APPROVED", "REJECTED", "FRAUD_SUSPECT", "ABANDONED", "DISABLED"}
 OPEN_AML_STATUS = "OPEN"
+OPEN_AML_STATUSES = {"OPEN", "CONFIRMED", "ESCALATED", "PENDING"}
+BASELINE_REQUIRED = "Baseline requise"
 
 
 def _utc_now() -> datetime:
@@ -1079,6 +1085,704 @@ async def get_technical_metrics(db: AsyncSession, **filters: Any) -> dict[str, A
         "environment": settings.ENVIRONMENT,
         "qa": qa,
     }
+
+
+def _num(value: Any, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    if isinstance(value, Decimal):
+        return float(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _int_num(value: Any, default: int = 0) -> int:
+    try:
+        return int(value or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_div(numerator: float | int, denominator: float | int) -> float:
+    denominator = float(denominator or 0)
+    return float(numerator or 0) / denominator if denominator else 0.0
+
+
+def _format_ratio(value: float | int | None) -> str:
+    return f"{_num(value) * 100:.1f}%"
+
+
+def _format_percent_value(value: float | int | None) -> str:
+    return f"{_num(value):.1f}%"
+
+
+def _format_xaf(value: float | int | None) -> str:
+    amount = _num(value)
+    return f"{amount:,.0f} XAF".replace(",", " ")
+
+
+def _metric(raw: Any, display: str, unit: str | None = None) -> dict[str, Any]:
+    payload = {"raw": raw, "display": display}
+    if unit:
+        payload["unit"] = unit
+    return payload
+
+
+def _ratio_metric(value: float | int | None) -> dict[str, Any]:
+    raw = _num(value)
+    return _metric(raw, _format_ratio(raw), "ratio")
+
+
+def _count_metric(value: int | float | None) -> dict[str, Any]:
+    raw = _int_num(value)
+    return _metric(raw, str(raw), "count")
+
+
+def _duration_seconds_metric(value: float | int | None) -> dict[str, Any]:
+    raw = _num(value)
+    return _metric(raw, _format_duration(raw), "seconds")
+
+
+def _money_metric(value: float | int | None, baseline_required: bool = False) -> dict[str, Any]:
+    if baseline_required:
+        return _metric(None, BASELINE_REQUIRED, "XAF")
+    raw = _num(value)
+    return _metric(raw, _format_xaf(raw), "XAF")
+
+
+def _baseline_value(baseline: dict[str, Any], key: str, default: float = 0.0) -> float:
+    return _num(baseline.get(key), default)
+
+
+def calculate_business_case_metrics(
+    baseline: dict[str, Any] | None,
+    actual: dict[str, Any],
+) -> dict[str, Any]:
+    """Compute business KPIs from declarative BICEC baseline and VeriPass facts."""
+
+    started = _int_num(actual.get("started_count"))
+    submitted = _int_num(actual.get("submitted_count"))
+    approved = _int_num(actual.get("approved_count"))
+    approved_without_info = _int_num(actual.get("approved_without_info_count"))
+    abandoned = _int_num(actual.get("abandoned_count"))
+    info_requested = _int_num(actual.get("info_requested_sessions"))
+    resubmitted = _int_num(actual.get("resubmitted_count"))
+    ocr_fields = _int_num(actual.get("ocr_fields_count"))
+    ocr_corrected = _int_num(actual.get("ocr_corrected_count"))
+    decision_count = _int_num(actual.get("decision_count"))
+    late_decisions = _int_num(actual.get("late_decisions_count"))
+    aml_alert_sessions = _int_num(actual.get("aml_alert_sessions"))
+    aml_alert_count = _int_num(actual.get("aml_alert_count"))
+    risk_blocked_open = _int_num(actual.get("risk_blocked_open_count"))
+
+    first_time_right_rate = _safe_div(approved_without_info, submitted)
+    complement_request_rate = _safe_div(info_requested, submitted)
+    resubmission_rate = _safe_div(resubmitted, submitted)
+    ocr_correction_rate = _safe_div(ocr_corrected, ocr_fields)
+    abandonment_rate = _safe_div(abandoned, started)
+    conversion_rate = _safe_div(approved, started)
+    sla_respected_rate = _safe_div(decision_count - late_decisions, decision_count)
+    aml_alert_rate = _safe_div(aml_alert_sessions, submitted)
+
+    baseline_required = baseline is None
+    finance = {
+        "current_cost_per_dossier": _money_metric(None, baseline_required=True),
+        "veripass_cost_per_dossier": _money_metric(None, baseline_required=True),
+        "operational_savings_monthly": _money_metric(None, baseline_required=True),
+        "compliance_gain_monthly": _money_metric(None, baseline_required=True),
+        "commercial_gain_monthly": _money_metric(None, baseline_required=True),
+        "pilot_gain": _money_metric(None, baseline_required=True),
+        "pilot_cost": _money_metric(None, baseline_required=True),
+        "roi_percent": _metric(None, BASELINE_REQUIRED, "percent"),
+    }
+    direction = {
+        "pilot_abandonment_rate": _ratio_metric(abandonment_rate),
+        "start_to_approved_conversion_rate": _ratio_metric(conversion_rate),
+        "conversion_uplift_vs_baseline": _metric(None, BASELINE_REQUIRED, "ratio"),
+        "estimated_commercial_value": _money_metric(None, baseline_required=True),
+    }
+    compliance_extra = {
+        "audit_export_time_saved_hours": _metric(None, BASELINE_REQUIRED, "hours"),
+    }
+
+    if baseline:
+        monthly_volume = _baseline_value(baseline, "monthly_kyc_volume", submitted or started)
+        hourly_cost = _baseline_value(baseline, "hourly_staff_cost_xaf")
+        branch_minutes = _baseline_value(baseline, "current_branch_minutes_per_dossier")
+        backoffice_minutes = _baseline_value(baseline, "current_backoffice_minutes_per_dossier")
+        current_cost_per_dossier = ((branch_minutes + backoffice_minutes) / 60) * hourly_cost
+
+        avg_review_minutes = _num(actual.get("avg_review_duration_ms")) / 60000
+        pilot_dossiers = submitted or monthly_volume
+        pilot_labor_cost_per_dossier = (avg_review_minutes / 60) * hourly_cost
+        pilot_run_cost_per_dossier = _safe_div(
+            _baseline_value(baseline, "pilot_monthly_run_cost_xaf"),
+            pilot_dossiers,
+        )
+        veripass_cost_per_dossier = pilot_labor_cost_per_dossier + pilot_run_cost_per_dossier
+
+        operational_savings_monthly = max(current_cost_per_dossier - veripass_cost_per_dossier, 0) * pilot_dossiers
+        avoided_rework = monthly_volume * max(_baseline_value(baseline, "current_incomplete_rate") - complement_request_rate, 0)
+        audit_hours_saved = max(
+            _baseline_value(baseline, "current_audit_assembly_hours")
+            - _baseline_value(baseline, "veripass_audit_export_hours"),
+            0,
+        )
+        compliance_gain_monthly = (
+            _baseline_value(baseline, "audit_requests_per_period") * audit_hours_saved * hourly_cost
+            + avoided_rework * _baseline_value(baseline, "average_rework_cost_xaf")
+        )
+        baseline_conversion_rate = max(1 - _baseline_value(baseline, "current_abandonment_rate"), 0)
+        conversion_uplift = conversion_rate - baseline_conversion_rate
+        commercial_gain_monthly = (
+            max(conversion_uplift, 0)
+            * monthly_volume
+            * _baseline_value(baseline, "avg_customer_12m_value_xaf")
+        )
+        pilot_duration_months = max(_int_num(baseline.get("pilot_duration_months"), 1), 1)
+        pilot_setup_cost = _baseline_value(baseline, "pilot_setup_cost_xaf")
+        pilot_monthly_run_cost = _baseline_value(baseline, "pilot_monthly_run_cost_xaf")
+        pilot_cost = (
+            pilot_setup_cost
+            + pilot_monthly_run_cost * pilot_duration_months
+            + pilot_labor_cost_per_dossier * monthly_volume * pilot_duration_months
+        )
+        pilot_gain = (
+            operational_savings_monthly + compliance_gain_monthly + commercial_gain_monthly
+        ) * pilot_duration_months
+        roi_percent = ((pilot_gain - pilot_cost) / pilot_cost * 100) if pilot_cost > 0 else None
+
+        finance = {
+            "current_cost_per_dossier": _money_metric(current_cost_per_dossier),
+            "veripass_cost_per_dossier": _money_metric(veripass_cost_per_dossier),
+            "operational_savings_monthly": _money_metric(operational_savings_monthly),
+            "compliance_gain_monthly": _money_metric(compliance_gain_monthly),
+            "commercial_gain_monthly": _money_metric(commercial_gain_monthly),
+            "pilot_gain": _money_metric(pilot_gain),
+            "pilot_cost": _money_metric(pilot_cost),
+            "roi_percent": _metric(
+                roi_percent,
+                _format_percent_value(roi_percent) if roi_percent is not None else "N/A",
+                "percent",
+            ),
+        }
+        direction = {
+            "pilot_abandonment_rate": _ratio_metric(abandonment_rate),
+            "start_to_approved_conversion_rate": _ratio_metric(conversion_rate),
+            "conversion_uplift_vs_baseline": _ratio_metric(conversion_uplift),
+            "estimated_commercial_value": _money_metric(commercial_gain_monthly),
+        }
+        compliance_extra = {
+            "audit_export_time_saved_hours": _metric(audit_hours_saved, f"{audit_hours_saved:.1f}h", "hours"),
+        }
+
+    return {
+        "baseline_required": baseline_required,
+        "network_quality": {
+            "first_time_right_rate": _ratio_metric(first_time_right_rate),
+            "complement_request_rate": _ratio_metric(complement_request_rate),
+            "resubmission_rate": _ratio_metric(resubmission_rate),
+            "ocr_correction_rate": _ratio_metric(ocr_correction_rate),
+            "start_to_submit_delay": _duration_seconds_metric(actual.get("avg_start_to_submit_seconds")),
+        },
+        "operations": {
+            "submit_to_decision_delay": _duration_seconds_metric(actual.get("avg_submit_to_decision_seconds")),
+            "average_agent_review_duration": _metric(
+                _num(actual.get("avg_review_duration_ms")),
+                _format_duration(_num(actual.get("avg_review_duration_ms")) / 1000),
+                "milliseconds",
+            ),
+            "sla_respected_rate": _ratio_metric(sla_respected_rate),
+            "late_dossiers": _count_metric(late_decisions),
+        },
+        "finance": finance,
+        "direction": direction,
+        "compliance": {
+            "aml_alert_rate": _ratio_metric(aml_alert_rate),
+            "aml_alert_count": _count_metric(aml_alert_count),
+            "risk_blocked_open_count": _count_metric(risk_blocked_open),
+            **compliance_extra,
+        },
+    }
+
+
+BASELINE_FIELDS = [
+    "id",
+    "period_start",
+    "period_end",
+    "agency_id",
+    "monthly_kyc_volume",
+    "current_avg_days_to_validate",
+    "current_branch_minutes_per_dossier",
+    "current_backoffice_minutes_per_dossier",
+    "current_incomplete_rate",
+    "current_complement_rate",
+    "current_abandonment_rate",
+    "hourly_staff_cost_xaf",
+    "avg_customer_12m_value_xaf",
+    "audit_requests_per_period",
+    "current_audit_assembly_hours",
+    "veripass_audit_export_hours",
+    "average_rework_cost_xaf",
+    "current_aml_sensitive_case_rate",
+    "pilot_setup_cost_xaf",
+    "pilot_monthly_run_cost_xaf",
+    "pilot_duration_months",
+    "source_note",
+    "validated_by",
+    "validated_at",
+    "created_by",
+    "updated_by",
+    "created_at",
+    "updated_at",
+]
+
+
+def _json_value(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
+def _baseline_to_dict(baseline: BusinessMetricBaseline | None) -> dict[str, Any] | None:
+    if baseline is None:
+        return None
+    return {field: _json_value(getattr(baseline, field)) for field in BASELINE_FIELDS}
+
+
+def _agent_uuid(agent: Agent | Any) -> uuid.UUID | None:
+    agent_id = getattr(agent, "id", None)
+    return agent_id if isinstance(agent_id, uuid.UUID) else None
+
+
+async def _find_business_baseline_record(
+    db: AsyncSession,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    agency_id: str | None = None,
+) -> BusinessMetricBaseline | None:
+    conditions: list[Any] = []
+    if date_from:
+        conditions.append(BusinessMetricBaseline.period_end >= date_from)
+    if date_to:
+        conditions.append(BusinessMetricBaseline.period_start <= date_to)
+
+    agency_uuid = _parse_uuid(agency_id)
+    if agency_uuid:
+        query = (
+            select(BusinessMetricBaseline)
+            .where(
+                *conditions,
+                (BusinessMetricBaseline.agency_id == agency_uuid) | BusinessMetricBaseline.agency_id.is_(None),
+            )
+            .order_by(
+                (BusinessMetricBaseline.agency_id == agency_uuid).desc(),
+                BusinessMetricBaseline.updated_at.desc(),
+                BusinessMetricBaseline.created_at.desc(),
+            )
+        )
+    else:
+        query = (
+            select(BusinessMetricBaseline)
+            .where(*conditions, BusinessMetricBaseline.agency_id.is_(None))
+            .order_by(BusinessMetricBaseline.updated_at.desc(), BusinessMetricBaseline.created_at.desc())
+        )
+    return (await db.execute(query.limit(1))).scalar_one_or_none()
+
+
+async def get_business_baseline(
+    db: AsyncSession,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    agency_id: str | None = None,
+) -> dict[str, Any] | None:
+    return _baseline_to_dict(
+        await _find_business_baseline_record(
+            db,
+            date_from=date_from,
+            date_to=date_to,
+            agency_id=agency_id,
+        )
+    )
+
+
+async def create_business_baseline(db: AsyncSession, payload: Any, agent: Agent) -> dict[str, Any]:
+    now = _utc_now()
+    agent_id = _agent_uuid(agent)
+    data = payload.model_dump()
+    baseline = BusinessMetricBaseline(
+        **data,
+        created_by=agent_id,
+        updated_by=agent_id,
+        validated_by=agent_id,
+        validated_at=now,
+    )
+    db.add(baseline)
+    await db.commit()
+    await db.refresh(baseline)
+    return _baseline_to_dict(baseline) or {}
+
+
+async def update_business_baseline(db: AsyncSession, payload: Any, agent: Agent) -> dict[str, Any]:
+    data = payload.model_dump()
+    baseline_id = data.pop("id", None)
+    if baseline_id:
+        baseline = (
+            await db.execute(select(BusinessMetricBaseline).where(BusinessMetricBaseline.id == baseline_id))
+        ).scalar_one_or_none()
+    else:
+        baseline = await _find_business_baseline_record(
+            db,
+            date_from=data.get("period_start"),
+            date_to=data.get("period_end"),
+            agency_id=str(data.get("agency_id")) if data.get("agency_id") else None,
+        )
+    if baseline is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business baseline not found")
+
+    for key, value in data.items():
+        setattr(baseline, key, value)
+    agent_id = _agent_uuid(agent)
+    baseline.updated_by = agent_id
+    baseline.validated_by = agent_id
+    baseline.validated_at = _utc_now()
+    await db.commit()
+    await db.refresh(baseline)
+    return _baseline_to_dict(baseline) or {}
+
+
+async def _business_actuals(db: AsyncSession, **filters: Any) -> dict[str, Any]:
+    session_conditions = _kyc_conditions(filters)
+    agency_uuid = _parse_uuid(filters.get("agency_id"))
+
+    started_count = _int_num(
+        (await db.execute(select(func.count(KYCSession.id)).where(*session_conditions))).scalar()
+    )
+    submitted_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(KYCSession.id)).where(
+                    KYCSession.submitted_at.is_not(None),
+                    *session_conditions,
+                )
+            )
+        ).scalar()
+    )
+    approved_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(KYCSession.id)).where(
+                    KYCSession.status == "APPROVED",
+                    *session_conditions,
+                )
+            )
+        ).scalar()
+    )
+    abandoned_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(KYCSession.id)).where(
+                    KYCSession.status == "ABANDONED",
+                    *session_conditions,
+                )
+            )
+        ).scalar()
+    )
+
+    info_subquery = select(ValidationDecision.session_id).where(ValidationDecision.decision == "INFO_REQUESTED")
+    approved_without_info_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(KYCSession.id)).where(
+                    KYCSession.status == "APPROVED",
+                    ~KYCSession.id.in_(info_subquery),
+                    *session_conditions,
+                )
+            )
+        ).scalar()
+    )
+    info_requested_sessions = _int_num(
+        (
+            await db.execute(
+                select(func.count(func.distinct(ValidationDecision.session_id)))
+                .join(KYCSession, KYCSession.id == ValidationDecision.session_id)
+                .where(ValidationDecision.decision == "INFO_REQUESTED", *session_conditions)
+            )
+        ).scalar()
+    )
+
+    audit_conditions = []
+    start, end = _datetime_bounds(filters.get("date_from"), filters.get("date_to"))
+    if start is not None:
+        audit_conditions.append(AuditLog.performed_at >= start)
+    if end is not None:
+        audit_conditions.append(AuditLog.performed_at < end)
+    resubmitted_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(func.distinct(AuditLog.record_id))).where(
+                    AuditLog.action == "KYC_RESUBMIT",
+                    *audit_conditions,
+                )
+            )
+        ).scalar()
+    )
+
+    doc_conditions = _kyc_conditions(filters, Document.captured_at)
+    if filters.get("doc_type"):
+        doc_conditions.append(Document.doc_type == filters["doc_type"])
+    ocr_base = select(func.count(OCRField.id)).join(Document, Document.id == OCRField.document_id).join(KYCSession, KYCSession.id == Document.session_id)
+    ocr_fields_count = _int_num((await db.execute(ocr_base.where(*doc_conditions))).scalar())
+    ocr_corrected_count = _int_num(
+        (await db.execute(ocr_base.where(OCRField.human_corrected == True, *doc_conditions))).scalar()  # noqa: E712
+    )
+
+    avg_start_to_submit_seconds = _num(
+        (
+            await db.execute(
+                select(func.avg(func.extract("epoch", KYCSession.submitted_at - KYCSession.started_at))).where(
+                    KYCSession.submitted_at.is_not(None),
+                    *session_conditions,
+                )
+            )
+        ).scalar()
+    )
+    avg_submit_to_decision_seconds = _num(
+        (
+            await db.execute(
+                select(func.avg(func.extract("epoch", ValidationDecision.decided_at - KYCSession.submitted_at)))
+                .join(KYCSession, KYCSession.id == ValidationDecision.session_id)
+                .where(KYCSession.submitted_at.is_not(None), *session_conditions)
+            )
+        ).scalar()
+    )
+    avg_review_duration_ms = _num(
+        (
+            await db.execute(
+                select(func.avg(ValidationDecision.review_duration_ms))
+                .join(KYCSession, KYCSession.id == ValidationDecision.session_id)
+                .where(ValidationDecision.review_duration_ms.is_not(None), *session_conditions)
+            )
+        ).scalar()
+    )
+    decision_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(ValidationDecision.id))
+                .join(KYCSession, KYCSession.id == ValidationDecision.session_id)
+                .where(*session_conditions)
+            )
+        ).scalar()
+    )
+    late_decisions_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(ValidationDecision.id))
+                .join(KYCSession, KYCSession.id == ValidationDecision.session_id)
+                .where(
+                    KYCSession.submitted_at.is_not(None),
+                    func.extract("epoch", ValidationDecision.decided_at - KYCSession.submitted_at) > 7200,
+                    *session_conditions,
+                )
+            )
+        ).scalar()
+    )
+
+    aml_query_conditions = _kyc_conditions(filters, AmlAlert.created_at)
+    aml_alert_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(AmlAlert.id))
+                .join(KYCSession, KYCSession.id == AmlAlert.session_id)
+                .where(*aml_query_conditions)
+            )
+        ).scalar()
+    )
+    aml_alert_sessions = _int_num(
+        (
+            await db.execute(
+                select(func.count(func.distinct(AmlAlert.session_id)))
+                .join(KYCSession, KYCSession.id == AmlAlert.session_id)
+                .where(*aml_query_conditions)
+            )
+        ).scalar()
+    )
+    risk_block_conditions = [AmlAlert.status.in_(OPEN_AML_STATUSES), ~KYCSession.status.in_(["APPROVED", "REJECTED", "ABANDONED"])]
+    if agency_uuid:
+        risk_block_conditions.append(KYCSession.agency_id == agency_uuid)
+    risk_blocked_open_count = _int_num(
+        (
+            await db.execute(
+                select(func.count(func.distinct(KYCSession.id)))
+                .join(AmlAlert, AmlAlert.session_id == KYCSession.id)
+                .where(*risk_block_conditions)
+            )
+        ).scalar()
+    )
+    audit_export_events = _int_num(
+        (
+            await db.execute(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.action.ilike("%EXPORT%"),
+                    *audit_conditions,
+                )
+            )
+        ).scalar()
+    )
+    dwh_events_count = 0
+    try:
+        where, params = _filters(
+            date_column="occurred_at::date",
+            agency_column=None,
+            channel_column="channel",
+            date_from=filters.get("date_from"),
+            date_to=filters.get("date_to"),
+            channel=filters.get("channel"),
+        )
+        dwh_events_count = _int_num(await _scalar(db, f"SELECT COUNT(*) FROM dwh.fact_kyc_events{where}", params))
+    except Exception:
+        dwh_events_count = 0
+
+    return {
+        "started_count": started_count,
+        "submitted_count": submitted_count,
+        "approved_count": approved_count,
+        "approved_without_info_count": approved_without_info_count,
+        "abandoned_count": abandoned_count,
+        "info_requested_sessions": info_requested_sessions,
+        "resubmitted_count": resubmitted_count,
+        "ocr_fields_count": ocr_fields_count,
+        "ocr_corrected_count": ocr_corrected_count,
+        "avg_start_to_submit_seconds": avg_start_to_submit_seconds,
+        "avg_submit_to_decision_seconds": avg_submit_to_decision_seconds,
+        "avg_review_duration_ms": avg_review_duration_ms,
+        "decision_count": decision_count,
+        "late_decisions_count": late_decisions_count,
+        "aml_alert_sessions": aml_alert_sessions,
+        "aml_alert_count": aml_alert_count,
+        "risk_blocked_open_count": risk_blocked_open_count,
+        "audit_export_events": audit_export_events,
+        "dwh_events_count": dwh_events_count,
+    }
+
+
+BUSINESS_FORMULAS = [
+    {
+        "metric": "First-time-right",
+        "formula": "dossiers approuves sans INFO_REQUESTED / dossiers soumis",
+        "source": "validation_decisions + kyc_sessions",
+    },
+    {
+        "metric": "Cout actuel par dossier",
+        "formula": "(minutes agence actuelles + minutes backoffice actuelles) / 60 * cout horaire",
+        "source": "baseline BICEC",
+    },
+    {
+        "metric": "Cout VeriPass par dossier",
+        "formula": "cout main-d'oeuvre pilote + cout mensuel run / dossiers pilote",
+        "source": "review_duration_ms + baseline BICEC",
+    },
+    {
+        "metric": "ROI pilote",
+        "formula": "(gains pilote - couts pilote) / couts pilote * 100",
+        "source": "baseline BICEC + metriques VeriPass",
+    },
+    {
+        "metric": "Gain commercial",
+        "formula": "uplift conversion vs baseline * volume mensuel * valeur client 12 mois",
+        "source": "kyc_sessions + baseline BICEC",
+    },
+    {
+        "metric": "Gain audit/conformite",
+        "formula": "heures audit evitees * cout horaire + reprises evitees * cout reprise",
+        "source": "audit_log + baseline BICEC",
+    },
+]
+
+
+async def get_business_case(db: AsyncSession, **filters: Any) -> dict[str, Any]:
+    baseline = await get_business_baseline(
+        db,
+        date_from=filters.get("date_from"),
+        date_to=filters.get("date_to"),
+        agency_id=filters.get("agency_id"),
+    )
+    actual = await _business_actuals(db, **filters)
+    metrics = calculate_business_case_metrics(baseline, actual)
+    return {
+        "generated_at": _utc_now().isoformat(),
+        "filters": {key: _json_value(value) for key, value in filters.items()},
+        "baseline": baseline,
+        "actuals": actual,
+        "formulas": BUSINESS_FORMULAS,
+        **metrics,
+    }
+
+
+def build_business_case_export_html(payload: dict[str, Any]) -> str:
+    def row(label: str, metric: dict[str, Any]) -> str:
+        return (
+            "<tr>"
+            f"<th>{escape(label)}</th>"
+            f"<td>{escape(str(metric.get('display', '')))}</td>"
+            f"<td>{escape(str(metric.get('raw', '')))}</td>"
+            "</tr>"
+        )
+
+    sections = [
+        ("Reseau / qualite dossier", payload.get("network_quality", {})),
+        ("Operations", payload.get("operations", {})),
+        ("Finance", payload.get("finance", {})),
+        ("Direction", payload.get("direction", {})),
+        ("Conformite", payload.get("compliance", {})),
+    ]
+    section_html = []
+    for title, metrics in sections:
+        rows = "".join(row(key.replace("_", " "), value) for key, value in metrics.items())
+        section_html.append(
+            f"<h2>{escape(title)}</h2><table><thead><tr><th>Metrique</th><th>Affichage</th><th>Raw</th></tr></thead><tbody>{rows}</tbody></table>"
+        )
+    formula_rows = "".join(
+        "<tr>"
+        f"<td>{escape(item['metric'])}</td>"
+        f"<td>{escape(item['formula'])}</td>"
+        f"<td>{escape(item['source'])}</td>"
+        "</tr>"
+        for item in payload.get("formulas", [])
+    )
+    baseline_status = "Baseline requise" if payload.get("baseline_required") else "Baseline validee"
+    return f"""<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>VeriPass - Pilotage & ROI</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; margin: 32px; color: #0f172a; }}
+    h1 {{ margin-bottom: 4px; }}
+    h2 {{ margin-top: 28px; }}
+    .meta {{ color: #475569; margin-bottom: 20px; }}
+    .badge {{ display: inline-block; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; }}
+    table {{ border-collapse: collapse; width: 100%; margin-top: 8px; }}
+    th, td {{ border: 1px solid #e2e8f0; padding: 8px; text-align: left; vertical-align: top; }}
+    th {{ background: #f8fafc; }}
+  </style>
+</head>
+<body>
+  <h1>VeriPass - Pilotage & ROI</h1>
+  <p class="meta">Genere le {escape(str(payload.get("generated_at", "")))} - <span class="badge">{escape(baseline_status)}</span></p>
+  {''.join(section_html)}
+  <h2>Formules</h2>
+  <table><thead><tr><th>Metrique</th><th>Formule</th><th>Source</th></tr></thead><tbody>{formula_rows}</tbody></table>
+</body>
+</html>"""
 
 
 async def get_dashboard_stats(db: AsyncSession, role: str = "SYLVIE", **filters: Any) -> dict[str, Any]:

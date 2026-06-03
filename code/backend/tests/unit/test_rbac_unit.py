@@ -279,3 +279,75 @@ class TestAnalyticsDashboardAccess:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_jean_business_case_denied(self, client: AsyncClient):
+        token = _agent_token(AgentRole.JEAN)
+        response = await client.get(
+            "/api/v1/analytics/business-case",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_thomas_business_case_denied(self, client: AsyncClient):
+        token = _agent_token(AgentRole.THOMAS)
+        response = await client.get(
+            "/api/v1/analytics/business-case",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_sylvie_business_case_allowed(self, client: AsyncClient):
+        token = _agent_token(AgentRole.SYLVIE)
+        with patch("app.modules.analytics.router.analytics_service.get_business_case", new_callable=AsyncMock) as mock_case:
+            mock_case.return_value = {"baseline_required": True, "generated_at": "2026-06-03T00:00:00Z"}
+            response = await client.get(
+                "/api/v1/analytics/business-case",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_admin_it_business_export_allowed_json(self, client: AsyncClient):
+        token = _agent_token(AgentRole.ADMIN_IT)
+        with patch("app.modules.analytics.router.analytics_service.get_business_case", new_callable=AsyncMock) as mock_case:
+            mock_case.return_value = {"baseline_required": True, "generated_at": "2026-06-03T00:00:00Z"}
+            response = await client.get(
+                "/api/v1/analytics/business-case/export?format=json",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        assert response.status_code == 200
+        assert response.json()["baseline_required"] is True
+
+    @pytest.mark.asyncio
+    async def test_thomas_business_baseline_write_denied(self, client: AsyncClient):
+        token = _agent_token(AgentRole.THOMAS)
+        response = await client.post(
+            "/api/v1/analytics/business-baseline",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "period_start": "2026-06-01",
+                "period_end": "2026-06-30",
+                "monthly_kyc_volume": 100,
+            },
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_sylvie_business_baseline_write_allowed(self, client: AsyncClient):
+        token = _agent_token(AgentRole.SYLVIE)
+        payload = {
+            "period_start": "2026-06-01",
+            "period_end": "2026-06-30",
+            "monthly_kyc_volume": 100,
+        }
+        with patch("app.modules.analytics.router.analytics_service.create_business_baseline", new_callable=AsyncMock) as mock_create:
+            mock_create.return_value = payload | {"id": "00000000-0000-0000-0000-000000000001"}
+            response = await client.post(
+                "/api/v1/analytics/business-baseline",
+                headers={"Authorization": f"Bearer {token}"},
+                json=payload,
+            )
+        assert response.status_code == 200

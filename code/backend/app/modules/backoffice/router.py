@@ -992,6 +992,7 @@ async def submit_review_decision(
         decision=body.decision,
         reason=body.reason,
         agent_ip=request.client.host if request.client else None,
+        review_duration_ms=body.review_duration_ms,
         decided_at=now,
     )
     db.add(decision_record)
@@ -1024,6 +1025,7 @@ async def submit_review_decision(
                 else False
             ),
             "biometric_risk_flags": biometric_risk_flags,
+            "review_duration_ms": body.review_duration_ms,
         },
         performed_by=current_agent.id,
         performed_at=now,

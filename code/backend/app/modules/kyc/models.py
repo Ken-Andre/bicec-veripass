@@ -207,6 +207,7 @@ class ValidationDecision(Base):
     reason = Column(Text, nullable=True)
 
     agent_ip = Column(INET, nullable=True)
+    review_duration_ms = Column(Integer, nullable=True)
     decided_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

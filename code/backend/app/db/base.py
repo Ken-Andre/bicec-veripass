@@ -31,3 +31,4 @@ from app.modules.aml.models import AmlListImport, BatchJob  # noqa
 from app.modules.banking.models import BankCard, Transfer, Transaction, SavingsPocket  # noqa
 from app.modules.devices.models import DeviceRegistration  # noqa
 from app.modules.notifications.models import PushSubscription, NotificationPreference  # noqa
+from app.modules.analytics.models import BusinessMetricBaseline  # noqa

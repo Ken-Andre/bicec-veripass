@@ -96,6 +96,11 @@ class ReviewDecisionRequest(BaseModel):
         False,
         description="Required when approving a dossier with biometric risk flags.",
     )
+    review_duration_ms: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Elapsed review time between opening the dossier and submitting a decision.",
+    )
 
 
 class ReviewDecisionResponse(BaseModel):
@@ -332,4 +337,3 @@ class PromoteAttachmentResponse(BaseModel):
     promoted_at: datetime
 
     model_config = {"from_attributes": True}
-
