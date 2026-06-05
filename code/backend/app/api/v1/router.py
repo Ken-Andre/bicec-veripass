@@ -10,6 +10,7 @@ from app.modules.devices.router import router as devices_router
 from app.modules.support.router import router as support_router
 from app.modules.audit.router import router as audit_router
 from app.modules.banking.router import router as banking_router
+from app.modules.legal.router import router as legal_router
 from app.api.v1.ocr import router as ocr_router
 from app.api.v1.sentry_proxy import router as sentry_proxy_router
 
@@ -18,6 +19,7 @@ api_router = APIRouter()
 api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(kyc_router, prefix="/kyc", tags=["kyc"])
 api_router.include_router(banking_router, prefix="/banking", tags=["banking"])
+api_router.include_router(legal_router, prefix="/legal", tags=["legal"])
 api_router.include_router(backoffice_router, prefix="/backoffice", tags=["backoffice"])
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_router.include_router(aml_router, prefix="/aml", tags=["aml"])
