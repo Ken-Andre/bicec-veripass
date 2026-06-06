@@ -37,6 +37,7 @@ from app.modules.auth.models import Agent, AgentRole
 from app.modules.admin.models import Agency
 from app.modules.kyc.models import (
     KYCSession,
+    AmlAlert,
     Document,
     DuplicateCheck,
     OCRField,
@@ -157,6 +158,78 @@ ALLOWED_DOC_CATEGORIES: set[str] = {
     "ADDRESS_PROOF",
     "OTHER",
 }
+
+
+async def _session_has_compliance_trigger(
+    db: AsyncSession, session_id: uuid.UUID
+) -> bool:
+    aml_result = await db.execute(
+        select(AmlAlert.id).where(AmlAlert.session_id == session_id).limit(1)
+    )
+    if aml_result.scalar_one_or_none() is not None:
+        return True
+
+    duplicate_result = await db.execute(
+        select(DuplicateCheck.id)
+        .where(
+            (DuplicateCheck.session_id_new == session_id)
+            | (DuplicateCheck.session_id_existing == session_id)
+        )
+        .limit(1)
+    )
+    return duplicate_result.scalar_one_or_none() is not None
+
+
+async def _has_current_assignment(
+    db: AsyncSession, session_id: uuid.UUID, agent_id: uuid.UUID
+) -> bool:
+    result = await db.execute(
+        select(DossierAssignment.id)
+        .where(
+            DossierAssignment.session_id == session_id,
+            DossierAssignment.agent_id == agent_id,
+            DossierAssignment.is_current == True,  # noqa: E712
+            DossierAssignment.completed_at == None,  # noqa: E711
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _ensure_agent_can_access_session(
+    db: AsyncSession,
+    session: KYCSession,
+    agent: Agent,
+    *,
+    allow_admin: bool = False,
+) -> None:
+    if allow_admin and agent.role == AgentRole.ADMIN_IT:
+        return
+    if agent.role == AgentRole.SYLVIE:
+        return
+    if agent.role == AgentRole.THOMAS:
+        if await _session_has_compliance_trigger(db, session.id):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: compliance trigger does not exist for this dossier.",
+        )
+    if agent.role == AgentRole.JEAN:
+        if session.agency_id and agent.agency_id and session.agency_id == agent.agency_id:
+            return
+        if session.agency_id is None and await _has_current_assignment(
+            db, session.id, agent.id
+        ):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: dossier is outside this agent's agency.",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Role '{agent.role.value}' cannot access this dossier.",
+    )
 
 
 @router.get("/")
@@ -459,6 +532,16 @@ async def list_queue(
         conditions.append(KYCSession.status == status_filter)
     else:
         conditions.append(KYCSession.status.in_(_REVIEW_STATES))
+    if _agent.role == AgentRole.JEAN:
+        if not _agent.agency_id:
+            return PageResponse(
+                items=[],
+                total=0,
+                page=page.page,
+                limit=limit,
+                pages=1,
+            )
+        conditions.append(KYCSession.agency_id == _agent.agency_id)
 
     base_query = (
         select(KYCSession)
@@ -579,6 +662,8 @@ async def get_dossier_detail(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Dossier not found")
+
+    await _ensure_agent_can_access_session(db, session, _agent)
 
     if _agent.role == AgentRole.THOMAS:
         # Verify if dossier has active compliance triggers
@@ -763,6 +848,14 @@ async def get_document_file(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    await _ensure_agent_can_access_session(db, session, _agent)
+
     file_path = document_storage.base_path / doc.file_path
     resolved = file_path.resolve()
     if not resolved.exists():
@@ -801,6 +894,14 @@ async def classify_document(
     document = result.scalar_one_or_none()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     categories = [c.strip().upper() for c in body.categories if c.strip()]
     if not categories:
@@ -887,6 +988,8 @@ async def submit_review_decision(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Dossier not found")
+
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     reviewable = _REVIEW_STATES | {LifecycleState.FRAUD_SUSPECT}
     if session.status not in reviewable:
@@ -1116,6 +1219,7 @@ async def assign_dossier(
             status_code=400,
             detail=f"Dossier in status '{session.status}' cannot be assigned.",
         )
+    await _ensure_agent_can_access_session(db, session, _agent, allow_admin=True)
 
     result = await db.execute(select(Agent).where(Agent.id == body.agent_id))
     target_agent = result.scalar_one_or_none()
@@ -1123,6 +1227,15 @@ async def assign_dossier(
         raise HTTPException(status_code=404, detail="Target agent not found")
     if not target_agent.is_available:
         raise HTTPException(status_code=400, detail="Target agent is not available")
+    if (
+        session.agency_id
+        and target_agent.role == AgentRole.JEAN
+        and target_agent.agency_id != session.agency_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Target JEAN agent must belong to the dossier agency.",
+        )
 
     now = datetime.now(timezone.utc)
     previous_agent_ids: set[uuid.UUID] = set()
@@ -1208,6 +1321,7 @@ async def auto_assign_dossier(
             status_code=400,
             detail=f"Dossier in status '{session.status}' cannot be assigned.",
         )
+    await _ensure_agent_can_access_session(db, session, _agent, allow_admin=True)
 
     agent_query = select(Agent).where(
         Agent.role == AgentRole.JEAN,
@@ -1229,14 +1343,6 @@ async def auto_assign_dossier(
         target_agent = await _least_loaded_connected_agent(
             db, list(result.scalars().all())
         )
-
-        if not target_agent:
-            result = await db.execute(
-                agent_query.order_by(Agent.name.asc())
-            )
-            target_agent = await _least_loaded_connected_agent(
-                db, list(result.scalars().all())
-            )
     else:
         result = await db.execute(
             agent_query.order_by(Agent.name.asc())
@@ -1348,7 +1454,22 @@ async def list_support_threads(
         selectinload(SupportThread.messages),
     ).order_by(SupportThread.created_at.desc())
     if session_id:
+        session_result = await db.execute(
+            select(KYCSession).where(KYCSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        await _ensure_agent_can_access_session(db, session, _agent)
         query = query.where(SupportThread.session_id == session_id)
+    elif _agent.role == AgentRole.JEAN:
+        if not _agent.agency_id:
+            return []
+        query = query.join(KYCSession, KYCSession.id == SupportThread.session_id).where(
+            KYCSession.agency_id == _agent.agency_id
+        )
+    elif _agent.role == AgentRole.THOMAS:
+        return []
     result = await db.execute(query)
     threads = result.scalars().unique().all()
     return [
@@ -1368,7 +1489,9 @@ async def list_support_threads(
 async def create_support_thread(
     request: Request,
     body: SupportThreadCreate,
-    current_agent: Agent = Depends(get_current_agent),
+    current_agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE)
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new support thread for a session."""
@@ -1378,6 +1501,7 @@ async def create_support_thread(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     thread = SupportThread(
         id=uuid.uuid4(),
@@ -1416,6 +1540,13 @@ async def list_support_messages(
     thread = thread_result.scalar_one_or_none()
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, _agent)
 
     result = await db.execute(
         select(SupportMessage)
@@ -1455,7 +1586,9 @@ async def send_support_message(
     request: Request,
     thread_id: uuid.UUID,
     body: SupportMessageCreate,
-    current_agent: Agent = Depends(get_current_agent),
+    current_agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE)
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Send a message in a support thread (as an agent)."""
@@ -1465,6 +1598,13 @@ async def send_support_message(
     thread = result.scalar_one_or_none()
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     now = datetime.now(timezone.utc)
     message = SupportMessage(
@@ -1535,11 +1675,20 @@ async def get_support_message_attachment(
 ):
     """Download attachment linked to a support message."""
     result = await db.execute(
-        select(SupportMessage).where(SupportMessage.id == message_id)
+        select(SupportMessage)
+        .options(selectinload(SupportMessage.thread))
+        .where(SupportMessage.id == message_id)
     )
     message = result.scalar_one_or_none()
     if not message:
         raise HTTPException(status_code=404, detail="Support message not found")
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == message.thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, _agent)
     if not message.attachment_path:
         raise HTTPException(status_code=404, detail="No attachment for this message")
 
@@ -1568,11 +1717,20 @@ async def mark_message_read(
 ):
     """Mark a support message as read."""
     result = await db.execute(
-        select(SupportMessage).where(SupportMessage.id == message_id)
+        select(SupportMessage)
+        .options(selectinload(SupportMessage.thread))
+        .where(SupportMessage.id == message_id)
     )
     message = result.scalar_one_or_none()
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == message.thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, _agent)
     message.read_at = datetime.now(timezone.utc)
     await db.commit()
     return {"status": "read", "message_id": str(message_id)}
@@ -1588,7 +1746,7 @@ async def promote_support_attachment(
     message_id: uuid.UUID,
     body: PromoteAttachmentRequest,
     current_agent: Agent = Depends(
-        require_agent_role(AgentRole.JEAN, AgentRole.SYLVIE)
+        require_agent_role(AgentRole.JEAN)
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1606,6 +1764,13 @@ async def promote_support_attachment(
         raise HTTPException(
             status_code=400, detail="This message does not contain any attachment"
         )
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == message.thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     # 2. Check if already promoted (doublon check)
     session_id = message.thread.session_id
@@ -1743,6 +1908,7 @@ async def correct_ocr_field(
     session = session_result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     # Verify document belongs to session
     doc_result = await db.execute(

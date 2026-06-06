@@ -17,6 +17,7 @@ class DeviceTagDecision(str, Enum):
     ALLOWED = "allowed"
     REGISTRATION_REQUIRED = "registration_required"
     INVALID = "invalid"
+    NO_REGISTERED_DEVICE = "no_registered_device"
 
 
 def evaluate_device_tag(
@@ -57,6 +58,46 @@ async def require_registered_device(
         raise HTTPException(
             status_code=status.HTTP_428_PRECONDITION_REQUIRED,
             detail="Device tag required. Register this device before continuing.",
+        )
+    if decision == DeviceTagDecision.INVALID:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Device tag is not registered for this user.",
+        )
+
+    for device in devices:
+        if device.device_tag == x_device_tag:
+            device.last_seen_at = datetime.now(timezone.utc)
+            await db.commit()
+            break
+
+    return current_user
+
+
+async def require_existing_registered_device(
+    x_device_tag: str | None = Header(None, alias="X-Device-Tag"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Require a known active device tag, with no bearer-only bootstrap window."""
+    result = await db.execute(
+        select(DeviceRegistration).where(
+            DeviceRegistration.user_id == current_user.id,
+            DeviceRegistration.is_active == True,  # noqa: E712
+        )
+    )
+    devices = list(result.scalars().all())
+    if not devices:
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail="Register this device before continuing.",
+        )
+
+    decision = evaluate_device_tag([device.device_tag for device in devices], x_device_tag)
+    if decision == DeviceTagDecision.REGISTRATION_REQUIRED:
+        raise HTTPException(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail="Device tag required.",
         )
     if decision == DeviceTagDecision.INVALID:
         raise HTTPException(

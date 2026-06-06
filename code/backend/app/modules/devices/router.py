@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,6 +43,7 @@ async def register_device(
     request: Request,
     body: DeviceRegisterRequest,
     x_device_fingerprint: str | None = Header(None, alias="X-Device-Fingerprint"),
+    x_device_tag: str | None = Header(None, alias="X-Device-Tag"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -55,6 +56,25 @@ async def register_device(
     now = datetime.now(timezone.utc)
     device_tag = _make_device_tag(current_user.id, fingerprint_hash)
     user_agent = request.headers.get("user-agent")
+
+    active_result = await db.execute(
+        select(DeviceRegistration).where(
+            DeviceRegistration.user_id == current_user.id,
+            DeviceRegistration.is_active == True,  # noqa: E712
+        )
+    )
+    active_devices = list(active_result.scalars().all())
+    if active_devices:
+        if not x_device_tag:
+            raise HTTPException(
+                status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+                detail="Current device tag required to register or rotate devices.",
+            )
+        if x_device_tag not in {device.device_tag for device in active_devices}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Current device tag is not registered for this user.",
+            )
 
     result = await db.execute(
         select(DeviceRegistration).where(

@@ -14,6 +14,7 @@ import {
   persistKycState,
 } from '../services/kycOfflineStore';
 import { fetchWithCorrelation } from '../services/apiClient';
+import { getAuthToken } from '../services/authTokenStorage';
 import { ensureDeviceRegistered } from '../services/deviceRegistrationService';
 
 /** Status de réconciliation backend → local */
@@ -316,7 +317,7 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     void (async () => {
       try {
-        const token = localStorage.getItem('vp_token');
+        const token = getAuthToken();
         if (!token) {
           if (active) setReconciliationStatus('skipped');
           return;

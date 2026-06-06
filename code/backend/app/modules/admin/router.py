@@ -1,5 +1,6 @@
 import uuid as _uuid
 
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy import func, select
@@ -20,6 +21,7 @@ from app.modules.auth.schemas import (
     AdminAgentResponse,
 )
 from app.modules.admin.schemas import UserSchema
+from app.modules.audit.models import AuditLog
 
 router = APIRouter()
 
@@ -89,6 +91,42 @@ async def list_agents(
     )
 
 
+def _agent_audit_payload(agent: Agent) -> dict:
+    return {
+        "agent_id": str(agent.id),
+        "name": agent.name,
+        "email": agent.email,
+        "role": agent.role.value if hasattr(agent.role, "value") else str(agent.role),
+        "agency_id": str(agent.agency_id) if agent.agency_id else None,
+        "is_available": agent.is_available,
+    }
+
+
+def _add_admin_audit(
+    db: AsyncSession,
+    *,
+    action: str,
+    target_agent: Agent,
+    admin_agent: Agent,
+    request: Request,
+    old_data: dict | None = None,
+    new_data: dict | None = None,
+) -> None:
+    db.add(
+        AuditLog(
+            id=_uuid.uuid4(),
+            action=action,
+            table_name="agents",
+            record_id=str(target_agent.id),
+            old_data=old_data,
+            new_data=new_data,
+            performed_by=admin_agent.id,
+            performed_at=datetime.now(timezone.utc),
+            client_ip=request.client.host if request.client else None,
+        )
+    )
+
+
 @router.post("/agents", response_model=AdminAgentResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(settings.RATE_LIMIT_ADMIN)
 async def create_agent(
@@ -115,6 +153,15 @@ async def create_agent(
         agency_id=agency_id,
     )
     db.add(agent)
+    await db.flush()
+    _add_admin_audit(
+        db,
+        action="ADMIN_AGENT_CREATE",
+        target_agent=agent,
+        admin_agent=_agent,
+        request=request,
+        new_data=_agent_audit_payload(agent),
+    )
     await db.commit()
     await db.refresh(agent)
 
@@ -142,6 +189,7 @@ async def update_agent(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found.")
 
+    old_data = _agent_audit_payload(agent)
     if body.name is not None:
         agent.name = body.name
     if body.email is not None:
@@ -162,6 +210,15 @@ async def update_agent(
     if body.agency_id is not None:
         agent.agency_id = _uuid.UUID(body.agency_id) if body.agency_id else None
 
+    _add_admin_audit(
+        db,
+        action="ADMIN_AGENT_UPDATE",
+        target_agent=agent,
+        admin_agent=_agent,
+        request=request,
+        old_data=old_data,
+        new_data=_agent_audit_payload(agent),
+    )
     await db.commit()
     await db.refresh(agent)
 
@@ -190,6 +247,14 @@ async def reset_agent_password(
         raise HTTPException(status_code=404, detail="Agent not found.")
 
     agent.password_hash = hash_password(body.new_password)
+    _add_admin_audit(
+        db,
+        action="ADMIN_AGENT_PASSWORD_RESET",
+        target_agent=agent,
+        admin_agent=_agent,
+        request=request,
+        new_data={"agent_id": str(agent.id), "password_reset": True},
+    )
     await db.commit()
 
     logger.info(f"Agent password reset: {agent.email} by admin")
@@ -215,7 +280,17 @@ async def deactivate_agent(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found.")
 
+    old_data = _agent_audit_payload(agent)
     agent.is_available = False
+    _add_admin_audit(
+        db,
+        action="ADMIN_AGENT_DEACTIVATE",
+        target_agent=agent,
+        admin_agent=_agent,
+        request=request,
+        old_data=old_data,
+        new_data=_agent_audit_payload(agent),
+    )
     await db.commit()
 
     logger.info(f"Agent deactivated: {agent.email} by admin")

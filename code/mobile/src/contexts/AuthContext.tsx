@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, setSessionExpiredHandler } from '../services/apiClient';
+import { clearAuthToken, getAuthToken, setAuthToken } from '../services/authTokenStorage';
 import { isPasskeySupported, registerPasskey, authenticatePasskey, removePasskey, type PasskeyAuthResult } from '../services/passkeyService';
 import { clearPersistedKycState } from '../services/kycOfflineStore';
 import { ensureDeviceRegistered } from '../services/deviceRegistrationService';
@@ -104,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('vp_token');
+    clearAuthToken();
     localStorage.removeItem('vp_user');
     localStorage.removeItem('vp_device_tag');
     sessionStorage.removeItem(LOCKED_SESSION_KEY);
@@ -118,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearTimer]);
 
   const expireAuthenticatedSession = useCallback(() => {
-    localStorage.removeItem('vp_token');
+    clearAuthToken();
     sessionStorage.removeItem(LOCKED_SESSION_KEY);
     setIsAuthenticated(false);
     setIsLocked(false);
@@ -212,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Load persisted session on mount
   useEffect(() => {
     lastActivityRef.current = Date.now();
-    const token = localStorage.getItem('vp_token');
+    const token = getAuthToken();
     const savedUser = localStorage.getItem('vp_user');
 
     if (savedUser) {
@@ -232,7 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         console.error("Auth session parsing error", err);
-        localStorage.removeItem('vp_token');
+        clearAuthToken();
         localStorage.removeItem('vp_user');
       }
     }
@@ -247,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, isLocked, user]);
 
   const login = useCallback((token: string, userData: User) => {
-    localStorage.setItem('vp_token', token);
+    setAuthToken(token);
     localStorage.setItem('vp_user', JSON.stringify(userData));
     sessionStorage.removeItem(LOCKED_SESSION_KEY);
     setIsAuthenticated(true);
@@ -282,7 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetAccount = useCallback(() => {
-    localStorage.removeItem('vp_token');
+    clearAuthToken();
     localStorage.removeItem('vp_user');
     localStorage.removeItem('vp_device_tag');
     sessionStorage.removeItem(LOCKED_SESSION_KEY);
@@ -324,7 +325,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // API may not exist yet, proceed with local cleanup
     }
-    localStorage.removeItem('vp_token');
+    clearAuthToken();
     localStorage.removeItem('vp_user');
     localStorage.removeItem('vp_device_tag');
     sessionStorage.removeItem(LOCKED_SESSION_KEY);

@@ -84,6 +84,7 @@ class PinSetupRequest(BaseModel):
     """PIN setup request."""
 
     pin: ConstrainedPin
+    current_pin: Optional[ConstrainedPin] = None
 
 
 class PinVerifyRequest(BaseModel):

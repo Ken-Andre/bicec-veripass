@@ -831,7 +831,10 @@ async def merge_ocr_fields(
     from app.services.ocr_service import combine_extractions
 
     result = await db.execute(
-        select(KYCSession).where(KYCSession.id == session_id)
+        select(KYCSession).where(
+            KYCSession.id == session_id,
+            KYCSession.user_id == current_user.id,
+        )
     )
     session = result.scalar_one_or_none()
     if not session:

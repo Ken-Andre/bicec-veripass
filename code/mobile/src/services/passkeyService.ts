@@ -33,6 +33,39 @@ function base64urlDecode(str: string): ArrayBuffer {
   return bytes.buffer as ArrayBuffer;
 }
 
+function attestationResponseToJSON(credential: PublicKeyCredential) {
+  const response = credential.response as AuthenticatorAttestationResponse;
+  const transports = typeof response.getTransports === 'function'
+    ? response.getTransports()
+    : ['internal'];
+  return {
+    id: credential.id,
+    rawId: base64urlEncode(credential.rawId),
+    type: credential.type,
+    authenticatorAttachment: credential.authenticatorAttachment,
+    response: {
+      attestationObject: base64urlEncode(response.attestationObject),
+      clientDataJSON: base64urlEncode(response.clientDataJSON),
+      transports,
+    },
+  };
+}
+
+function assertionResponseToJSON(assertion: PublicKeyCredential) {
+  const response = assertion.response as AuthenticatorAssertionResponse;
+  return {
+    id: assertion.id,
+    rawId: base64urlEncode(assertion.rawId),
+    type: assertion.type,
+    response: {
+      authenticatorData: base64urlEncode(response.authenticatorData),
+      clientDataJSON: base64urlEncode(response.clientDataJSON),
+      signature: base64urlEncode(response.signature),
+      userHandle: response.userHandle ? base64urlEncode(response.userHandle) : null,
+    },
+  };
+}
+
 export async function registerPasskey(userId: string): Promise<boolean> {
   if (!isPasskeySupported()) return false;
 
@@ -71,10 +104,12 @@ export async function registerPasskey(userId: string): Promise<boolean> {
     if (!credential) return false;
 
     const credentialId = base64urlEncode(credential.rawId);
+    const rawResponse = attestationResponseToJSON(credential);
     await apiClient.post('/auth/webauthn/register/verify', {
       challenge: options.challenge,
       credential_id: credentialId,
-      transports: ['internal'],
+      transports: rawResponse.response.transports,
+      raw_response: rawResponse,
     });
 
     localStorage.setItem('vp_passkey_cred', credentialId);
@@ -121,13 +156,20 @@ export async function authenticatePasskey(phone?: string): Promise<PasskeyAuthRe
     if (!assertion) return null;
 
     const credentialId = base64urlEncode(assertion.rawId);
+    const rawResponse = assertionResponseToJSON(assertion);
     localStorage.setItem('vp_passkey_cred', credentialId);
-    return apiClient.post<PasskeyAuthResult, { phone: string; challenge: string; credential_id: string }>(
+    return apiClient.post<PasskeyAuthResult, {
+      phone: string;
+      challenge: string;
+      credential_id: string;
+      raw_response: ReturnType<typeof assertionResponseToJSON>;
+    }>(
       '/auth/webauthn/auth/verify',
       {
         phone,
         challenge: options.challenge,
         credential_id: credentialId,
+        raw_response: rawResponse,
       },
     );
   } catch {

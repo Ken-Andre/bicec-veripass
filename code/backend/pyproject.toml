@@ -2,6 +2,7 @@
 name = "bicec-veripass-backend"
 version = "0.1.0"
 description = "Sovereign digital KYC onboarding platform for BICEC (Cameroon)"
+license = "LicenseRef-BICEC-VeriPass-Proprietary"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
