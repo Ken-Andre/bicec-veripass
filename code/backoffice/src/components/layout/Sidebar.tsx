@@ -42,10 +42,10 @@ function NavigationLinks({ onClick }: { onClick?: () => void }) {
           onClick={onClick}
           className={({ isActive }) =>
             cn(
-              'group flex items-center rounded-md px-3 py-2 text-sm font-medium',
+              'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
               isActive
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                : 'text-sidebar-foreground/85 hover:bg-white/10 hover:text-sidebar-foreground'
             )
           }
         >
@@ -65,9 +65,9 @@ export default function Sidebar() {
     <>
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="fixed inset-0 bg-gray-600/75" onClick={() => setMobileOpen(false)} />
-          <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white">
-            <div className="flex h-16 items-center justify-between px-4">
+          <div className="fixed inset-0 bg-bicec-brun/75" onClick={() => setMobileOpen(false)} />
+          <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-sidebar text-sidebar-foreground">
+            <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
               <span className="text-lg font-semibold">BICEC VeriPass</span>
               <button onClick={() => setMobileOpen(false)}>
                 <X className="h-6 w-6" />
@@ -76,14 +76,14 @@ export default function Sidebar() {
             <nav className="flex-1 space-y-1 px-2 py-4">
               <NavigationLinks onClick={() => setMobileOpen(false)} />
             </nav>
-            <div className="border-t p-4">
+            <div className="border-t border-white/10 p-4">
               <div className="mb-2 text-sm">
                 <p className="font-medium">{user?.name}</p>
-                <p className="text-gray-500">{user?.role}</p>
+                <p className="text-sidebar-muted">{user?.role}</p>
               </div>
               <button
                 onClick={logout}
-                className="flex w-full items-center rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                className="flex w-full items-center rounded-md px-3 py-2 text-sm text-sidebar-foreground/80 hover:bg-white/10 hover:text-sidebar-foreground"
               >
                 <LogOut className="mr-3 h-5 w-5" />
                 Déconnexion
@@ -94,20 +94,20 @@ export default function Sidebar() {
       )}
 
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex h-16 items-center border-b px-6">
+        <div className="flex h-16 items-center border-b border-white/10 bg-sidebar px-6 text-sidebar-foreground">
           <span className="text-lg font-semibold">BICEC VeriPass</span>
         </div>
-        <nav className="flex-1 space-y-1 bg-white px-2 py-4">
+        <nav className="flex-1 space-y-1 bg-sidebar px-2 py-4">
           <NavigationLinks />
         </nav>
-        <div className="border-t bg-white p-4">
+        <div className="border-t border-white/10 bg-sidebar p-4 text-sidebar-foreground">
           <div className="mb-2 text-sm">
             <p className="font-medium">{user?.name}</p>
-            <p className="text-gray-500">{user?.role}</p>
+            <p className="text-sidebar-muted">{user?.role}</p>
           </div>
           <button
             onClick={logout}
-            className="flex w-full items-center rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            className="flex w-full items-center rounded-md px-3 py-2 text-sm text-sidebar-foreground/80 hover:bg-white/10 hover:text-sidebar-foreground"
           >
             <LogOut className="mr-3 h-5 w-5" />
             Déconnexion
@@ -117,8 +117,9 @@ export default function Sidebar() {
 
       <div className="lg:hidden">
         <button
+          aria-label="Ouvrir le menu"
           onClick={() => setMobileOpen(true)}
-          className="fixed bottom-4 right-4 z-50 rounded-full bg-blue-600 p-3 text-white shadow-lg"
+          className="fixed bottom-4 right-4 z-50 rounded-full bg-primary p-3 text-primary-foreground shadow-lg"
         >
           <Menu className="h-6 w-6" />
         </button>
