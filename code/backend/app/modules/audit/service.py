@@ -109,6 +109,9 @@ async def export_audit_log_cobac(
     db: AsyncSession,
     date_from: str,
     date_to: str,
+    *,
+    performed_by: uuid.UUID | None = None,
+    client_ip: str | None = None,
 ) -> list[dict]:
     """Export audit entries over a date range in a regulator-readable shape."""
     logger.info("Exporting audit log COBAC %s to %s", date_from, date_to)
@@ -129,7 +132,7 @@ async def export_audit_log_cobac(
         .where(AuditLog.performed_at >= start, AuditLog.performed_at <= end)
         .order_by(AuditLog.performed_at.asc())
     )
-    return [
+    entries = [
         {
             "id": str(log.id),
             "timestamp": log.performed_at.isoformat() if log.performed_at else None,
@@ -143,6 +146,25 @@ async def export_audit_log_cobac(
         }
         for log in result.scalars().all()
     ]
+    db.add(
+        AuditLog(
+            id=uuid.uuid4(),
+            action="AUDIT_EXPORT_COBAC",
+            table_name="audit_log",
+            record_id=None,
+            old_data={},
+            new_data={
+                "date_from": date_from,
+                "date_to": date_to,
+                "exported_entries": len(entries),
+            },
+            performed_by=performed_by,
+            performed_at=datetime.now(timezone.utc),
+            client_ip=client_ip,
+        )
+    )
+    await db.commit()
+    return entries
 
 
 def _fmt_datetime(value: str | None) -> str:
