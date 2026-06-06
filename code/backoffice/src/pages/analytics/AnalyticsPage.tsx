@@ -119,21 +119,28 @@ const integerBaselineFields = new Set<keyof BaselineForm>([
   'pilot_duration_months',
 ])
 
+const percentageBaselineFields = new Set<keyof BaselineForm>([
+  'current_incomplete_rate',
+  'current_complement_rate',
+  'current_abandonment_rate',
+  'current_aml_sensitive_case_rate',
+])
+
 const baselineFieldLabels: Array<{ key: keyof BaselineForm; label: string; placeholder?: string }> = [
-  { key: 'monthly_kyc_volume', label: 'Volume KYC mensuel', placeholder: '1200' },
-  { key: 'current_avg_days_to_validate', label: 'Delai actuel validation (jours)', placeholder: '3.5' },
-  { key: 'current_branch_minutes_per_dossier', label: 'Minutes agence actuelles', placeholder: '18' },
-  { key: 'current_backoffice_minutes_per_dossier', label: 'Minutes backoffice actuelles', placeholder: '22' },
-  { key: 'current_incomplete_rate', label: 'Taux incomplets actuel (0..1)', placeholder: '0.18' },
-  { key: 'current_complement_rate', label: 'Taux complements actuel (0..1)', placeholder: '0.14' },
-  { key: 'current_abandonment_rate', label: 'Taux abandon actuel (0..1)', placeholder: '0.10' },
-  { key: 'hourly_staff_cost_xaf', label: 'Cout horaire staff XAF', placeholder: '7500' },
-  { key: 'avg_customer_12m_value_xaf', label: 'Valeur client 12 mois XAF', placeholder: '45000' },
-  { key: 'audit_requests_per_period', label: 'Demandes audit / periode', placeholder: '4' },
-  { key: 'current_audit_assembly_hours', label: 'Heures audit actuelles', placeholder: '6' },
-  { key: 'veripass_audit_export_hours', label: 'Heures export VeriPass', placeholder: '0.25' },
+  { key: 'monthly_kyc_volume', label: 'Monthly KYC Volume', placeholder: '1200' },
+  { key: 'current_avg_days_to_validate', label: 'Average Delay (days)', placeholder: '3.5' },
+  { key: 'current_branch_minutes_per_dossier', label: 'Branch Time per File (minutes)', placeholder: '18' },
+  { key: 'current_backoffice_minutes_per_dossier', label: 'Backoffice Time per File (minutes)', placeholder: '22' },
+  { key: 'current_incomplete_rate', label: 'Incompleteness Rate (%)', placeholder: '18' },
+  { key: 'current_complement_rate', label: 'Complement Request Rate (%)', placeholder: '14' },
+  { key: 'current_abandonment_rate', label: 'Abandonment Rate (%)', placeholder: '10' },
+  { key: 'hourly_staff_cost_xaf', label: 'Hourly Rate (XAF)', placeholder: '7500' },
+  { key: 'avg_customer_12m_value_xaf', label: 'Client LTV (12m XAF)', placeholder: '45000' },
+  { key: 'audit_requests_per_period', label: 'Audit Frequency', placeholder: '4' },
+  { key: 'current_audit_assembly_hours', label: 'Audit Reconstitution Time (hours)', placeholder: '6' },
+  { key: 'veripass_audit_export_hours', label: 'VeriPass Audit Export Time (hours)', placeholder: '0.25' },
   { key: 'average_rework_cost_xaf', label: 'Cout reprise dossier XAF', placeholder: '5000' },
-  { key: 'current_aml_sensitive_case_rate', label: 'Taux dossiers AML sensibles (0..1)', placeholder: '0.03' },
+  { key: 'current_aml_sensitive_case_rate', label: 'AML Alert Rate (%)', placeholder: '3' },
   { key: 'pilot_setup_cost_xaf', label: 'Cout setup pilote XAF', placeholder: '2500000' },
   { key: 'pilot_monthly_run_cost_xaf', label: 'Cout run mensuel XAF', placeholder: '750000' },
   { key: 'pilot_duration_months', label: 'Duree pilote (mois)', placeholder: '3' },
@@ -154,26 +161,37 @@ function buildExportQuery(filters: Filters, format: 'html' | 'json') {
   return `?${params.toString()}`
 }
 
-function formValue(value: unknown) {
-  return value === null || value === undefined ? '' : String(value)
+function baselineFormValue(key: keyof BaselineForm, value: unknown) {
+  if (value === null || value === undefined) return ''
+  if (percentageBaselineFields.has(key)) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return String(Number((parsed * 100).toFixed(4)))
+  }
+  return String(value)
 }
 
-function formFromBaseline(baseline: any): BaselineForm {
+export function formFromBaseline(baseline: any): BaselineForm {
   if (!baseline) return emptyBaselineForm
   return {
     ...emptyBaselineForm,
-    ...Object.fromEntries(Object.keys(emptyBaselineForm).map((key) => [key, formValue(baseline[key])])),
+    ...Object.fromEntries(
+      Object.keys(emptyBaselineForm).map((key) => [
+        key,
+        baselineFormValue(key as keyof BaselineForm, baseline[key]),
+      ]),
+    ),
   } as BaselineForm
 }
 
-function numberOrNull(value: string, integer = false) {
+function numberOrNull(value: string, integer = false, percentage = false) {
   if (!value.trim()) return null
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return null
-  return integer ? Math.trunc(parsed) : parsed
+  const normalized = percentage ? parsed / 100 : parsed
+  return integer ? Math.trunc(normalized) : normalized
 }
 
-function baselinePayload(form: BaselineForm) {
+export function baselinePayload(form: BaselineForm) {
   const payload: Record<string, any> = {
     period_start: form.period_start,
     period_end: form.period_end,
@@ -182,7 +200,11 @@ function baselinePayload(form: BaselineForm) {
   }
   if (form.id) payload.id = form.id
   baselineNumberFields.forEach((key) => {
-    payload[key] = numberOrNull(form[key], integerBaselineFields.has(key))
+    payload[key] = numberOrNull(
+      form[key],
+      integerBaselineFields.has(key),
+      percentageBaselineFields.has(key),
+    )
   })
   return payload
 }
@@ -334,6 +356,9 @@ export default function AnalyticsPage() {
   const finance = businessCase?.finance || {}
   const direction = businessCase?.direction || {}
   const businessCompliance = businessCase?.compliance || {}
+  const roiEngine = businessCase?.roi_engine || {}
+  const roiInputs = roiEngine.inputs || {}
+  const roiOutputs = roiEngine.outputs || {}
 
   return (
     <div className="space-y-6">
@@ -455,9 +480,20 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Monthly KYC Volume" value={metricDisplay(roiInputs.monthly_kyc_volume, '0')} icon={FileText} />
+            <MetricCard title="Current Minutes per File" value={metricDisplay(roiInputs.current_minutes_per_file, 'Baseline requise')} icon={Clock} />
+            <MetricCard title="Target Minutes per File" value={metricDisplay(roiInputs.target_minutes_per_file, '0m')} icon={Calculator} />
+            <MetricCard title="Hourly Rate" value={metricDisplay(roiInputs.hourly_rate, 'Baseline requise')} icon={Calculator} />
+            <MetricCard title="Operational Gain" value={metricDisplay(roiOutputs.operational_gain_monthly, 'Baseline requise')} icon={TrendingUp} />
+            <MetricCard title="Conversion Uplift / client" value={metricDisplay(roiOutputs.conversion_uplift_value, 'Baseline requise')} icon={TrendingUp} />
+            <MetricCard title="Commercial Gain" value={metricDisplay(roiOutputs.commercial_gain_monthly, 'Baseline requise')} icon={TrendingUp} />
+            <MetricCard title="Compliance/Audit Savings" value={metricDisplay(roiOutputs.compliance_audit_savings, 'Baseline requise')} icon={ShieldCheck} />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard title="Cout actuel / dossier" value={metricDisplay(finance.current_cost_per_dossier, 'Baseline requise')} icon={Calculator} />
             <MetricCard title="Cout VeriPass / dossier" value={metricDisplay(finance.veripass_cost_per_dossier, 'Baseline requise')} icon={Calculator} />
-            <MetricCard title="Economies mensuelles" value={metricDisplay(finance.operational_savings_monthly, 'Baseline requise')} icon={TrendingUp} />
+            <MetricCard title="Total monthly gain" value={metricDisplay(roiOutputs.total_monthly_gain, 'Baseline requise')} icon={TrendingUp} />
             <MetricCard title="ROI pilote" value={metricDisplay(finance.roi_percent, 'Baseline requise')} icon={BarChart3} />
             <MetricCard title="Abandon pilote" value={metricDisplay(direction.pilot_abandonment_rate, '0%')} icon={AlertTriangle} />
             <MetricCard title="Conversion start -> approved" value={metricDisplay(direction.start_to_approved_conversion_rate, '0%')} icon={CheckCircle} />
