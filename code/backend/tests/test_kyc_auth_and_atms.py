@@ -142,7 +142,7 @@ def test_liveness_bypass_for_ia_agents():
     [P1] Given liveness verification, When liveness bypass header is sent,
     Then liveness check succeeds for automated test agents while executing internal logs/validations.
     """
-    headers = {"X-Bypass-Liveness": "true"}
+    _headers = {"X-Bypass-Liveness": "true"}
     # response = client.post("/api/v1/kyc/liveness/verify", headers=headers, json={"liveness_data": "..."})
     response_status = 404
     assert response_status == 200

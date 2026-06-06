@@ -14,7 +14,7 @@ from html import escape
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
