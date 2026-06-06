@@ -61,7 +61,7 @@
   - 5.9 [Versioning et changelog](#59-versioning-et-changelog)
 - [6. Annexes](#6-annexes)
   - A [Index croisé master ↔ docs détaillées](#annexe-a--index-croisé-master--docs-détaillées)
-  - B [Rendu SVG et PDF — comment régénérer](#annexe-b--rendu-svg-et-pdf--comment-régénérer)
+  - B [Rendu SVG, PNG et PDF — comment régénérer](#annexe-b--rendu-svg-png-et-pdf--comment-régénérer)
   - C [Note d'autorité documentaire](#annexe-c--note-dautorité-documentaire)
 
 ---
@@ -72,7 +72,7 @@
 
 Ce document est conçu pour être lu **de haut en bas**. À chaque section, vous trouverez :
 
-1. Un **diagramme Mermaid** (rendu natif dans GitHub, VS Code, Obsidian, et la plupart des viewers Markdown). Une copie SVG est disponible sous [`docs/c4-architecture/diagrams/`](./c4-architecture/diagrams/) pour impression et inclusion dans un PDF.
+1. Un **diagramme Mermaid** (rendu natif dans GitHub, VS Code, Obsidian, et la plupart des viewers Markdown). Des copies SVG et PNG sont disponibles sous [`docs/c4-architecture/diagrams/`](./c4-architecture/diagrams/) pour impression, inclusion dans un PDF et insertion dans Word.
 2. Un **texte explicatif** court (rôle, acteurs, frontières).
 3. Un **cross-link** vers la documentation détaillée correspondante dans `docs/` (la « doc de référence »). Cette doc de référence reste la vérité de détail ; le présent document est la vérité d'ensemble.
 
@@ -1431,7 +1431,7 @@ bun run build
 
 - **Version du document** : 1.0.0 (2026-06-02).
 - **Politique** : tout changement de portée, d'architecture majeure, ou d'invariant doit être reflété ici et dans `docs/documentation-authority.md`.
-- **Render** : régénérer les SVG et le PDF via `docs/c4-architecture/render.ps1` (Windows) ou `docs/c4-architecture/render.sh` (Linux/WSL). Voir [Annexe B](#annexe-b--rendu-svg-et-pdf--comment-régénérer).
+- **Render** : régénérer les SVG, les PNG et le PDF via `docs/c4-architecture/render.ps1` (Windows) ou `docs/c4-architecture/render.sh` (Linux/WSL). Voir [Annexe B](#annexe-b--rendu-svg-png-et-pdf--comment-régénérer).
 - **Changelog** :
 
 | Date | Version | Auteur | Note |
@@ -1468,35 +1468,36 @@ bun run build
 | § 5.5 Invariants | [`docs/maintainer-handbook.md`](./maintainer-handbook.md) § « Critical Invariants » | — |
 | § 5.6 Smoke | [`docs/development-guide.md`](./development-guide.md), [`docs/operations-runbook.md`](./operations-runbook.md) | — |
 
-### Annexe B — Rendu SVG et PDF — comment régénérer
+### Annexe B — Rendu SVG, PNG et PDF — comment régénérer
 
-Les diagrammes de ce document sont en syntaxe **Mermaid** et sont rendus nativement par GitHub, VS Code, Obsidian, etc. Pour des exports SVG / PDF :
+Les diagrammes de ce document sont en syntaxe **Mermaid** et sont rendus nativement par GitHub, VS Code, Obsidian, etc. Pour des exports SVG / PNG / PDF :
 
 **Pré-requis :**
 
 - Node.js 18+
 - `npm i -g @mermaid-js/mermaid-cli` (binaire `mmdc`)
-- (optionnel, pour le PDF) Pandoc + un moteur LaTeX (lualatex / tectonic) ou WeasyPrint
+- (optionnel, pour le PDF) Pandoc + Chrome / chrome-headless-shell ou WeasyPrint
 
 **Windows (PowerShell) :**
 
 ```powershell
 cd docs\c4-architecture
-.\render.ps1            # SVG uniquement
-.\render.ps1 -Pdf       # SVG + PDF
+.\render.ps1            # SVG + PNG
+.\render.ps1 -Pdf       # SVG + PNG + PDF
 ```
 
 **Linux / WSL :**
 
 ```bash
 cd docs/c4-architecture
-./render.sh             # SVG uniquement
-./render.sh --pdf       # SVG + PDF
+./render.sh             # SVG + PNG
+./render.sh --pdf       # SVG + PNG + PDF
 ```
 
 Les fichiers produits :
 
 - `docs/c4-architecture/diagrams/c4-{level}-{num}-{slug}.svg` — un SVG par diagramme.
+- `docs/c4-architecture/diagrams/c4-{level}-{num}-{slug}.png` — un PNG haute résolution par diagramme, avec layout `elk`, adapté à Word.
 - `docs/c4-architecture/BICEC-VERIPASS-VUE-ENSEMBLE.pdf` — PDF imprimable A4.
 - `docs/c4-architecture/mermaid/*.mmd` — sources Mermaid extraites (pour édition sans toucher au master).
 
