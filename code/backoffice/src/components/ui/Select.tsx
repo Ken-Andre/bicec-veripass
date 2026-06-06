@@ -29,7 +29,7 @@ export function SelectTrigger({ children, className }: { children: ReactNode; cl
   if (!context) throw new Error('SelectTrigger must be used within Select')
 
   return (
-    <button type="button" className={cn('flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm', className)} onClick={() => context.setOpen(!context.open)}>
+    <button type="button" className={cn('flex h-10 w-full items-center justify-between rounded-md border border-input bg-card px-3 py-2 text-sm', className)} onClick={() => context.setOpen(!context.open)}>
       {children}
       <ChevronDown className="h-4 w-4 opacity-50" />
     </button>
@@ -50,7 +50,7 @@ export function SelectContent({ children, className }: { children: ReactNode; cl
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={() => context.setOpen(false)} />
-      <div className={cn('absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-md', className)}>
+      <div className={cn('absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md', className)}>
         {children}
       </div>
     </>
@@ -62,7 +62,7 @@ export function SelectItem({ children, value, className }: { children: ReactNode
   if (!context) throw new Error('SelectItem must be used within Select')
 
   return (
-    <div className={cn('relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm hover:bg-slate-100', context.value === value && 'bg-slate-100', className)} onClick={() => { context.onValueChange(value); context.setOpen(false) }}>
+    <div className={cn('relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm hover:bg-muted', context.value === value && 'bg-muted', className)} onClick={() => { context.onValueChange(value); context.setOpen(false) }}>
       {children}
     </div>
   )
