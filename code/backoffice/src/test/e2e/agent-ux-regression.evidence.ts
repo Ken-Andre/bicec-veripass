@@ -52,7 +52,7 @@ test.describe('Agent UX regressions', () => {
     ensureEvidenceDir();
   });
 
-  test('Jean queue metrics stay stable when filtering and dead notification button is absent', async ({ page }) => {
+  test('Jean queue metrics stay stable when filtering and notification placeholder is disabled', async ({ page }) => {
     const consoleEntries: ConsoleEntry[] = [];
     const pageErrors: string[] = [];
     const failedRequests: string[] = [];
@@ -72,7 +72,7 @@ test.describe('Agent UX regressions', () => {
 
     await loginAsJean(page);
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button', { name: /notifications/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /notifications/i })).toBeDisabled();
 
     const activeMetrics = await readQueueMetrics(page);
     await page.screenshot({
