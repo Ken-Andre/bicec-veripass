@@ -297,9 +297,14 @@ code/b_logs_utf8.txt
 # ========================
 ~$*.docx
 # ========================
-# AI Agent Plans
+# AI Agent memory & config dirs
 # ========================
-.opencode/plans/
+.kiro/
+.agent/
+.agents/
+.cline/
+.review/
+.opencode/
 
 # ========================
 # Docker stack backups
