@@ -15,10 +15,44 @@ license, model-training license, or other permission is granted by making this
 material available, visible, accessible, indexed, mirrored, leaked, copied, or
 transmitted in any public or private location.
 
+0. Contributor Residuals and Professional Reference
+
+Nothing in this license shall be construed to extinguish the customary
+residual, moral, evidentiary, academic, and professional-reference interests of
+any natural person who authored or materially contributed to the project before
+an assignment, transfer, exclusive license, operational handover, or commercial
+deployment by BICEC or an authorized assignee ("Qualifying Contributor").
+
+Subject at all times to confidentiality, banking secrecy, data protection,
+security, employment, internship, and other mandatory obligations, each
+Qualifying Contributor retains a personal, non-exclusive, worldwide,
+royalty-free, perpetual, irrevocable, and non-transferable right to preserve
+private records of their own contribution; to evidence authorship and technical
+experience; to refer to sanitized excerpts, diagrams, screenshots, recordings,
+architectural descriptions, and implementation summaries for academic
+assessment, professional reference, interviews, curriculum vitae, and portfolio
+purposes; to maintain private notes, prototypes, and non-production research
+materials for learning and professional development; and to reuse general
+knowledge, methods, skill, experience, design judgment, and independently
+developed ideas that do not disclose or depend upon protected bank information.
+
+The foregoing survives any assignment, transfer, exclusive license, handover,
+or commercialization of the project, except to the extent a Qualifying
+Contributor later signs a written instrument that specifically identifies this
+section and expressly waives the relevant retained interest.
+
+For avoidance of doubt, this section does not permit publication of the full
+source code, disclosure of customer data, disclosure of bank-confidential
+information, production operation, sale, sublicensing, commercial exploitation,
+competitive misuse, misuse of BICEC marks, violation of a valid confidentiality
+obligation, or circumvention of operational security, credential, access,
+deployment, audit, or administrative controls.
+
 1. No Permission Granted
 
 Except under a separate written agreement signed by an authorized representative
-of the rights holder, no person or system may:
+of the rights holder, or except for the limited retained interests described in
+Section 0, no person or system may:
 
 - use, run, host, deploy, benchmark, or operate this software;
 - copy, download, fork, clone, mirror, archive, cache, scrape, index, or crawl

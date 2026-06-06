@@ -7,6 +7,10 @@ archive, redistribute, train on, fine-tune on, embed, vectorize, summarize for
 model training, or use this material to build or improve any AI system,
 software agent, code assistant, dataset, search index, or competing product.
 
+Certain limited contributor residuals and professional-reference interests may
+be retained as described in LICENSE. They do not permit source-code disclosure,
+customer-data disclosure, commercial exploitation, or operational access.
+
 Access to this material, including through a public URL, private repository,
 cache, mirror, leak, browser session, CI artifact, prompt context, or accidental
 disclosure, does not grant a license.
