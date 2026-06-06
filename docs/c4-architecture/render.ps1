@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Render Mermaid diagrams from the master document to SVG (and optional PDF).
+    Render Mermaid diagrams from the master document to SVG/PNG (and optional PDF).
 
 .DESCRIPTION
     Pre-requisites:
@@ -14,6 +14,7 @@
 
     Outputs:
       diagrams\c4-*.svg                       (one SVG per Mermaid block)
+      diagrams\c4-*.png                       (one Word-friendly PNG per Mermaid block)
       mermaid\c4-*.mmd                        (extracted Mermaid sources)
       BICEC-VERIPASS-VUE-ENSEMBLE.pdf         (only with -Pdf)
 
@@ -21,7 +22,7 @@
     Also render the PDF (requires pandoc + chrome-headless-shell).
 
 .PARAMETER Clean
-    Remove generated artifacts (SVG, mmd, PDF).
+    Remove generated artifacts (SVG, PNG, mmd, PDF).
 
 .EXAMPLE
     .\render.ps1
@@ -43,6 +44,7 @@ Set-Location -LiteralPath $ScriptDir
 $Master      = '..\BICEC-VERIPASS-VUE-ENSEMBLE.md'
 $OutDir      = 'diagrams'
 $SrcDir      = 'mermaid'
+$ConfigFile  = 'mermaid-elk.config.json'
 $PdfFile     = 'BICEC-VERIPASS-VUE-ENSEMBLE.pdf'
 
 function Write-Log([string]$msg) { Write-Host "[render.ps1] $msg" }
@@ -115,24 +117,35 @@ function Invoke-ExtractMermaid {
 }
 
 function Invoke-RenderSvg {
-    if (-not (Test-Bin 'mmdc')) {
+    $mmdc = Get-Command 'mmdc' -ErrorAction SilentlyContinue
+    $mmdcPath = if ($mmdc) { $mmdc.Source } else { Join-Path $env:APPDATA 'npm\mmdc.ps1' }
+    if (-not $mmdcPath -or (-not (Test-Path -LiteralPath $mmdcPath))) {
         Die "mmdc (mermaid-cli) is not installed. Install with: npm i -g @mermaid-js/mermaid-cli"
     }
-    Write-Log "Rendering SVG files via mmdc..."
+    $configPath = Join-Path $ScriptDir $ConfigFile
+    if (-not (Test-Path -LiteralPath $configPath)) {
+        Die "Mermaid config not found at $configPath"
+    }
+    Write-Log "Rendering SVG and PNG files via mmdc..."
     if (-not (Test-Path -LiteralPath $OutDir)) {
         New-Item -ItemType Directory -Path $OutDir | Out-Null
     }
     $files = Get-ChildItem -LiteralPath $SrcDir -Filter '*.mmd' -File
     foreach ($f in $files) {
         $base = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
-        $out  = Join-Path $OutDir ("{0}.svg" -f $base)
+        $svgOut = Join-Path $OutDir ("{0}.svg" -f $base)
+        $pngOut = Join-Path $OutDir ("{0}.png" -f $base)
         Write-Log ("  - {0}" -f $base)
-        & mmdc -i $f.FullName -o $out -t default -b transparent --quiet 2>$null
+        & $mmdcPath -i $f.FullName -o $svgOut -c $configPath -t default -b transparent --quiet 2>$null
         if ($LASTEXITCODE -ne 0) {
-            Write-Log ("    (warning) mmdc failed for {0}" -f $base)
+            Write-Log ("    (warning) mmdc SVG failed for {0}" -f $base)
+        }
+        & $mmdcPath -i $f.FullName -o $pngOut -c $configPath -t default -b white -w 2400 -H 1600 -s 2 --quiet 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log ("    (warning) mmdc PNG failed for {0}" -f $base)
         }
     }
-    Write-Log "SVG rendering complete: $OutDir\"
+    Write-Log "Diagram rendering complete: $OutDir\"
 }
 
 function Invoke-RenderPdf {

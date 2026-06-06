@@ -8,10 +8,12 @@ Ce dossier contient les **artefacts visuels** et les **scripts de rendu** de l'a
 | --- | --- |
 | `../BICEC-VERIPASS-VUE-ENSEMBLE.md` | **Document maître** (markdown, ~20+ diagrammes Mermaid inline). C'est la source de vérité. |
 | `diagrams/*.svg` | Rendu SVG de chaque diagramme Mermaid (un fichier par diagramme). Régénéré par `render.sh` / `render.ps1`. |
+| `diagrams/*.png` | Rendu PNG haute résolution, fond blanc, destiné aux rapports Word/PowerPoint. Régénéré par `render.sh` / `render.ps1`. |
 | `mermaid/*.mmd` | Sources Mermaid extraites du document maître (un fichier `.mmd` par diagramme, nommé `c4-{chapter}-{n}-{slug}.mmd`). |
+| `mermaid-elk.config.json` | Configuration Mermaid utilisée par `mmdc` pour forcer le layout `elk` et réduire les croisements de connexions. |
 | `BICEC-VERIPASS-VUE-ENSEMBLE.pdf` | PDF imprimable A4 du document maître, avec SVGs intégrés et logo BICEC (uniquement après exécution avec `--pdf` / `-Pdf`). |
 | `BICEC-VERIPASS-VUE-ENSEMBLE.html` | HTML intermédiaire (pandoc) utilisé pour la génération du PDF. Conservé pour debug. |
-| `render.sh` | Wrapper bash (Linux/WSL) qui extrait les blocs Mermaid, génère les SVG via `mmdc`, et optionnellement le PDF via `pandoc + chrome`. |
+| `render.sh` | Wrapper bash (Linux/WSL) qui extrait les blocs Mermaid, génère les SVG/PNG via `mmdc`, et optionnellement le PDF via `pandoc + chrome`. |
 | `render.ps1` | Wrapper PowerShell (Windows) équivalent. |
 | `print_pdf.py` | Script Python partagé qui orchestre la génération du PDF (pandoc + chrome-headless-shell). |
 | `rename_mermaid.py` | Renomme les `.mmd` extraits avec un slug sémantique (`c4-{chap}-{n}-{slug}.mmd`). |
@@ -78,8 +80,8 @@ Le pipeline WSL utilise `chromium-browser` (natif Linux) pour les SVG et bascule
 
 ```powershell
 cd docs\c4-architecture
-.\render.ps1            # SVG uniquement
-.\render.ps1 -Pdf       # SVG + PDF
+.\render.ps1            # SVG + PNG
+.\render.ps1 -Pdf       # SVG + PNG + PDF
 .\render.ps1 -Clean     # nettoyer les artefacts
 ```
 
@@ -87,22 +89,23 @@ cd docs\c4-architecture
 
 ```bash
 cd docs/c4-architecture
-./render.sh             # SVG uniquement
-./render.sh --pdf       # SVG + PDF
+./render.sh             # SVG + PNG
+./render.sh --pdf       # SVG + PNG + PDF
 ./render.sh --clean     # nettoyer les artefacts
 ```
 
 ## Workflow recommandé
 
 1. Éditer `../BICEC-VERIPASS-VUE-ENSEMBLE.md` (Mermaid inline dans les blocs ` ```mermaid `).
-2. Exécuter `render.ps1 -Pdf` (ou `render.sh --pdf`) pour régénérer les SVG et le PDF.
-3. Committer le `.md`, les `.svg` modifiés, et le `.pdf` régénéré.
+2. Exécuter `render.ps1 -Pdf` (ou `render.sh --pdf`) pour régénérer les SVG, les PNG et le PDF.
+3. Committer le `.md`, les `.svg` / `.png` modifiés, et le `.pdf` régénéré.
 
 ## Convention de nommage des fichiers produits
 
 | Pattern | Exemple | Sens |
 | --- | --- | --- |
 | `diagrams/c4-{chapter}-{n}-{slug}.svg` | `diagrams/c4-2-1-containers-overview.svg` | SVG du diagramme 2.1 « Vue d'ensemble des containers » |
+| `diagrams/c4-{chapter}-{n}-{slug}.png` | `diagrams/c4-2-1-containers-overview.png` | PNG haute résolution du même diagramme, à insérer dans Word |
 | `mermaid/c4-{chapter}-{n}-{slug}.mmd` | `mermaid/c4-4-1-kyc-state-machine.mmd` | Source Mermaid du diagramme 4.1 |
 
 - `chapter` = niveau C4 (0=index, 1=Context, 2=Container, 3=Component, 4=Code, 5=Ops).
@@ -112,6 +115,7 @@ cd docs/c4-architecture
 ## Limites connues
 
 - **Pas d'exécution automatique** : les scripts ne sont pas lancés par opencode. Ils sont fournis à l'équipe BICEC pour régénérer les artefacts après édition.
+- **PNG pour Word** : les PNG sont générés avec `mermaid-elk.config.json`, un fond blanc, une largeur de rendu élevée et `layout: elk` pour éviter les exports SVG/PNG sans texte observés dans Word ou certains convertisseurs web.
 - **Mermaid 11 lexer** est strict : `normalize_mermaid.py` réécrit les labels incompatibles (parens, crochets, `/*`, etc.) avant le rendu. Les diagrammes source dans le master `.md` ne sont pas modifiés — c'est seulement les `.mmd` extraits qui sont normalisés.
 - **Les noms de fichiers `.svg` et `.mmd` peuvent contenir des accents** (`séquence`, `modèle`, `opérations`). C'est volontaire pour rester lisible. Si vous avez un pipeline qui n'aime pas l'UTF-8, changez les slugs dans `rename_mermaid.py`.
 - **Chrome 149 vs 148** : voir la section « Note technique » ci-dessus. Le PDF généré via Chrome 149 est compatible.
