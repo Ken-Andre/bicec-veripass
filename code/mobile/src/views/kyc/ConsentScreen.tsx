@@ -118,13 +118,15 @@ export default function ConsentScreen() {
 
   useEffect(() => {
     let mounted = true;
-    setLoadingDocs(true);
-    setDocumentError('');
-    fetchLegalDocuments(language)
-      .then((items) => {
+    const loadDocuments = async () => {
+      await Promise.resolve();
+      if (!mounted) return;
+      setLoadingDocs(true);
+      setDocumentError('');
+      try {
+        const items = await fetchLegalDocuments(language);
         if (mounted) setDocuments(items);
-      })
-      .catch(() => {
+      } catch {
         if (mounted) {
           const translated = t('consent.documentUnavailable');
           setDocumentError(
@@ -133,10 +135,11 @@ export default function ConsentScreen() {
               : translated,
           );
         }
-      })
-      .finally(() => {
+      } finally {
         if (mounted) setLoadingDocs(false);
-      });
+      }
+    };
+    void loadDocuments();
     return () => {
       mounted = false;
     };

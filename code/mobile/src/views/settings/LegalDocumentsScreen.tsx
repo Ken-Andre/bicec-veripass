@@ -19,21 +19,24 @@ export default function LegalDocumentsScreen() {
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    setError('');
-    fetchLegalDocuments(language)
-      .then((items) => {
+    const loadDocuments = async () => {
+      await Promise.resolve();
+      if (!mounted) return;
+      setLoading(true);
+      setError('');
+      try {
+        const items = await fetchLegalDocuments(language);
         if (mounted) setDocuments(items);
-      })
-      .catch(() => {
+      } catch {
         if (mounted) {
           const translated = t('legal.unavailable');
           setError(translated === 'legal.unavailable' ? 'Documents indisponibles.' : translated);
         }
-      })
-      .finally(() => {
+      } finally {
         if (mounted) setLoading(false);
-      });
+      }
+    };
+    void loadDocuments();
     return () => {
       mounted = false;
     };
