@@ -3,6 +3,8 @@ const TOKEN_KEY = 'vp_token';
 let inMemoryToken: string | null = null;
 
 export function getAuthToken(): string | null {
+  if (inMemoryToken) return inMemoryToken;
+
   const sessionToken = sessionStorage.getItem(TOKEN_KEY);
   if (sessionToken) {
     inMemoryToken = sessionToken;
@@ -17,7 +19,6 @@ export function getAuthToken(): string | null {
     return legacyToken;
   }
 
-  inMemoryToken = null;
   return null;
 }
 
