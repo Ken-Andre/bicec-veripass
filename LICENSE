@@ -1,0 +1,122 @@
+BICEC VeriPass Proprietary and Confidential Bank Software License
+SPDX-License-Identifier: LicenseRef-BICEC-VeriPass-Proprietary
+
+Copyright (c) 2026 BICEC VeriPass Project Owner(s), BICEC, and/or their
+authorized assignees. All rights reserved.
+
+IMPORTANT NOTICE
+
+This repository, including all source code, documentation, prompts, tests,
+design assets, generated outputs, configuration, schemas, data models, and
+related materials, is proprietary, confidential, and bank-sensitive software.
+
+No open-source license, public license, implied license, patent license, data
+license, model-training license, or other permission is granted by making this
+material available, visible, accessible, indexed, mirrored, leaked, copied, or
+transmitted in any public or private location.
+
+0. Contributor Residuals and Professional Reference
+
+Nothing in this license shall be construed to extinguish the customary
+residual, moral, evidentiary, academic, and professional-reference interests of
+any natural person who authored or materially contributed to the project before
+an assignment, transfer, exclusive license, operational handover, or commercial
+deployment by BICEC or an authorized assignee ("Qualifying Contributor").
+
+Subject at all times to confidentiality, banking secrecy, data protection,
+security, employment, internship, and other mandatory obligations, each
+Qualifying Contributor retains a personal, non-exclusive, worldwide,
+royalty-free, perpetual, irrevocable, and non-transferable right to preserve
+private records of their own contribution; to evidence authorship and technical
+experience; to refer to sanitized excerpts, diagrams, screenshots, recordings,
+architectural descriptions, and implementation summaries for academic
+assessment, professional reference, interviews, curriculum vitae, and portfolio
+purposes; to maintain private notes, prototypes, and non-production research
+materials for learning and professional development; and to reuse general
+knowledge, methods, skill, experience, design judgment, and independently
+developed ideas that do not disclose or depend upon protected bank information.
+
+The foregoing survives any assignment, transfer, exclusive license, handover,
+or commercialization of the project, except to the extent a Qualifying
+Contributor later signs a written instrument that specifically identifies this
+section and expressly waives the relevant retained interest.
+
+For avoidance of doubt, this section does not permit publication of the full
+source code, disclosure of customer data, disclosure of bank-confidential
+information, production operation, sale, sublicensing, commercial exploitation,
+competitive misuse, misuse of BICEC marks, violation of a valid confidentiality
+obligation, or circumvention of operational security, credential, access,
+deployment, audit, or administrative controls.
+
+1. No Permission Granted
+
+Except under a separate written agreement signed by an authorized representative
+of the rights holder, or except for the limited retained interests described in
+Section 0, no person or system may:
+
+- use, run, host, deploy, benchmark, or operate this software;
+- copy, download, fork, clone, mirror, archive, cache, scrape, index, or crawl
+  this repository or any substantial part of it;
+- modify, translate, adapt, refactor, decompile, reverse engineer, or create
+  derivative works from it;
+- redistribute, publish, sell, sublicense, rent, lease, lend, transfer, or make
+  it available to any third party;
+- use it to build, train, fine-tune, evaluate, benchmark, improve, or augment
+  any artificial intelligence, machine learning, foundation model, language
+  model, embedding model, retrieval system, code assistant, autonomous agent,
+  dataset, vector database, search index, or similar system;
+- extract architecture, workflows, business logic, prompts, tests, schemas,
+  trade secrets, security controls, compliance controls, banking process
+  knowledge, UI/UX patterns, data structures, or implementation details for
+  reuse in another product or service.
+
+2. Automated Systems, Scrapers, and AI Agents
+
+Automated access does not create consent. Bots, crawlers, scrapers, indexers,
+software agents, AI agents, data-mining systems, model-training pipelines, and
+similar automated systems are expressly denied permission to access, collect,
+store, reproduce, transform, summarize, embed, vectorize, train on, or otherwise
+process this material, except where a separate written agreement explicitly
+authorizes that exact use.
+
+This prohibition applies even if the material is accessible through a public
+URL, public repository, private repository, search cache, mirror, archive,
+artifact, package, container image, prompt context, browser session, CI output,
+log, or accidental disclosure.
+
+3. Confidentiality and Leak Handling
+
+Any unauthorized recipient must immediately stop using the material, delete all
+copies under their control, prevent further disclosure, and notify the rights
+holder or repository administrator. Possession of leaked, misdirected, indexed,
+or accidentally exposed material does not grant any license or right.
+
+4. Third-Party Components
+
+This license applies only to the original BICEC VeriPass materials in this
+repository. Third-party dependencies, libraries, tools, frameworks, and bundled
+notices remain governed by their respective licenses. Nothing in this license
+limits rights that a third-party license independently grants for those
+third-party components.
+
+5. Security, Regulatory, and Banking Restrictions
+
+This material may include security architecture, KYC/AML workflows, audit
+controls, banking operational procedures, regulatory compliance logic, and
+customer-service processes. Unauthorized use, analysis, replication, or
+deployment may create operational, financial, regulatory, confidentiality, and
+security risk.
+
+6. No Warranty
+
+To the maximum extent permitted by applicable law, this material is provided
+only to authorized recipients "as is" and without warranties of any kind,
+whether express, implied, statutory, or otherwise.
+
+7. Enforcement
+
+All rights and remedies are reserved. Any unauthorized use may be pursued under
+applicable contract, copyright, trade secret, unfair competition, computer
+misuse, confidentiality, banking, data protection, and other laws or regulatory
+rules. If a signed agreement conflicts with this license, that signed agreement
+controls only for the authorized party and authorized scope described in it.

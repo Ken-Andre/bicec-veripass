@@ -30,7 +30,7 @@ export function Tabs({ value: controlledValue, defaultValue, onValueChange, chil
 
 export function TabsList({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('inline-flex h-10 items-center justify-center rounded-md bg-slate-100 p-1 text-slate-500', className)}>
+    <div className={cn('inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground', className)}>
       {children}
     </div>
   )
@@ -46,8 +46,8 @@ export function TabsTrigger({ children, value, className }: { children: ReactNod
     <button
       type="button"
       className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-        isActive ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-900',
+        'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+        isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
         className
       )}
       onClick={() => context.onValueChange(value)}
@@ -64,7 +64,7 @@ export function TabsContent({ children, value, className }: { children: ReactNod
   if (context.value !== value) return null
 
   return (
-    <div className={cn('mt-2 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2', className)}>
+    <div className={cn('mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', className)}>
       {children}
     </div>
   )

@@ -17,6 +17,7 @@ const ConflictResolverPage = lazy(() => import('./pages/compliance/ConflictResol
 const AmlListsPage = lazy(() => import('./pages/compliance/AmlListsPage'))
 const AdminPage = lazy(() => import('@/pages/admin/AdminPage'))
 const SystemLogsPage = lazy(() => import('@/pages/admin/SystemLogsPage'))
+const LegalDocumentsPage = lazy(() => import('@/pages/admin/LegalDocumentsPage'))
 const CommandCenterPage = lazy(() => import('@/pages/command-center/CommandCenterPage'))
 const AnalyticsPage = lazy(() => import('@/pages/analytics/AnalyticsPage'))
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
@@ -123,6 +124,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['ADMIN_IT', 'SYLVIE']}>
                   <SystemLogsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/legal"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN_IT']}>
+                  <LegalDocumentsPage />
                 </ProtectedRoute>
               }
             />

@@ -73,6 +73,7 @@ Minimum deployment-critical values:
 | `ORANGE_SMS_CLIENT_ID` / `ORANGE_SMS_CLIENT_SECRET` | Orange SMS credentials |
 | `SMTP_*` | Email fallback configuration |
 | `FLOWER_USER` / `FLOWER_PASSWORD` | Flower basic auth |
+| `VP_PRIVATE_BIND_ADDR` | Optional private interface for direct HTTP/HTTPS binding; defaults to `127.0.0.1` |
 | `OFFLINE_MODELS_DIR` | Host directory mounted to `/opt/models-offline` |
 | `SENTRY_DSN_BACKEND` | Backend Sentry DSN |
 | `VITE_SENTRY_DSN_MOBILE` | Mobile frontend Sentry DSN |

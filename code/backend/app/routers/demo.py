@@ -4,8 +4,10 @@ Endpoints pour tester les différents workers
 """
 
 import random
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
+from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.tasks_demo import (
     demo_extract_cni,
     demo_verify_liveness,
@@ -33,7 +35,9 @@ class TaskResponse(BaseModel):
 
 
 @router.post("/ocr/extract-cni", response_model=TaskResponse)
+@limiter.limit(settings.RATE_LIMIT_AUTH)
 async def trigger_ocr_extraction(
+    request: Request,
     document_id: str = "CNI_001", simulate_failure: bool = False
 ):
     """
@@ -58,7 +62,8 @@ async def trigger_ocr_extraction(
 
 
 @router.post("/ocr/verify-liveness", response_model=TaskResponse)
-async def trigger_liveness_check(selfie_id: str = "SELFIE_001"):
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def trigger_liveness_check(request: Request, selfie_id: str = "SELFIE_001"):
     """
     🤳 Déclenche une vérification de vivacité (anti-spoofing)
 
@@ -84,7 +89,10 @@ async def trigger_liveness_check(selfie_id: str = "SELFIE_001"):
 
 
 @router.post("/notif/send-otp", response_model=TaskResponse)
-async def trigger_otp_sms(phone: str = "+237670123456", otp_code: str = "123456"):
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def trigger_otp_sms(
+    request: Request, phone: str = "+237670123456", otp_code: str = "123456"
+):
     """
     📱 Envoie un OTP par SMS via Orange Cameroon
 
@@ -105,7 +113,10 @@ async def trigger_otp_sms(phone: str = "+237670123456", otp_code: str = "123456"
 
 
 @router.post("/notif/send-kyc-result", response_model=TaskResponse)
-async def trigger_kyc_email(email: str = "marie@example.cm", status: str = "approved"):
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def trigger_kyc_email(
+    request: Request, email: str = "marie@example.cm", status: str = "approved"
+):
     """
     📧 Envoie un email de résultat KYC
 
@@ -126,7 +137,11 @@ async def trigger_kyc_email(email: str = "marie@example.cm", status: str = "appr
 
 
 @router.post("/notif/batch-provision", response_model=TaskResponse)
-async def trigger_batch_provision(user_count: int = 5):
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def trigger_batch_provision(
+    request: Request,
+    user_count: int = Query(5, ge=1, le=settings.DEMO_BULK_KYC_MAX_COUNT),
+):
     """
     🏦 Provisionne des comptes bancaires en batch
 
@@ -154,7 +169,8 @@ async def trigger_batch_provision(user_count: int = 5):
 
 
 @router.post("/cron/cleanup-otps", response_model=TaskResponse)
-async def trigger_cleanup_otps():
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def trigger_cleanup_otps(request: Request):
     """
     🧹 Déclenche manuellement le nettoyage des OTP expirés
 
@@ -179,7 +195,9 @@ async def trigger_cleanup_otps():
 
 
 @router.post("/workflow/complete-kyc", response_model=TaskResponse)
+@limiter.limit(settings.RATE_LIMIT_AUTH)
 async def trigger_complete_kyc(
+    request: Request,
     user_id: str = "DEMO_USER_001",
     phone: str = "+237670123456",
     email: str = "client.demo@gmail.com",
@@ -204,7 +222,11 @@ async def trigger_complete_kyc(
 
 
 @router.post("/populate/bulk-kyc", response_model=list[TaskResponse])
-async def populate_bulk_kyc(count: int = 5):
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def populate_bulk_kyc(
+    request: Request,
+    count: int = Query(5, ge=1, le=settings.DEMO_BULK_KYC_MAX_COUNT),
+):
     """
     🌪️ Stress Test & Audit : Génère N workflows KYC complets en parallèle
 

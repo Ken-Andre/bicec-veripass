@@ -180,7 +180,7 @@ export function ImageViewer({
         <Button
           variant={invert ? "default" : "secondary"}
           size="sm"
-          className={cn("h-7 px-2 text-[10px] font-medium backdrop-blur-sm flex items-center", invert ? "bg-blue-600 text-white" : "bg-card/80")}
+          className={cn("flex h-7 items-center px-2 text-[10px] font-medium backdrop-blur-sm", invert ? "bg-primary text-primary-foreground" : "bg-card/80")}
           onClick={() => setInvert((i) => !i)}
           title="Inverser les couleurs"
         >

@@ -6,13 +6,14 @@ import asyncio
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.rate_limit import limiter
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.modules.auth.models import User
@@ -123,7 +124,9 @@ async def extract_ocr_from_document(
 
 
 @router.post("/extract/upload")
+@limiter.limit(settings.RATE_LIMIT_AUTH)
 async def extract_ocr_from_upload(
+    request: Request,
     file: UploadFile = File(...),
 ):
     """Extract OCR from an uploaded image directly.
@@ -138,14 +141,33 @@ async def extract_ocr_from_upload(
     Returns:
         OCR extraction results
     """
-    # Read file bytes
-    image_bytes = await file.read()
+    allowed_types = {"image/jpeg", "image/jpg", "image/png"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Only PNG and JPEG images are supported.",
+        )
+
+    image_bytes = await file.read(settings.OCR_UPLOAD_MAX_BYTES + 1)
+    if len(image_bytes) > settings.OCR_UPLOAD_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="OCR upload exceeds the configured size limit.",
+        )
 
     # Validate it's an image
     if len(image_bytes) < 100:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File too small to be a valid image",
+        )
+    if not (
+        image_bytes.startswith(b"\xff\xd8\xff")
+        or image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid image signature.",
         )
 
     # Run OCR in thread pool so the event loop stays free
@@ -185,11 +207,15 @@ async def get_ocr_thresholds():
 
 
 @router.get("/test/extract")
-async def test_ocr_extract():
+@limiter.limit(settings.RATE_LIMIT_AUTH)
+async def test_ocr_extract(request: Request):
     """Test endpoint - extract from a test image inside the container.
 
     This is for testing OCR without uploading a file.
     """
+    if not settings.OCR_TEST_ENDPOINT_ENABLED:
+        raise HTTPException(status_code=404, detail="OCR test endpoint disabled")
+
     # Look for test images in the mounted volume first, then fallback
     _test_dirs = [Path("/tmp/test-images"), Path("/tmp")]
     test_image_path = None

@@ -32,3 +32,4 @@ from app.modules.banking.models import BankCard, Transfer, Transaction, SavingsP
 from app.modules.devices.models import DeviceRegistration  # noqa
 from app.modules.notifications.models import PushSubscription, NotificationPreference  # noqa
 from app.modules.analytics.models import BusinessMetricBaseline  # noqa
+from app.modules.legal.models import LegalDocumentVersion  # noqa

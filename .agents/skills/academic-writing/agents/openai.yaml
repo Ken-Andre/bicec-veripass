@@ -1,4 +1,0 @@
-interface:
-  display_name: "Academic Writing"
-  short_description: "Review, draft, and preserve authorial voice"
-  default_prompt: "Use $academic-writing to review my thesis chapter for logic, prose, citations, LaTeX consistency, and authorial voice."

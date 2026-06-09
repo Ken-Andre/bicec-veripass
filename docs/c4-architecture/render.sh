@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Render Mermaid diagrams from the master document to SVG (and optional PDF).
+# Render Mermaid diagrams from the master document to SVG/PNG (and optional PDF).
 #
 # Usage:
-#   ./render.sh            # SVG only
-#   ./render.sh --pdf      # SVG + PDF
-#   ./render.sh --clean    # remove generated SVGs and PDF
+#   ./render.sh            # SVG + PNG
+#   ./render.sh --pdf      # SVG + PNG + PDF
+#   ./render.sh --clean    # remove generated SVGs, PNGs and PDF
 #
 # Pre-requisites:
 #   - Node.js 18+
@@ -16,6 +16,7 @@
 #
 # Outputs:
 #   diagrams/c4-*.svg                      (one SVG per Mermaid block)
+#   diagrams/c4-*.png                      (one Word-friendly PNG per Mermaid block)
 #   mermaid/c4-*.mmd                       (extracted Mermaid sources)
 #   BICEC-VERIPASS-VUE-ENSEMBLE.pdf        (only with --pdf)
 
@@ -28,6 +29,7 @@ cd "$SCRIPT_DIR"
 MASTER="$(cd .. && pwd)/BICEC-VERIPASS-VUE-ENSEMBLE.md"
 OUT_DIR="$SCRIPT_DIR/diagrams"
 SRC_DIR="$SCRIPT_DIR/mermaid"
+CONFIG="$SCRIPT_DIR/mermaid-elk.config.json"
 PDF="$SCRIPT_DIR/BICEC-VERIPASS-VUE-ENSEMBLE.pdf"
 
 # --- helpers ----------------------------------------------------------------
@@ -92,25 +94,38 @@ extract_mermaid() {
     fi
 }
 
-render_svg() {
+render_diagrams() {
     if ! have mmdc; then
         die "mmdc (mermaid-cli) is not installed. Install with: npm i -g @mermaid-js/mermaid-cli"
     fi
-    log "Rendering SVG files via mmdc..."
+    if [[ ! -f "$CONFIG" ]]; then
+        die "Mermaid config not found at $CONFIG"
+    fi
+    log "Rendering SVG and PNG files via mmdc..."
     mkdir -p "$OUT_DIR"
     shopt -s nullglob
     for src in "$SRC_DIR"/*.mmd; do
         base="$(basename "$src" .mmd)"
-        out="$OUT_DIR/$base.svg"
+        svg_out="$OUT_DIR/$base.svg"
+        png_out="$OUT_DIR/$base.png"
         log "  - $base"
-        # mmdc config: default theme, transparent background
-        mmdc -i "$src" -o "$out" \
+        mmdc -i "$src" -o "$svg_out" \
+             -c "$CONFIG" \
              -t default \
              -b transparent \
              --quiet 2>/dev/null \
-             || log "    (warning) mmdc failed for $base"
+             || log "    (warning) mmdc SVG failed for $base"
+        mmdc -i "$src" -o "$png_out" \
+             -c "$CONFIG" \
+             -t default \
+             -b white \
+             -w 2400 \
+             -H 1600 \
+             -s 2 \
+             --quiet 2>/dev/null \
+             || log "    (warning) mmdc PNG failed for $base"
     done
-    log "SVG rendering complete: $OUT_DIR/"
+    log "Diagram rendering complete: $OUT_DIR/"
 }
 
 render_pdf() {
@@ -134,12 +149,12 @@ case "${1:-}" in
     --clean) clean ;;
     --pdf)
         extract_mermaid
-        render_svg
+        render_diagrams
         render_pdf
         ;;
     "")
         extract_mermaid
-        render_svg
+        render_diagrams
         ;;
     *)
         echo "Usage: $0 [--pdf] [--clean]" >&2

@@ -16,6 +16,7 @@ async def test_send_sms_notification_simulates_in_dev_local(
         )
 
     monkeypatch.setenv("OTP_MODE", "dev_local")
+    monkeypatch.setattr(config_module.settings, "OTP_MODE", "dev_local")
     monkeypatch.setattr(
         notification_service.orange_sms, "send_sms", unexpected_send_sms
     )
@@ -47,6 +48,7 @@ async def test_send_sms_notification_uses_orange_client_outside_dev_local(
         return expected
 
     monkeypatch.setenv("OTP_MODE", "orange")
+    monkeypatch.setattr(config_module.settings, "OTP_MODE", "orange")
     monkeypatch.setattr(notification_service.orange_sms, "send_sms", fake_send_sms)
 
     result = await notification_service.send_sms_notification(

@@ -50,7 +50,13 @@ async def export_audit_log_cobac(
     Export du journal d'audit pour le régulateur COBAC.
     Access: SYLVIE, ADMIN_IT
     """
-    entries = await service.export_audit_log_cobac(db, date_from, date_to)
+    entries = await service.export_audit_log_cobac(
+        db,
+        date_from,
+        date_to,
+        performed_by=getattr(_agent, "id", None),
+        client_ip=request.client.host if request.client else None,
+    )
     report = service.build_cobac_audit_report_html(
         entries,
         date_from=date_from,

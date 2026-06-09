@@ -1118,6 +1118,14 @@ def _format_percent_value(value: float | int | None) -> str:
     return f"{_num(value):.1f}%"
 
 
+def _format_minutes(value: float | int | None) -> str:
+    return f"{_num(value):.1f}m"
+
+
+def _format_hours(value: float | int | None) -> str:
+    return f"{_num(value):.1f}h"
+
+
 def _format_xaf(value: float | int | None) -> str:
     amount = _num(value)
     return f"{amount:,.0f} XAF".replace(",", " ")
@@ -1156,6 +1164,111 @@ def _baseline_value(baseline: dict[str, Any], key: str, default: float = 0.0) ->
     return _num(baseline.get(key), default)
 
 
+def _baseline_required_metric(unit: str | None = None) -> dict[str, Any]:
+    return _metric(None, BASELINE_REQUIRED, unit)
+
+
+def _minutes_metric(value: float | int | None, baseline_required: bool = False) -> dict[str, Any]:
+    if baseline_required:
+        return _baseline_required_metric("minutes")
+    raw = _num(value)
+    return _metric(raw, _format_minutes(raw), "minutes")
+
+
+def _hours_metric(value: float | int | None, baseline_required: bool = False) -> dict[str, Any]:
+    if baseline_required:
+        return _baseline_required_metric("hours")
+    raw = _num(value)
+    return _metric(raw, _format_hours(raw), "hours")
+
+
+def _roi_engine_required(
+    actual: dict[str, Any],
+    *,
+    submitted: int,
+    started: int,
+    abandonment_rate: float,
+    complement_request_rate: float,
+    aml_alert_rate: float,
+) -> dict[str, Any]:
+    avg_review_minutes = _num(actual.get("avg_review_duration_ms")) / 60000
+    observed_volume = submitted or started
+    return {
+        "currency": "XAF",
+        "baseline_required": True,
+        "inputs": {
+            "monthly_kyc_volume": _count_metric(observed_volume),
+            "current_minutes_per_file": _baseline_required_metric("minutes"),
+            "target_minutes_per_file": _minutes_metric(avg_review_minutes),
+            "hourly_rate": _money_metric(None, baseline_required=True),
+            "current_abandonment_rate": _baseline_required_metric("ratio"),
+            "pilot_abandonment_rate": _ratio_metric(abandonment_rate),
+            "abandonment_reduction_rate": _baseline_required_metric("ratio"),
+            "average_annual_client_value": _money_metric(None, baseline_required=True),
+            "audit_reconstitution_hours_saved": _baseline_required_metric("hours"),
+            "audit_requests_per_period": _baseline_required_metric("count"),
+            "incompleteness_rate": _ratio_metric(complement_request_rate),
+            "aml_alert_rate": _ratio_metric(aml_alert_rate),
+        },
+        "formulas": BUSINESS_FORMULAS,
+        "outputs": {
+            "operational_gain_monthly": _money_metric(None, baseline_required=True),
+            "conversion_uplift_value": _money_metric(None, baseline_required=True),
+            "commercial_gain_monthly": _money_metric(None, baseline_required=True),
+            "compliance_audit_savings": _money_metric(None, baseline_required=True),
+            "total_monthly_gain": _money_metric(None, baseline_required=True),
+        },
+    }
+
+
+def _roi_engine_from_values(
+    *,
+    monthly_volume: float,
+    current_minutes_per_file: float,
+    target_minutes_per_file: float,
+    hourly_rate: float,
+    current_abandonment_rate: float,
+    pilot_abandonment_rate: float,
+    average_annual_client_value: float,
+    audit_reconstitution_hours_saved: float,
+    audit_requests_per_period: int,
+    incompleteness_rate: float,
+    aml_alert_rate: float,
+    operational_gain_monthly: float,
+    conversion_uplift_value: float,
+    commercial_gain_monthly: float,
+    compliance_audit_savings: float,
+) -> dict[str, Any]:
+    total_monthly_gain = operational_gain_monthly + commercial_gain_monthly + compliance_audit_savings
+    abandonment_reduction_rate = max(current_abandonment_rate - pilot_abandonment_rate, 0)
+    return {
+        "currency": "XAF",
+        "baseline_required": False,
+        "inputs": {
+            "monthly_kyc_volume": _count_metric(monthly_volume),
+            "current_minutes_per_file": _minutes_metric(current_minutes_per_file),
+            "target_minutes_per_file": _minutes_metric(target_minutes_per_file),
+            "hourly_rate": _money_metric(hourly_rate),
+            "current_abandonment_rate": _ratio_metric(current_abandonment_rate),
+            "pilot_abandonment_rate": _ratio_metric(pilot_abandonment_rate),
+            "abandonment_reduction_rate": _ratio_metric(abandonment_reduction_rate),
+            "average_annual_client_value": _money_metric(average_annual_client_value),
+            "audit_reconstitution_hours_saved": _hours_metric(audit_reconstitution_hours_saved),
+            "audit_requests_per_period": _count_metric(audit_requests_per_period),
+            "incompleteness_rate": _ratio_metric(incompleteness_rate),
+            "aml_alert_rate": _ratio_metric(aml_alert_rate),
+        },
+        "formulas": BUSINESS_FORMULAS,
+        "outputs": {
+            "operational_gain_monthly": _money_metric(operational_gain_monthly),
+            "conversion_uplift_value": _money_metric(conversion_uplift_value),
+            "commercial_gain_monthly": _money_metric(commercial_gain_monthly),
+            "compliance_audit_savings": _money_metric(compliance_audit_savings),
+            "total_monthly_gain": _money_metric(total_monthly_gain),
+        },
+    }
+
+
 def calculate_business_case_metrics(
     baseline: dict[str, Any] | None,
     actual: dict[str, Any],
@@ -1185,6 +1298,7 @@ def calculate_business_case_metrics(
     conversion_rate = _safe_div(approved, started)
     sla_respected_rate = _safe_div(decision_count - late_decisions, decision_count)
     aml_alert_rate = _safe_div(aml_alert_sessions, submitted)
+    avg_review_minutes = _num(actual.get("avg_review_duration_ms")) / 60000
 
     baseline_required = baseline is None
     finance = {
@@ -1206,16 +1320,24 @@ def calculate_business_case_metrics(
     compliance_extra = {
         "audit_export_time_saved_hours": _metric(None, BASELINE_REQUIRED, "hours"),
     }
+    roi_engine = _roi_engine_required(
+        actual,
+        submitted=submitted,
+        started=started,
+        abandonment_rate=abandonment_rate,
+        complement_request_rate=complement_request_rate,
+        aml_alert_rate=aml_alert_rate,
+    )
 
     if baseline:
         monthly_volume = _baseline_value(baseline, "monthly_kyc_volume", submitted or started)
         hourly_cost = _baseline_value(baseline, "hourly_staff_cost_xaf")
         branch_minutes = _baseline_value(baseline, "current_branch_minutes_per_dossier")
         backoffice_minutes = _baseline_value(baseline, "current_backoffice_minutes_per_dossier")
+        current_minutes_per_file = branch_minutes + backoffice_minutes
         current_cost_per_dossier = ((branch_minutes + backoffice_minutes) / 60) * hourly_cost
 
-        avg_review_minutes = _num(actual.get("avg_review_duration_ms")) / 60000
-        pilot_dossiers = submitted or monthly_volume
+        pilot_dossiers = monthly_volume or submitted or started
         pilot_labor_cost_per_dossier = (avg_review_minutes / 60) * hourly_cost
         pilot_run_cost_per_dossier = _safe_div(
             _baseline_value(baseline, "pilot_monthly_run_cost_xaf"),
@@ -1223,24 +1345,24 @@ def calculate_business_case_metrics(
         )
         veripass_cost_per_dossier = pilot_labor_cost_per_dossier + pilot_run_cost_per_dossier
 
-        operational_savings_monthly = max(current_cost_per_dossier - veripass_cost_per_dossier, 0) * pilot_dossiers
-        avoided_rework = monthly_volume * max(_baseline_value(baseline, "current_incomplete_rate") - complement_request_rate, 0)
+        operational_savings_monthly = (
+            max(current_minutes_per_file - avg_review_minutes, 0)
+            / 60
+            * hourly_cost
+            * monthly_volume
+        )
         audit_hours_saved = max(
             _baseline_value(baseline, "current_audit_assembly_hours")
             - _baseline_value(baseline, "veripass_audit_export_hours"),
             0,
         )
-        compliance_gain_monthly = (
-            _baseline_value(baseline, "audit_requests_per_period") * audit_hours_saved * hourly_cost
-            + avoided_rework * _baseline_value(baseline, "average_rework_cost_xaf")
-        )
-        baseline_conversion_rate = max(1 - _baseline_value(baseline, "current_abandonment_rate"), 0)
-        conversion_uplift = conversion_rate - baseline_conversion_rate
-        commercial_gain_monthly = (
-            max(conversion_uplift, 0)
-            * monthly_volume
-            * _baseline_value(baseline, "avg_customer_12m_value_xaf")
-        )
+        audit_requests = _int_num(baseline.get("audit_requests_per_period"))
+        compliance_gain_monthly = audit_requests * audit_hours_saved * hourly_cost
+        current_abandonment_rate = _baseline_value(baseline, "current_abandonment_rate")
+        abandonment_reduction_rate = max(current_abandonment_rate - abandonment_rate, 0)
+        conversion_uplift = abandonment_reduction_rate
+        conversion_uplift_value = abandonment_reduction_rate * _baseline_value(baseline, "avg_customer_12m_value_xaf")
+        commercial_gain_monthly = conversion_uplift_value * monthly_volume
         pilot_duration_months = max(_int_num(baseline.get("pilot_duration_months"), 1), 1)
         pilot_setup_cost = _baseline_value(baseline, "pilot_setup_cost_xaf")
         pilot_monthly_run_cost = _baseline_value(baseline, "pilot_monthly_run_cost_xaf")
@@ -1277,6 +1399,23 @@ def calculate_business_case_metrics(
         compliance_extra = {
             "audit_export_time_saved_hours": _metric(audit_hours_saved, f"{audit_hours_saved:.1f}h", "hours"),
         }
+        roi_engine = _roi_engine_from_values(
+            monthly_volume=monthly_volume,
+            current_minutes_per_file=current_minutes_per_file,
+            target_minutes_per_file=avg_review_minutes,
+            hourly_rate=hourly_cost,
+            current_abandonment_rate=current_abandonment_rate,
+            pilot_abandonment_rate=abandonment_rate,
+            average_annual_client_value=_baseline_value(baseline, "avg_customer_12m_value_xaf"),
+            audit_reconstitution_hours_saved=audit_hours_saved,
+            audit_requests_per_period=audit_requests,
+            incompleteness_rate=complement_request_rate,
+            aml_alert_rate=aml_alert_rate,
+            operational_gain_monthly=operational_savings_monthly,
+            conversion_uplift_value=conversion_uplift_value,
+            commercial_gain_monthly=commercial_gain_monthly,
+            compliance_audit_savings=compliance_gain_monthly,
+        )
 
     return {
         "baseline_required": baseline_required,
@@ -1305,6 +1444,7 @@ def calculate_business_case_metrics(
             "risk_blocked_open_count": _count_metric(risk_blocked_open),
             **compliance_extra,
         },
+        "roi_engine": roi_engine,
     }
 
 
@@ -1676,34 +1816,34 @@ async def _business_actuals(db: AsyncSession, **filters: Any) -> dict[str, Any]:
 
 BUSINESS_FORMULAS = [
     {
+        "metric": "Operational Gain",
+        "formula": "max(Current Minutes per File - Target Minutes per File, 0) / 60 * Hourly Rate * Monthly Volume",
+        "source": "business_metric_baselines + validation_decisions.review_duration_ms",
+    },
+    {
+        "metric": "Conversion Uplift",
+        "formula": "max(Current Abandonment Rate - Pilot Abandonment Rate, 0) * Client LTV (12m)",
+        "source": "business_metric_baselines + kyc_sessions",
+    },
+    {
+        "metric": "Commercial Gain",
+        "formula": "Conversion Uplift * Monthly KYC Volume",
+        "source": "roi_engine.outputs.conversion_uplift_value + business_metric_baselines.monthly_kyc_volume",
+    },
+    {
+        "metric": "Compliance/Audit Savings",
+        "formula": "max(Time to Reconstitute File for Audit - VeriPass Audit Export Time, 0) * Number of Audit Requests * Hourly Rate",
+        "source": "business_metric_baselines + audit_log",
+    },
+    {
+        "metric": "Pilot ROI",
+        "formula": "(Pilot Gain - Pilot Cost) / Pilot Cost * 100",
+        "source": "roi_engine.outputs + pilot cost baseline",
+    },
+    {
         "metric": "First-time-right",
-        "formula": "dossiers approuves sans INFO_REQUESTED / dossiers soumis",
+        "formula": "Approved dossiers without INFO_REQUESTED / Submitted dossiers",
         "source": "validation_decisions + kyc_sessions",
-    },
-    {
-        "metric": "Cout actuel par dossier",
-        "formula": "(minutes agence actuelles + minutes backoffice actuelles) / 60 * cout horaire",
-        "source": "baseline BICEC",
-    },
-    {
-        "metric": "Cout VeriPass par dossier",
-        "formula": "cout main-d'oeuvre pilote + cout mensuel run / dossiers pilote",
-        "source": "review_duration_ms + baseline BICEC",
-    },
-    {
-        "metric": "ROI pilote",
-        "formula": "(gains pilote - couts pilote) / couts pilote * 100",
-        "source": "baseline BICEC + metriques VeriPass",
-    },
-    {
-        "metric": "Gain commercial",
-        "formula": "uplift conversion vs baseline * volume mensuel * valeur client 12 mois",
-        "source": "kyc_sessions + baseline BICEC",
-    },
-    {
-        "metric": "Gain audit/conformite",
-        "formula": "heures audit evitees * cout horaire + reprises evitees * cout reprise",
-        "source": "audit_log + baseline BICEC",
     },
 ]
 
@@ -1740,6 +1880,7 @@ def build_business_case_export_html(payload: dict[str, Any]) -> str:
     sections = [
         ("Reseau / qualite dossier", payload.get("network_quality", {})),
         ("Operations", payload.get("operations", {})),
+        ("ROI Engine", payload.get("roi_engine", {}).get("outputs", {})),
         ("Finance", payload.get("finance", {})),
         ("Direction", payload.get("direction", {})),
         ("Conformite", payload.get("compliance", {})),

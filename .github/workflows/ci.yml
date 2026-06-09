@@ -45,6 +45,23 @@ jobs:
           cd code/mobile
           npm run lint
 
+  lint-backoffice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.10'
+      - name: Install dependencies
+        run: |
+          cd code/backoffice
+          bun install --frozen-lockfile
+      - name: Lint with ESLint
+        run: |
+          cd code/backoffice
+          bun run lint
+
   test-backend:
     runs-on: ubuntu-latest
     services:
@@ -91,6 +108,23 @@ jobs:
           MODELS_PATH: ${{ runner.temp }}/veripass-models
         run: cd code/backend && uv run pytest -v
 
+  test-backoffice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.10'
+      - name: Install dependencies
+        run: |
+          cd code/backoffice
+          bun install --frozen-lockfile
+      - name: Run tests
+        run: |
+          cd code/backoffice
+          bun run test
+
   build-mobile:
     runs-on: ubuntu-latest
     steps:
@@ -107,3 +141,20 @@ jobs:
         run: |
           cd code/mobile
           npm run build
+
+  build-backoffice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.10'
+      - name: Install dependencies
+        run: |
+          cd code/backoffice
+          bun install --frozen-lockfile
+      - name: Build
+        run: |
+          cd code/backoffice
+          bun run build

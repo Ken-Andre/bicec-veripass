@@ -1,5 +1,6 @@
 import { apiClient, fetchWithCorrelation } from './apiClient';
 import type { KycStepType, LivenessResult, AddressData } from '../types';
+import type { AcceptedLegalDocument } from './legalDocuments';
 import {
   decryptJsonPayload,
   enqueueKycSyncItem,
@@ -53,6 +54,7 @@ interface ConsentPayload {
   cgu_accepted: boolean;
   privacy_accepted: boolean;
   data_processing_accepted: boolean;
+  accepted_documents?: AcceptedLegalDocument[];
 }
 
 interface SignaturePayload {
@@ -383,6 +385,7 @@ async function submitConsent(item: KycSyncQueueItem): Promise<void> {
       cgu_accepted: payload.cgu_accepted,
       privacy_accepted: payload.privacy_accepted,
       data_processing_accepted: payload.data_processing_accepted,
+      accepted_documents: payload.accepted_documents,
     }),
   });
   if (!response.ok) {
@@ -604,6 +607,7 @@ export async function enqueueOfflineConsent(input: {
   cguAccepted: boolean;
   privacyAccepted: boolean;
   dataProcessingAccepted: boolean;
+  acceptedDocuments?: AcceptedLegalDocument[];
 }): Promise<void> {
   await enqueueKycSyncItem({
     op_type: 'submit_consent',
@@ -613,6 +617,7 @@ export async function enqueueOfflineConsent(input: {
       cgu_accepted: input.cguAccepted,
       privacy_accepted: input.privacyAccepted,
       data_processing_accepted: input.dataProcessingAccepted,
+      accepted_documents: input.acceptedDocuments,
     } satisfies ConsentPayload,
     meta: { cgu_accepted: String(input.cguAccepted) },
   });

@@ -173,6 +173,9 @@ const InfoRequestedScreen = lazy(
 const DeleteAccountScreen = lazy(
   () => import("./views/settings/DeleteAccountScreen"),
 );
+const LegalDocumentsScreen = lazy(
+  () => import("./views/settings/LegalDocumentsScreen"),
+);
 
 // --- 404 ---
 const NotFoundPage = lazy(() =>
@@ -312,6 +315,10 @@ function App() {
                       />
                       <Route path="/more" element={<MoreScreen />} />
                       <Route path="/settings" element={<SettingsScreen />} />
+                      <Route
+                        path="/settings/legal"
+                        element={<LegalDocumentsScreen />}
+                      />
                       <Route
                         path="/notifications"
                         element={<NotificationsScreen />}

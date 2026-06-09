@@ -259,7 +259,7 @@ export function SettingsScreen() {
           <div className="space-y-1">
             {[
               { icon: Lock, label: label('settings.changePin', 'Changer le PIN'), path: '/auth/pin-setup' },
-              { icon: Shield, label: label('settings.privacy', 'Confidentialite'), path: '#' },
+              { icon: Shield, label: label('settings.privacy', 'Confidentialite'), path: '/settings/legal' },
             ].map((item) => (
               <button key={item.label} onClick={() => item.path !== '#' && navigate(item.path)} className="w-full bg-card border border-border rounded-2xl p-4 text-left active:scale-[0.98] transition-all">
                 <div className="flex items-center justify-between">

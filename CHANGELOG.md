@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Weekly recap (2026-06-01 to 2026-06-05)
+
+- Added the backend analytics module with business metrics models, schemas, router/service wiring, Alembic migration `031_business_metrics.py`, and unit coverage for metrics and RBAC behavior.
+- Expanded backoffice analytics and evidence review with `AnalyticsPage`, `EvidenceViewerPage`, API client updates, and dossier service integration.
+- Strengthened verification coverage with KYC auth/ATM regression updates, analytics service hotfixes, and a dedicated SMS OTP dev/local-mode fallback test.
+- Added Docker handoff materials, including backup/restore docs, stack export/import scripts, image backup scripts, and SharePoint/OneDrive upload helpers.
+- Refreshed architecture documentation with the BICEC VERIPASS overview, C4 HTML/PDF outputs, Mermaid/SVG diagram sources, current state/sequence/ER/IA diagrams, ADR-040 for multi-agency back-office access, and maintainer/index updates.
+- Added stage-report and presentation deliverables, including memoire v8/v9/v10/v11 artifacts, rendered previews, budget/transport figures, executive/buy-in/war-room/beta PPTX outputs, speaker guide, source notes, FAQ, scorecard, and supporting marketing pack files.
+- PR references: [#323](https://github.com/Ken-Andre/bicec-veripass/pull/323) is open for the current branch; no merged GitHub PR metadata was recorded for the develop commits in this period.
+
 ### Weekly recap (2026-05-25 to 2026-05-29)
 
 - Added FaceMatch v2 and biometric review metadata across backend and backoffice, including manual review reasons, queue risk flags, dossier metadata, and expanded KYC/router test coverage.

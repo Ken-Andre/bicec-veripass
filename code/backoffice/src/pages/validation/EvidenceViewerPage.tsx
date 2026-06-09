@@ -331,7 +331,7 @@ function SupportThreadPanel({ sessionId, onOpenDocumentFromChat, onPromoteAttach
                         <Button
                           size="sm"
                           variant="default"
-                          className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium gap-1"
+                          className="h-7 gap-1 bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                           onClick={() => onPromoteAttachment(message)}
                         >
                           <Tags className="h-3 w-3" />
@@ -819,7 +819,7 @@ export default function EvidenceViewerPage() {
                         </span>
                         <Badge variant="secondary" className="font-semibold">{currentDoc.doc_type}</Badge>
                         {secondaryClassificationCategories.map((category) => (
-                          <Badge key={category} variant="default" className="bg-slate-500/10 text-slate-700 hover:bg-slate-500/20">{category}</Badge>
+                          <Badge key={category} variant="default" className="bg-primary/10 text-primary hover:bg-primary/15">{category}</Badge>
                         ))}
                         {currentDoc.classified_by_name && (
                           <span className="text-[10px] text-muted-foreground italic">
@@ -832,10 +832,10 @@ export default function EvidenceViewerPage() {
                       </Button>
                     </div>
                   ) : (
-                    <div data-testid="document-classification-form" className="space-y-3 rounded-lg bg-slate-50/50 p-3 border border-slate-100">
+                    <div data-testid="document-classification-form" className="space-y-3 rounded-lg border border-border bg-muted/50 p-3">
                       <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-gray-700 flex items-center gap-1.5 uppercase tracking-wider">
-                          <Tags className="h-3.5 w-3.5 text-blue-500" />
+                        <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-foreground">
+                          <Tags className="h-3.5 w-3.5 text-primary" />
                           {classificationNeedsAttention ? 'Assigner ce fichier' : 'Reclasser le document'}
                         </h4>
                         {!classificationNeedsAttention && (
@@ -1103,7 +1103,7 @@ export default function EvidenceViewerPage() {
                       )}
                     </div>
                     <div className="flex gap-1">
-                      {field.human_corrected && <span className="text-xs italic text-blue-600">Corrige</span>}
+                      {field.human_corrected && <span className="text-xs italic text-primary">Corrige</span>}
                       {!field.human_corrected && field.confidence_score < 0.7 && <span className="text-xs text-orange-500">Faible</span>}
                     </div>
                   </div>
@@ -1153,7 +1153,7 @@ export default function EvidenceViewerPage() {
                     ) : (
                       <p className="text-sm font-medium">{row.value || '-'}</p>
                     )}
-                    {row.corrected && <p className="text-xs italic text-blue-600">Corrige manuellement</p>}
+                    {row.corrected && <p className="text-xs italic text-primary">Corrige manuellement</p>}
                   </div>
                 ))}
               </CardContent>

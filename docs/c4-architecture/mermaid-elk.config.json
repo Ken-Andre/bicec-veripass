@@ -1,0 +1,16 @@
+{
+  "theme": "default",
+  "layout": "elk",
+  "htmlLabels": true,
+  "flowchart": {
+    "curve": "basis",
+    "diagramPadding": 24,
+    "nodeSpacing": 55,
+    "rankSpacing": 70
+  },
+  "elk": {
+    "mergeEdges": false,
+    "nodePlacementStrategy": "BRANDES_KOEPF",
+    "cycleBreakingStrategy": "INTERACTIVE"
+  }
+}

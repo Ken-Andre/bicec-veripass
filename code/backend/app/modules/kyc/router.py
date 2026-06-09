@@ -56,6 +56,7 @@ from app.modules.analytics.service import (
     record_ocr_performance_best_effort,
     track_event_best_effort,
 )
+from app.modules.legal.service import resolve_accepted_documents
 from app.modules.kyc.schemas import (
     KYCSessionResponse,
     KYCSubmitResponse,
@@ -830,7 +831,10 @@ async def merge_ocr_fields(
     from app.services.ocr_service import combine_extractions
 
     result = await db.execute(
-        select(KYCSession).where(KYCSession.id == session_id)
+        select(KYCSession).where(
+            KYCSession.id == session_id,
+            KYCSession.user_id == current_user.id,
+        )
     )
     session = result.scalar_one_or_none()
     if not session:
@@ -1218,6 +1222,20 @@ async def submit_consent(
     ):
         raise HTTPException(status_code=400, detail="All consents must be accepted")
 
+    accepted_documents = await resolve_accepted_documents(
+        db,
+        body.accepted_documents,
+        fallback_locale=getattr(current_user, "language", None) or "fr",
+    )
+    cgu_document = next(
+        (document for document in accepted_documents if document.get("document_key") == "cgu"),
+        None,
+    )
+    privacy_document = next(
+        (document for document in accepted_documents if document.get("document_key") == "privacy"),
+        None,
+    )
+
     # Upsert: find existing consent or create new one
     existing_result = await db.execute(
         select(ConsentRecord)
@@ -1228,10 +1246,23 @@ async def submit_consent(
     existing = existing_result.scalars().first()
 
     if existing:
+        consent_metadata = dict(existing.consent_metadata or {})
+        consent_metadata["accepted_documents"] = accepted_documents
         existing.cgu_accepted = body.cgu_accepted
         existing.privacy_accepted = body.privacy_accepted
         existing.data_processing_accepted = body.data_processing_accepted
         existing.consent_method = body.consent_method
+        existing.cgu_version = (
+            str(cgu_document.get("version"))
+            if cgu_document and cgu_document.get("version")
+            else existing.cgu_version
+        )
+        existing.privacy_version = (
+            str(privacy_document.get("version"))
+            if privacy_document and privacy_document.get("version")
+            else existing.privacy_version
+        )
+        existing.consent_metadata = consent_metadata
         existing.signed_at = datetime.now(timezone.utc)
         consent = existing
     else:
@@ -1242,8 +1273,17 @@ async def submit_consent(
             privacy_accepted=body.privacy_accepted,
             data_processing_accepted=body.data_processing_accepted,
             consent_method=body.consent_method,
-            cgu_version="1.0.0",
-            privacy_version="1.0.0",
+            cgu_version=(
+                str(cgu_document.get("version"))
+                if cgu_document and cgu_document.get("version")
+                else "1.0.0"
+            ),
+            privacy_version=(
+                str(privacy_document.get("version"))
+                if privacy_document and privacy_document.get("version")
+                else "1.0.0"
+            ),
+            consent_metadata={"accepted_documents": accepted_documents},
             signed_at=datetime.now(timezone.utc),
         )
         db.add(consent)
@@ -1269,6 +1309,7 @@ async def submit_consent(
         consent_method=consent.consent_method,
         cgu_version=consent.cgu_version,
         privacy_version=consent.privacy_version,
+        accepted_documents=(consent.consent_metadata or {}).get("accepted_documents"),
         signed_at=consent.signed_at,
     )
 

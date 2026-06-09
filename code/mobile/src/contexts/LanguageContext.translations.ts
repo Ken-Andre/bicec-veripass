@@ -271,6 +271,8 @@ export const translations: Record<string, Record<Language, string>> = {
     'settings.privacy': { fr: 'Confidentialité', en: 'Privacy' },
     'settings.dev.title': { fr: 'Développement', en: 'Development' },
     'settings.dev.fullAccess': { fr: 'Forcer Full Access', en: 'Force Full Access' },
+    'legal.title': { fr: 'Documents legaux', en: 'Legal documents' },
+    'legal.unavailable': { fr: 'Documents indisponibles.', en: 'Documents unavailable.' },
 
     // Notifications
     'notifications.title': { fr: 'Notifications', en: 'Notifications' },
@@ -320,6 +322,10 @@ export const translations: Record<string, Record<Language, string>> = {
     'consent.privacy': { fr: 'Politique de confidentialité', en: 'Privacy Policy' },
     'consent.data': { fr: 'Traitement des données personnelles', en: 'Personal Data Processing' },
     'consent.readDoc': { fr: 'Lire le document', en: 'Read document' },
+    'consent.loadingDocs': { fr: 'Chargement des documents...', en: 'Loading documents...' },
+    'consent.documentUnavailable': { fr: 'Documents indisponibles. Vous pourrez continuer hors ligne.', en: 'Documents unavailable. You can continue offline.' },
+    'consent.version': { fr: 'Version', en: 'Version' },
+    'consent.close': { fr: 'Fermer', en: 'Close' },
     'consent.submit': { fr: 'J\'accepte et je continue', en: 'I accept and continue' },
 
     // Signature Screen

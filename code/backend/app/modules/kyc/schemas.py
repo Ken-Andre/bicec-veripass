@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 from datetime import datetime, date
 from uuid import UUID
 
+from app.modules.legal.schemas import AcceptedLegalDocument
+
 
 # === ADR-001 Lifecycle States & Access Tiers ===
 
@@ -110,6 +112,7 @@ class ConsentSubmitRequest(BaseModel):
     privacy_accepted: bool
     data_processing_accepted: bool
     consent_method: str = Field(default="CHECKBOX_DIGITAL")
+    accepted_documents: Optional[list[AcceptedLegalDocument]] = None
 
 
 class ConsentRecordResponse(BaseModel):
@@ -122,6 +125,7 @@ class ConsentRecordResponse(BaseModel):
     consent_method: str
     cgu_version: str
     privacy_version: str
+    accepted_documents: Optional[list[dict]] = None
     signed_at: datetime
 
 

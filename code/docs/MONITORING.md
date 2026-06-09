@@ -21,8 +21,8 @@ https://localhost/flower/
 ```
 
 **Authentification :**
-- Username : `admin` (configurable via `FLOWER_USER` dans `.env`)
-- Password : `admin` (configurable via `FLOWER_PASSWORD` dans `.env`)
+- Username : `admin` by default (configurable via `FLOWER_USER` dans `.env`)
+- Password : `dev-flower-change-me` by default for development only (set `FLOWER_PASSWORD` dans `.env`)
 
 ### Fonctionnalités
 
