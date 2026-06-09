@@ -25,6 +25,13 @@ jobs:
         with:
           persist-credentials: false
           submodules: false
+          fetch-depth: 0
+
+      - name: Fix Git submodule state
+        run: |
+          git config --global --add safe.directory '*'
+          git rm --cached bmad-builder 2>/dev/null || true
+          rm -rf .git/modules/bmad-builder 2>/dev/null || true
 
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
