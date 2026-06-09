@@ -20,25 +20,12 @@ jobs:
       pull-requests: read
       issues: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-          submodules: false
-          fetch-depth: 0
-
-      - name: Remove broken submodule from git state
+      - name: Checkout repository (skip submodule processing)
         run: |
-          git config --global --add safe.directory '*'
-          
-          # Force remove the bmad-builder entry from git's internal state
-          git ls-files -s | grep bmad-builder && git rm --cached -f bmad-builder || true
-          
-          # Remove from git config
-          git config --remove-section submodule.bmad-builder 2>/dev/null || true
-          
-          # Clean up the git modules directory
-          rm -rf .git/modules/bmad-builder 2>/dev/null || true
+          git init
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git fetch origin HEAD --depth=1
+          git checkout FETCH_HEAD
 
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
