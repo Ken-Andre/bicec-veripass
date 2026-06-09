@@ -20,12 +20,12 @@ jobs:
       pull-requests: read
       issues: read
     steps:
-      - name: Checkout repository (skip submodule processing)
+      - name: Checkout repository without submodules
         run: |
           git init
           git remote add origin https://github.com/${{ github.repository }}.git
           git fetch origin HEAD --depth=1
-          git checkout FETCH_HEAD
+          git checkout -f --no-recurse-submodules FETCH_HEAD
 
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
