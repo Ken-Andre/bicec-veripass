@@ -1,3 +1,1 @@
-[submodule "bmad-builder"]
-    path = bmad-builder
-    url = https://github.com/bmad-code-org/BMAD-METHOD.git
+# Git submodules configuration - currently empty
