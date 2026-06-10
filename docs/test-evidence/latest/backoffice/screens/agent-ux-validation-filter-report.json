@@ -1,0 +1,25 @@
+{
+  "date": "2026-05-28T14:26:28.951Z",
+  "route": "/back-office/validation",
+  "activeMetrics": {
+    "pending": "1",
+    "infoRequired": "0",
+    "aml": "0",
+    "approved": "8"
+  },
+  "approvedMetrics": {
+    "pending": "1",
+    "infoRequired": "0",
+    "aml": "0",
+    "approved": "8"
+  },
+  "pageErrors": [],
+  "failedRequests": [
+    "POST https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456 :: net::ERR_ABORTED",
+    "POST https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456 :: net::ERR_ABORTED",
+    "POST https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456 :: net::ERR_ABORTED",
+    "POST https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456 :: net::ERR_ABORTED",
+    "POST https://localhost/api/v1/sentry-proxy?sentry_key=49bd6f4bd179bb392335dc25b9df8ed4&sentry_version=7&sentry_client=sentry.javascript.react%2F10.45.0&sentry_project=4511114014949456 :: net::ERR_ABORTED"
+  ],
+  "consoleEntries": []
+}

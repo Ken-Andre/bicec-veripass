@@ -1,0 +1,30 @@
+{
+  "version": "0.0.1",
+  "TCP": {
+    "443": {
+      "HTTPS": true
+    },
+    "8443": {
+      "HTTPS": true
+    }
+  },
+  "Web": {
+    "darkshadow.tail0c09b7.ts.net:443": {
+      "Handlers": {
+        "/": {
+          "Proxy": "http://127.0.0.1:8081"
+        }
+      }
+    },
+    "darkshadow.tail0c09b7.ts.net:8443": {
+      "Handlers": {
+        "/": {
+          "Proxy": "https+insecure://127.0.0.1:443"
+        }
+      }
+    }
+  },
+  "AllowFunnel": {
+    "darkshadow.tail0c09b7.ts.net:443": true
+  }
+}

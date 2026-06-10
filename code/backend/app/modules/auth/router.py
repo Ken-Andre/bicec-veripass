@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
@@ -65,6 +66,10 @@ def _active_mobile_statuses() -> list[str]:
     return ["DRAFT", "PENDING_INFO"]
 
 
+def _pin_attempt_keys(user_id: _uuid.UUID) -> tuple[str, str]:
+    return f"pin_attempts:{user_id}", f"pin_lockout:{user_id}"
+
+
 async def _get_or_create_mobile_session(db: AsyncSession, user: User) -> KYCSession:
     result = await db.execute(
         select(KYCSession)
@@ -78,13 +83,43 @@ async def _get_or_create_mobile_session(db: AsyncSession, user: User) -> KYCSess
             user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
         )
         db.add(kyc_session)
-        await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            result = await db.execute(
+                select(KYCSession)
+                .where(
+                    KYCSession.user_id == user.id,
+                    KYCSession.status.in_(_active_mobile_statuses()),
+                )
+                .order_by(KYCSession.started_at.desc())
+                .limit(1)
+            )
+            kyc_session = result.scalar_one_or_none()
+            if kyc_session is None:
+                raise
     return kyc_session
 
 
 async def _issue_mobile_tokens(db: AsyncSession, user: User) -> TokenResponse:
     kyc_session = await _get_or_create_mobile_session(db, user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(
+            select(KYCSession)
+            .where(
+                KYCSession.user_id == user.id,
+                KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
+            )
+            .order_by(KYCSession.started_at.desc())
+            .limit(1)
+        )
+        kyc_session = result.scalar_one_or_none()
+        if kyc_session is None:
+            raise
     await db.refresh(kyc_session)
     session_handle = make_session_handle(str(kyc_session.id))
     access_token = create_access_token(
@@ -342,7 +377,22 @@ async def verify_otp_endpoint(
         if not kyc_session.last_step_completed:
             kyc_session.last_step_completed = "PHONE_VERIFIED"
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        result = await db.execute(
+            select(KYCSession)
+            .where(
+                KYCSession.user_id == user.id,
+                KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
+            )
+            .order_by(KYCSession.started_at.desc())
+            .limit(1)
+        )
+        kyc_session = result.scalar_one_or_none()
+        if kyc_session is None:
+            raise
     await db.refresh(kyc_session)
     session_handle = make_session_handle(str(kyc_session.id))
 
@@ -539,6 +589,13 @@ async def setup_pin(
     db: AsyncSession = Depends(get_db),
 ):
     """Setup PIN for returning mobile user."""
+    if current_user.pin_hash:
+        if not body.current_pin or not verify_password(body.current_pin, current_user.pin_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Current PIN is required to replace an existing PIN.",
+            )
+
     current_user.pin_hash = hash_password(body.pin)
 
     # Update KYCSession State — limit(1) prevents MultipleResultsFound
@@ -589,11 +646,31 @@ async def verify_pin(
             detail="PIN non configuré. Veuillez d'abord configurer votre PIN via OTP.",
         )
 
+    redis = await get_redis()
+    attempts_key, lockout_key = _pin_attempt_keys(user.id)
+    if await redis.get(lockout_key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account locked for 15 minutes due to multiple failed PIN attempts.",
+        )
+
     if not verify_password(body.pin, user.pin_hash):
+        attempts = await redis.incr(attempts_key)
+        await redis.expire(attempts_key, 3600)
+        if attempts >= settings.PIN_MAX_ATTEMPTS:
+            await redis.set(lockout_key, "locked", ex=settings.PIN_LOCKOUT_SECONDS)
+            await redis.delete(attempts_key)
+            logger.warning("PIN account locked after repeated failures: user_id=%s", user.id)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account locked for 15 minutes due to multiple failed PIN attempts.",
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
+
+    await redis.delete(attempts_key)
 
     # Manage KYCSession for State Resume — limit(1) prevents MultipleResultsFound.
     # A user who restarted KYC multiple times may have several DRAFT sessions;
@@ -615,7 +692,22 @@ async def verify_pin(
             user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
         )
         db.add(kyc_session)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            kyc_result = await db.execute(
+                select(KYCSession)
+                .where(
+                    KYCSession.user_id == user.id,
+                    KYCSession.status.in_(["DRAFT", "PENDING_INFO"]),
+                )
+                .order_by(KYCSession.started_at.desc())
+                .limit(1)
+            )
+            kyc_session = kyc_result.scalar_one_or_none()
+            if kyc_session is None:
+                raise
         await db.refresh(kyc_session)
 
     session_handle = make_session_handle(str(kyc_session.id))
@@ -697,6 +789,16 @@ async def webauthn_register_verify(
     challenge = challenge_result.scalar_one_or_none()
     if challenge is None or challenge.expires_at < now:
         raise HTTPException(status_code=400, detail="Invalid or expired WebAuthn challenge.")
+
+    if not body.raw_response:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Raw WebAuthn registration response is required.",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Passkey registration requires server-side WebAuthn attestation verification.",
+    )
 
     challenge.consumed_at = now
     credential_result = await db.execute(
@@ -791,6 +893,16 @@ async def webauthn_auth_verify(
     if credential is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    if not body.raw_response:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Raw WebAuthn assertion response is required.",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Passkey authentication requires server-side WebAuthn assertion verification.",
+    )
+
     challenge.consumed_at = now
     credential.last_used_at = now
     user.biometric_opt_in = True
@@ -841,8 +953,16 @@ async def agent_login(
             detail=f"Invalid email or password. Attempt {attempts}/5.",
         )
 
+    if not agent.is_available:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Agent account is disabled.",
+        )
+
     # 3. Success: Reset attempts
     await redis.delete(attempts_key)
+    agent.last_activity_at = datetime.now(timezone.utc)
+    await db.commit()
 
     # Create tokens
     access_token = create_access_token(
@@ -955,11 +1075,21 @@ async def refresh_token(
     result = await db.execute(select(Agent).where(Agent.id == parsed_uuid))
     agent = result.scalar_one_or_none()
     if agent:
+        if not agent.is_available:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Agent account is disabled",
+            )
         additional_claims = {"role": agent.role.value, "user_type": "agent"}
     else:
         result = await db.execute(select(User).where(User.id == parsed_uuid))
         user = result.scalar_one_or_none()
         if user:
+            if user.is_deleted:
+                raise HTTPException(
+                    status_code=status.HTTP_410_GONE,
+                    detail="Account has been deleted",
+                )
             # For mobile users, re-derive session handle if possible — limit(1) prevents crash
             kyc_result = await db.execute(
                 select(KYCSession)

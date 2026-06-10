@@ -6,7 +6,7 @@ import type { AccessTier, KycStatus, KycStepType } from '../../types';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { Button } from '../../components/ui/button';
 import { ProgressStepper } from '../../components/ProgressStepper';
-import { CheckCircle, FileText, User, MapPin, Shield, PenLine, Receipt, AlertCircle, ArrowRight, RotateCcw } from 'lucide-react';
+import { CheckCircle, CheckSquare, FileText, User, MapPin, Shield, PenLine, Receipt, AlertCircle, ArrowRight, RotateCcw, Square } from 'lucide-react';
 import { getSubmissionBlockerStatus, runKycSyncNow } from '../../services/kycSyncService';
 import { fetchWithCorrelation } from '../../services/apiClient';
 
@@ -114,6 +114,34 @@ function CheckItem({ icon, label, detail, ok, children }: CheckItemProps) {
   );
 }
 
+interface FinalConsentRowProps {
+  checked: boolean;
+  description: string;
+  label: string;
+  onToggle: () => void;
+}
+
+function FinalConsentRow({ checked, description, label, onToggle }: FinalConsentRowProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={checked}
+      onClick={onToggle}
+      className="flex w-full items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-muted/50"
+    >
+      {checked ? (
+        <CheckSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+      ) : (
+        <Square className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+      )}
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-foreground">{label}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  );
+}
+
 /**
  * Resolve a checklist value using backend-first logic:
  * - If backend is loaded and has an explicit flag → use it (true/false)
@@ -141,6 +169,11 @@ export default function ReviewScreen() {
   const [backendReadiness, setBackendReadiness] = useState<ReadinessData | null>(null);
   const [offlineBlocked, setOfflineBlocked] = useState<string | null>(null);
   const [loadingReadiness, setLoadingReadiness] = useState(true);
+  const [finalConfirmations, setFinalConfirmations] = useState({
+    accuracy: false,
+    bicecSharing: false,
+    terms: false,
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -171,7 +204,9 @@ export default function ReviewScreen() {
     void load();
   }, []);
 
-  const canSubmit = Boolean(backendReadiness?.can_submit) && !offlineBlocked && !loadingReadiness;
+  const backendCanSubmit = Boolean(backendReadiness?.can_submit) && !offlineBlocked && !loadingReadiness;
+  const finalConfirmationsAccepted = Object.values(finalConfirmations).every(Boolean);
+  const canSubmit = backendCanSubmit && finalConfirmationsAccepted;
 
   const docTypes = session?.documents?.map(d => d.doc_type) || [];
   const backendLoaded = !loadingReadiness && backendReadiness !== null;
@@ -225,6 +260,10 @@ export default function ReviewScreen() {
     navigate(route);
   };
 
+  const toggleFinalConfirmation = (key: keyof typeof finalConfirmations) => {
+    setFinalConfirmations((current) => ({ ...current, [key]: !current[key] }));
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError(null);
@@ -232,6 +271,11 @@ export default function ReviewScreen() {
       const offlineStatus = await getSubmissionBlockerStatus();
       if (!offlineStatus.canSubmit) {
         setSubmitError(offlineStatus.blockingReason);
+        return;
+      }
+
+      if (!finalConfirmationsAccepted) {
+        setSubmitError('Confirmez les attestations finales avant soumission.');
         return;
       }
 
@@ -335,6 +379,35 @@ export default function ReviewScreen() {
           </CheckItem>
         </div>
 
+        <section className="rounded-xl border border-border bg-muted/30 p-3">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-foreground">Attestations finales</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Confirmez ces points avant d'envoyer le dossier a BICEC.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <FinalConsentRow
+              checked={finalConfirmations.accuracy}
+              label="Les informations du dossier sont exactes"
+              description="Marie confirme avoir relu les champs OCR, l'adresse, le NIU et les justificatifs."
+              onToggle={() => toggleFinalConfirmation('accuracy')}
+            />
+            <FinalConsentRow
+              checked={finalConfirmations.bicecSharing}
+              label="J'autorise le partage avec BICEC"
+              description="Les pieces et donnees KYC peuvent etre transmises aux equipes habilitees pour revue."
+              onToggle={() => toggleFinalConfirmation('bicecSharing')}
+            />
+            <FinalConsentRow
+              checked={finalConfirmations.terms}
+              label="J'accepte les CGU et la politique de confidentialite"
+              description="Cette confirmation complete les consentements deja enregistres a l'etape precedente."
+              onToggle={() => toggleFinalConfirmation('terms')}
+            />
+          </div>
+        </section>
+
         {/* Warnings from backend */}
         {backendReadiness?.warnings?.map((w, i) => (
           <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
@@ -377,6 +450,12 @@ export default function ReviewScreen() {
         {/* Submit error */}
         {submitError && (
           <p className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{submitError}</p>
+        )}
+
+        {!loadingReadiness && backendCanSubmit && !finalConfirmationsAccepted && (
+          <p className="text-xs text-center text-muted-foreground">
+            Cochez les attestations finales pour activer la soumission.
+          </p>
         )}
 
         {/* Submit button — driven by backend readiness */}

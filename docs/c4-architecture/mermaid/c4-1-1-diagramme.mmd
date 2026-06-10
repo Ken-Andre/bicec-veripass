@@ -1,0 +1,42 @@
+
+flowchart LR
+    subgraph Acteurs["Personnes"]
+        M["Marie<br/>(cliente, navigateur mobile)"]
+        J["Jean<br/>(agent KYC, navigateur)"]
+        T["Thomas<br/>(superviseur AML/CFT)"]
+        S["Sylvie<br/>(manager opérationnel)"]
+        AIT["Admin IT<br/>(administrateur système)"]
+        MAINT["Équipe IT BICEC<br/>(mainteneurs, DevOps)"]
+    end
+
+    subgraph VeriPass["BICEC VeriPass (boîte noire)"]
+        VP["BICEC VeriPass<br/>Onboarding KYC + Identité vérifiée<br/>+ Garde-fou d'éligibilité"]
+    end
+
+    subgraph AppsAval["Applications mobiles aval (handoff)"]
+        BIPAY["BI PAY<br/>(App Store + Google Play)"]
+        WALLET["BICEC Mobile-Banking<br/>+ BICEC Wallet"]
+    end
+
+    subgraph Externes["Systèmes externes"]
+        SMS["Orange SMS / SMTP<br/>(OTP et notifications)"]
+        OS["OpenSanctions<br/>(PEP / sanctions)"]
+        OCR_CLOUD["Oracle Cloud OCR<br/>(optionnel, chiffré)"]
+    end
+
+    M -->|KYC, dashboard, / handoff| VP
+    J -->|Validation dossiers| VP
+    T -->|AML, conflits NIU, / agences| VP
+    S -->|Centre de commande, / analytics| VP
+    AIT -->|Agents, ATM, audit| VP
+    MAINT -->|Déploiement, / backups, ops| VP
+
+    VP -->|OTP sortants, / emails| SMS
+    VP -->|Sync hebdomadaire| OS
+    VP -.->|Si OCR_ONLINE=true / payload chiffré| OCR_CLOUD
+
+    VP -->|Après APPROVED : / app-link + store fallback| BIPAY
+    VP -->|Après APPROVED : / app-link + store fallback| WALLET
+
+    classDef ext fill:#FFF3E0,stroke:#E65100,color:#000
+    class SMS,OS,OCR_CLOUD,BIPAY,WALLET ext

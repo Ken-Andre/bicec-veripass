@@ -30,10 +30,10 @@ const actionColorMap: Record<string, string> = {
   [ActionType.APPROVE]: 'bg-green-100 text-green-700',
   [ActionType.REJECT]: 'bg-red-100 text-red-700',
   [ActionType.REQUEST_INFO]: 'bg-yellow-100 text-yellow-700',
-  [ActionType.ASSIGN]: 'bg-blue-100 text-blue-700',
+  [ActionType.ASSIGN]: 'bg-primary/10 text-primary',
   [ActionType.AML_CLEAR]: 'bg-green-100 text-green-700',
   [ActionType.AML_ESCALATE]: 'bg-orange-100 text-orange-700',
-  [ActionType.SYSTEM_AUTO]: 'bg-gray-100 text-gray-500',
+  [ActionType.SYSTEM_AUTO]: 'bg-muted text-muted-foreground',
 };
 
 interface DossierTimelineProps {

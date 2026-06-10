@@ -17,14 +17,15 @@ from fastapi import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.core.rate_limit import limiter
 from app.core.config import settings
-from app.core.security import make_session_handle, verify_session_handle
+from app.core.security import make_session_handle, verify_session_handle, require_agent_role
 from app.core.logging import logger
 from app.db.session import get_db
-from app.modules.auth.models import User
+from app.modules.auth.models import User, Agent, AgentRole
 from app.modules.devices.dependencies import require_registered_device
 from app.modules.kyc.models import (
     KYCSession,
@@ -37,10 +38,25 @@ from app.modules.kyc.models import (
 )
 from app.modules.kyc.service import (
     process_document_ocr_pipeline,
-    compute_anti_spoofing_score_from_landmarks,
-    compute_face_match_score_for_session,
+    compute_face_match_for_session,
+    compute_liveness_motion_score,
+    compute_minifasnet_for_session,
+    biometric_manual_review_reasons,
+    is_liveness_challenge_passed,
+    FACE_MATCH_MODEL_NAME,
+    FACE_MATCH_STATUS_ERROR,
+    FACE_MATCH_STATUS_FAILED,
+    FACE_MATCH_STATUS_NOT_PERFORMED,
+    LIVENESS_MODEL_VERSION,
+    MINIFASNET_STATUS_ERROR,
+    MINIFASNET_STATUS_NOT_PERFORMED,
 )
 from app.modules.audit.models import AuditLog
+from app.modules.analytics.service import (
+    record_ocr_performance_best_effort,
+    track_event_best_effort,
+)
+from app.modules.legal.service import resolve_accepted_documents
 from app.modules.kyc.schemas import (
     KYCSessionResponse,
     KYCSubmitResponse,
@@ -64,12 +80,23 @@ from app.modules.kyc.schemas import (
     LifecycleState,
     AccessTier,
     LIFECYCLE_TO_ACCESS_TIER,
+    ATMCreate,
+    ATMUpdate,
+    ATMResponse,
 )
 from app.modules.kyc import geo_data
 
 router = APIRouter()
 SHA256_HEX_RE = re.compile(r"^[a-fA-F0-9]{64}$")
 VALID_CAPTURE_SIDES = {"RECTO", "VERSO"}
+SUPPORTED_DOCUMENT_UPLOAD_TYPES = {
+    "CNI_RECTO",
+    "CNI_VERSO",
+    "SELFIE",
+    "BILL_ENEO",
+    "BILL_CAMWATER",
+    "NIU",
+}
 LIVENESS_LOCKOUT_COOLDOWN_SECONDS = 60
 LIVENESS_LOCKOUT_WINDOW_HOURS = 24
 MAX_LIVENESS_LOCKOUTS_PER_WINDOW = 3
@@ -83,12 +110,51 @@ def _is_valid_sha256(value: str) -> bool:
     return bool(SHA256_HEX_RE.fullmatch(value.strip()))
 
 
+def _request_uuid(request: Request) -> uuid.UUID | None:
+    raw = getattr(request.state, "correlation_id", None)
+    try:
+        return uuid.UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
+
+
+def _float_or_none(value) -> float | None:
+    return float(value) if value is not None else None
+
+
+def _biometric_response(biometric: BiometricResult) -> BiometricResultResponse:
+    return BiometricResultResponse(
+        id=make_session_handle(str(biometric.id)),
+        face_match_score=_float_or_none(biometric.face_match_score),
+        face_match_status=biometric.face_match_status,
+        face_match_reason=biometric.face_match_reason,
+        face_match_distance=_float_or_none(biometric.face_match_distance),
+        face_match_threshold=_float_or_none(biometric.face_match_threshold),
+        face_match_detector=biometric.face_match_detector,
+        liveness_score=_float_or_none(biometric.liveness_score),
+        anti_spoofing_score=_float_or_none(biometric.anti_spoofing_score),
+        model_version_face=biometric.model_version_face,
+        model_version_liveness=biometric.model_version_liveness,
+        processed_at=biometric.processed_at,
+    )
+
+
 def _normalize_capture_side(side: str) -> str:
     normalized = side.strip().upper()
     if normalized not in VALID_CAPTURE_SIDES:
         raise HTTPException(
             status_code=400,
             detail="Invalid side. Expected RECTO or VERSO.",
+        )
+    return normalized
+
+
+def _normalize_supported_doc_type(doc_type: str) -> str:
+    normalized = doc_type.strip().upper()
+    if normalized not in SUPPORTED_DOCUMENT_UPLOAD_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Document type is not supported.",
         )
     return normalized
 
@@ -111,6 +177,8 @@ def _locked_liveness_response(lockout_count_24h: int) -> LivenessResultResponse:
         attempts_remaining=0,
         strikes_remaining=0,
         face_match_score=None,
+        face_match_status=FACE_MATCH_STATUS_NOT_PERFORMED,
+        face_match_reason="liveness_locked",
         anti_spoofing_score=None,
         is_locked=True,
         cooldown_seconds=LIVENESS_LOCKOUT_COOLDOWN_SECONDS,
@@ -141,6 +209,36 @@ async def _get_active_editable_session(
     return session
 
 
+async def _get_latest_active_session(
+    db: AsyncSession,
+    user_id: UUID,
+) -> KYCSession | None:
+    result = await db.execute(
+        select(KYCSession)
+        .where(
+            KYCSession.user_id == user_id,
+            KYCSession.status.in_(
+                [
+                    LifecycleState.DRAFT,
+                    LifecycleState.PENDING_KYC,
+                    LifecycleState.PENDING_INFO,
+                ]
+            ),
+        )
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+def _session_start_response(session: KYCSession, *, existing: bool) -> dict[str, str]:
+    return {
+        "session_id": make_session_handle(str(session.id)),
+        "status": session.status,
+        "message": "Existing session found" if existing else "Session started",
+    }
+
+
 async def _store_document_and_create_record(
     *,
     session: KYCSession,
@@ -150,6 +248,8 @@ async def _store_document_and_create_record(
     client_sha256: str | None = None,
 ) -> DocumentResponse:
     from app.modules.kyc.storage import document_storage
+
+    doc_type = _normalize_supported_doc_type(doc_type)
 
     if client_sha256 and not _is_valid_sha256(client_sha256):
         raise HTTPException(
@@ -236,6 +336,31 @@ async def _store_document_and_create_record(
 
     await db.refresh(doc, attribute_names=["ocr_fields"])
 
+    await track_event_best_effort(
+        db,
+        event_type="DOCUMENT_UPLOADED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        occurred_at=doc.captured_at,
+        step=f"upload_{doc_type.lower()}",
+        status=doc.ocr_status,
+        metadata={"doc_type": doc.doc_type, "file_size_bytes": doc.file_size_bytes},
+    )
+    await track_event_best_effort(
+        db,
+        event_type="OCR_FAILED" if doc.ocr_status == "FAILED" else "OCR_COMPLETED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        occurred_at=doc.captured_at,
+        step="ocr",
+        status=doc.ocr_status,
+        metadata={"doc_type": doc.doc_type, "engine": doc.ocr_engine},
+    )
+    await record_ocr_performance_best_effort(db, doc.id)
+    await db.commit()
+
     logger.info(
         "Document %s uploaded for session %s — ocr_status=%s",
         doc_type,
@@ -321,6 +446,17 @@ async def get_current_session(
         status=kyc_session.status,
         access_level=kyc_session.access_level,
         niu_type=kyc_session.niu_type,
+        niu_number=kyc_session.niu_number,
+        niu_declarative=bool(kyc_session.niu_declarative),
+        address_city=kyc_session.address_city,
+        address_commune=kyc_session.address_commune,
+        address_quartier=kyc_session.address_quartier,
+        address_lieu_dit=kyc_session.address_lieu_dit,
+        address_details=kyc_session.address_details,
+        gps_latitude=_float_or_none(kyc_session.gps_latitude),
+        gps_longitude=_float_or_none(kyc_session.gps_longitude),
+        utility_provider=kyc_session.utility_provider,
+        utility_bill_date=kyc_session.utility_bill_date,
         confidence_score_global=float(kyc_session.confidence_score_global)
         if kyc_session.confidence_score_global
         else None,
@@ -355,19 +491,7 @@ async def get_current_session(
             )
             for doc in kyc_session.documents
         ],
-        biometric_result=BiometricResultResponse(
-            id=make_session_handle(str(kyc_session.biometric_results.id)),
-            face_match_score=float(kyc_session.biometric_results.face_match_score)
-            if kyc_session.biometric_results.face_match_score
-            else None,
-            liveness_score=float(kyc_session.biometric_results.liveness_score)
-            if kyc_session.biometric_results.liveness_score
-            else None,
-            anti_spoofing_score=float(kyc_session.biometric_results.anti_spoofing_score)
-            if kyc_session.biometric_results.anti_spoofing_score
-            else None,
-            processed_at=kyc_session.biometric_results.processed_at,
-        )
+        biometric_result=_biometric_response(kyc_session.biometric_results)
         if kyc_session.biometric_results
         else None,
         consent_record=ConsentRecordResponse(
@@ -394,19 +518,9 @@ async def start_kyc_session(
 ):
     """Start a new KYC session for the user."""
     # Check for existing active session
-    result = await db.execute(
-        select(KYCSession).where(
-            KYCSession.user_id == current_user.id,
-            KYCSession.status.in_([LifecycleState.DRAFT, LifecycleState.PENDING_KYC, LifecycleState.PENDING_INFO]),
-        )
-    )
-    existing = result.scalars().first()
+    existing = await _get_latest_active_session(db, current_user.id)
     if existing:
-        return {
-            "session_id": make_session_handle(str(existing.id)),
-            "status": existing.status,
-            "message": "Existing session found",
-        }
+        return _session_start_response(existing, existing=True)
 
     # Create new session — ADR-001: DRAFT → RESTRICTED access
     # Note: ADR-001 specifies GUEST for DRAFT, but existing sessions use RESTRICTED.
@@ -419,14 +533,28 @@ async def start_kyc_session(
         started_at=datetime.now(timezone.utc),
     )
     db.add(session)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        existing = await _get_latest_active_session(db, current_user.id)
+        if existing:
+            return _session_start_response(existing, existing=True)
+        raise
 
     logger.info(f"KYC session started for user {current_user.id}")
-    return {
-        "session_id": make_session_handle(str(session.id)),
-        "status": "DRAFT",
-        "message": "Session started",
-    }
+    await track_event_best_effort(
+        db,
+        event_type="KYC_SESSION_STARTED",
+        session_id=session.id,
+        user_id=current_user.id,
+        occurred_at=session.started_at,
+        step="start",
+        status=session.status,
+        request_id=_request_uuid(request),
+    )
+    await db.commit()
+    return _session_start_response(session, existing=False)
 
 
 @router.post("/document/upload", response_model=DocumentResponse)
@@ -640,6 +768,27 @@ async def submit_ocr_review(
 
     session.last_step_completed = "ocr_review"
     session.ocr_review_confirmed = True
+    await track_event_best_effort(
+        db,
+        event_type="OCR_CORRECTED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        step="ocr_review",
+        status=session.status,
+        metadata={"corrected_fields": sorted(body.fields.keys())},
+        request_id=_request_uuid(request),
+    )
+    await track_event_best_effort(
+        db,
+        event_type="OCR_REVIEW_CONFIRMED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        step="ocr_review",
+        status=session.status,
+        request_id=_request_uuid(request),
+    )
     await db.commit()
 
     return {"status": "success", "message": "OCR review submitted"}
@@ -682,7 +831,10 @@ async def merge_ocr_fields(
     from app.services.ocr_service import combine_extractions
 
     result = await db.execute(
-        select(KYCSession).where(KYCSession.id == session_id)
+        select(KYCSession).where(
+            KYCSession.id == session_id,
+            KYCSession.user_id == current_user.id,
+        )
     )
     session = result.scalar_one_or_none()
     if not session:
@@ -794,10 +946,37 @@ async def submit_liveness(
         await db.commit()
         return _locked_liveness_response(current_user.liveness_lockout_count_24h or 0)
 
-    # In production, validate landmarks and compute liveness score
-    # For now, accept if landmarks are provided
-    is_alive = len(body.landmarks_json) > 0
-    confidence = 0.95 if is_alive else 0.0
+    liveness_score = compute_liveness_motion_score(body.landmarks_json, body.challenge_type)
+    challenge_passed = is_liveness_challenge_passed(
+        body.landmarks_json,
+        body.challenge_type,
+    )
+    minifasnet_result = await compute_minifasnet_for_session(
+        session_id=session.id,
+        db=db,
+    )
+    if minifasnet_result.status == MINIFASNET_STATUS_NOT_PERFORMED:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "FACE_MATCH_EVIDENCE_MISSING",
+                "message": "Selfie evidence is required before liveness can be completed.",
+                "reason": minifasnet_result.reason,
+            },
+        )
+    if minifasnet_result.status == MINIFASNET_STATUS_ERROR:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "ANTI_SPOOFING_ERROR",
+                "message": "MiniFASNet anti-spoofing engine unavailable. Please retry liveness.",
+                "reason": minifasnet_result.reason,
+            },
+        )
+
+    anti_spoofing_score = minifasnet_result.score
+    is_alive = challenge_passed and minifasnet_result.passed
+    confidence = liveness_score
 
     if not is_alive:
         session.liveness_strike_count += 1
@@ -806,39 +985,88 @@ async def submit_liveness(
             current_user.liveness_lockout_count_24h = (
                 (current_user.liveness_lockout_count_24h or 0) + 1
             )
+            await track_event_best_effort(
+                db,
+                event_type="LIVENESS_FAILED",
+                session_id=session.id,
+                user_id=session.user_id,
+                agency_id=session.agency_id,
+                step="liveness",
+                status=session.status,
+                metadata={
+                    "locked": True,
+                    "liveness_score": liveness_score,
+                    "anti_spoofing_score": anti_spoofing_score,
+                    "anti_spoofing_reason": minifasnet_result.reason,
+                    "anti_spoofing_model": minifasnet_result.model,
+                    "challenge_passed": challenge_passed,
+                },
+                request_id=_request_uuid(request),
+            )
             await db.commit()
             return _locked_liveness_response(current_user.liveness_lockout_count_24h)
 
+        await track_event_best_effort(
+            db,
+            event_type="LIVENESS_FAILED",
+            session_id=session.id,
+            user_id=session.user_id,
+            agency_id=session.agency_id,
+            step="liveness",
+            status=session.status,
+            metadata={
+                "locked": False,
+                "liveness_score": liveness_score,
+                "anti_spoofing_score": anti_spoofing_score,
+                "anti_spoofing_reason": minifasnet_result.reason,
+                "anti_spoofing_model": minifasnet_result.model,
+                "challenge_passed": challenge_passed,
+            },
+            request_id=_request_uuid(request),
+        )
         await db.commit()
         return LivenessResultResponse(
             is_alive=False,
-            confidence=0.0,
+            confidence=confidence,
             attempts_remaining=3 - session.liveness_strike_count,
             strikes_remaining=3 - session.liveness_strike_count,
             face_match_score=None,
-            anti_spoofing_score=None,
+            face_match_status=FACE_MATCH_STATUS_NOT_PERFORMED,
+            face_match_reason="liveness_failed",
+            anti_spoofing_score=anti_spoofing_score,
             is_locked=False,
             cooldown_seconds=None,
             lockout_count_24h=current_user.liveness_lockout_count_24h or 0,
             branch_fallback_available=False,
         )
 
-    anti_spoofing_score = compute_anti_spoofing_score_from_landmarks(
-        body.landmarks_json,
-        body.challenge_type,
-    )
-    face_match_score = await compute_face_match_score_for_session(
+    face_match_result = await compute_face_match_for_session(
         session_id=session.id,
         db=db,
     )
-    # face_match_score is None when no SELFIE document exists yet.
-    # In that case, we do NOT substitute the liveness confidence —
-    # a None score is honest and signals that face matching was not performed.
-    if face_match_score is not None and (
-        anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
-        or face_match_score < settings.FACE_MATCH_MIN_SCORE
-    ):
+    if face_match_result.status == FACE_MATCH_STATUS_NOT_PERFORMED:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "FACE_MATCH_EVIDENCE_MISSING",
+                "message": "CNI recto and selfie evidence are required before liveness can be completed.",
+                "reason": face_match_result.reason,
+            },
+        )
+
+    if face_match_result.status == FACE_MATCH_STATUS_FAILED:
         session.priority_flag = True
+        await track_event_best_effort(
+            db,
+            event_type="FACE_MATCH_FAILED",
+            session_id=session.id,
+            user_id=session.user_id,
+            agency_id=session.agency_id,
+            step="face_match",
+            status=session.status,
+            metadata={"score": face_match_result.score, "reason": face_match_result.reason},
+            request_id=_request_uuid(request),
+        )
 
     result = await db.execute(
         select(BiometricResult).where(BiometricResult.session_id == session.id)
@@ -849,18 +1077,60 @@ async def submit_liveness(
             id=uuid.uuid4(),
             session_id=session.id,
             liveness_score=confidence,
-            face_match_score=face_match_score,
+            face_match_score=face_match_result.score,
+            face_match_status=face_match_result.status,
+            face_match_reason=face_match_result.reason,
+            face_match_distance=face_match_result.distance,
+            face_match_threshold=face_match_result.threshold,
+            face_match_detector=face_match_result.detector,
             anti_spoofing_score=anti_spoofing_score,
+            model_version_face=FACE_MATCH_MODEL_NAME,
+            model_version_liveness=LIVENESS_MODEL_VERSION,
             processed_at=datetime.now(timezone.utc),
         )
         db.add(biometric)
     else:
         biometric.liveness_score = confidence
-        biometric.face_match_score = face_match_score
+        biometric.face_match_score = face_match_result.score
+        biometric.face_match_status = face_match_result.status
+        biometric.face_match_reason = face_match_result.reason
+        biometric.face_match_distance = face_match_result.distance
+        biometric.face_match_threshold = face_match_result.threshold
+        biometric.face_match_detector = face_match_result.detector
         biometric.anti_spoofing_score = anti_spoofing_score
+        biometric.model_version_face = FACE_MATCH_MODEL_NAME
+        biometric.model_version_liveness = LIVENESS_MODEL_VERSION
         biometric.processed_at = datetime.now(timezone.utc)
+
+    if face_match_result.status == FACE_MATCH_STATUS_ERROR:
+        await db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "FACE_MATCH_ERROR",
+                "message": "Face match engine unavailable. Please retry liveness.",
+                "reason": face_match_result.reason,
+            },
+        )
+
     session.liveness_strike_count = 0
     session.last_step_completed = "liveness"
+    await track_event_best_effort(
+        db,
+        event_type="LIVENESS_PASSED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        step="liveness",
+        status=session.status,
+        metadata={
+            "liveness_score": liveness_score,
+            "anti_spoofing_score": anti_spoofing_score,
+            "anti_spoofing_model": minifasnet_result.model,
+            "face_match_status": face_match_result.status,
+        },
+        request_id=_request_uuid(request),
+    )
     await db.commit()
 
     return LivenessResultResponse(
@@ -868,7 +1138,9 @@ async def submit_liveness(
         confidence=confidence,
         attempts_remaining=3 - session.liveness_strike_count,
         strikes_remaining=3 - session.liveness_strike_count,
-        face_match_score=face_match_score,
+        face_match_score=face_match_result.score,
+        face_match_status=face_match_result.status,
+        face_match_reason=face_match_result.reason,
         anti_spoofing_score=anti_spoofing_score,
         is_locked=False,
         cooldown_seconds=None,
@@ -913,12 +1185,23 @@ async def submit_address(
                 detail="GPS coordinates outside Cameroon bounds. Please ensure location services are enabled.",
             )
 
+    session.address_city = body.city
+    session.address_commune = body.commune
+    session.address_quartier = body.quartier
+    session.address_lieu_dit = body.lieu_dit
+    session.address_details = body.region
+    session.gps_latitude = body.gps_lat
+    session.gps_longitude = body.gps_lng
     session.last_step_completed = "address"
     await db.commit()
 
     return {
         "status": "success",
         "message": "Address and GPS validated",
+        "address_city": session.address_city,
+        "address_commune": session.address_commune,
+        "address_quartier": session.address_quartier,
+        "address_lieu_dit": session.address_lieu_dit,
         "gps_validated": body.gps_lat is not None and body.gps_lng is not None,
     }
 
@@ -939,6 +1222,20 @@ async def submit_consent(
     ):
         raise HTTPException(status_code=400, detail="All consents must be accepted")
 
+    accepted_documents = await resolve_accepted_documents(
+        db,
+        body.accepted_documents,
+        fallback_locale=getattr(current_user, "language", None) or "fr",
+    )
+    cgu_document = next(
+        (document for document in accepted_documents if document.get("document_key") == "cgu"),
+        None,
+    )
+    privacy_document = next(
+        (document for document in accepted_documents if document.get("document_key") == "privacy"),
+        None,
+    )
+
     # Upsert: find existing consent or create new one
     existing_result = await db.execute(
         select(ConsentRecord)
@@ -949,10 +1246,23 @@ async def submit_consent(
     existing = existing_result.scalars().first()
 
     if existing:
+        consent_metadata = dict(existing.consent_metadata or {})
+        consent_metadata["accepted_documents"] = accepted_documents
         existing.cgu_accepted = body.cgu_accepted
         existing.privacy_accepted = body.privacy_accepted
         existing.data_processing_accepted = body.data_processing_accepted
         existing.consent_method = body.consent_method
+        existing.cgu_version = (
+            str(cgu_document.get("version"))
+            if cgu_document and cgu_document.get("version")
+            else existing.cgu_version
+        )
+        existing.privacy_version = (
+            str(privacy_document.get("version"))
+            if privacy_document and privacy_document.get("version")
+            else existing.privacy_version
+        )
+        existing.consent_metadata = consent_metadata
         existing.signed_at = datetime.now(timezone.utc)
         consent = existing
     else:
@@ -963,12 +1273,32 @@ async def submit_consent(
             privacy_accepted=body.privacy_accepted,
             data_processing_accepted=body.data_processing_accepted,
             consent_method=body.consent_method,
-            cgu_version="1.0.0",
-            privacy_version="1.0.0",
+            cgu_version=(
+                str(cgu_document.get("version"))
+                if cgu_document and cgu_document.get("version")
+                else "1.0.0"
+            ),
+            privacy_version=(
+                str(privacy_document.get("version"))
+                if privacy_document and privacy_document.get("version")
+                else "1.0.0"
+            ),
+            consent_metadata={"accepted_documents": accepted_documents},
             signed_at=datetime.now(timezone.utc),
         )
         db.add(consent)
     session.last_step_completed = "consent"
+    await track_event_best_effort(
+        db,
+        event_type="CONSENT_SUBMITTED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        occurred_at=consent.signed_at,
+        step="consent",
+        status=session.status,
+        request_id=_request_uuid(request),
+    )
     await db.commit()
 
     return ConsentRecordResponse(
@@ -979,6 +1309,7 @@ async def submit_consent(
         consent_method=consent.consent_method,
         cgu_version=consent.cgu_version,
         privacy_version=consent.privacy_version,
+        accepted_documents=(consent.consent_metadata or {}).get("accepted_documents"),
         signed_at=consent.signed_at,
     )
 
@@ -994,11 +1325,45 @@ async def submit_niu(
     """Submit NIU information."""
     session = await _get_active_editable_session(db, current_user)
 
-    session.niu_type = body.niu_type
+    niu_type = body.niu_type.strip().upper()
+    if niu_type not in {"MISSING", "DECLARATIVE", "UPLOADED"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid niu_type. Expected MISSING, DECLARATIVE, or UPLOADED.",
+        )
+
+    niu_value = body.niu_value.strip().upper() if body.niu_value else None
+    if niu_type == "DECLARATIVE":
+        if not niu_value:
+            raise HTTPException(status_code=400, detail="niu_value is required for DECLARATIVE NIU")
+        if not re.fullmatch(r"M\d{10,14}", niu_value):
+            raise HTTPException(status_code=400, detail="Invalid NIU format")
+    elif niu_type == "UPLOADED":
+        doc_result = await db.execute(
+            select(Document)
+            .where(Document.session_id == session.id, Document.doc_type == "NIU")
+            .limit(1)
+        )
+        if doc_result.scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=409,
+                detail="NIU upload evidence is required before submitting niu_type=UPLOADED",
+            )
+    else:
+        niu_value = None
+
+    session.niu_type = niu_type
+    session.niu_number = niu_value
+    session.niu_declarative = niu_type == "DECLARATIVE"
     session.last_step_completed = "niu"
     await db.commit()
 
-    return {"status": "success", "niu_type": body.niu_type}
+    return {
+        "status": "success",
+        "niu_type": niu_type,
+        "niu_number": session.niu_number,
+        "niu_declarative": session.niu_declarative,
+    }
 
 
 @router.post("/signature/submit")
@@ -1070,10 +1435,6 @@ async def _compute_kyc_readiness(
     biometric = result.scalar_one_or_none()
     has_biometric_result = biometric is not None
 
-    # Liveness capture already provides a face image; if biometric result exists,
-    # it satisfies the SELFIE requirement (no separate selfie upload needed).
-    if has_biometric_result:
-        doc_types = doc_types | {"SELFIE"}
     missing = sorted(required - doc_types)
     blocking_reasons: list[str] = []
     warnings: list[str] = []
@@ -1144,10 +1505,11 @@ async def _compute_kyc_readiness(
         if face_match_score is not None:
             score_components.append(face_match_score)
         confidence_score_global = float(mean(score_components))
-        if face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE:
-            warnings.append("Face match below threshold: priority manual review will be applied.")
-        if anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE:
-            warnings.append("Anti-spoofing below threshold: priority manual review will be applied.")
+        biometric_risk_reasons = biometric_manual_review_reasons(biometric)
+        if any(reason.startswith("FACE_MATCH") for reason in biometric_risk_reasons):
+            warnings.append("Face match requires priority manual review.")
+        if "ANTI_SPOOFING_BELOW_THRESHOLD" in biometric_risk_reasons:
+            warnings.append("Anti-spoofing requires priority manual review.")
 
     return KYCReadinessResponse(
         can_submit=len(blocking_reasons) == 0,
@@ -1195,15 +1557,8 @@ async def submit_kyc(
     biometric = result.scalar_one_or_none()
     if not biometric:
         raise HTTPException(status_code=400, detail="Liveness step not completed")
-    raw_face_match = biometric.face_match_score
-    face_match_score = float(raw_face_match) if raw_face_match is not None else None
-    anti_spoofing_score = float(biometric.anti_spoofing_score or 0.0)
-
-    # Flag for stronger manual review, but keep submission path available.
-    # Only check face_match if it was actually computed (not None).
-    low_face_match = face_match_score is not None and face_match_score < settings.FACE_MATCH_MIN_SCORE
-    low_anti_spoofing = anti_spoofing_score < settings.ANTI_SPOOFING_MIN_SCORE
-    if low_face_match or low_anti_spoofing:
+    biometric_risk_reasons = biometric_manual_review_reasons(biometric)
+    if biometric_risk_reasons:
         session.priority_flag = True
 
     session.confidence_score_global = readiness.confidence_score_global
@@ -1221,18 +1576,61 @@ async def submit_kyc(
     session.last_step_completed = "submission"
 
     # Audit log
+    new_data = {"status": new_status, "access_level": new_access_level}
+    if biometric_risk_reasons:
+        new_data["biometric_manual_review_reasons"] = biometric_risk_reasons
+
     audit = AuditLog(
         id=uuid.uuid4(),
         action="KYC_RESUBMIT" if old_status == LifecycleState.PENDING_INFO else "KYC_SUBMIT",
         table_name="kyc_sessions",
         record_id=str(session.id),
         old_data={"status": old_status, "access_level": old_access_level},
-        new_data={"status": new_status, "access_level": new_access_level},
+        new_data=new_data,
         performed_by=current_user.id,
         performed_at=now,
     )
     db.add(audit)
+    if biometric_risk_reasons:
+        db.add(
+            AuditLog(
+                id=uuid.uuid4(),
+                action="KYC_BIOMETRIC_RISK_FLAGGED",
+                table_name="kyc_sessions",
+                record_id=str(session.id),
+                old_data={},
+                new_data={
+                    "biometric_manual_review_reasons": biometric_risk_reasons,
+                    "priority_flag": True,
+                },
+                performed_by=current_user.id,
+                performed_at=now,
+            )
+        )
+    await track_event_best_effort(
+        db,
+        event_type="KYC_SUBMITTED",
+        session_id=session.id,
+        user_id=session.user_id,
+        agency_id=session.agency_id,
+        occurred_at=now,
+        step="submission",
+        status=new_status,
+        request_id=_request_uuid(request),
+        metadata={"biometric_manual_review_reasons": biometric_risk_reasons},
+    )
     await db.commit()
+
+    try:
+        from app.tasks.kyc import celery_screen_session_against_sanctions
+
+        celery_screen_session_against_sanctions.delay(str(session.id))
+    except Exception as exc:
+        logger.warning(
+            "Unable to enqueue AML screening for session %s: %s",
+            session.id,
+            exc,
+        )
 
     logger.info(f"KYC submitted for user {current_user.id}, session {session.id}")
     message = "Dossier soumis avec succès. Un agent validera votre dossier sous 24-48h."
@@ -1445,3 +1843,300 @@ async def get_cities(request: Request, region_code: str):
 async def get_quartiers(request: Request, city_code: str):
     """Get quartiers for a city."""
     return geo_data.get_quartiers(city_code)
+
+
+# === ATM / GAB Management & Synchronization Endpoints ===
+
+@router.get("/atms", response_model=list[ATMResponse])
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def list_atms(
+    request: Request,
+    current_user: User = Depends(require_registered_device),
+    db: AsyncSession = Depends(get_db)
+):
+    """List ATMs matching the user's KYC session access level. Seeding dynamically if empty."""
+    from app.modules.kyc.models import ATM, KYCSession
+    
+    # Query current user's session to check access level
+    session_result = await db.execute(
+        select(KYCSession)
+        .where(KYCSession.user_id == current_user.id)
+        .order_by(KYCSession.started_at.desc())
+        .limit(1)
+    )
+    session = session_result.scalar_one_or_none()
+    access_level = "GUEST"
+    if session:
+        access_level = session.access_level
+
+    # Seeding safeguard to remain Demo-Ready
+    result = await db.execute(select(ATM))
+    atms = result.scalars().all()
+    if not atms:
+        initial_atms = [
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Siege Bonanjo",
+                city="Douala",
+                address="Avenue du General de Gaulle, Bonanjo",
+                latitude=4.0419,
+                longitude=9.6877,
+                services=["Retrait", "Consultation solde", "Mini releve"],
+                available_24h=True,
+                access_tier="basic"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Yaounde Centre",
+                city="Yaounde",
+                address="Boulevard du 20 Mai, Centre-ville",
+                latitude=3.8667,
+                longitude=11.5167,
+                services=["Retrait", "Consultation solde"],
+                available_24h=True,
+                access_tier="basic"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Akwa",
+                city="Douala",
+                address="Boulevard de la Liberte, Akwa",
+                latitude=4.0533,
+                longitude=9.6996,
+                services=["Retrait", "Depot cheque", "Consultation solde"],
+                available_24h=True,
+                access_tier="full"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Bastos",
+                city="Yaounde",
+                address="Quartier Bastos",
+                latitude=3.8954,
+                longitude=11.5158,
+                services=["Retrait", "Depot cheque"],
+                available_24h=True,
+                access_tier="full"
+            ),
+        ]
+        db.add_all(initial_atms)
+        await db.commit()
+    stmt = select(ATM)
+    if access_level == "GUEST":
+        stmt = stmt.where(ATM.access_tier == "basic")
+    
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+
+@router.get("/backoffice/atms", response_model=list[ATMResponse])
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def list_backoffice_atms(
+    request: Request,
+    current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all ATMs in the directory for backoffice administration. Restricted to ADMIN_IT."""
+    from app.modules.kyc.models import ATM
+    
+    # Seeding safeguard to remain Demo-Ready
+    result = await db.execute(select(ATM))
+    atms = result.scalars().all()
+    if not atms:
+        initial_atms = [
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Siege Bonanjo",
+                city="Douala",
+                address="Avenue du General de Gaulle, Bonanjo",
+                latitude=4.0419,
+                longitude=9.6877,
+                services=["Retrait", "Consultation solde", "Mini releve"],
+                available_24h=True,
+                access_tier="basic"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Yaounde Centre",
+                city="Yaounde",
+                address="Boulevard du 20 Mai, Centre-ville",
+                latitude=3.8667,
+                longitude=11.5167,
+                services=["Retrait", "Consultation solde"],
+                available_24h=True,
+                access_tier="basic"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Akwa",
+                city="Douala",
+                address="Boulevard de la Liberte, Akwa",
+                latitude=4.0533,
+                longitude=9.6996,
+                services=["Retrait", "Depot cheque", "Consultation solde"],
+                available_24h=True,
+                access_tier="full"
+            ),
+            ATM(
+                id=uuid.uuid4(),
+                name="BICEC Bastos",
+                city="Yaounde",
+                address="Quartier Bastos",
+                latitude=3.8954,
+                longitude=11.5158,
+                services=["Retrait", "Depot cheque"],
+                available_24h=True,
+                access_tier="full"
+            ),
+        ]
+        db.add_all(initial_atms)
+        await db.commit()
+        
+    res = await db.execute(select(ATM))
+    return res.scalars().all()
+
+
+@router.post("/backoffice/atms", response_model=ATMResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def create_atm(
+    request: Request,
+    body: ATMCreate,
+    current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
+    db: AsyncSession = Depends(get_db)
+):
+    """Add a new ATM to the directory. Restricted strictly to ADMIN_IT."""
+    from app.modules.kyc.models import ATM
+    
+    atm = ATM(
+        id=uuid.uuid4(),
+        name=body.name,
+        city=body.city,
+        address=body.address,
+        latitude=body.latitude,
+        longitude=body.longitude,
+        services=body.services,
+        available_24h=body.available_24h,
+        access_tier=body.access_tier
+    )
+    db.add(atm)
+    
+    # Audit log
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="ATM_CREATE",
+        table_name="atms",
+        record_id=str(atm.id),
+        new_data={
+            "name": body.name,
+            "city": body.city,
+            "address": body.address,
+            "access_tier": body.access_tier
+        },
+        performed_by=current_agent.id,
+        performed_at=datetime.now(timezone.utc),
+        client_ip=request.client.host if request.client else None
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(atm)
+    return atm
+
+
+@router.put("/backoffice/atms/{atm_id}", response_model=ATMResponse)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def update_atm(
+    request: Request,
+    atm_id: UUID,
+    body: ATMUpdate,
+    current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update ATM attributes. Restricted to ADMIN_IT."""
+    from app.modules.kyc.models import ATM
+    
+    result = await db.execute(select(ATM).where(ATM.id == atm_id))
+    atm = result.scalar_one_or_none()
+    if not atm:
+        raise HTTPException(status_code=404, detail="ATM not found")
+        
+    old_data = {
+        "name": atm.name,
+        "city": atm.city,
+        "address": atm.address,
+        "services": atm.services,
+        "available_24h": atm.available_24h,
+        "access_tier": atm.access_tier
+    }
+
+    if body.name is not None:
+        atm.name = body.name
+    if body.city is not None:
+        atm.city = body.city
+    if body.address is not None:
+        atm.address = body.address
+    if body.latitude is not None:
+        atm.latitude = body.latitude
+    if body.longitude is not None:
+        atm.longitude = body.longitude
+    if body.services is not None:
+        atm.services = body.services
+    if body.available_24h is not None:
+        atm.available_24h = body.available_24h
+    if body.access_tier is not None:
+        atm.access_tier = body.access_tier
+
+    atm.last_verified = datetime.now(timezone.utc).date()
+
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="ATM_UPDATE",
+        table_name="atms",
+        record_id=str(atm.id),
+        old_data=old_data,
+        new_data={
+            "name": atm.name,
+            "city": atm.city,
+            "address": atm.address,
+            "access_tier": atm.access_tier
+        },
+        performed_by=current_agent.id,
+        performed_at=datetime.now(timezone.utc),
+        client_ip=request.client.host if request.client else None
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(atm)
+    return atm
+
+
+@router.delete("/backoffice/atms/{atm_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def delete_atm(
+    request: Request,
+    atm_id: UUID,
+    current_agent: Agent = Depends(require_agent_role(AgentRole.ADMIN_IT)),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete an ATM from the directory. Restricted to ADMIN_IT."""
+    from app.modules.kyc.models import ATM
+    
+    result = await db.execute(select(ATM).where(ATM.id == atm_id))
+    atm = result.scalar_one_or_none()
+    if not atm:
+        raise HTTPException(status_code=404, detail="ATM not found")
+
+    await db.delete(atm)
+
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="ATM_DELETE",
+        table_name="atms",
+        record_id=str(atm_id),
+        old_data={"name": atm.name, "city": atm.city},
+        performed_by=current_agent.id,
+        performed_at=datetime.now(timezone.utc),
+        client_ip=request.client.host if request.client else None
+    )
+    db.add(audit)
+    await db.commit()
+    return None

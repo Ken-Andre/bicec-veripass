@@ -14,8 +14,7 @@ class AmlSeverity(str, Enum):
 
 
 class AmlAlertStatus(str, Enum):
-    PENDING = "PENDING"
-    UNDER_REVIEW = "UNDER_REVIEW"
+    OPEN = "OPEN"
     CLEARED = "CLEARED"
     CONFIRMED = "CONFIRMED"
     ESCALATED = "ESCALATED"
@@ -28,12 +27,13 @@ class AmlListType(str, Enum):
 
 
 class NiuConflictStatus(str, Enum):
-    PENDING = "PENDING"
+    OPEN = "OPEN"
     MERGED = "MERGED"
     FRAUD = "FRAUD"
 
 
 class BatchJobStatus(str, Enum):
+    PENDING = "PENDING"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -164,3 +164,77 @@ class BatchJobResponse(BaseModel):
     completed_at: Optional[datetime] = Field(None, alias="completedAt")
 
     model_config = {"populate_by_name": True, "from_attributes": True}
+
+
+class DocumentExpiryItem(BaseModel):
+    session_id: str = Field(alias="sessionId")
+    client_name: str = Field(alias="clientName")
+    status: str
+    access_level: str = Field(alias="accessLevel")
+    expiry_date: datetime | None = Field(None, alias="expiryDate")
+    state: str
+    notified_at: datetime | None = Field(None, alias="notifiedAt")
+    contact: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+    @field_validator("session_id", mode="before")
+    @classmethod
+    def mask_session_id(cls, v):
+        from app.core.security import make_session_handle
+
+        if v and isinstance(v, str):
+            return make_session_handle(v)
+        return v
+
+
+class DocumentExpiryListResponse(BaseModel):
+    items: list[DocumentExpiryItem]
+    total: int = Field(..., ge=0)
+    page: int = Field(..., ge=1)
+    limit: int = Field(..., ge=1)
+
+
+class GlobalNotificationRequest(BaseModel):
+    type: str = Field(..., min_length=1, max_length=50)
+    message: str = Field(..., min_length=1, max_length=500)
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+class GlobalNotificationResponse(BaseModel):
+    created: int = Field(..., ge=0)
+    event_key: str = Field(alias="eventKey")
+
+    model_config = {"populate_by_name": True}
+
+
+class AmlListRegistryItem(BaseModel):
+    source: str
+    list_type: AmlListType = Field(alias="listType")
+    active_count: int = Field(alias="activeCount", ge=0)
+    latest_synced_at: str | None = Field(None, alias="latestSyncedAt")
+    latest_import_id: str | None = Field(None, alias="latestImportId")
+    latest_import_status: str | None = Field(None, alias="latestImportStatus")
+    latest_import_at: datetime | None = Field(None, alias="latestImportAt")
+    imported_by: str | None = Field(None, alias="importedBy")
+
+    model_config = {"populate_by_name": True}
+
+
+class AmlListImportError(BaseModel):
+    row: int
+    message: str
+
+
+class AmlListImportReport(BaseModel):
+    import_id: str | None = Field(None, alias="importId")
+    source: str
+    list_type: AmlListType = Field(alias="listType")
+    dry_run: bool = Field(alias="dryRun")
+    status: str
+    total_rows: int = Field(alias="totalRows", ge=0)
+    imported_rows: int = Field(alias="importedRows", ge=0)
+    failed_rows: int = Field(alias="failedRows", ge=0)
+    errors: list[AmlListImportError] = []
+
+    model_config = {"populate_by_name": True}

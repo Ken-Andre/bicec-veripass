@@ -1,5 +1,17 @@
 # PostgreSQL Backup & Restore — bicec-veripass
 
+## Full Docker handoff is a separate procedure
+
+This document covers PostgreSQL backup and restore.
+
+For a runnable Docker Desktop handoff to another machine, use `code/docs/DOCKER_HANDOFF.md` and the scripts below:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File code\scripts\export-docker-stack.ps1 -IncludeEnv
+```
+
+`docker load -i archive.tar.gz` is not a full restore. It restores images only. It does not restore Docker volumes, uploaded documents, PostgreSQL data, Redis data, model caches, Compose networks, the `code` Docker Desktop project, service healthchecks, or startup ordering.
+
 ## Architecture
 
 ```
@@ -40,7 +52,7 @@
 The `backend` Docker image (Alpine-based) includes:
 
 - `postgresql-client` — provides `pg_dump`, `pg_restore`, `psql`
-- `docker-cli` — for `docker system prune` in disk usage task
+- `docker-cli` — for non-volume Docker cleanup in the disk usage task
 - Docker socket mounted at `/var/run/docker.sock` (read-only)
 
 ## Automated Backups
@@ -150,10 +162,10 @@ Restore time: 5s
 The `check_disk_usage` task:
 
 1. Runs `df -h /` to check disk usage
-2. If usage > 85%, triggers `docker system prune -af --volumes`
+2. If usage > 85%, triggers `docker system prune -af`
 3. Logs reclaimed space
 
-**Note:** The `db_backups` volume is NOT pruned (it's a named volume, not part of `docker system prune`).
+**Note:** Docker volumes are never pruned automatically. `db_storage`, `db_backups`, and `documents_storage` are persistent external volumes and must only be removed through an explicit, reviewed recovery procedure.
 
 ## Troubleshooting
 

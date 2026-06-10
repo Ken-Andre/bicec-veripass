@@ -1,0 +1,61 @@
+
+flowchart TB
+    subgraph Edge["Edge / Reverse proxy"]
+        NGX["vp_nginx<br/>Nginx TLS :443/:80<br/>(frontière HTTPS)"]
+    end
+
+    subgraph Static["Static frontends"]
+        PWA["vp_pwa<br/>PWA statique (Nginx-unprivileged)"]
+        BO["vp_backoffice<br/>Backoffice SPA statique"]
+    end
+
+    subgraph App["Backend applicatif"]
+        API["vp_api<br/>FastAPI (Uvicorn)<br/>+ migrations + warmup OCR"]
+        FWR["vp_flower<br/>Monitoring Celery"]
+    end
+
+    subgraph Data["Couche données"]
+        PG["vp_postgres<br/>PostgreSQL 17"]
+        RD["vp_redis<br/>Redis 7<br/>(broker, cache, locks)"]
+    end
+
+    subgraph Workers["Workers asynchrones"]
+        OCR["vp_celery_ocr<br/>GLM-OCR queue (1 job à la fois)"]
+        NOT["vp_celery_notif<br/>OTP / email / push / batch"]
+        BEAT["vp_celery_beat<br/>Scheduler (backups, sanctions, expiry)"]
+    end
+
+    subgraph Dev["Outils dev (non-prod)"]
+        MP["vp_mailpit<br/>SMTP sink local :8025"]
+    end
+
+    subgraph Init["Bootstrap"]
+        SI["vp_storage_init<br/>One-shot ownership fix"]
+        MI["vp_model_init<br/>(profil online-init seulement)"]
+    end
+
+    NGX --> PWA
+    NGX --> BO
+    NGX --> API
+    NGX --> FWR
+
+    API --> PG
+    API --> RD
+    API -.->|OCR / notif / beat| RD
+
+    RD --> OCR
+    RD --> NOT
+    RD --> BEAT
+
+    NOT --> MP
+    BEAT --> PG
+    OCR --> RD
+
+    SI -.->|chown| PG
+    SI -.->|chown| Volumes
+    MI -.->|télécharge| Models
+
+    classDef dev fill:#FFF3E0,stroke:#E65100
+    class MP dev
+    classDef init fill:#F3E5F5,stroke:#6A1B9A
+    class SI,MI init

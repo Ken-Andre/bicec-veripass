@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
@@ -8,6 +8,7 @@ import { FileText, Camera, CheckCircle, Shield } from 'lucide-react';
 import { useKyc } from '../../contexts/KycContext';
 import type { BackendSessionData, BackendReadinessData } from '../../contexts/KycContext';
 import { fetchWithCorrelation } from '../../services/apiClient';
+import { preloadGeoRegions } from '../../services/geoReferenceService';
 
 const KYC_STEPS = [
   { label: 'CNI' },
@@ -26,6 +27,10 @@ export default function KycIntroScreen() {
   const navigate = useNavigate();
   const { setSessionId, basicProfile, documentChoice, hydrateKycFromBackend } = useKyc();
   const [starting, setStarting] = useState(false);
+
+  useEffect(() => {
+    preloadGeoRegions();
+  }, []);
 
   const ensureKycSession = async () => {
     if (!basicProfile) {

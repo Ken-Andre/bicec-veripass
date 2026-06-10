@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Rapport COBAC - Journal d'audit VeriPass</title>
+  <style>
+    @page { size: A4 landscape; margin: 14mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111827; background: #ffffff; }
+    header { border-bottom: 3px solid #0f172a; padding-bottom: 18px; margin-bottom: 22px; }
+    .eyebrow { color: #475569; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 8px 0 6px; font-size: 28px; }
+    .subtitle { margin: 0; color: #475569; font-size: 14px; }
+    .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0 22px; }
+    .metric { border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; }
+    .metric span { display: block; color: #64748b; font-size: 11px; text-transform: uppercase; font-weight: 700; }
+    .metric strong { display: block; margin-top: 6px; font-size: 22px; }
+    .section { break-inside: avoid; margin: 22px 0; }
+    h2 { margin: 0 0 10px; font-size: 18px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
+    .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    ul { list-style: none; margin: 0; padding: 0; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; }
+    li { display: flex; justify-content: space-between; gap: 16px; padding: 9px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    li:last-child { border-bottom: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #f1f5f9; text-align: left; color: #334155; }
+    th, td { border: 1px solid #cbd5e1; padding: 7px; vertical-align: top; }
+    td:nth-child(6), td:nth-child(8) { max-width: 180px; word-break: break-word; }
+    .notice { border-left: 4px solid #0f172a; background: #f8fafc; padding: 12px 14px; color: #334155; font-size: 13px; }
+    footer { margin-top: 22px; padding-top: 12px; border-top: 1px solid #cbd5e1; color: #64748b; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">BICEC VeriPass - Controle permanent</div>
+    <h1>Rapport COBAC du journal d'audit</h1>
+    <p class="subtitle">Trace complete des actions systeme, agents et decisions KYC sur la periode demandee.</p>
+  </header>
+
+  <section class="meta">
+    <div class="metric"><span>Periode</span><strong>2026-04-27 - 2026-05-27</strong></div>
+    <div class="metric"><span>Actions auditees</span><strong>23</strong></div>
+    <div class="metric"><span>Acteurs distincts</span><strong>6</strong></div>
+    <div class="metric"><span>Decisions controlees</span><strong>9</strong></div>
+  </section>
+
+  <section class="section">
+    <h2>Synthese de conformite</h2>
+    <div class="notice">
+      Rapport genere le 27/05/2026 09:32 UTC par Sylvie Bernard.
+      Les donnees ci-dessous proviennent de la table d'audit operationnelle VeriPass.
+      Ce document est destine aux controles internes et aux demandes de justification regulateur.
+    </div>
+  </section>
+
+  <section class="section summary">
+    <div>
+      <h2>Actions principales</h2>
+      <ul><li><strong>DOCUMENT_CLASSIFY</strong><span>5</span></li><li><strong>KYC_REVIEW_APPROVED</strong><span>5</span></li><li><strong>KYC_SUBMIT</strong><span>4</span></li><li><strong>DOSSIER_AUTO_ASSIGN</strong><span>4</span></li><li><strong>KYC_REVIEW_INFO_REQUESTED</strong><span>4</span></li><li><strong>COMPLIANCE_GLOBAL_NOTIFICATION</strong><span>1</span></li></ul>
+    </div>
+    <div>
+      <h2>Objets impactes</h2>
+      <ul><li><strong>kyc_sessions</strong><span>13</span></li><li><strong>documents</strong><span>5</span></li><li><strong>dossier_assignments</strong><span>4</span></li><li><strong>notifications</strong><span>1</span></li></ul>
+    </div>
+  </section>
+
+  <section class="meta">
+    <div class="metric"><span>Actions systeme</span><strong>4</strong></div>
+    <div class="metric"><span>Actions AML</span><strong>0</strong></div>
+    <div class="metric"><span>Actions KYC</span><strong>13</strong></div>
+    <div class="metric"><span>Sessions / records</span><strong>6</strong></div>
+  </section>
+
+  <section class="section">
+    <h2>Journal detaille</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Date UTC</th>
+          <th>Action</th>
+          <th>Acteur</th>
+          <th>Objet</th>
+          <th>Reference</th>
+          <th>Transition</th>
+          <th>Justification</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>23/05/2026 15:24 UTC</td><td>DOCUMENT_CLASSIFY</td><td>Jean Dupont</td><td>documents</td><td>6cb5621e-8106-46e9-ba32-f0c27fd78492</td><td>-</td><td>Verification WebBridge: categorisation complementaire valide.</td><td>172.18.0.1</td></tr><tr><td>2</td><td>23/05/2026 15:24 UTC</td><td>KYC_REVIEW_APPROVED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>6cb5621e-8106-46e9-ba32-f0c27fd78492</td><td>PENDING_KYC -> APPROVED</td><td>Verification WebBridge: documents conformes, OCR et biometrie acceptes.</td><td>172.18.0.1</td></tr><tr><td>3</td><td>23/05/2026 15:37 UTC</td><td>KYC_SUBMIT</td><td>ae184e19-49b7-4160-94e0-f77c1843b57f</td><td>kyc_sessions</td><td>7ee71e11-5cd3-4c9f-aaa2-97672b98f122</td><td>DRAFT -> PENDING_AGENT_REVIEW</td><td>-</td><td>-</td></tr><tr><td>4</td><td>23/05/2026 15:37 UTC</td><td>DOSSIER_AUTO_ASSIGN</td><td>2a973900-7be8-4924-a42e-4dbc8dcc56c4</td><td>dossier_assignments</td><td>7ee71e11-5cd3-4c9f-aaa2-97672b98f122</td><td>-</td><td>-</td><td>172.18.0.9</td></tr><tr><td>5</td><td>23/05/2026 15:37 UTC</td><td>KYC_REVIEW_INFO_REQUESTED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>7ee71e11-5cd3-4c9f-aaa2-97672b98f122</td><td>PENDING_AGENT_REVIEW -> PENDING_INFO</td><td>Merci de transmettre un justificatif complementaire lisible.</td><td>172.18.0.9</td></tr><tr><td>6</td><td>23/05/2026 15:37 UTC</td><td>DOCUMENT_CLASSIFY</td><td>Jean Dupont</td><td>documents</td><td>7ee71e11-5cd3-4c9f-aaa2-97672b98f122</td><td>-</td><td>Client sent requested complementary address proof via support chat.</td><td>172.18.0.9</td></tr><tr><td>7</td><td>23/05/2026 15:37 UTC</td><td>KYC_REVIEW_APPROVED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>7ee71e11-5cd3-4c9f-aaa2-97672b98f122</td><td>PENDING_INFO -> APPROVED</td><td>Dossier complet apres justificatif complementaire.</td><td>172.18.0.9</td></tr><tr><td>8</td><td>23/05/2026 15:51 UTC</td><td>KYC_SUBMIT</td><td>217dce9c-18b2-4701-bdeb-ff9f45ec5ba1</td><td>kyc_sessions</td><td>6746a0c6-306c-4578-9470-ee58128d0360</td><td>DRAFT -> PENDING_AGENT_REVIEW</td><td>-</td><td>-</td></tr><tr><td>9</td><td>23/05/2026 15:51 UTC</td><td>DOSSIER_AUTO_ASSIGN</td><td>2a973900-7be8-4924-a42e-4dbc8dcc56c4</td><td>dossier_assignments</td><td>6746a0c6-306c-4578-9470-ee58128d0360</td><td>-</td><td>-</td><td>172.18.0.9</td></tr><tr><td>10</td><td>23/05/2026 15:51 UTC</td><td>KYC_REVIEW_INFO_REQUESTED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>6746a0c6-306c-4578-9470-ee58128d0360</td><td>PENDING_AGENT_REVIEW -> PENDING_INFO</td><td>Merci de transmettre un justificatif complementaire lisible.</td><td>172.18.0.9</td></tr><tr><td>11</td><td>23/05/2026 15:51 UTC</td><td>DOCUMENT_CLASSIFY</td><td>Jean Dupont</td><td>documents</td><td>6746a0c6-306c-4578-9470-ee58128d0360</td><td>-</td><td>Client sent requested complementary address proof via support chat.</td><td>172.18.0.9</td></tr><tr><td>12</td><td>23/05/2026 15:51 UTC</td><td>KYC_REVIEW_APPROVED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>6746a0c6-306c-4578-9470-ee58128d0360</td><td>PENDING_INFO -> APPROVED</td><td>Dossier complet apres justificatif complementaire.</td><td>172.18.0.9</td></tr><tr><td>13</td><td>26/05/2026 04:00 UTC</td><td>KYC_SUBMIT</td><td>f67950a3-c88d-4266-b976-32d34eec6e68</td><td>kyc_sessions</td><td>0a9816e8-7824-4cad-97e5-f99aa62ce4f5</td><td>DRAFT -> PENDING_AGENT_REVIEW</td><td>-</td><td>-</td></tr><tr><td>14</td><td>26/05/2026 04:00 UTC</td><td>DOSSIER_AUTO_ASSIGN</td><td>2a973900-7be8-4924-a42e-4dbc8dcc56c4</td><td>dossier_assignments</td><td>0a9816e8-7824-4cad-97e5-f99aa62ce4f5</td><td>-</td><td>-</td><td>172.18.0.12</td></tr><tr><td>15</td><td>26/05/2026 04:00 UTC</td><td>KYC_REVIEW_INFO_REQUESTED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>0a9816e8-7824-4cad-97e5-f99aa62ce4f5</td><td>PENDING_AGENT_REVIEW -> PENDING_INFO</td><td>Merci de transmettre un justificatif complementaire lisible.</td><td>172.18.0.12</td></tr><tr><td>16</td><td>26/05/2026 04:00 UTC</td><td>DOCUMENT_CLASSIFY</td><td>Jean Dupont</td><td>documents</td><td>0a9816e8-7824-4cad-97e5-f99aa62ce4f5</td><td>-</td><td>Client sent requested complementary address proof via support chat.</td><td>172.18.0.12</td></tr><tr><td>17</td><td>26/05/2026 04:00 UTC</td><td>KYC_REVIEW_APPROVED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>0a9816e8-7824-4cad-97e5-f99aa62ce4f5</td><td>PENDING_INFO -> APPROVED</td><td>Dossier complet apres justificatif complementaire.</td><td>172.18.0.12</td></tr><tr><td>18</td><td>26/05/2026 04:09 UTC</td><td>KYC_SUBMIT</td><td>858c3460-220a-495a-91c2-d2d52d312bca</td><td>kyc_sessions</td><td>2c4b5701-2dff-4edf-b380-458a20ecb8d9</td><td>DRAFT -> PENDING_AGENT_REVIEW</td><td>-</td><td>-</td></tr><tr><td>19</td><td>26/05/2026 04:09 UTC</td><td>DOSSIER_AUTO_ASSIGN</td><td>2a973900-7be8-4924-a42e-4dbc8dcc56c4</td><td>dossier_assignments</td><td>2c4b5701-2dff-4edf-b380-458a20ecb8d9</td><td>-</td><td>-</td><td>172.18.0.12</td></tr><tr><td>20</td><td>26/05/2026 04:09 UTC</td><td>KYC_REVIEW_INFO_REQUESTED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>2c4b5701-2dff-4edf-b380-458a20ecb8d9</td><td>PENDING_AGENT_REVIEW -> PENDING_INFO</td><td>Merci de transmettre un justificatif complementaire lisible.</td><td>172.18.0.12</td></tr><tr><td>21</td><td>26/05/2026 04:09 UTC</td><td>DOCUMENT_CLASSIFY</td><td>Jean Dupont</td><td>documents</td><td>2c4b5701-2dff-4edf-b380-458a20ecb8d9</td><td>-</td><td>Client sent requested complementary address proof via support chat.</td><td>172.18.0.12</td></tr><tr><td>22</td><td>26/05/2026 04:09 UTC</td><td>KYC_REVIEW_APPROVED</td><td>Jean Dupont</td><td>kyc_sessions</td><td>2c4b5701-2dff-4edf-b380-458a20ecb8d9</td><td>PENDING_INFO -> APPROVED</td><td>Dossier complet apres justificatif complementaire.</td><td>172.18.0.12</td></tr><tr><td>23</td><td>27/05/2026 08:28 UTC</td><td>COMPLIANCE_GLOBAL_NOTIFICATION</td><td>4b4b2bcb-3fe8-457e-9629-fa7fa7360d45</td><td>notifications</td><td>global:REGULATORY:825a1c1b-60ae-5050-bd2e-c4832884a673</td><td>-</td><td>evidence-run-2026-05-27</td><td>-</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    VeriPass Back Office - Rapport COBAC genere automatiquement. Les informations personnelles brutes ne sont pas ajoutees au rapport.
+  </footer>
+</body>
+</html>

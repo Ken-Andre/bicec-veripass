@@ -1,5 +1,7 @@
 # Stitch Prompts — bicec-veripass
 
+> Historical note, 2026-05-28: these prompts are old UI-generation material. They are not current product scope, architecture, or roadmap authority.
+
 > **Instructions d'utilisation :**
 > 1. Crée **3 projets séparés** dans Stitch : `bicec-veripass-mobile`, `bicec-veripass-backoffice`, `bicec-veripass-dashboard`
 > 2. Dans chaque projet, commence par le **Prompt d'Initialisation** (Étape 0) avant de générer les écrans individuels

@@ -1,0 +1,28 @@
+
+flowchart TB
+    IMG["Image capturée<br/>(CNI recto/verso<br/>ou selfie)"] --> PRE["ocr_service.py<br/>preprocessing<br/>(deskew, denoise, crop)"]
+    PRE --> PADDLE["PaddleOCR<br/>(get_shared_paddle_ocr)<br/>premier passage synchrone"]
+    PADDLE --> CONF{Confiance<br/>et nombre<br/>de champs ?}
+    CONF -->|OK| OUT1["Champs OCR + confidence"]
+    CONF -->|< seuil / ou champs manquants| FLAG["status = PADDLE_PENDING_GLM"]
+    FLAG --> ENQ["Enqueue task:<br/>app.tasks.ocr.run_glm_ocr_fallback<br/>(queue glm_ocr_jobs)"]
+    ENQ --> GLM{OCR_ONLINE ?}
+    GLM -->|false| LOCAL["GLM-OCR local<br/>(glm_utils.py)"]
+    GLM -->|true| CLOUD["Payload chiffré<br/>→ OCR_CLOUD_URL<br/>(Oracle Cloud)"]
+    LOCAL --> OUT2["Champs OCR corrigés"]
+    CLOUD --> OUT2
+
+    OUT1 --> MERGE["Merge recto/verso<br/>(POST /kyc/ocr/merge)"]
+    OUT2 --> MERGE
+    MERGE --> REVIEW["OcrReviewScreen<br/>(client confirme)"]
+
+    IMG_S["Selfie + landmarks MediaPipe"] --> PAD["MiniFASNetV2 ONNX<br/>(anti-spoofing)"]
+    PAD --> PAD_RES{"PAD ok ?"}
+    PAD_RES -->|non| LIVFAIL["biometric_results.status=spoof_suspect"]
+    PAD_RES -->|oui| LIVSCORE["Liveness score<br/>(landmarks_v2)"]
+    LIVSCORE --> DFACE{"DeepFace<br/>dispo ?"}
+    DFACE -->|oui| FM["Face match vs CNI photo<br/>(FaceNet-512)"]
+    DFACE -->|non| FMNA["Skip face match"]
+    FM --> BIOOUT["biometric_results<br/>(status, score, threshold,<br/>model_version_liveness)"]
+    FMNA --> BIOOUT
+    LIVFAIL --> BIOOUT

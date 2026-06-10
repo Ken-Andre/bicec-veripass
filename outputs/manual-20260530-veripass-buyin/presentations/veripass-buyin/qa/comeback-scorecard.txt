@@ -1,0 +1,52 @@
+Deck: veripass-buy-in-bicec.pptx
+Date: 2026-05-30
+
+Primary profile: product-platform
+Secondary gates: gtm-growth
+
+Profile gates:
+- Product system, not feature list: PASS
+- Capabilities tied to adoption/control/decision confidence: PASS
+- Growth loop without fabricated numbers: PASS
+- Brand authenticity: PASS
+- No BICEC internal scale figures used as persuasion: PASS
+- No "backlog" framing: PASS
+
+Rubric:
+- story: 5/5
+- specificity: 5/5
+- rhythm: 4/5
+- whitespace: 4/5
+- chart/diagram clarity: 4/5
+- typography: 4/5
+- restraint: 5/5
+- precision: 5/5
+- coherence: 4/5
+
+Total: 40/45
+Reference delta: n/a, no reference deck was selected as the quality target.
+
+Package checks:
+- Final PPTX exists: PASS
+- Final PPTX bytes: 1,336,504
+- Slide count in package: 12
+- Empty media files: 0
+- Native charts: none; diagrams are authored with editable primitives.
+
+Render checks:
+- Artifact-tool rendered all 12 slides to PNG.
+- Contact sheet reviewed after iteration.
+- Dark-slide title contrast fixed on slides 5, 9, 12.
+- Slide 1 metric rail and closing line fixed.
+- Slide 6 title/callout clipping fixed.
+- Slide 7 title overlap fixed.
+- Layout checker reports 0 errors.
+
+Accepted warnings:
+- Tight text warnings are accepted where rendered slides are visually clean.
+- Split-inline warnings are accepted for intentional label/value pairs.
+- Screenshot gutter warning on slide 5 is accepted because the overlap creates an intentional layered product proof.
+
+Remaining weak spots:
+- The deck uses demo screenshots with sparse data; before the live presentation, seed more convincing dossiers if possible.
+- Slide 7 compliance proof is persuasive but visually dense; use speaker narration to point to the AML block rather than expecting the screenshot alone to carry the proof.

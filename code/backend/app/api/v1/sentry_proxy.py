@@ -9,26 +9,59 @@
 #   BackgroundTasks we respond 202 instantly; Sentry forwarding happens after.
 #   If the container's outbound connection to Sentry is slow/broken the user never sees it.
 
+import json
+import logging
+from urllib.parse import urlparse
+
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Request, Response, status
 from fastapi.responses import JSONResponse
-import httpx
-import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Sentry envelope endpoint (server-side calls are not blocked by browser extensions)
-SENTRY_ENVELOPE_URL = (
-    'https://o4511113586409472.ingest.de.sentry.io'
-    '/api/4511114011410512/envelope/'
-)
+SENTRY_INGEST_HOST = 'o4511113586409472.ingest.de.sentry.io'
+ALLOWED_SENTRY_PROJECTS = {
+    '4511114011410512',  # veripass-mobile
+    '4511114014949456',  # veripass-backoffice
+}
 
 # Generous timeout for the background task — the client is not waiting
 _HTTPX_TIMEOUT = 30.0
 
 
+def _extract_allowed_envelope_url(body: bytes) -> str | None:
+    """Resolve the allowed Sentry project target from the envelope DSN header."""
+    lines = body.splitlines()
+    if not lines:
+        return None
+
+    try:
+        header = json.loads(lines[0].decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+    dsn = str(header.get('dsn') or '')
+    if not dsn:
+        return None
+
+    parsed = urlparse(dsn)
+    project_id = parsed.path.strip('/').split('/')[-1]
+    if parsed.hostname != SENTRY_INGEST_HOST or project_id not in ALLOWED_SENTRY_PROJECTS:
+        return None
+
+    return f'https://{SENTRY_INGEST_HOST}/api/{project_id}/envelope/'
+
+
+def _allowed_envelope_url_for_project(project_id: str) -> str | None:
+    if project_id not in ALLOWED_SENTRY_PROJECTS:
+        return None
+    return f'https://{SENTRY_INGEST_HOST}/api/{project_id}/envelope/'
+
+
 async def _forward_to_sentry(
     body: bytes,
+    envelope_url: str,
     sentry_key: str,
     sentry_version: str,
     sentry_client: str,
@@ -45,7 +78,7 @@ async def _forward_to_sentry(
     try:
         async with httpx.AsyncClient(timeout=_HTTPX_TIMEOUT) as client:
             response = await client.post(
-                SENTRY_ENVELOPE_URL,
+                envelope_url,
                 content=body,
                 params=params,
                 headers={
@@ -87,11 +120,17 @@ async def sentry_proxy(request: Request, background_tasks: BackgroundTasks) -> R
     sentry_key = request.query_params.get('sentry_key', '')
     sentry_version = request.query_params.get('sentry_version', '7')
     sentry_client = request.query_params.get('sentry_client', '')
+    sentry_project = request.query_params.get('sentry_project', '')
+    envelope_url = _extract_allowed_envelope_url(body) or _allowed_envelope_url_for_project(sentry_project)
+    if envelope_url is None:
+        logger.warning('Sentry proxy: dropped envelope with missing or unauthorized DSN')
+        return Response(status_code=status.HTTP_202_ACCEPTED)
 
     # Schedule forwarding AFTER we return — client gets 202 immediately
     background_tasks.add_task(
         _forward_to_sentry,
         body,
+        envelope_url,
         sentry_key,
         sentry_version,
         sentry_client,

@@ -1,5 +1,7 @@
 // TODO INFRA-02 intégration : pointer vers FastAPI backend sur :8000
 
+import { clearAuthToken, getAuthToken } from './authTokenStorage';
+
 export interface ApiError extends Error {
   status?: number;
   response?: {
@@ -47,7 +49,7 @@ function fetchWithTimeout(
 async function handleResponse<T>(response: Response): Promise<T> {
   if (response.status === 401) {
     // JWT expired or invalid — clear token and trigger handler
-    localStorage.removeItem('vp_token');
+    clearAuthToken();
     if (_onSessionExpired) {
       _onSessionExpired();
     }
@@ -79,7 +81,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 export const createApiClient = (baseUrl: string) => {
   const getHeaders = (extraHeaders?: Record<string, string>) => {
-    const token = localStorage.getItem('vp_token');
+    const token = getAuthToken();
     const deviceTag = localStorage.getItem('vp_device_tag');
     return {
       'Content-Type': 'application/json',
@@ -169,7 +171,7 @@ export function fetchWithCorrelation(
   url: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const token = localStorage.getItem('vp_token');
+  const token = getAuthToken();
   const headers = new Headers(init.headers);
 
   if (!headers.has('X-Correlation-ID')) {
@@ -185,7 +187,7 @@ export function fetchWithCorrelation(
 
   return fetch(url, { ...init, headers }).then((response) => {
     if (response.status === 401) {
-      localStorage.removeItem('vp_token');
+      clearAuthToken();
       if (_onSessionExpired) {
         _onSessionExpired();
       }

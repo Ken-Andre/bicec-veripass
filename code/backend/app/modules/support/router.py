@@ -113,9 +113,9 @@ async def _validate_and_store_attachment(
             detail="Format non supporte. Utilisez JPG, PNG ou PDF.",
         )
 
-    hard_max_size = settings.MAX_DOCUMENT_SIZE_MB * 1024 * 1024
     content = await file.read()
-    if len(content) > hard_max_size:
+    max_allowed_size = settings.MAX_DOCUMENT_SIZE_MB * 1024 * 1024
+    if len(content) > max_allowed_size:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"Fichier trop volumineux. Limite: {settings.MAX_DOCUMENT_SIZE_MB} Mo.",
@@ -211,27 +211,6 @@ async def get_current_thread(
         status=thread.status,
         created_at=thread.created_at,
     )
-
-
-@router.get("/threads/messages", response_model=list[SupportMessageResponse])
-async def list_current_thread_messages_compat(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Deprecated compatibility route for stale PWA clients.
-
-    Canonical route: GET /support/threads/{thread_id}/messages.
-    Remove after deployed service workers no longer request this path.
-    """
-    thread = await _get_or_create_support_thread(db, current_user)
-    await db.flush()
-    result = await db.execute(
-        select(SupportMessage)
-        .where(SupportMessage.thread_id == thread.id)
-        .order_by(SupportMessage.sent_at.asc())
-    )
-    await db.commit()
-    return [_to_message_response(message) for message in result.scalars().all()]
 
 
 @router.get("/threads/{thread_id}/messages", response_model=list[SupportMessageResponse])

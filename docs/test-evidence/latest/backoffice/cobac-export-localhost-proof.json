@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "url": "https://localhost/back-office/admin/audit",
+  "navigation": "sidebar link from https://localhost/back-office/command-center",
+  "role": "SYLVIE",
+  "download": {
+    "suggestedFilename": "export-cobac-2026-05-27.json",
+    "savedAs": "C:/Users/yoann/Documents/School/Xp-X5/Stage/bicec-veripass/docs/test-evidence/latest/backoffice/screens/export-cobac-2026-05-27.json",
+    "sizeBytes": 14442
+  },
+  "screenshots": {
+    "beforeClick": "C:/Users/yoann/Documents/School/Xp-X5/Stage/bicec-veripass/docs/test-evidence/latest/backoffice/screens/cobac-export-localhost-menu-before-click.png",
+    "afterClick": "C:/Users/yoann/Documents/School/Xp-X5/Stage/bicec-veripass/docs/test-evidence/latest/backoffice/screens/cobac-export-localhost-menu-after-click.png"
+  },
+  "sourceEvidence": {
+    "frontendHandler": "code/backoffice/src/pages/admin/SystemLogsPage.tsx:40-57",
+    "backendRoute": "code/backend/app/modules/audit/router.py:40-54"
+  }
+}

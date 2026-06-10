@@ -1,5 +1,7 @@
 # Architecture Document — bicec-veripass
 
+> Historical note, 2026-05-28: this architecture document is an early planning artifact. DGI, Sopra Amplitude, Axway/core-banking provisioning, and "Phase 2" claims here are obsolete unless re-approved in a new ADR or current issue. Use `docs/architecture.md` and implemented code for current architecture.
+
 **Auteur :** Ken-André  
 **Date :** 2026-02-28  
 **Version :** 1.0  

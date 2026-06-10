@@ -33,6 +33,9 @@ export default function BillCaptureScreen({ billType: propBillType }: BillCaptur
   const [error, setError] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
+  const [reviewing, setReviewing] = useState(false);
   const capturedRef = useRef(false);
 
   const ensureSessionId = useCallback(() => {
@@ -155,15 +158,12 @@ export default function BillCaptureScreen({ billType: propBillType }: BillCaptur
         reader.onload = (ev) => resolve(ev.target?.result as string);
         reader.readAsDataURL(compressed);
       });
-      setBillCapture(dataUrl);
-
-      setUploading(true);
-      await uploadBill(compressed, dataUrl);
-      setUploading(false);
-
-      completeStep('utility_bill');
       stopCamera();
-      navigate('/kyc/niu');
+      setBillCapture(dataUrl);
+      setCapturedImage(dataUrl);
+      setCapturedBlob(compressed);
+      setReviewing(true);
+      setCapturing(false);
     } catch (err) {
       captureKycException(err, 'upload_failure', {
         sessionId,
@@ -174,7 +174,7 @@ export default function BillCaptureScreen({ billType: propBillType }: BillCaptur
       setCapturing(false);
       capturedRef.current = false;
     }
-  }, [navigate, setBillCapture, completeStep, stopCamera, uploadBill, sessionId]);
+  }, [setBillCapture, stopCamera, sessionId]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -212,6 +212,25 @@ export default function BillCaptureScreen({ billType: propBillType }: BillCaptur
     }
   }, [t, sessionId, billType]);
 
+  const handleRetake = useCallback(() => {
+    setCapturedImage(null);
+    setCapturedBlob(null);
+    setReviewing(false);
+    setUploading(false);
+    setCapturing(false);
+    capturedRef.current = false;
+    void startCamera();
+  }, [startCamera]);
+
+  const handleConfirm = useCallback(async () => {
+    if (!capturedBlob || !capturedImage) return;
+    setUploading(true);
+    await uploadBill(capturedBlob, capturedImage);
+    setUploading(false);
+    completeStep('utility_bill');
+    navigate('/kyc/niu');
+  }, [capturedBlob, capturedImage, completeStep, navigate, uploadBill]);
+
   useEffect(() => {
     const startTimer = window.setTimeout(() => {
       void startCamera();
@@ -240,6 +259,54 @@ export default function BillCaptureScreen({ billType: propBillType }: BillCaptur
           <button onClick={() => navigate(-1)} className="text-white/60 text-sm hover:text-white">
             {t('common.back') || 'Retour'}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (reviewing && capturedImage) {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex flex-col text-white">
+        <div className="absolute top-4 left-4 z-20 safe-top">
+          <button
+            onClick={handleRetake}
+            disabled={uploading}
+            className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white disabled:opacity-50"
+            aria-label="Reprendre la photo"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-4 pt-16 pb-4">
+          <img
+            src={capturedImage}
+            alt={`Facture ${billLabel}`}
+            className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
+          />
+        </div>
+
+        <div className="bg-black/90 p-6 safe-bottom">
+          <p className="text-center text-sm text-white/70 mb-4">
+            Verifiez que la facture est lisible et complete avant de continuer.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleConfirm}
+              disabled={uploading}
+              className="w-full h-12 rounded-2xl bg-white text-slate-950 font-bold disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {uploading && <Loader2 className="w-5 h-5 animate-spin" />}
+              {uploading ? 'Envoi...' : 'Confirmer'}
+            </button>
+            <button
+              onClick={handleRetake}
+              disabled={uploading}
+              className="w-full h-12 rounded-2xl border border-white/25 text-white font-semibold disabled:opacity-60"
+            >
+              Reprendre la photo
+            </button>
+          </div>
         </div>
       </div>
     );

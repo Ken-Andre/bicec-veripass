@@ -10,18 +10,15 @@ networks:
 
 volumes:
   documents_storage:  # /data/documents — Images CNI, selfies, factures — 10 ans COBAC
-    labels:
-      com.bicec.retention: "10y"
-      com.bicec.type: "pii-documents"
+    name: ${VP_DOCUMENTS_VOLUME_NAME:-code_documents_storage}
+    external: true
   models_storage:     # /data/models   — PaddleOCR, GLM-OCR, MiniFASNet, FaceNet-512
   db_storage:         # /data/db       — PostgreSQL data files
-    labels:
-      com.bicec.retention: "10y"
-      com.bicec.type: "pii-database"
+    name: ${VP_DB_VOLUME_NAME:-code_db_storage}
+    external: true
   db_backups:         # /backups/db    — PostgreSQL backups (non-pruned par docker prune)
-    labels:
-      com.bicec.retention: "10y"
-      com.bicec.type: "backup"
+    name: ${VP_DB_BACKUPS_VOLUME_NAME:-code_db_backups}
+    external: true
   redis_data:
   models_paddlex_storage: # /home/vpuser/.paddlex — Cache for PaddleX models
   nginx_certs:
@@ -35,8 +32,9 @@ services:
       dockerfile: Dockerfile
     container_name: vp_nginx
     ports:
-      - "443:8443"
-      - "80:8080"
+      - "${VP_PRIVATE_BIND_ADDR:-127.0.0.1}:443:8443"
+      - "${VP_PRIVATE_BIND_ADDR:-127.0.0.1}:80:8080"
+      - "127.0.0.1:8081:8081" # Public onboarding-only entrypoint for Tailscale Funnel/Cloudflare Tunnel
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infra/nginx/security_headers.conf:/etc/nginx/security_headers.conf:ro
@@ -66,6 +64,25 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  # PUBLIC DEMO TUNNEL — PWA onboarding only
+  # Starts a Cloudflare Quick Tunnel to nginx's port 8081, which denies
+  # back-office/admin/compliance routes by construction. Use for demos only;
+  # named Cloudflare tunnels should be used for stable preprod hostnames.
+  cloudflared_quick:
+    image: cloudflare/cloudflared:latest
+    container_name: vp_cloudflared
+    profiles: ["public-demo"]
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", "http://host.docker.internal:8081"]
+    depends_on:
+      nginx:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   #  PWA MARIE (Mobile)
   pwa:
     build:
@@ -82,7 +99,7 @@ services:
     restart: unless-stopped
     # RAM: ~128MB (nginx serve static)
     ports:
-      - "3000:8080" # Optional direct access for debug
+      - "127.0.0.1:3000:8080" # Optional direct access for local debug only
     healthcheck:
       # wget BusyBox (Alpine) ne supporte pas --spider — utiliser 127.0.0.1 (localhost DNS fail)
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
@@ -112,7 +129,7 @@ services:
     restart: unless-stopped
     # RAM: ~128MB
     ports:
-      - "3001:8080" # Optional direct access for debug
+      - "127.0.0.1:3001:8080" # Optional direct access for local debug only
     healthcheck:
       # wget BusyBox (Alpine) ne supporte pas --spider — utiliser 127.0.0.1 (localhost DNS fail)
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
@@ -160,7 +177,15 @@ services:
       - PADDLE_DET_MODEL_DIR=${PADDLE_DET_MODEL_DIR:-/opt/models-offline/paddlex/official_models/PP-OCRv5_server_det}
       - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/opt/models-offline/paddlex/official_models/latin_PP-OCRv5_mobile_rec}
       - FACE_MATCH_MIN_SCORE=${FACE_MATCH_MIN_SCORE:-0.8}
+      - DEEPFACE_HOME=${DEEPFACE_HOME:-/data/models}
+      - DEEPFACE_DETECTOR_BACKEND=${DEEPFACE_DETECTOR_BACKEND:-opencv}
       - ANTI_SPOOFING_MIN_SCORE=${ANTI_SPOOFING_MIN_SCORE:-0.7}
+      - MINIFASNET_ENABLED=${MINIFASNET_ENABLED:-true}
+      - MINIFASNET_MODEL_PATH=${MINIFASNET_MODEL_PATH:-/opt/models-offline/minifasnet/MiniFASNetV2.onnx}
+      - MINIFASNET_MODEL_SHA256=${MINIFASNET_MODEL_SHA256:-}
+      - MINIFASNET_CROP_SCALE=${MINIFASNET_CROP_SCALE:-2.7}
+      - MINIFASNET_INPUT_SIZE=${MINIFASNET_INPUT_SIZE:-80}
+      - MINIFASNET_LIVE_CLASS_INDEX=${MINIFASNET_LIVE_CLASS_INDEX:-1}
       - GLM_OCR_ENABLED=${GLM_OCR_ENABLED:-true}
       - GLM_OCR_CLI_PATH=${GLM_OCR_CLI_PATH:-llama-mtmd-cli}
       - GLM_OCR_MODEL_PATH=${GLM_OCR_MODEL_PATH:-/opt/models-offline/glm-ocr/GLM-OCR.i1-Q4_K_M.gguf}
@@ -188,7 +213,7 @@ services:
     restart: unless-stopped
     mem_limit: 4g       # PaddleOCR (3GB) + FastAPI workers (512MB)
     ports:
-      - "8001:8000"     # Debug direct access (sans nginx) - CHANGED from 8000 to avoid conflicts
+      - "127.0.0.1:8001:8000"     # Debug direct access (sans nginx) - CHANGED from 8000 to avoid conflicts
     healthcheck:
       test: ["CMD", "python", "healthcheck.py"]
       interval: 30s
@@ -213,7 +238,7 @@ services:
       [
         "sh",
         "-lc",
-        "mkdir -p /data/documents /data/models /home/vpuser/.paddlex && chown -R vpuser:vpgroup /data/documents /data/models /home/vpuser/.paddlex || true",
+        "mkdir -p /data/documents /data/models/.deepface/weights /home/vpuser/.paddlex && chown -R vpuser:vpgroup /data/documents /data/models /home/vpuser/.paddlex || true",
       ]
     user: root
     volumes:
@@ -241,6 +266,11 @@ services:
       - PADDLE_REC_MODEL_DIR=${PADDLE_REC_MODEL_DIR:-/data/models/paddle/PP-OCRv5_server_rec}
       - PADDLE_CLS_MODEL_DIR=${PADDLE_CLS_MODEL_DIR:-/data/models/paddle/ch_ppocr_mobile_v2.0_cls_infer}
       - PADDLEX_HOME=/home/vpuser/.paddlex
+      - DEEPFACE_HOME=${DEEPFACE_HOME:-/data/models}
+      - DEEPFACE_DETECTOR_BACKEND=${DEEPFACE_DETECTOR_BACKEND:-opencv}
+      - MINIFASNET_MODEL_PATH=${MINIFASNET_MODEL_INIT_PATH:-/data/models/minifasnet/MiniFASNetV2.onnx}
+      - MINIFASNET_MODEL_URL=${MINIFASNET_MODEL_URL:-}
+      - MINIFASNET_MODEL_SHA256=${MINIFASNET_MODEL_SHA256:-}
     volumes:
       - models_storage:/data/models
       - models_paddlex_storage:/home/vpuser/.paddlex
@@ -404,9 +434,9 @@ services:
   flower:
     image: mher/flower:2.0
     container_name: vp_flower
-    command: celery --broker=redis://redis:6379/0 flower --port=5555 --basic-auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin}
+    command: celery --broker=redis://redis:6379/0 flower --port=5555 --basic-auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-dev-flower-change-me}
     ports:
-      - "5555:5555"
+      - "127.0.0.1:5555:5555"
     depends_on:
       redis:
         condition: service_healthy
@@ -441,7 +471,7 @@ services:
       - db_backups:/backups/db
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "15432:5432"    # Debug: accès direct depuis host (DBeaver, pgAdmin, Alembic) - CHANGED from 5432 to avoid conflicts
+      - "127.0.0.1:15432:5432"    # Debug: acces direct depuis host (DBeaver, pgAdmin, Alembic) - CHANGED from 5432 to avoid conflicts
     networks:
       - veripass-net
     restart: unless-stopped
@@ -466,7 +496,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "16379:6379"    # Debug: accès direct depuis host (redis-cli, RedisInsight) - CHANGED from 6379 to avoid conflicts
+      - "127.0.0.1:16379:6379"    # Debug: acces direct depuis host (redis-cli, RedisInsight) - CHANGED from 6379 to avoid conflicts
     networks:
       - veripass-net
     restart: unless-stopped
@@ -488,8 +518,8 @@ services:
     image: axllent/mailpit
     container_name: vp_mailpit
     ports:
-      - "8025:8025"   # Web UI
-      - "1025:1025"   # SMTP port
+      - "127.0.0.1:8025:8025"   # Web UI
+      - "127.0.0.1:1025:1025"   # SMTP port
     networks:
       - veripass-net
     restart: unless-stopped

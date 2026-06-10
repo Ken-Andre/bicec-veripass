@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, setSessionExpiredHandler } from '../services/apiClient';
+import { clearAuthToken, getAuthToken, setAuthToken } from '../services/authTokenStorage';
 import { isPasskeySupported, registerPasskey, authenticatePasskey, removePasskey, type PasskeyAuthResult } from '../services/passkeyService';
 import { clearPersistedKycState } from '../services/kycOfflineStore';
 import { ensureDeviceRegistered } from '../services/deviceRegistrationService';
@@ -38,6 +39,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // 25s for dev, 5min for production
 const INACTIVITY_TIMEOUT = import.meta.env.PROD ? 5 * 60 * 1000 : 25 * 1000;
+const LOCKED_SESSION_KEY = 'vp_is_locked';
+const LAST_ROUTE_KEY = 'vp_last_route';
+
+function stripMobileBase(pathname: string): string {
+  return pathname.replace(/^\/mobile/, '') || '/';
+}
+
+function isAuthPath(pathname: string): boolean {
+  const pathWithoutBase = stripMobileBase(pathname);
+  return pathWithoutBase === '/auth' || pathWithoutBase.startsWith('/auth/');
+}
+
+function isLockScreenPath(pathname: string): boolean {
+  return stripMobileBase(pathname) === '/auth/lock';
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -46,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isLocked, setIsLocked] = useState(false);
+  const [isLocked, setIsLocked] = useState(() => sessionStorage.getItem(LOCKED_SESSION_KEY) === 'true');
   const [biometricEnabled, setBiometricEnabled] = useState(() =>
     localStorage.getItem('vp_biometric') === 'true'
   );
@@ -73,38 +89,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isAuthenticatedRef.current) {
       // Store route WITHOUT the basename (router adds it back on navigate)
       const pathname = window.location.pathname;
-      const cleanPath = pathname.replace(/^\/mobile/, '') || '/dashboard';
-      sessionStorage.setItem('vp_last_route', cleanPath);
+      const cleanPath = stripMobileBase(pathname);
+      const previousRoute = sessionStorage.getItem(LAST_ROUTE_KEY);
+      const resumeRoute = isAuthPath(cleanPath) ? (previousRoute || '/dashboard') : cleanPath;
+      sessionStorage.setItem(LAST_ROUTE_KEY, resumeRoute);
+      sessionStorage.setItem(LOCKED_SESSION_KEY, 'true');
       setIsLocked(true);
       clearTimer();
     }
   }, [clearTimer]);
 
   const unlock = useCallback(() => {
+    sessionStorage.removeItem(LOCKED_SESSION_KEY);
     setIsLocked(false);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('vp_token');
+    clearAuthToken();
     localStorage.removeItem('vp_user');
     localStorage.removeItem('vp_device_tag');
+    sessionStorage.removeItem(LOCKED_SESSION_KEY);
     setUser(null);
     setIsAuthenticated(false);
     setIsLocked(false);
     clearTimer();
-    void clearPersistedKycState();
+    clearPersistedKycState().catch((err) => {
+      console.warn('Failed to clear persisted KYC state on logout', err);
+    });
+  }, [clearTimer]);
+
+  const expireAuthenticatedSession = useCallback(() => {
+    clearAuthToken();
+    sessionStorage.removeItem(LOCKED_SESSION_KEY);
+    setIsAuthenticated(false);
+    setIsLocked(false);
+    clearTimer();
   }, [clearTimer]);
 
   // Register session expired handler with apiClient so 401 responses trigger logout
   useEffect(() => {
     setSessionExpiredHandler(() => {
-      logout();
+      expireAuthenticatedSession();
       const currentPath = window.location.pathname;
-      // Stay on lock screen or any auth page to avoid redirect loops
-      if (currentPath.includes('/auth/')) return;
-      navigate('/auth', { replace: true });
+      const savedUser = localStorage.getItem('vp_user');
+      let shouldUsePinLogin = false;
+      if (savedUser) {
+        try {
+          shouldUsePinLogin = Boolean((JSON.parse(savedUser) as User).has_pin);
+        } catch {
+          shouldUsePinLogin = false;
+        }
+      }
+      if (shouldUsePinLogin) {
+        if (!currentPath.includes('/auth/pin-login')) {
+          navigate('/auth/pin-login', { replace: true });
+        }
+        return;
+      }
+      if (!currentPath.includes('/auth/')) {
+        navigate('/auth', { replace: true });
+      }
     });
-  }, [logout, navigate]);
+  }, [expireAuthenticatedSession, navigate]);
 
   // Reset the inactivity timer on user activity
   const resetTimer = useCallback(() => {
@@ -167,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Load persisted session on mount
   useEffect(() => {
     lastActivityRef.current = Date.now();
-    const token = localStorage.getItem('vp_token');
+    const token = getAuthToken();
     const savedUser = localStorage.getItem('vp_user');
 
     if (savedUser) {
@@ -177,10 +223,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(parsedUser);
         if (token) {
           setIsAuthenticated(true);
+          const shouldRestoreLock =
+            sessionStorage.getItem(LOCKED_SESSION_KEY) === 'true' ||
+            isLockScreenPath(window.location.pathname);
+          if (shouldRestoreLock) {
+            sessionStorage.setItem(LOCKED_SESSION_KEY, 'true');
+            setIsLocked(true);
+          }
         }
       } catch (err) {
         console.error("Auth session parsing error", err);
-        localStorage.removeItem('vp_token');
+        clearAuthToken();
         localStorage.removeItem('vp_user');
       }
     }
@@ -188,15 +241,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !user || localStorage.getItem('vp_device_tag')) return;
+    if (!isAuthenticated || isLocked || !user || localStorage.getItem('vp_device_tag')) return;
     void ensureDeviceRegistered().catch((err) => {
       console.warn('Device registration failed', err);
     });
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, isLocked, user]);
 
   const login = useCallback((token: string, userData: User) => {
-    localStorage.setItem('vp_token', token);
+    setAuthToken(token);
     localStorage.setItem('vp_user', JSON.stringify(userData));
+    sessionStorage.removeItem(LOCKED_SESSION_KEY);
     setIsAuthenticated(true);
     setIsLocked(false);
     setUser(userData);
@@ -229,16 +283,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetAccount = useCallback(() => {
-    localStorage.removeItem('vp_token');
+    clearAuthToken();
     localStorage.removeItem('vp_user');
     localStorage.removeItem('vp_device_tag');
+    sessionStorage.removeItem(LOCKED_SESSION_KEY);
     removePasskey();
     setIsAuthenticated(false);
     setUser(null);
     setIsLocked(false);
     setBiometricEnabled(false);
     clearTimer();
-    void clearPersistedKycState();
+    clearPersistedKycState().catch((err) => {
+      console.warn('Failed to clear persisted KYC state on reset', err);
+    });
   }, [clearTimer]);
 
   const handleSetBiometric = useCallback(async (enabled: boolean): Promise<boolean> => {
@@ -268,14 +325,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // API may not exist yet, proceed with local cleanup
     }
-    localStorage.removeItem('vp_token');
+    clearAuthToken();
     localStorage.removeItem('vp_user');
     localStorage.removeItem('vp_device_tag');
+    sessionStorage.removeItem(LOCKED_SESSION_KEY);
     setIsAuthenticated(false);
     setUser(null);
     setIsLocked(false);
     clearTimer();
-    void clearPersistedKycState();
+    clearPersistedKycState().catch((err) => {
+      console.warn('Failed to clear persisted KYC state on delete', err);
+    });
   };
 
   return (

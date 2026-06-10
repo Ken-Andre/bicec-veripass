@@ -1,0 +1,125 @@
+{
+  "repository_type": "multi-part",
+  "generated_at": "2026-05-28T06:48:29+02:00",
+  "project_name": "bicec-veripass",
+  "parts": [
+    {
+      "part_id": "backend",
+      "display_name": "FastAPI backend",
+      "root_path": "code/backend",
+      "project_type_id": "backend",
+      "primary_language": "Python 3.11",
+      "frameworks": ["FastAPI", "SQLAlchemy", "Alembic", "Celery"],
+      "responsibilities": [
+        "API contracts under /api/v1",
+        "KYC state and validation workflow",
+        "OCR and biometric processing",
+        "Authentication, RBAC, device tags",
+        "PostgreSQL models and migrations",
+        "Celery task definitions"
+      ]
+    },
+    {
+      "part_id": "mobile",
+      "display_name": "Mobile PWA",
+      "root_path": "code/mobile",
+      "project_type_id": "web",
+      "primary_language": "TypeScript",
+      "frameworks": ["React", "Vite", "TanStack Query", "Playwright", "Vitest"],
+      "responsibilities": [
+        "Client authentication",
+        "KYC capture and offline replay",
+        "Verified-user handoff to configured BICEC mobile apps",
+        "Support and notifications"
+      ]
+    },
+    {
+      "part_id": "backoffice",
+      "display_name": "Backoffice SPA",
+      "root_path": "code/backoffice",
+      "project_type_id": "web",
+      "primary_language": "TypeScript",
+      "frameworks": ["React", "Vite", "TanStack Query", "Playwright", "Vitest"],
+      "responsibilities": [
+        "Role-based KYC review",
+        "AML and compliance dashboards",
+        "Command center and analytics",
+        "Agent and ATM administration"
+      ]
+    },
+    {
+      "part_id": "infra",
+      "display_name": "Docker/Nginx infrastructure",
+      "root_path": "code/infra",
+      "project_type_id": "infra",
+      "primary_language": "YAML and Nginx configuration",
+      "frameworks": ["Docker Compose", "Nginx"],
+      "responsibilities": [
+        "TLS reverse proxy",
+        "Static app routing",
+        "API routing and timeouts",
+        "Security headers",
+        "Offline model mount conventions"
+      ]
+    },
+    {
+      "part_id": "scripts",
+      "display_name": "Operational scripts",
+      "root_path": "code/scripts",
+      "project_type_id": "cli",
+      "primary_language": "PowerShell and Bash",
+      "frameworks": [],
+      "responsibilities": [
+        "Volume bootstrap",
+        "Smoke checks",
+        "Backup and restore helpers",
+        "Docker cleanup",
+        "Environment encryption helpers"
+      ]
+    }
+  ],
+  "integration_points": [
+    {
+      "from": "mobile",
+      "to": "backend",
+      "protocol": "HTTPS JSON and multipart",
+      "paths": ["/api/v1/auth", "/api/v1/kyc", "/api/v1/banking", "/api/v1/notifications", "/api/v1/support", "/api/v1/devices"]
+    },
+    {
+      "from": "backoffice",
+      "to": "backend",
+      "protocol": "HTTPS JSON and blob downloads",
+      "paths": ["/api/v1/auth/agent", "/api/v1/backoffice", "/api/v1/admin", "/api/v1/aml", "/api/v1/analytics", "/api/v1/audit"]
+    },
+    {
+      "from": "backend",
+      "to": "postgres",
+      "protocol": "asyncpg",
+      "paths": ["DATABASE_URL"]
+    },
+    {
+      "from": "backend",
+      "to": "redis",
+      "protocol": "redis",
+      "paths": ["REDIS_URL"]
+    },
+    {
+      "from": "backend",
+      "to": "celery",
+      "protocol": "Redis broker/result backend",
+      "paths": ["glm_ocr_jobs", "notifications", "internal_batch", "sanctions_sync"]
+    },
+    {
+      "from": "mobile",
+      "to": "BI PAY / BICEC Mobile-Banking / BICEC Wallet",
+      "protocol": "OS-aware app link, deep link, or store redirect",
+      "paths": ["configured iOS App Store URL", "configured Android Google Play URL", "optional universal/app link"]
+    },
+    {
+      "from": "nginx",
+      "to": "all public services",
+      "protocol": "HTTPS reverse proxy",
+      "paths": ["/mobile/", "/back-office/", "/api/", "/health", "/flower/"]
+    }
+  ]
+}

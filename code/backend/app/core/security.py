@@ -242,6 +242,12 @@ async def get_current_user(
             detail="User not found",
         )
 
+    if user.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Account has been deleted",
+        )
+
     return user
 
 
@@ -295,6 +301,20 @@ async def get_current_agent(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Agent not found",
         )
+
+    if not agent.is_available:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Agent account is disabled",
+        )
+
+    now = datetime.now(timezone.utc)
+    last_activity_at = agent.last_activity_at
+    if last_activity_at and last_activity_at.tzinfo is None:
+        last_activity_at = last_activity_at.replace(tzinfo=timezone.utc)
+    if not last_activity_at or now - last_activity_at > timedelta(minutes=1):
+        agent.last_activity_at = now
+        await db.commit()
 
     return agent
 

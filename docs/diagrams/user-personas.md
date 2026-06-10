@@ -1,5 +1,7 @@
 # User Personas — BICEC VeriPass
 
+> Historical note, 2026-05-28: this persona file is historical context only. Duties mentioning Amplitude provisioning are obsolete and must not define current product scope or future roadmap.
+
 **Version:** 2.1  
 **Date:** 2026-02-26  
 **Auteur:** Ken (UX Designer)

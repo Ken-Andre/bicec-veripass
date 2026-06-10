@@ -206,8 +206,10 @@ export interface LivenessResult {
   is_alive: boolean;
   confidence: number;
   attempts_remaining: number;
-  face_match_score?: number;
-  anti_spoofing_score?: number;
+  face_match_score?: number | null;
+  face_match_status?: 'PASSED' | 'FAILED' | 'NOT_PERFORMED' | 'ERROR' | null;
+  face_match_reason?: string | null;
+  anti_spoofing_score?: number | null;
   strikes_remaining?: number;
   is_locked?: boolean;
   cooldown_seconds?: number | null;

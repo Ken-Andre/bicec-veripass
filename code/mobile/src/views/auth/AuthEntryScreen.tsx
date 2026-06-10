@@ -1,9 +1,23 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, LogIn, UserPlus } from 'lucide-react';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AuthEntryScreen() {
   const navigate = useNavigate();
+  const { isAuthenticated, user, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading) return;
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    if (user?.has_pin) {
+      navigate('/auth/pin-login', { replace: true });
+    }
+  }, [isAuthenticated, loading, navigate, user]);
 
   return (
     <ScreenLayoutV2 className="bg-background">

@@ -1,6 +1,6 @@
 """Backoffice Pydantic schemas."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Optional
 from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
@@ -21,8 +21,19 @@ class KYCQueueItemSchema(BaseModel):
     assigned_agent_name: Optional[str] = None
     overall_confidence: Optional[float] = None
     agency_code: Optional[str] = None
+    biometric_risk_flags: list[str] = []
 
     model_config = {"from_attributes": True}
+
+
+class KYCQueueStatsSchema(BaseModel):
+    """Stable queue counters independent from table filters."""
+
+    pending: int = 0
+    info_required: int = 0
+    fraud_suspect: int = 0
+    approved: int = 0
+    rejected: int = 0
 
 
 class AuditLogSchema(BaseModel):
@@ -44,25 +55,28 @@ class AuditLogSchema(BaseModel):
     @classmethod
     def _extract_from_data(cls, data: Any) -> Any:
         """Extract agentName, rationale, previousState, newState from JSONB fields."""
+        def _as_text(value: Any) -> str:
+            return "" if value is None else str(value)
+
         if hasattr(data, "__dict__"):
             # SQLAlchemy model instance
             new = getattr(data, "new_data", None) or {}
             old = getattr(data, "old_data", None) or {}
-            if not hasattr(data, "agentName"):
-                data.agentName = new.get("agent_name", "")
-            if not hasattr(data, "rationale"):
-                data.rationale = new.get("rationale", "")
-            if not hasattr(data, "previousState"):
-                data.previousState = old.get("status", "")
-            if not hasattr(data, "newState"):
-                data.newState = new.get("status", "")
+            if not hasattr(data, "agentName") or getattr(data, "agentName") is None:
+                data.agentName = _as_text(new.get("agent_name", ""))
+            if not hasattr(data, "rationale") or getattr(data, "rationale") is None:
+                data.rationale = _as_text(new.get("rationale", ""))
+            if not hasattr(data, "previousState") or getattr(data, "previousState") is None:
+                data.previousState = _as_text(old.get("status", ""))
+            if not hasattr(data, "newState") or getattr(data, "newState") is None:
+                data.newState = _as_text(new.get("status", ""))
         elif isinstance(data, dict):
             new = data.get("new_data") or {}
             old = data.get("old_data") or {}
-            data.setdefault("agentName", new.get("agent_name", ""))
-            data.setdefault("rationale", new.get("rationale", ""))
-            data.setdefault("previousState", old.get("status", ""))
-            data.setdefault("newState", new.get("status", ""))
+            data["agentName"] = _as_text(data.get("agentName", new.get("agent_name", "")))
+            data["rationale"] = _as_text(data.get("rationale", new.get("rationale", "")))
+            data["previousState"] = _as_text(data.get("previousState", old.get("status", "")))
+            data["newState"] = _as_text(data.get("newState", new.get("status", "")))
         return data
 
 
@@ -77,6 +91,15 @@ class ReviewDecisionRequest(BaseModel):
         ...,
         description="Mandatory justification for the decision (audit trail, COBAC R-2023/01)",
         min_length=1,
+    )
+    biometric_override_confirmed: bool = Field(
+        False,
+        description="Required when approving a dossier with biometric risk flags.",
+    )
+    review_duration_ms: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Elapsed review time between opening the dossier and submitting a decision.",
     )
 
 
@@ -120,6 +143,10 @@ class DossierDocumentBrief(BaseModel):
     ocr_status: str = "PENDING"
     ocr_error: Optional[str] = None
     ocr_engine: Optional[str] = None
+    classification_categories: list[str] = []
+    classified_by_name: Optional[str] = None
+    classified_at: Optional[str] = None
+    classification_reason: Optional[str] = None
     captured_at: datetime
     ocr_fields: list["OCRFieldBrief"] = []
 
@@ -146,8 +173,15 @@ class DossierBiometricBrief(BaseModel):
 
     id: UUID
     face_match_score: Optional[float] = None
+    face_match_status: Optional[str] = None
+    face_match_reason: Optional[str] = None
+    face_match_distance: Optional[float] = None
+    face_match_threshold: Optional[float] = None
+    face_match_detector: Optional[str] = None
     liveness_score: Optional[float] = None
     anti_spoofing_score: Optional[float] = None
+    model_version_face: Optional[str] = None
+    model_version_liveness: Optional[str] = None
     processed_at: datetime
 
     model_config = {"from_attributes": True}
@@ -189,6 +223,17 @@ class DossierDetailSchema(BaseModel):
     completed_at: Optional[datetime] = None
     last_step_completed: Optional[str] = None
     niu_type: Optional[str] = None
+    niu_number: Optional[str] = None
+    niu_declarative: bool = False
+    address_city: Optional[str] = None
+    address_commune: Optional[str] = None
+    address_quartier: Optional[str] = None
+    address_lieu_dit: Optional[str] = None
+    address_details: Optional[str] = None
+    gps_latitude: Optional[float] = None
+    gps_longitude: Optional[float] = None
+    utility_provider: Optional[str] = None
+    utility_bill_date: Optional[date] = None
 
     user_phone: Optional[str] = None
     client_name: Optional[str] = None
@@ -197,6 +242,7 @@ class DossierDetailSchema(BaseModel):
     documents: list[DossierDocumentBrief] = []
 
     biometric_result: Optional[DossierBiometricBrief] = None
+    biometric_risk_flags: list[str] = []
 
     has_consent: bool = False
     consent_method: Optional[str] = None
@@ -230,6 +276,8 @@ class SupportMessageSchema(BaseModel):
     content: str
     attachment_path: Optional[str] = None
     attachment_sha256: Optional[str] = None
+    attachment_filename: Optional[str] = None
+    attachment_document_id: Optional[UUID] = None
     sent_at: datetime
     read_at: Optional[datetime] = None
 
@@ -269,5 +317,23 @@ class DocumentClassifyResponse(BaseModel):
     doc_type: str
     categories: list[str]
     classified_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PromoteAttachmentRequest(BaseModel):
+    """Promote an attachment sent by the client in support chat to a KYC document."""
+
+    doc_type: str = Field(..., description="Target canonical doc_type (e.g. CNI_RECTO, BILL_ENEO)")
+    categories: list[str] = Field(..., min_length=1, description="E.g. ['CNI_RECTO', 'IDENTITY_PROOF']")
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+class PromoteAttachmentResponse(BaseModel):
+    session_id: UUID
+    document_id: UUID
+    doc_type: str
+    categories: list[str]
+    promoted_at: datetime
 
     model_config = {"from_attributes": True}

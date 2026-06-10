@@ -94,7 +94,7 @@ export default function AmlAlertDetailPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Statut</p>
-              <Badge variant={alert.status === 'PENDING' ? 'default' : 'secondary'}>{alert.status}</Badge>
+              <Badge variant={alert.status === 'OPEN' ? 'default' : 'secondary'}>{alert.status}</Badge>
             </div>
           </CardContent>
         </Card>

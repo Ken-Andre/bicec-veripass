@@ -1,5 +1,7 @@
 # Prompt d'Intégration - Projet Mobile BICEC-Veripass
 
+> Historical note, 2026-05-28: this is a prototype integration prompt, not current implementation guidance or roadmap authority. Use `docs/documentation-authority.md` and current code for decisions.
+
 **Date:** 2026-03-30  
 **Destinataire:** Consultant externe  
 **Contexte:** Harmonisation du travail du consultant avec l'architecture existante du projet

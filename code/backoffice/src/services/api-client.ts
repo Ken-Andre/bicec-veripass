@@ -33,6 +33,31 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json()
 }
 
+async function handleBlobResponse(res: Response): Promise<{ blob: Blob; filename: string | null }> {
+  if (!res.ok) {
+    let detail = res.statusText || 'Request failed'
+    try {
+      const body = await res.json()
+      if (body.detail) detail = body.detail
+    } catch { /* ignore */ }
+    throw new ApiError(res.status, detail)
+  }
+  const disposition = res.headers.get('Content-Disposition') || res.headers.get('content-disposition')
+  const filenameMatch = disposition?.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i)
+  return {
+    blob: await res.blob(),
+    filename: filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/"$/g, '')) : null,
+  }
+}
+
+async function handleBlobResponseWithMetadata(
+  res: Response,
+): Promise<{ blob: Blob; filename: string | null; contentType: string | null }> {
+  const { blob, filename } = await handleBlobResponse(res)
+  const contentType = res.headers.get('Content-Type') || res.headers.get('content-type')
+  return { blob, filename, contentType }
+}
+
 type RequestOptions = Omit<RequestInit, 'headers'> & {
   headers?: Record<string, string>
 }
@@ -51,7 +76,41 @@ export async function apiGet<T = any>(path: string, options?: RequestOptions): P
   return handleResponse<T>(res)
 }
 
+export async function apiGetBlob(
+  path: string,
+  options?: RequestOptions,
+): Promise<{ blob: Blob; filename: string | null; contentType: string | null }> {
+  const token = getToken()
+  const headers: Record<string, string> = {
+    ...options?.headers,
+  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    method: 'GET',
+    headers,
+  })
+  return handleBlobResponseWithMetadata(res)
+}
+
 export async function apiPost<T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  const token = getToken()
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
+  const headers: Record<string, string> = {
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...options?.headers,
+  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    method: 'POST',
+    headers,
+    body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
+  })
+  return handleResponse<T>(res)
+}
+
+export async function apiPut<T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -60,11 +119,31 @@ export async function apiPost<T = any>(path: string, body?: unknown, options?: R
   if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    method: 'POST',
+    method: 'PUT',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
   return handleResponse<T>(res)
+}
+
+export async function apiDownload(
+  path: string,
+  body?: unknown,
+  options?: RequestOptions,
+): Promise<{ blob: Blob; filename: string | null }> {
+  const token = getToken()
+  const headers: Record<string, string> = {
+    ...options?.headers,
+  }
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    method: 'POST',
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  return handleBlobResponse(res)
 }
 
 export async function apiPatch<T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {

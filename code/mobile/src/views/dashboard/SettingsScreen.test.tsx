@@ -72,7 +72,11 @@ describe('SettingsScreen notification preferences', () => {
       in_app_enabled: true,
     });
     mockDisablePushNotifications.mockResolvedValue(undefined);
-    mockEnablePushNotifications.mockResolvedValue(true);
+    mockEnablePushNotifications.mockResolvedValue({
+      enabled: true,
+      code: 'enabled',
+      message: 'Notifications push activees.',
+    });
   });
 
   it('loads and persists the official message channel preference', async () => {

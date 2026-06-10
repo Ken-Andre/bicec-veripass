@@ -1,4 +1,6 @@
 # Architectural and Analytical Foundations for a High-Performance KYC Banking Ecosystem
+
+> Historical note, 2026-05-28: this research report is background material only. It is not current implementation, architecture, or roadmap authority.
 ## A Strategic MVP Implementation at BICEC
 
 ---
@@ -289,4 +291,3 @@ The technical core of the system — centered on **MediaPipe-powered liveness de
 42. [Audit trigger — PostgreSQL wiki](https://wiki.postgresql.org/wiki/Audit_trigger)
 43. [OWASP Top 10 Mobile in Detail & 8 Ways to Mitigate Them — Radware](https://www.radware.com/cyberpedia/application-security/owasp-top-10-mobile/)
 44. [Mobile Application Security — OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/Mobile_Application_Security_Cheat_Sheet.html)
-

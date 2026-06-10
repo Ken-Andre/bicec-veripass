@@ -7,7 +7,7 @@ export { KycStatus, AccessLevel, Priority, DocumentType, DossierFlag, RejectReas
 export type { OcrField, KycDocument, BiometricResult, ClientIdentity, KycSession } from './kyc';
 
 export { AmlSeverity, AmlAlertStatus } from './aml';
-export type { SanctionHit, AmlAlert, NiuConflict, Agency, BatchJob } from './aml';
+export type { SanctionHit, AmlAlert, NiuConflict, Agency, BatchJob, DocumentExpiryItem, DocumentExpiryResponse } from './aml';
 
 export { ActionType } from './audit';
 export type { AuditEntry } from './audit';

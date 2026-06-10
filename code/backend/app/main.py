@@ -12,6 +12,8 @@ from fastapi.exceptions import RequestValidationError
 from app.api.v1.router import api_router
 from app.routers.demo import router as demo_router
 from app.core.config import settings
+from app.core.sentry import before_send
+from app.core.metrics import metrics_registry, monotonic_seconds
 
 # Sentry Init (skip if SKIP_SENTRY=1, needed for tests with Python 3.14)
 if settings.SENTRY_DSN and not os.getenv("SKIP_SENTRY"):
@@ -21,6 +23,7 @@ if settings.SENTRY_DSN and not os.getenv("SKIP_SENTRY"):
         traces_sample_rate=0.1,
         environment=settings.ENVIRONMENT,
         release=f"{settings.PROJECT_NAME}@{settings.PROJECT_VERSION}",
+        before_send=before_send,
     )
 from app.core.logging import logger
 from app.core.exceptions import (
@@ -136,9 +139,35 @@ async def add_correlation_id(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def collect_http_metrics(request: Request, call_next):
+    start_time = monotonic_seconds()
+    response: Response = await call_next(request)
+    path = request.url.path
+    if path != "/metrics":
+        metrics_registry.record_http_request(
+            method=request.method,
+            path=path,
+            status_code=response.status_code,
+            duration_seconds=monotonic_seconds() - start_time,
+        )
+    return response
+
+
 # Routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(demo_router, prefix="/api/v1")
+
+
+@app.get("/metrics", tags=["monitoring"])
+async def prometheus_metrics():
+    return Response(
+        content=metrics_registry.render(
+            app_name=settings.PROJECT_NAME,
+            version=settings.PROJECT_VERSION,
+        ),
+        media_type="text/plain; version=0.0.4",
+    )
 
 
 @app.get("/api/health", tags=["health"])

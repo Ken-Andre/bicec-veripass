@@ -7,7 +7,8 @@ from app.core.logging import logger
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    logger.error(f"HTTP error: {exc.detail}", extra={"status_code": exc.status_code})
+    log = logger.error if exc.status_code >= 500 else logger.warning
+    log(f"HTTP error: {exc.detail}", extra={"status_code": exc.status_code})
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "status_code": exc.status_code},
@@ -15,7 +16,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logger.error(f"Validation error: {exc.errors()}")
+    logger.warning(f"Validation error: {exc.errors()}")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors(), "type": "validation_error"},

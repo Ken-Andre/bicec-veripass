@@ -4,8 +4,8 @@ from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 # Use DATABASE_URL from env (CI sets it), fallback to TEST_DATABASE_URL, then local default
 # On Windows/Docker: use port 15432 (mapped from container's 5432)
@@ -22,67 +22,54 @@ TEST_DATABASE_URL = os.getenv(
 
 # If still no DATABASE_URL, try reading from .env file (for local dev)
 if TEST_DATABASE_URL is None:
-    # Try to import python-dotenv if available
     try:
         from dotenv import load_dotenv
-        # Look for .env in backend directory or parent
         env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
         if os.path.exists(env_path):
             load_dotenv(env_path)
-        # Now check again after loading .env
         TEST_DATABASE_URL = os.getenv(
             "TEST_DATABASE_URL",
-            os.getenv(
-                "DATABASE_URL",
-                None
-            ),
+            os.getenv("DATABASE_URL", None),
         )
     except ImportError:
-        pass  # dotenv not installed, that's fine
+        pass
 
-# Final fallback: require environment variables to be set
 if TEST_DATABASE_URL is None:
     db_user = os.getenv("DB_USER", "")
     db_password = os.getenv("DB_PASSWORD", "")
     db_host = os.getenv("DB_HOST", "localhost")
-    db_port = os.getenv("DB_PORT", "15432")  # Docker-mapped port
+    db_port = os.getenv("DB_PORT", "15432")
     db_name = os.getenv("DB_NAME", "veripass")
-    
+
     if db_user and db_password:
-        # Construct URL from individual environment variables
         encoded_password = urllib.parse.quote_plus(db_password)
         TEST_DATABASE_URL = f"postgresql+asyncpg://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}"
     else:
-        # No credentials available - tests will skip
         TEST_DATABASE_URL = None
+
 if TEST_DATABASE_URL is not None:
     os.environ["DATABASE_URL"] = TEST_DATABASE_URL
-    # Also set TEST_DATABASE_URL for tests that use it directly
     os.environ.setdefault("TEST_DATABASE_URL", TEST_DATABASE_URL)
 
-# Skip Sentry initialization in tests (langchain incompatible with Python 3.14)
 os.environ["SENTRY_DSN"] = ""
 os.environ["SKIP_SENTRY"] = "1"
 os.environ.setdefault("STORAGE_PATH", os.path.abspath(".test-data/documents"))
 os.environ.setdefault("MODELS_PATH", os.path.abspath(".test-data/models"))
 
-# Patch sentry_sdk.init to be a no-op before importing app.main
 import sentry_sdk  # noqa: E402
-_original_init = sentry_sdk.init  # noqa: F841
+_original_init = sentry_sdk.init
 
 def _mock_init(*args, **kwargs):
-    # Don't actually initialize Sentry in tests
     pass
 
 sentry_sdk.init = _mock_init
 
-# Now import app after Sentry is mocked
-from app.main import app  # noqa: E402 — must be after env override
+from app.main import app  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
 
-# Engine dédié aux tests (created lazily)
+# Dedicated engine for tests (created lazily)
 _test_engine = None
 _db_available = None  # None = not checked yet, True/False = checked
 
@@ -135,14 +122,15 @@ def reset_rate_limiter():
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_test_db():
-    """Crée toutes les tables avant la session de tests, les supprime après.
-    Skip si PostgreSQL n'est pas disponible (CI sans DB).
-    
+    """Create all tables before the test session, drop them after.
+    Skip if PostgreSQL is not available (CI without DB).
+
     Note: Engine is kept alive for the entire session and cleaned up naturally.
     """
     available = await _check_db_available()
     if not available:
-        pytest.skip("PostgreSQL not available — skipping DB-dependent tests")
+        # Keep non-DB tests runnable in environments without PostgreSQL.
+        yield
         return
 
     engine = _get_test_engine()
@@ -161,10 +149,7 @@ async def setup_test_db():
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Session DB isolée par test.
-    
-    Uses a connection from the pool with explicit rollback for isolation.
-    """
+    """Isolated DB session per test with automatic rollback."""
     if not await _check_db_available():
         pytest.skip("PostgreSQL not available")
         return
@@ -186,7 +171,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest_asyncio.fixture
 async def client():
-    """Client HTTP without DB override."""
+    """HTTP client without DB override. Use client_db for DB-backed tests."""
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",

@@ -1,0 +1,29 @@
+
+sequenceDiagram
+    autonumber
+    actor M as Marie (mobile)
+    participant APP as PWA VeriPass
+    participant OS as OS detection
+    participant APPLNK as App link / Universal link
+    participant STORE as App Store / Google Play
+    participant BANK as App aval<br/>(BI PAY / Wallet)
+
+    M->>APP: Click "Continuer vers BI PAY"<br/>(sur dashboard après APPROVED)
+    APP->>APP: check access_level >= LIMITED_ACCESS
+    APP->>OS: navigator.userAgent
+    OS-->>APP: iOS / Android / Desktop
+    alt iOS
+        APP->>APPLNK: window.location = BIPAY_IOS_APP_LINK<br/>(si configuré)
+        APPLNK-->>BANK: ouvre l'app si installée
+        APPLNK-->>APP: fallback si non installée
+        APP->>STORE: window.location = BIPAY_IOS_STORE_URL
+    else Android
+        APP->>APPLNK: window.location = BIPAY_ANDROID_APP_LINK<br/>(si configuré)
+        APPLNK-->>BANK: ouvre l'app si installée
+        APPLNK-->>APP: fallback si non installée
+        APP->>STORE: window.location = BIPAY_ANDROID_STORE_URL
+    else Desktop
+        APP->>APP: render landing page
+        APP-->>M: QR code iOS + bouton Android
+    end
+    M->>BANK: utilise l'app bancaire

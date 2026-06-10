@@ -1,0 +1,10 @@
+{
+  "date": "2026-05-28T08:03:22.225Z",
+  "baseURL": "http://backoffice:8080",
+  "compactText": "Document classe\nCNI_RECTO\nReclasser",
+  "formBeforeClick": 0,
+  "formText": "Reclasser le document\nAnnuler\n\nType principal\n\nCNI_RECTO\n\nCategories\n\nAssigner le document",
+  "pageErrors": [],
+  "failedRequests": [],
+  "consoleEntries": []
+}

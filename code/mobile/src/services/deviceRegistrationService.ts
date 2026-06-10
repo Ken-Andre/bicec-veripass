@@ -6,6 +6,7 @@ interface DeviceRegistrationResponse {
 
 const DEVICE_SEED_KEY = 'vp_device_seed';
 const DEVICE_TAG_KEY = 'vp_device_tag';
+let registrationInFlight: Promise<string | null> | null = null;
 
 function randomHex(bytes = 16): string {
   const values = crypto.getRandomValues(new Uint8Array(bytes));
@@ -51,20 +52,30 @@ export async function buildDeviceFingerprintHash(): Promise<string> {
 export async function ensureDeviceRegistered(): Promise<string | null> {
   if (!crypto?.subtle || !navigator) return localStorage.getItem(DEVICE_TAG_KEY);
 
-  const fingerprintHash = await buildDeviceFingerprintHash();
-  const response = await apiClient.post<DeviceRegistrationResponse, { fingerprint_hash: string; metadata: ReturnType<typeof getDeviceMetadata> }>(
-    '/devices/register',
-    {
-      fingerprint_hash: fingerprintHash,
-      metadata: getDeviceMetadata(),
-    },
-    {
-      headers: {
-        'X-Device-Fingerprint': fingerprintHash,
-      },
-    },
-  );
+  const existingTag = localStorage.getItem(DEVICE_TAG_KEY);
+  if (existingTag) return existingTag;
+  if (registrationInFlight) return registrationInFlight;
 
-  localStorage.setItem(DEVICE_TAG_KEY, response.device_tag);
-  return response.device_tag;
+  registrationInFlight = (async () => {
+    const fingerprintHash = await buildDeviceFingerprintHash();
+    const response = await apiClient.post<DeviceRegistrationResponse, { fingerprint_hash: string; metadata: ReturnType<typeof getDeviceMetadata> }>(
+      '/devices/register',
+      {
+        fingerprint_hash: fingerprintHash,
+        metadata: getDeviceMetadata(),
+      },
+      {
+        headers: {
+          'X-Device-Fingerprint': fingerprintHash,
+        },
+      },
+    );
+
+    localStorage.setItem(DEVICE_TAG_KEY, response.device_tag);
+    return response.device_tag;
+  })().finally(() => {
+    registrationInFlight = null;
+  });
+
+  return registrationInFlight;
 }

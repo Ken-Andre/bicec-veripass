@@ -1,0 +1,44 @@
+
+flowchart TB
+    MAIN["app/main.py<br/>FastAPI app<br/>• lifespan (warmup OCR)<br/>• Sentry init<br/>• CORS<br/>• Exception handlers<br/>• Correlation middleware"] --> ROUTER["app/api/v1/router.py<br/>APIRouter('/api/v1')<br/>+ include_router pour chaque module"]
+
+    ROUTER --> AUTH["modules/auth<br/>router.py + service.py + models.py + schemas.py + tasks.py"]
+    ROUTER --> KYC["modules/kyc<br/>router.py + service.py + models.py + schemas.py + storage.py"]
+    ROUTER --> BACK["modules/backoffice<br/>router.py + service.py + models.py + schemas.py"]
+    ROUTER --> AML["modules/aml<br/>router.py + service.py + models.py + schemas.py"]
+    ROUTER --> ANA["modules/analytics<br/>router.py + service.py"]
+    ROUTER --> AUD["modules/audit<br/>router.py + models.py"]
+    ROUTER --> ADM["modules/admin<br/>router.py + models.py"]
+    ROUTER --> BAN["modules/banking<br/>router.py + service.py + models.py + schemas.py"]
+    ROUTER --> DEV["modules/devices<br/>router.py + models.py + dependencies.py"]
+    ROUTER --> NOT["modules/notifications<br/>router.py + service.py + models.py + schemas.py"]
+    ROUTER --> SUP["modules/support<br/>router.py + models.py + schemas.py"]
+    ROUTER --> USR["modules/users<br/>(alias historique auth)"]
+    ROUTER --> OCR["api/v1/ocr.py<br/>(utilitaire debug OCR)"]
+    ROUTER --> SEN["api/v1/sentry_proxy.py<br/>(proxy Sentry same-origin)"]
+
+    MAIN --> CORE
+    MAIN --> DB
+    MAIN --> SVC
+
+    subgraph CORE["app/core/*"]
+        CONF["config.py<br/>Settings (Pydantic)"]
+        SEC["security.py<br/>JWT + bcrypt + RBAC"]
+        CEL["celery_config.py<br/>Celery app + beat schedule"]
+        RED["redis.py<br/>Connection helpers"]
+        RL["rate_limit.py<br/>SlowAPI"]
+        LOG["logging.py<br/>Structured logs"]
+        EXC["exceptions.py<br/>Handlers"]
+    end
+
+    subgraph DB["app/db/*"]
+        SES["session.py<br/>Async engine/session"]
+        BAS["base.py<br/>Model metadata imports"]
+        SD["seed_data.py<br/>+ seed_dev.py<br/>+ seed_banking.py"]
+    end
+
+    subgraph SVC["app/services/*"]
+        OCRS["ocr_service.py<br/>(preprocessing, helpers)"]
+        GLM["glm_utils.py"]
+        ISO["iso20022_service.py"]
+    end

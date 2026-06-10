@@ -12,10 +12,13 @@ Endpoints:
 - POST /support/threads — Create support thread
 - GET  /support/threads/{id}/messages — List messages in a thread
 - POST /support/threads/{id}/messages — Send a message in a thread
+- GET  /support/messages/{id}/attachment — Download support attachment
 """
 
+import mimetypes
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Query, status
 from fastapi.responses import FileResponse
@@ -34,7 +37,9 @@ from app.modules.auth.models import Agent, AgentRole
 from app.modules.admin.models import Agency
 from app.modules.kyc.models import (
     KYCSession,
+    AmlAlert,
     Document,
+    DuplicateCheck,
     OCRField,
     ValidationDecision,
     DossierAssignment,
@@ -47,11 +52,17 @@ from app.modules.kyc.schemas import (
     AccessTier,
     LIFECYCLE_TO_ACCESS_TIER,
 )
+from app.modules.kyc.service import biometric_manual_review_reasons
 from app.modules.audit.models import AuditLog
+from app.modules.analytics.service import (
+    record_ocr_performance_best_effort,
+    track_event_best_effort,
+)
 from app.modules.kyc.storage import DocumentStorage
 from app.modules.backoffice.schemas import (
-    KYCQueueItemSchema,
     AuditLogSchema,
+    KYCQueueItemSchema,
+    KYCQueueStatsSchema,
     DossierDetailSchema,
     DossierDocumentBrief,
     DossierBiometricBrief,
@@ -69,10 +80,53 @@ from app.modules.backoffice.schemas import (
     SupportMessageSchema,
     SupportMessageCreate,
     SupportThreadCreate,
+    PromoteAttachmentRequest,
+    PromoteAttachmentResponse,
 )
 
 router = APIRouter()
 document_storage = DocumentStorage()
+
+
+def _request_uuid(request: Request) -> uuid.UUID | None:
+    raw = getattr(request.state, "correlation_id", None)
+    try:
+        return uuid.UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
+
+
+def _attachment_filename(path: str | None) -> str | None:
+    if not path:
+        return None
+    name = Path(path).name
+    parts = name.split("_", 1)
+    return parts[1] if len(parts) == 2 else name
+
+
+def _resolve_attachment_path(path: str) -> Path:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    return (document_storage.base_path / candidate).resolve()
+
+
+async def _resolve_attachment_document_id(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    attachment_path: str | None,
+    attachment_sha256: str | None,
+) -> uuid.UUID | None:
+    if not attachment_path and not attachment_sha256:
+        return None
+    query = select(Document.id).where(Document.session_id == session_id)
+    if attachment_sha256:
+        query = query.where(Document.sha256_hash == attachment_sha256)
+    elif attachment_path:
+        query = query.where(Document.file_path == attachment_path)
+    query = query.order_by(Document.captured_at.desc())
+    result = await db.execute(query.limit(1))
+    return result.scalar_one_or_none()
 
 
 _ROLE_DECISIONS: dict[AgentRole, set[str]] = {
@@ -100,14 +154,272 @@ ALLOWED_DOC_CATEGORIES: set[str] = {
     "BILL_CAMWATER",
     "NIU",
     "SELFIE",
+    "IDENTITY_PROOF",
     "ADDRESS_PROOF",
     "OTHER",
 }
 
 
+async def _session_has_compliance_trigger(
+    db: AsyncSession, session_id: uuid.UUID
+) -> bool:
+    aml_result = await db.execute(
+        select(AmlAlert.id).where(AmlAlert.session_id == session_id).limit(1)
+    )
+    if aml_result.scalar_one_or_none() is not None:
+        return True
+
+    duplicate_result = await db.execute(
+        select(DuplicateCheck.id)
+        .where(
+            (DuplicateCheck.session_id_new == session_id)
+            | (DuplicateCheck.session_id_existing == session_id)
+        )
+        .limit(1)
+    )
+    return duplicate_result.scalar_one_or_none() is not None
+
+
+async def _has_current_assignment(
+    db: AsyncSession, session_id: uuid.UUID, agent_id: uuid.UUID
+) -> bool:
+    result = await db.execute(
+        select(DossierAssignment.id)
+        .where(
+            DossierAssignment.session_id == session_id,
+            DossierAssignment.agent_id == agent_id,
+            DossierAssignment.is_current == True,  # noqa: E712
+            DossierAssignment.completed_at == None,  # noqa: E711
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _ensure_agent_can_access_session(
+    db: AsyncSession,
+    session: KYCSession,
+    agent: Agent,
+    *,
+    allow_admin: bool = False,
+) -> None:
+    if allow_admin and agent.role == AgentRole.ADMIN_IT:
+        return
+    if agent.role == AgentRole.SYLVIE:
+        return
+    if agent.role == AgentRole.THOMAS:
+        if await _session_has_compliance_trigger(db, session.id):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: compliance trigger does not exist for this dossier.",
+        )
+    if agent.role == AgentRole.JEAN:
+        if session.agency_id and agent.agency_id and session.agency_id == agent.agency_id:
+            return
+        if session.agency_id is None and await _has_current_assignment(
+            db, session.id, agent.id
+        ):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: dossier is outside this agent's agency.",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Role '{agent.role.value}' cannot access this dossier.",
+    )
+
+
 @router.get("/")
 async def get_root():
     return {"module": "backoffice", "status": "initialized"}
+
+
+class CommandCenterAgentLoadSchema(BaseModel):
+    """Read-only agent load snapshot for operational dashboards."""
+
+    id: str
+    name: str
+    email: str
+    role: str
+    agency_id: str | None = None
+    agency_code: str | None = None
+    agency_name: str | None = None
+    is_available: bool
+    is_connected: bool
+    active_dossier_count: int
+    active_queue_count: int
+    completed_dossier_count: int
+    total_assigned_count: int
+    last_activity_at: str | None = None
+
+
+AGENT_CONNECTED_WINDOW = timedelta(minutes=5)
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _is_agent_connected(agent: Agent) -> bool:
+    last_activity_at = _as_utc(agent.last_activity_at)
+    if not last_activity_at:
+        return False
+    return datetime.now(timezone.utc) - last_activity_at <= AGENT_CONNECTED_WINDOW
+
+
+async def _count_agent_active_queue(db: AsyncSession, agent_id: uuid.UUID) -> int:
+    result = await db.execute(
+        select(func.count(func.distinct(DossierAssignment.session_id)))
+        .select_from(DossierAssignment)
+        .join(KYCSession, KYCSession.id == DossierAssignment.session_id)
+        .where(
+            DossierAssignment.agent_id == agent_id,
+            DossierAssignment.is_current == True,  # noqa: E712
+            DossierAssignment.completed_at == None,  # noqa: E711
+            KYCSession.status.in_(_REVIEW_STATES),
+        )
+    )
+    return int(result.scalar() or 0)
+
+
+async def _sync_agent_active_count(db: AsyncSession, agent_id: uuid.UUID) -> None:
+    agent = await db.get(Agent, agent_id)
+    if agent:
+        agent.active_dossier_count = await _count_agent_active_queue(db, agent_id)
+
+
+async def _agent_load_counts(
+    db: AsyncSession, agent_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, dict[str, int]]:
+    counts = {
+        agent_id: {
+            "active_queue_count": 0,
+            "completed_dossier_count": 0,
+            "total_assigned_count": 0,
+        }
+        for agent_id in agent_ids
+    }
+    if not agent_ids:
+        return counts
+
+    active_rows = await db.execute(
+        select(
+            DossierAssignment.agent_id,
+            func.count(func.distinct(DossierAssignment.session_id)),
+        )
+        .select_from(DossierAssignment)
+        .join(KYCSession, KYCSession.id == DossierAssignment.session_id)
+        .where(
+            DossierAssignment.agent_id.in_(agent_ids),
+            DossierAssignment.is_current == True,  # noqa: E712
+            DossierAssignment.completed_at == None,  # noqa: E711
+            KYCSession.status.in_(_REVIEW_STATES),
+        )
+        .group_by(DossierAssignment.agent_id)
+    )
+    for agent_id, count in active_rows.all():
+        counts[agent_id]["active_queue_count"] = int(count or 0)
+
+    completed_rows = await db.execute(
+        select(
+            ValidationDecision.agent_id,
+            func.count(func.distinct(ValidationDecision.session_id)),
+        )
+        .where(ValidationDecision.agent_id.in_(agent_ids))
+        .group_by(ValidationDecision.agent_id)
+    )
+    for agent_id, count in completed_rows.all():
+        counts[agent_id]["completed_dossier_count"] = int(count or 0)
+
+    assigned_rows = await db.execute(
+        select(
+            DossierAssignment.agent_id,
+            func.count(func.distinct(DossierAssignment.session_id)),
+        )
+        .where(DossierAssignment.agent_id.in_(agent_ids))
+        .group_by(DossierAssignment.agent_id)
+    )
+    for agent_id, count in assigned_rows.all():
+        counts[agent_id]["total_assigned_count"] = int(count or 0)
+
+    return counts
+
+
+async def _least_loaded_connected_agent(
+    db: AsyncSession, candidates: list[Agent]
+) -> Agent | None:
+    connected = [agent for agent in candidates if _is_agent_connected(agent)]
+    if not connected:
+        return None
+    counts = await _agent_load_counts(db, [agent.id for agent in connected])
+    return min(
+        connected,
+        key=lambda agent: (
+            counts[agent.id]["active_queue_count"],
+            agent.name.lower(),
+        ),
+    )
+
+
+def _agent_load_to_response(
+    agent: Agent, counts: dict[str, int]
+) -> CommandCenterAgentLoadSchema:
+    active_queue_count = counts.get("active_queue_count", 0)
+    agency = getattr(agent, "agency", None)
+    return CommandCenterAgentLoadSchema(
+        id=str(agent.id),
+        name=agent.name,
+        email=agent.email,
+        role=agent.role.value if hasattr(agent.role, "value") else str(agent.role),
+        agency_id=str(agent.agency_id) if agent.agency_id else None,
+        agency_code=getattr(agency, "code", None),
+        agency_name=getattr(agency, "name", None),
+        is_available=agent.is_available,
+        is_connected=_is_agent_connected(agent),
+        active_dossier_count=active_queue_count,
+        active_queue_count=active_queue_count,
+        completed_dossier_count=counts.get("completed_dossier_count", 0),
+        total_assigned_count=counts.get("total_assigned_count", 0),
+        last_activity_at=agent.last_activity_at.isoformat() if agent.last_activity_at else None,
+    )
+
+
+@router.get("/agents/load", response_model=PageResponse[CommandCenterAgentLoadSchema])
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def list_agent_load(
+    request: Request,
+    _agent: Agent = Depends(require_agent_role(AgentRole.SYLVIE, AgentRole.ADMIN_IT)),
+    page: PageParams = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read-only load distribution for command center dashboards.
+
+    This is intentionally separate from /admin/agents: SYLVIE can supervise
+    operational load, but only ADMIN_IT can create, edit, or deactivate agents.
+    """
+    query = (
+        select(Agent)
+        .options(selectinload(Agent.agency))
+        .order_by(Agent.role.asc(), Agent.name.asc())
+    )
+    total = (await db.execute(select(func.count()).select_from(Agent))).scalar_one()
+    result = await db.execute(query.offset(page.offset).limit(page.limit))
+    agents = result.scalars().all()
+    counts = await _agent_load_counts(db, [agent.id for agent in agents])
+    return PageResponse[CommandCenterAgentLoadSchema](
+        items=[_agent_load_to_response(agent, counts[agent.id]) for agent in agents],
+        total=total,
+        page=page.page,
+        pages=(total + page.limit - 1) // page.limit if total else 1,
+        limit=page.limit,
+    )
 
 
 async def _extract_client_name(session: KYCSession) -> str | None:
@@ -147,6 +459,48 @@ def _extract_client_name_from_docs(documents: list) -> str | None:
 
 
 @router.get(
+    "/queue/stats",
+    response_model=KYCQueueStatsSchema,
+)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def get_queue_stats(
+    request: Request,
+    _agent: Agent = Depends(
+        require_agent_role(
+            AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT
+        )
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Stable KYC queue counters for dashboard cards, independent of UI filters."""
+    result = await db.execute(
+        select(KYCSession.status, func.count(KYCSession.id))
+        .where(
+            KYCSession.status.in_(
+                [
+                    LifecycleState.PENDING_AGENT_REVIEW,
+                    LifecycleState.PENDING_KYC,
+                    LifecycleState.PENDING_INFO,
+                    LifecycleState.FRAUD_SUSPECT,
+                    LifecycleState.APPROVED,
+                    LifecycleState.REJECTED,
+                ]
+            )
+        )
+        .group_by(KYCSession.status)
+    )
+    counts = {status: int(count) for status, count in result.all()}
+    return KYCQueueStatsSchema(
+        pending=counts.get(LifecycleState.PENDING_AGENT_REVIEW, 0)
+        + counts.get(LifecycleState.PENDING_KYC, 0),
+        info_required=counts.get(LifecycleState.PENDING_INFO, 0),
+        fraud_suspect=counts.get(LifecycleState.FRAUD_SUSPECT, 0),
+        approved=counts.get(LifecycleState.APPROVED, 0),
+        rejected=counts.get(LifecycleState.REJECTED, 0),
+    )
+
+
+@router.get(
     "/queue",
     response_model=PageResponse[KYCQueueItemSchema],
 )
@@ -159,7 +513,9 @@ async def list_queue(
     agency_code: str | None = Query(None, description="Filter by agency code"),
     client_name: str | None = Query(None, description="Search by client name (partial match)"),
     _agent: Agent = Depends(
-        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT)
+        require_agent_role(
+            AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE, AgentRole.ADMIN_IT
+        )
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -176,6 +532,16 @@ async def list_queue(
         conditions.append(KYCSession.status == status_filter)
     else:
         conditions.append(KYCSession.status.in_(_REVIEW_STATES))
+    if _agent.role == AgentRole.JEAN:
+        if not _agent.agency_id:
+            return PageResponse(
+                items=[],
+                total=0,
+                page=page.page,
+                limit=limit,
+                pages=1,
+            )
+        conditions.append(KYCSession.agency_id == _agent.agency_id)
 
     base_query = (
         select(KYCSession)
@@ -184,6 +550,7 @@ async def list_queue(
             selectinload(KYCSession.user),
             selectinload(KYCSession.agency),
             selectinload(KYCSession.documents).selectinload(Document.ocr_fields),
+            selectinload(KYCSession.biometric_results),
             selectinload(KYCSession.assignments).selectinload(DossierAssignment.agent),
         )
     )
@@ -237,6 +604,7 @@ async def list_queue(
             assigned_agent_name = current.agent.name
 
         overall_confidence = float(session.confidence_score_global) if session.confidence_score_global else None
+        biometric_risk_flags = biometric_manual_review_reasons(session.biometric_results)
 
         items.append(KYCQueueItemSchema(
             id=session.id,
@@ -250,6 +618,7 @@ async def list_queue(
             assigned_agent_name=assigned_agent_name,
             overall_confidence=overall_confidence,
             agency_code=agency_code_val,
+            biometric_risk_flags=biometric_risk_flags,
         ))
 
     total_pages = (total + limit - 1) // limit if total > 0 else 1
@@ -294,6 +663,27 @@ async def get_dossier_detail(
     if not session:
         raise HTTPException(status_code=404, detail="Dossier not found")
 
+    await _ensure_agent_can_access_session(db, session, _agent)
+
+    if _agent.role == AgentRole.THOMAS:
+        # Verify if dossier has active compliance triggers
+        has_aml = len(session.aml_alerts) > 0
+        
+        # Query DuplicateCheck to see if a NIU conflict exists
+        dup_res = await db.execute(
+            select(DuplicateCheck).where(
+                (DuplicateCheck.session_id_new == session_id) | 
+                (DuplicateCheck.session_id_existing == session_id)
+            )
+        )
+        has_dup = dup_res.first() is not None
+
+        if not (has_aml or has_dup):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: compliance check does not exist for this dossier."
+            )
+
     client_name = _extract_client_name_from_docs(session.documents)
     user_phone = session.user.phone if session.user else None
     agency_code = session.agency.code if session.agency else None
@@ -313,6 +703,11 @@ async def get_dossier_detail(
             )
             for f in doc.ocr_fields
         ]
+        classification = {}
+        if isinstance(doc.ocr_raw_json, dict):
+            raw_classification = doc.ocr_raw_json.get("backoffice_classification")
+            if isinstance(raw_classification, dict):
+                classification = raw_classification
         doc_briefs.append(
             DossierDocumentBrief(
                 id=doc.id,
@@ -321,6 +716,10 @@ async def get_dossier_detail(
                 ocr_status=doc.ocr_status or "PENDING",
                 ocr_error=doc.ocr_error,
                 ocr_engine=doc.ocr_engine,
+                classification_categories=classification.get("categories") or [],
+                classified_by_name=classification.get("classified_by_name"),
+                classified_at=classification.get("classified_at"),
+                classification_reason=classification.get("reason"),
                 captured_at=doc.captured_at,
                 ocr_fields=ocr_field_briefs,
             )
@@ -331,14 +730,25 @@ async def get_dossier_detail(
         bio_brief = DossierBiometricBrief(
             id=session.biometric_results.id,
             face_match_score=float(session.biometric_results.face_match_score)
-            if session.biometric_results.face_match_score
+            if session.biometric_results.face_match_score is not None
             else None,
+            face_match_status=session.biometric_results.face_match_status,
+            face_match_reason=session.biometric_results.face_match_reason,
+            face_match_distance=float(session.biometric_results.face_match_distance)
+            if session.biometric_results.face_match_distance is not None
+            else None,
+            face_match_threshold=float(session.biometric_results.face_match_threshold)
+            if session.biometric_results.face_match_threshold is not None
+            else None,
+            face_match_detector=session.biometric_results.face_match_detector,
             liveness_score=float(session.biometric_results.liveness_score)
-            if session.biometric_results.liveness_score
+            if session.biometric_results.liveness_score is not None
             else None,
             anti_spoofing_score=float(session.biometric_results.anti_spoofing_score)
-            if session.biometric_results.anti_spoofing_score
+            if session.biometric_results.anti_spoofing_score is not None
             else None,
+            model_version_face=session.biometric_results.model_version_face,
+            model_version_liveness=session.biometric_results.model_version_liveness,
             processed_at=session.biometric_results.processed_at,
         )
 
@@ -386,11 +796,23 @@ async def get_dossier_detail(
         completed_at=session.completed_at,
         last_step_completed=session.last_step_completed,
         niu_type=session.niu_type,
+        niu_number=session.niu_number,
+        niu_declarative=bool(session.niu_declarative),
+        address_city=session.address_city,
+        address_commune=session.address_commune,
+        address_quartier=session.address_quartier,
+        address_lieu_dit=session.address_lieu_dit,
+        address_details=session.address_details,
+        gps_latitude=float(session.gps_latitude) if session.gps_latitude is not None else None,
+        gps_longitude=float(session.gps_longitude) if session.gps_longitude is not None else None,
+        utility_provider=session.utility_provider,
+        utility_bill_date=session.utility_bill_date,
         user_phone=user_phone,
         client_name=client_name,
         agency_code=agency_code,
         documents=doc_briefs,
         biometric_result=bio_brief,
+        biometric_risk_flags=biometric_manual_review_reasons(session.biometric_results),
         has_consent=session.consent_record is not None,
         consent_method=session.consent_record.consent_method if session.consent_record else None,
         signed_at=session.consent_record.signed_at if session.consent_record else None,
@@ -426,6 +848,14 @@ async def get_document_file(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    await _ensure_agent_can_access_session(db, session, _agent)
+
     file_path = document_storage.base_path / doc.file_path
     resolved = file_path.resolve()
     if not resolved.exists():
@@ -433,7 +863,8 @@ async def get_document_file(
 
     return FileResponse(
         path=str(resolved),
-        media_type="image/jpeg",
+        media_type=mimetypes.guess_type(resolved.name)[0]
+        or "application/octet-stream",
         filename=resolved.name,
     )
 
@@ -463,6 +894,14 @@ async def classify_document(
     document = result.scalar_one_or_none()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     categories = [c.strip().upper() for c in body.categories if c.strip()]
     if not categories:
@@ -539,12 +978,18 @@ async def submit_review_decision(
     """Submit a review decision on a KYC dossier."""
     result = await db.execute(
         select(KYCSession)
-        .options(selectinload(KYCSession.assignments))
+        .options(
+            selectinload(KYCSession.assignments),
+            selectinload(KYCSession.biometric_results),
+            selectinload(KYCSession.aml_alerts),
+        )
         .where(KYCSession.id == session_id)
     )
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Dossier not found")
+
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     reviewable = _REVIEW_STATES | {LifecycleState.FRAUD_SUSPECT}
     if session.status not in reviewable:
@@ -585,6 +1030,53 @@ async def submit_review_decision(
     if not new_status:
         raise HTTPException(status_code=400, detail=f"Invalid decision: {body.decision}")
 
+    biometric_risk_flags = biometric_manual_review_reasons(session.biometric_results)
+    if new_status == LifecycleState.APPROVED and biometric_risk_flags:
+        if not body.biometric_override_confirmed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "BIOMETRIC_OVERRIDE_REQUIRED",
+                    "message": "Biometric risk flags require explicit approval override.",
+                    "biometric_risk_flags": biometric_risk_flags,
+                },
+            )
+
+    if new_status == LifecycleState.APPROVED:
+        open_aml_statuses = {"OPEN", "CONFIRMED", "ESCALATED", "PENDING"}
+        active_aml_alerts = [
+            alert for alert in session.aml_alerts if str(alert.status) in open_aml_statuses
+        ]
+        if active_aml_alerts:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "AML_CLEARANCE_REQUIRED",
+                    "message": "Open AML alerts must be cleared by compliance before approval.",
+                    "alert_ids": [str(alert.id) for alert in active_aml_alerts],
+                },
+            )
+
+        duplicate_result = await db.execute(
+            select(DuplicateCheck.id).where(
+                (
+                    (DuplicateCheck.session_id_new == session.id)
+                    | (DuplicateCheck.session_id_existing == session.id)
+                ),
+                DuplicateCheck.status == "OPEN",
+            )
+        )
+        active_duplicate_ids = [str(row[0]) for row in duplicate_result.all()]
+        if active_duplicate_ids:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "DUPLICATE_CLEARANCE_REQUIRED",
+                    "message": "Open duplicate checks must be resolved before approval.",
+                    "duplicate_check_ids": active_duplicate_ids,
+                },
+            )
+
     new_access_level = LIFECYCLE_TO_ACCESS_TIER.get(new_status, AccessTier.RESTRICTED)
 
     old_status = session.status
@@ -603,14 +1095,21 @@ async def submit_review_decision(
         decision=body.decision,
         reason=body.reason,
         agent_ip=request.client.host if request.client else None,
+        review_duration_ms=body.review_duration_ms,
         decided_at=now,
     )
     db.add(decision_record)
 
+    closed_agent_ids: set[uuid.UUID] = set()
     for assignment in session.assignments:
         if assignment.is_current and assignment.completed_at is None:
             assignment.completed_at = now
             assignment.is_current = False
+            closed_agent_ids.add(assignment.agent_id)
+
+    await db.flush()
+    for agent_id in closed_agent_ids:
+        await _sync_agent_active_count(db, agent_id)
 
     audit = AuditLog(
         id=uuid.uuid4(),
@@ -623,6 +1122,13 @@ async def submit_review_decision(
             "access_level": new_access_level,
             "agent_name": current_agent.name,
             "rationale": body.reason,
+            "biometric_override_confirmed": (
+                bool(body.biometric_override_confirmed)
+                if new_status == LifecycleState.APPROVED and biometric_risk_flags
+                else False
+            ),
+            "biometric_risk_flags": biometric_risk_flags,
+            "review_duration_ms": body.review_duration_ms,
         },
         performed_by=current_agent.id,
         performed_at=now,
@@ -649,6 +1155,25 @@ async def submit_review_decision(
         sent_at=now,
     )
     db.add(user_notification)
+
+    event_by_decision = {
+        "APPROVED": "KYC_APPROVED",
+        "REJECTED": "KYC_REJECTED",
+        "INFO_REQUESTED": "KYC_INFO_REQUESTED",
+        "FRAUD_SUSPECT": "KYC_FRAUD_SUSPECT",
+    }
+    await track_event_best_effort(
+        db,
+        event_type=event_by_decision.get(body.decision, f"KYC_{body.decision}"),
+        session_id=session.id,
+        user_id=session.user_id,
+        agent_id=current_agent.id,
+        agency_id=session.agency_id,
+        occurred_at=now,
+        step="agent_review",
+        status=new_status,
+        request_id=_request_uuid(request),
+    )
 
     await db.commit()
 
@@ -694,6 +1219,7 @@ async def assign_dossier(
             status_code=400,
             detail=f"Dossier in status '{session.status}' cannot be assigned.",
         )
+    await _ensure_agent_can_access_session(db, session, _agent, allow_admin=True)
 
     result = await db.execute(select(Agent).where(Agent.id == body.agent_id))
     target_agent = result.scalar_one_or_none()
@@ -701,7 +1227,18 @@ async def assign_dossier(
         raise HTTPException(status_code=404, detail="Target agent not found")
     if not target_agent.is_available:
         raise HTTPException(status_code=400, detail="Target agent is not available")
+    if (
+        session.agency_id
+        and target_agent.role == AgentRole.JEAN
+        and target_agent.agency_id != session.agency_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Target JEAN agent must belong to the dossier agency.",
+        )
 
+    now = datetime.now(timezone.utc)
+    previous_agent_ids: set[uuid.UUID] = set()
     result = await db.execute(
         select(DossierAssignment).where(
             DossierAssignment.session_id == session_id,
@@ -711,10 +1248,10 @@ async def assign_dossier(
     )
     current_assignment = result.scalar_one_or_none()
     if current_assignment:
-        current_assignment.completed_at = datetime.now(timezone.utc)
+        current_assignment.completed_at = now
         current_assignment.is_current = False
+        previous_agent_ids.add(current_assignment.agent_id)
 
-    now = datetime.now(timezone.utc)
     assignment = DossierAssignment(
         id=uuid.uuid4(),
         session_id=session_id,
@@ -724,7 +1261,9 @@ async def assign_dossier(
     )
     db.add(assignment)
 
-    target_agent.active_dossier_count = (target_agent.active_dossier_count or 0) + 1
+    await db.flush()
+    for agent_id in previous_agent_ids | {target_agent.id}:
+        await _sync_agent_active_count(db, agent_id)
 
     audit = AuditLog(
         id=uuid.uuid4(),
@@ -767,7 +1306,7 @@ async def auto_assign_dossier(
     Algorithm:
     1. Find JEAN agents with same agency_id as the dossier (if set)
     2. Fallback to any available JEAN agent
-    3. Pick the one with lowest active_dossier_count
+    3. Pick the connected agent with the lowest live active queue count
     """
     result = await db.execute(
         select(KYCSession)
@@ -782,12 +1321,14 @@ async def auto_assign_dossier(
             status_code=400,
             detail=f"Dossier in status '{session.status}' cannot be assigned.",
         )
+    await _ensure_agent_can_access_session(db, session, _agent, allow_admin=True)
 
     agent_query = select(Agent).where(
         Agent.role == AgentRole.JEAN,
         Agent.is_available == True,  # noqa: E712
     )
 
+    target_agent = None
     if session.agency_id:
         same_agency = (
             select(Agent)
@@ -796,28 +1337,28 @@ async def auto_assign_dossier(
                 Agent.is_available == True,  # noqa: E712
                 Agent.agency_id == session.agency_id,
             )
-            .order_by(Agent.active_dossier_count.asc())
+            .order_by(Agent.name.asc())
         )
         result = await db.execute(same_agency)
-        target_agent = result.scalars().first()
-
-        if not target_agent:
-            result = await db.execute(
-                agent_query.order_by(Agent.active_dossier_count.asc())
-            )
-            target_agent = result.scalars().first()
+        target_agent = await _least_loaded_connected_agent(
+            db, list(result.scalars().all())
+        )
     else:
         result = await db.execute(
-            agent_query.order_by(Agent.active_dossier_count.asc())
+            agent_query.order_by(Agent.name.asc())
         )
-        target_agent = result.scalars().first()
+        target_agent = await _least_loaded_connected_agent(
+            db, list(result.scalars().all())
+        )
 
     if not target_agent:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Aucun agent JEAN disponible pour assigner ce dossier.",
+            detail="Aucun agent JEAN disponible et connecte pour assigner ce dossier.",
         )
 
+    now = datetime.now(timezone.utc)
+    previous_agent_ids: set[uuid.UUID] = set()
     result = await db.execute(
         select(DossierAssignment).where(
             DossierAssignment.session_id == session_id,
@@ -827,10 +1368,10 @@ async def auto_assign_dossier(
     )
     current_assignment = result.scalar_one_or_none()
     if current_assignment:
-        current_assignment.completed_at = datetime.now(timezone.utc)
+        current_assignment.completed_at = now
         current_assignment.is_current = False
+        previous_agent_ids.add(current_assignment.agent_id)
 
-    now = datetime.now(timezone.utc)
     assignment = DossierAssignment(
         id=uuid.uuid4(),
         session_id=session_id,
@@ -839,7 +1380,9 @@ async def auto_assign_dossier(
         is_current=True,
     )
     db.add(assignment)
-    target_agent.active_dossier_count = (target_agent.active_dossier_count or 0) + 1
+    await db.flush()
+    for agent_id in previous_agent_ids | {target_agent.id}:
+        await _sync_agent_active_count(db, agent_id)
 
     audit = AuditLog(
         id=uuid.uuid4(),
@@ -911,7 +1454,22 @@ async def list_support_threads(
         selectinload(SupportThread.messages),
     ).order_by(SupportThread.created_at.desc())
     if session_id:
+        session_result = await db.execute(
+            select(KYCSession).where(KYCSession.id == session_id)
+        )
+        session = session_result.scalar_one_or_none()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        await _ensure_agent_can_access_session(db, session, _agent)
         query = query.where(SupportThread.session_id == session_id)
+    elif _agent.role == AgentRole.JEAN:
+        if not _agent.agency_id:
+            return []
+        query = query.join(KYCSession, KYCSession.id == SupportThread.session_id).where(
+            KYCSession.agency_id == _agent.agency_id
+        )
+    elif _agent.role == AgentRole.THOMAS:
+        return []
     result = await db.execute(query)
     threads = result.scalars().unique().all()
     return [
@@ -931,7 +1489,9 @@ async def list_support_threads(
 async def create_support_thread(
     request: Request,
     body: SupportThreadCreate,
-    current_agent: Agent = Depends(get_current_agent),
+    current_agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE)
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new support thread for a session."""
@@ -941,6 +1501,7 @@ async def create_support_thread(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     thread = SupportThread(
         id=uuid.uuid4(),
@@ -973,12 +1534,34 @@ async def list_support_messages(
     db: AsyncSession = Depends(get_db),
 ):
     """List all messages in a support thread."""
+    thread_result = await db.execute(
+        select(SupportThread).where(SupportThread.id == thread_id)
+    )
+    thread = thread_result.scalar_one_or_none()
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, _agent)
+
     result = await db.execute(
         select(SupportMessage)
         .where(SupportMessage.thread_id == thread_id)
         .order_by(SupportMessage.sent_at.asc())
     )
     messages = result.scalars().all()
+    attachment_doc_ids: dict[uuid.UUID, uuid.UUID | None] = {}
+    for message in messages:
+        attachment_doc_ids[message.id] = await _resolve_attachment_document_id(
+            db,
+            thread.session_id,
+            message.attachment_path,
+            message.attachment_sha256,
+        )
     return [
         SupportMessageSchema(
             id=m.id,
@@ -988,6 +1571,8 @@ async def list_support_messages(
             content=m.content,
             attachment_path=m.attachment_path,
             attachment_sha256=m.attachment_sha256,
+            attachment_filename=_attachment_filename(m.attachment_path),
+            attachment_document_id=attachment_doc_ids.get(m.id),
             sent_at=m.sent_at,
             read_at=m.read_at,
         )
@@ -1001,7 +1586,9 @@ async def send_support_message(
     request: Request,
     thread_id: uuid.UUID,
     body: SupportMessageCreate,
-    current_agent: Agent = Depends(get_current_agent),
+    current_agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE)
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """Send a message in a support thread (as an agent)."""
@@ -1011,6 +1598,13 @@ async def send_support_message(
     thread = result.scalar_one_or_none()
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     now = datetime.now(timezone.utc)
     message = SupportMessage(
@@ -1029,18 +1623,25 @@ async def send_support_message(
     )
     session_user_id = session_result.scalar_one_or_none()
 
-    notification = Notification(
-        id=uuid.uuid4(),
-        user_id=session_user_id,
-        type="SUPPORT_MESSAGE",
-        message=f"Nouveau message de l'agent : {body.content[:100]}",
-        payload={
-            "thread_id": str(thread_id),
-            "session_id": str(thread.session_id),
-        },
-        sent_at=now,
-    )
-    db.add(notification)
+    if session_user_id is None:
+        logger.warning(
+            "Skipping support notification for thread %s: session %s has no user",
+            thread_id,
+            thread.session_id,
+        )
+    else:
+        notification = Notification(
+            id=uuid.uuid4(),
+            user_id=session_user_id,
+            type="SUPPORT_MESSAGE",
+            message=f"Nouveau message de l'agent : {body.content[:100]}",
+            payload={
+                "thread_id": str(thread_id),
+                "session_id": str(thread.session_id),
+            },
+            sent_at=now,
+        )
+        db.add(notification)
 
     await db.commit()
     await db.refresh(message)
@@ -1055,8 +1656,52 @@ async def send_support_message(
         content=message.content,
         attachment_path=message.attachment_path,
         attachment_sha256=message.attachment_sha256,
+        attachment_filename=_attachment_filename(message.attachment_path),
+        attachment_document_id=None,
         sent_at=message.sent_at,
         read_at=message.read_at,
+    )
+
+
+@router.get("/support/messages/{message_id}/attachment")
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def get_support_message_attachment(
+    request: Request,
+    message_id: uuid.UUID,
+    _agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN, AgentRole.THOMAS, AgentRole.SYLVIE)
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download attachment linked to a support message."""
+    result = await db.execute(
+        select(SupportMessage)
+        .options(selectinload(SupportMessage.thread))
+        .where(SupportMessage.id == message_id)
+    )
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Support message not found")
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == message.thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, _agent)
+    if not message.attachment_path:
+        raise HTTPException(status_code=404, detail="No attachment for this message")
+
+    resolved = _resolve_attachment_path(message.attachment_path)
+    if not resolved.exists() or not resolved.is_file():
+        raise HTTPException(status_code=404, detail="Attachment file not found on disk")
+
+    download_name = _attachment_filename(message.attachment_path) or resolved.name
+    return FileResponse(
+        path=str(resolved),
+        media_type=mimetypes.guess_type(resolved.name)[0]
+        or "application/octet-stream",
+        filename=download_name,
     )
 
 
@@ -1072,17 +1717,164 @@ async def mark_message_read(
 ):
     """Mark a support message as read."""
     result = await db.execute(
-        select(SupportMessage).where(SupportMessage.id == message_id)
+        select(SupportMessage)
+        .options(selectinload(SupportMessage.thread))
+        .where(SupportMessage.id == message_id)
     )
     message = result.scalar_one_or_none()
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == message.thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, _agent)
     message.read_at = datetime.now(timezone.utc)
     await db.commit()
     return {"status": "read", "message_id": str(message_id)}
 
 
+@router.post(
+    "/support/messages/{message_id}/promote-to-document",
+    response_model=PromoteAttachmentResponse,
+)
+@limiter.limit(settings.RATE_LIMIT_ADMIN)
+async def promote_support_attachment(
+    request: Request,
+    message_id: uuid.UUID,
+    body: PromoteAttachmentRequest,
+    current_agent: Agent = Depends(
+        require_agent_role(AgentRole.JEAN)
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    """Promote a support message's attachment to an official KYC document."""
+    # 1. Load support message
+    result = await db.execute(
+        select(SupportMessage)
+        .options(selectinload(SupportMessage.thread))
+        .where(SupportMessage.id == message_id)
+    )
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Support message not found")
+    if not message.attachment_path:
+        raise HTTPException(
+            status_code=400, detail="This message does not contain any attachment"
+        )
+    session_result = await db.execute(
+        select(KYCSession).where(KYCSession.id == message.thread.session_id)
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
+
+    # 2. Check if already promoted (doublon check)
+    session_id = message.thread.session_id
+    existing_doc_id = await _resolve_attachment_document_id(
+        db,
+        session_id,
+        message.attachment_path,
+        message.attachment_sha256,
+    )
+    if existing_doc_id:
+        raise HTTPException(
+            status_code=400,
+            detail="This attachment is already registered as a document in this session",
+        )
+
+    # 3. Get file info to create Document record
+    resolved_path = _resolve_attachment_path(message.attachment_path)
+    if not resolved_path.exists() or not resolved_path.is_file():
+        raise HTTPException(
+            status_code=404, detail="Attachment file not found on disk"
+        )
+
+    file_size = resolved_path.stat().st_size
+    sha256_hash = message.attachment_sha256 or "unknown_hash"
+
+    # Validate document categories & type
+    categories = [c.strip().upper() for c in body.categories if c.strip()]
+    if not categories:
+        raise HTTPException(status_code=400, detail="At least one category is required")
+    invalid = sorted(set(categories) - ALLOWED_DOC_CATEGORIES)
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid document categories: {', '.join(invalid)}",
+        )
+
+    primary_doc_type = body.doc_type.strip().upper()
+    if primary_doc_type not in ALLOWED_DOC_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Invalid doc_type")
+
+    now = datetime.now(timezone.utc)
+
+    # 4. Create Document entry
+    document_id = uuid.uuid4()
+    document = Document(
+        id=document_id,
+        session_id=session_id,
+        doc_type=primary_doc_type,
+        file_path=message.attachment_path,
+        sha256_hash=sha256_hash,
+        ocr_status="PENDING",
+        captured_at=now,
+        file_size_bytes=file_size,
+        ocr_raw_json={
+            "backoffice_classification": {
+                "categories": categories,
+                "primary_doc_type": primary_doc_type,
+                "classified_by": str(current_agent.id),
+                "classified_by_name": current_agent.name,
+                "classified_at": now.isoformat(),
+                "reason": body.reason,
+                "promoted_from_support_message_id": str(message_id),
+            }
+        }
+    )
+    db.add(document)
+
+    # 5. Create Audit Log
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        action="DOCUMENT_PROMOTE",
+        table_name="documents",
+        record_id=str(session_id),
+        new_data={
+            "document_id": str(document_id),
+            "doc_type": primary_doc_type,
+            "categories": categories,
+            "agent_name": current_agent.name,
+            "rationale": body.reason,
+            "source_message_id": str(message_id),
+        },
+        performed_by=current_agent.id,
+        performed_at=now,
+        client_ip=request.client.host if request.client else None,
+    )
+    db.add(audit)
+
+    await db.commit()
+
+    logger.info(
+        f"Agent {current_agent.id} promoted attachment from message {message_id} to document {document_id} (type={primary_doc_type})"
+    )
+
+    return PromoteAttachmentResponse(
+        session_id=session_id,
+        document_id=document_id,
+        doc_type=primary_doc_type,
+        categories=categories,
+        promoted_at=now,
+    )
+
+
 # --- OCR Correction ---
+
 
 
 class OcrCorrectRequest(BaseModel):
@@ -1116,6 +1908,7 @@ async def correct_ocr_field(
     session = session_result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    await _ensure_agent_can_access_session(db, session, current_agent)
 
     # Verify document belongs to session
     doc_result = await db.execute(
@@ -1164,6 +1957,19 @@ async def correct_ocr_field(
         performed_at=now,
     )
     db.add(audit)
+    await track_event_best_effort(
+        db,
+        event_type="OCR_CORRECTED",
+        session_id=session_uuid,
+        user_id=session.user_id,
+        agent_id=current_agent.id,
+        agency_id=session.agency_id,
+        step="ocr_correction",
+        status=session.status,
+        metadata={"field_name": body.field_name, "document_id": str(doc_uuid)},
+        request_id=_request_uuid(request),
+    )
+    await record_ocr_performance_best_effort(db, doc_uuid)
 
     await db.commit()
 

@@ -30,13 +30,7 @@ export const ScreenLayoutV2: React.FC<ScreenLayoutV2Props> = ({
   transparentHeader = false,
 }) => {
   return (
-    <div className={cn('min-h-screen bg-background flex flex-col relative', className)}>
-      {/* Decorative blobs */}
-      <div className="pointer-events-none absolute inset-0 opacity-60 overflow-hidden">
-        <div className="absolute -top-28 -right-20 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
-      </div>
-
+    <div className={cn('min-h-[100dvh] bg-background flex flex-col relative overflow-x-hidden', className)}>
       {/* App Bar */}
       {(title || showBack) && (
         <AppBar
@@ -51,7 +45,7 @@ export const ScreenLayoutV2: React.FC<ScreenLayoutV2Props> = ({
       {/* Scrollable content */}
       <main
         className={cn(
-          'flex-1 flex flex-col px-6 py-8 safe-bottom relative z-10 overflow-y-auto',
+          'flex-1 flex flex-col px-6 py-6 relative z-10 overflow-y-auto',
           center && 'items-center justify-center text-center',
           showNav && 'pb-24',
           contentClassName
@@ -64,8 +58,8 @@ export const ScreenLayoutV2: React.FC<ScreenLayoutV2Props> = ({
 
       {/* Sticky footer (CTA zone) */}
       {footer && (
-        <div className="shrink-0 z-20 safe-bottom bg-background/90 backdrop-blur-sm border-t border-border/50">
-          <div className="max-w-md mx-auto px-6 py-4">
+        <div className="shrink-0 z-20 bg-background/95 backdrop-blur-xl border-t border-border/50">
+          <div className="max-w-md mx-auto px-6 pt-3 pb-safe">
             {footer}
           </div>
         </div>

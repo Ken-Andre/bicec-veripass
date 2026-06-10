@@ -13,7 +13,7 @@ const PDF_MAX_PAGES = 5;
 const IMAGE_MAX_SIZE_BYTES = IMAGE_MAX_SIZE_MB * 1024 * 1024;
 const PDF_MAX_SIZE_BYTES = PDF_MAX_SIZE_MB * 1024 * 1024;
 const ACCEPTED_ATTACHMENT_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
-const ACCEPTED_ATTACHMENT_LABEL = `JPG/PNG ${IMAGE_MAX_SIZE_MB} Mo max - PDF ${PDF_MAX_SIZE_MB} Mo, ${PDF_MAX_PAGES} pages max`;
+const ACCEPTED_ATTACHMENT_LABEL = `JPG/PNG 4 Mo max - PDF ${PDF_MAX_SIZE_MB} Mo, ${PDF_MAX_PAGES} pages max`;
 
 function formatTime(d: string) {
   return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -251,7 +251,7 @@ export function SupportScreen() {
 
         <div className="shrink-0 border-t border-border bg-background/95 pt-3 pb-4">
           <div className="mb-2 flex items-center justify-between gap-3 text-[11px] font-medium text-muted-foreground">
-            <span>{ACCEPTED_ATTACHMENT_LABEL}</span>
+            <span data-testid="chat-upload-size-limit">{ACCEPTED_ATTACHMENT_LABEL}</span>
             <span className={remainingChars < 0 ? 'text-destructive' : ''}>{input.length}/{MAX_MESSAGE_CHARS}</span>
           </div>
 
@@ -284,6 +284,7 @@ export function SupportScreen() {
             <input
               ref={fileInputRef}
               type="file"
+              data-testid="chat-support-file-input"
               accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
               className="hidden"
               onChange={(event) => void handleFileChange(event.target.files?.[0] ?? null)}

@@ -1,13 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchQueue, fetchDossier, fetchAuditLog } from '@/services/dossier-service'
-import { fetchAmlAlerts, fetchNiuConflicts, fetchAgencies, fetchBatchJobs } from '@/services/aml-service'
-import type { QueueItem } from '@/services/dossier-service'
-import type { AmlAlert, NiuConflict, Agency, BatchJob } from '@/types/aml'
+import { fetchQueue, fetchQueueStats, fetchDossier, fetchAuditLog } from '@/services/dossier-service'
+import { fetchAmlAlerts, fetchAmlLists, fetchNiuConflicts, fetchAgencies, fetchBatchJobs, fetchDocumentExpiry } from '@/services/aml-service'
+import type { QueueItem, QueueStats } from '@/services/dossier-service'
+import type { AmlAlert, AmlListRegistryItem, NiuConflict, Agency, BatchJob, DocumentExpiryResponse } from '@/types/aml'
 
-export function useQueue() {
+export function useQueue(status?: string) {
   return useQuery<QueueItem[]>({
-    queryKey: ['queue'],
-    queryFn: fetchQueue,
+    queryKey: ['queue', status || 'active'],
+    queryFn: () => fetchQueue(status),
+    refetchInterval: 30_000,
+  })
+}
+
+export function useQueueStats() {
+  return useQuery<QueueStats>({
+    queryKey: ['queue-stats'],
+    queryFn: fetchQueueStats,
     refetchInterval: 30_000,
   })
 }
@@ -57,5 +65,21 @@ export function useBatchJobs() {
     queryKey: ['batch-jobs'],
     queryFn: fetchBatchJobs,
     refetchInterval: 30_000,
+  })
+}
+
+export function useDocumentExpiry() {
+  return useQuery<DocumentExpiryResponse>({
+    queryKey: ['document-expiry'],
+    queryFn: fetchDocumentExpiry,
+    refetchInterval: 30_000,
+  })
+}
+
+export function useAmlLists() {
+  return useQuery<AmlListRegistryItem[]>({
+    queryKey: ['aml-lists'],
+    queryFn: fetchAmlLists,
+    refetchInterval: 60_000,
   })
 }

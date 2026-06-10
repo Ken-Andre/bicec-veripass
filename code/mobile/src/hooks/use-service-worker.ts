@@ -22,15 +22,21 @@ export function useServiceWorker(): ServiceWorkerState {
   const [needsRefresh, setNeedsRefresh] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
 
-  // updateSW is the function returned by registerSW — calling it with true
+  // updateSW is the function returned by registerSW; calling it with true
   // forces the waiting SW to skipWaiting and reloads the page.
   const [updateFn, setUpdateFn] = useState<((reloadPage?: boolean) => Promise<void>) | null>(null);
 
   useEffect(() => {
+    let reloading = false;
+    const cleanups: Array<() => void> = [];
     const update = registerSW({
       immediate: true,
       onNeedRefresh() {
+        reloading = true;
         setNeedsRefresh(true);
+        update(true).catch((err) => {
+          console.warn('[SW] Update failed:', err);
+        });
       },
       onOfflineReady() {
         setOfflineReady(true);
@@ -40,7 +46,28 @@ export function useServiceWorker(): ServiceWorkerState {
           console.log('[SW] Registered:', registration);
         }
         if (registration) {
-          setInterval(() => registration.update(), 60 * 60 * 1000);
+          const refresh = () => {
+            if (navigator.onLine) {
+              registration.update().catch((err) => {
+                console.warn('[SW] Registration update failed:', err);
+              });
+            }
+          };
+          const interval = window.setInterval(refresh, 2 * 60 * 1000);
+          const handleOnline = () => refresh();
+          const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') refresh();
+          };
+
+          refresh();
+          window.addEventListener('online', handleOnline);
+          document.addEventListener('visibilitychange', handleVisibilityChange);
+
+          cleanups.push(() => {
+            window.clearInterval(interval);
+            window.removeEventListener('online', handleOnline);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+          });
         }
       },
       onRegisterError(error) {
@@ -48,9 +75,21 @@ export function useServiceWorker(): ServiceWorkerState {
       },
     });
 
+    const handleControllerChange = () => {
+      if (!reloading) return;
+      window.location.reload();
+    };
+
+    navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange);
+
     setTimeout(() => {
       setUpdateFn(() => update);
     }, 0);
+
+    return () => {
+      navigator.serviceWorker?.removeEventListener('controllerchange', handleControllerChange);
+      cleanups.forEach((cleanup) => cleanup());
+    };
   }, []);
 
   useEffect(() => {
@@ -65,7 +104,9 @@ export function useServiceWorker(): ServiceWorkerState {
   }, []);
 
   const updateSW = useCallback(() => {
-    updateFn?.(true);
+    updateFn?.(true).catch((err) => {
+      console.warn('[SW] updateSW failed:', err);
+    });
   }, [updateFn]);
 
   const dismiss = useCallback(() => {

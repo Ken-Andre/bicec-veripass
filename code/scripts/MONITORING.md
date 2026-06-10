@@ -51,14 +51,11 @@ docker image prune -a -f
 # Conteneurs arrêtés depuis plus de 24h
 docker container prune --filter "until=24h" -f
 
-# Volumes non utilisés
-docker volume prune -f
-
 # Build cache de plus de 7 jours
 docker builder prune --filter "until=168h" -f
 
-# Tout nettoyer (⚠️ DANGER)
-docker system prune -a --volumes -f
+# Tout nettoyer hors volumes persistants
+docker system prune -a -f
 ```
 
 ## Logs et alertes
@@ -126,7 +123,8 @@ Préférer les volumes nommés (gérés par Docker) :
 ```yaml
 volumes:
   db_storage:  # Volume nommé (géré)
-    driver: local
+    external: true
+    name: ${VP_DB_VOLUME_NAME:-code_db_storage}
 
 services:
   postgres:
@@ -146,8 +144,8 @@ df -h
 # 2. Identifier les gros consommateurs
 docker system df -v | sort -k3 -h
 
-# 3. Nettoyage d'urgence
-docker system prune -a --volumes -f
+# 3. Nettoyage d'urgence hors volumes persistants
+docker system prune -a -f
 
 # 4. Redémarrer Docker
 sudo systemctl restart docker  # Linux
@@ -175,10 +173,8 @@ DOCKER_BUILDKIT=1 docker build --cache-from=myimage:latest .
 # Lister les volumes orphelins
 docker volume ls -qf dangling=true
 
-# Les supprimer
-docker volume prune -f
-
-# Vérifier qu'aucun volume important n'est orphelin
+# Ne pas supprimer automatiquement les volumes: verifier manuellement
+# chaque volume orphelin avant une suppression explicite.
 docker volume ls
 ```
 

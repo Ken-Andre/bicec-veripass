@@ -16,8 +16,8 @@ export const DashboardLayout: React.FC = () => {
   const showNav = !hiddenNavPaths.some((p) => location.pathname.startsWith(p));
 
   return (
-    <div className="h-[100dvh] bg-background relative flex flex-col">
-      <main className={cn('flex-1 overflow-y-auto', showNav && 'pb-24')}>
+    <div className="h-[100dvh] bg-background relative flex flex-col overflow-hidden">
+      <main className={cn('flex-1 overflow-y-auto', showNav && 'pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]')}>
         <Outlet />
       </main>
       {showNav && <BottomNav />}

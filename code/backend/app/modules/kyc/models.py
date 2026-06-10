@@ -29,6 +29,18 @@ class KYCSession(Base):
     status = Column(String(50), nullable=False, default="DRAFT")
     access_level = Column(String(50), nullable=False, default="RESTRICTED")
     niu_type = Column(String(50), nullable=True)  # DECLARATIVE, UPLOADED, MISSING
+    niu_number = Column(String(32), nullable=True)
+    niu_declarative = Column(Boolean, nullable=False, default=False)
+
+    address_city = Column(String(100), nullable=True)
+    address_commune = Column(String(100), nullable=True)
+    address_quartier = Column(String(100), nullable=True)
+    address_lieu_dit = Column(String(150), nullable=True)
+    address_details = Column(Text, nullable=True)
+    gps_latitude = Column(Numeric(10, 7), nullable=True)
+    gps_longitude = Column(Numeric(10, 7), nullable=True)
+    utility_provider = Column(String(30), nullable=True)
+    utility_bill_date = Column(DATE, nullable=True)
 
     confidence_score_global = Column(Numeric(5, 4), nullable=True)
     liveness_strike_count = Column(Integer, default=0)
@@ -44,6 +56,11 @@ class KYCSession(Base):
     )
     submitted_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def created_at(self):
+        """Backward-compatible alias for modules that expect a created_at field."""
+        return self.started_at
 
     client_name = Column(String(200), nullable=True)
     last_step_completed = Column(String(100), nullable=True)
@@ -158,6 +175,11 @@ class BiometricResult(Base):
     )
 
     face_match_score = Column(Numeric(5, 4), nullable=True)
+    face_match_status = Column(String(20), nullable=True)
+    face_match_reason = Column(Text, nullable=True)
+    face_match_distance = Column(Numeric(8, 6), nullable=True)
+    face_match_threshold = Column(Numeric(5, 4), nullable=True)
+    face_match_detector = Column(String(50), nullable=True)
     liveness_score = Column(Numeric(5, 4), nullable=True)
     anti_spoofing_score = Column(Numeric(5, 4), nullable=True)
 
@@ -185,6 +207,7 @@ class ValidationDecision(Base):
     reason = Column(Text, nullable=True)
 
     agent_ip = Column(INET, nullable=True)
+    review_duration_ms = Column(Integer, nullable=True)
     decided_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -215,7 +238,7 @@ class DossierAssignment(Base):
 
 
 class AmlAlertStatus(str, Enum):
-    PENDING = "PENDING"
+    OPEN = "OPEN"
     CLEARED = "CLEARED"
     CONFIRMED = "CONFIRMED"
     ESCALATED = "ESCALATED"
@@ -283,9 +306,16 @@ class DuplicateCheck(Base):
     )
 
     match_type = Column(String(50), nullable=False)
+    niu_number = Column(String(32), nullable=True)
+    similarity_score = Column(Numeric(5, 4), nullable=True)
+    status = Column(String(50), nullable=False, default="OPEN")
     resolution = Column(String(50), nullable=True)
+    justification = Column(Text, nullable=True)
     resolved_by = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     # Relationships
     session_new = relationship(
@@ -380,3 +410,18 @@ class Notification(Base):
 
     # Relationships
     user = relationship("User", back_populates="notifications")
+
+
+class ATM(Base):
+    __tablename__ = "atms"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False)
+    city = Column(String(50), nullable=False)
+    address = Column(String(200), nullable=False)
+    latitude = Column(Numeric(10, 6), nullable=False)
+    longitude = Column(Numeric(10, 6), nullable=False)
+    services = Column(JSONB, nullable=False, default=list)  # e.g., ["Retrait", "Depot cheque"]
+    available_24h = Column(Boolean, default=True)
+    access_tier = Column(String(20), default="basic")  # basic vs full
+    last_verified = Column(DATE, default=lambda: datetime.now(timezone.utc).date())

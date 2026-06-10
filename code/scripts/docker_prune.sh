@@ -97,7 +97,12 @@ prune_docker() {
     if [ "$DRY_RUN" = true ]; then
         log "INFO" "${YELLOW}DRY RUN MODE - No actual cleanup will be performed${NC}"
         echo ""
-        echo "Would remove:"
+        echo "Would clean non-volume Docker resources:"
+        echo "  - stopped containers"
+        echo "  - dangling images"
+        echo "  - unused networks"
+        echo "  - build cache"
+        echo "  - Docker volumes: skipped"
         docker system df
         return 0
     fi
@@ -114,9 +119,9 @@ prune_docker() {
     log "INFO" "Removing unused networks..."
     docker network prune -f || log "WARN" "Failed to prune networks"
     
-    # Remove unused volumes (be careful with this!)
-    log "INFO" "Removing unused volumes..."
-    docker volume prune -f || log "WARN" "Failed to prune volumes"
+    # Never prune volumes automatically: this project stores database backups,
+    # PostgreSQL data, and KYC documents in persistent Docker volumes.
+    log "INFO" "Skipping volume prune; persistent volumes are never removed automatically."
     
     # Remove build cache
     log "INFO" "Removing build cache..."
@@ -167,4 +172,3 @@ main() {
 
 # Run main function
 main
-

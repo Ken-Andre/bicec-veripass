@@ -2,6 +2,7 @@
 name = "bicec-veripass-backend"
 version = "0.1.0"
 description = "Sovereign digital KYC onboarding platform for BICEC (Cameroon)"
+license = "LicenseRef-BICEC-VeriPass-Proprietary"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
@@ -32,6 +33,7 @@ dependencies = [
     "Pillow>=10.0",
     # Biometrics
     "deepface>=0.0.89",
+    "onnxruntime>=1.18",
     "tf-keras>=2.16",  # Required by retinaface (DeepFace detector) with TensorFlow 2.16+
 ]
 

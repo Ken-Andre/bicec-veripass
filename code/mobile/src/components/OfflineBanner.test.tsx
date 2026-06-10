@@ -139,6 +139,9 @@ describe('OfflineBanner', () => {
 
     setState({ isOnline: true, pendingCount: 0 });
     rerender(<OfflineBanner />);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     expect(screen.getByText(/Connexion rétablie/i)).toBeInTheDocument();
 
     advancePastJustOnline();
@@ -210,6 +213,9 @@ describe('OfflineBanner', () => {
     // Go offline — the useEffect resets dismissed when isOnline changes
     setState({ isOnline: false, pendingCount: 1 });
     rerender(<OfflineBanner />);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
 
     // Banner should reappear because going offline resets dismissed
     expect(screen.getByText(/Hors ligne/i)).toBeInTheDocument();

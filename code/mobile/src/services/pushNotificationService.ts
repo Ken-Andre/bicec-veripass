@@ -7,6 +7,25 @@ interface PushSubscriptionResponse {
   is_active: boolean;
 }
 
+export type PushEnableCode =
+  | 'enabled'
+  | 'unsupported'
+  | 'permission_denied'
+  | 'missing_vapid_key'
+  | 'service_worker_unavailable'
+  | 'subscription_failed'
+  | 'server_unavailable';
+
+export interface PushEnableResult {
+  enabled: boolean;
+  code: PushEnableCode;
+  message: string;
+}
+
+function pushResult(code: PushEnableCode, message: string, enabled = false): PushEnableResult {
+  return { enabled, code, message };
+}
+
 async function getReadyServiceWorker(timeoutMs = 2000): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) return null;
   try {
@@ -30,47 +49,66 @@ function urlBase64ToUint8Array(value: string): Uint8Array {
   return outputArray;
 }
 
-export async function enablePushNotifications(): Promise<boolean> {
+export async function enablePushNotifications(): Promise<PushEnableResult> {
   if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-    return false;
+    return pushResult('unsupported', "Les notifications push ne sont pas prises en charge sur cet appareil.");
   }
 
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return false;
+  if (permission !== 'granted') {
+    return pushResult('permission_denied', "Autorisation refusee. Activez les notifications dans les reglages de l'appareil.");
+  }
 
   const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
-  if (!vapidKey) return false;
+  if (!vapidKey) {
+    return pushResult('missing_vapid_key', 'Configuration push indisponible. Reessayez plus tard.');
+  }
 
   const registration = await getReadyServiceWorker();
-  if (!registration) return false;
-  const existing = await registration.pushManager.getSubscription();
-  const applicationServerKey = urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer;
-  const subscription = existing || await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey,
-  });
+  if (!registration) {
+    return pushResult('service_worker_unavailable', 'Service de notification indisponible. Rouvrez l application et reessayez.');
+  }
+
+  let subscription: PushSubscription;
+  try {
+    const existing = await registration.pushManager.getSubscription();
+    const applicationServerKey = urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer;
+    subscription = existing || await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+  } catch {
+    return pushResult('subscription_failed', 'Impossible de creer l abonnement push sur cet appareil.');
+  }
 
   const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+    return pushResult('subscription_failed', 'Abonnement push incomplet. Reessayez.');
+  }
 
-  const saved = await apiClient.post<PushSubscriptionResponse, {
-    endpoint: string;
-    keys: { p256dh: string; auth: string };
-    user_agent: string;
-    device_tag: string | null;
-  }>('/notifications/subscriptions', {
-    endpoint: json.endpoint,
-    keys: {
-      p256dh: json.keys?.p256dh,
-      auth: json.keys?.auth,
-    },
-    user_agent: navigator.userAgent,
-    device_tag: localStorage.getItem('vp_device_tag'),
-  });
+  let saved: PushSubscriptionResponse;
+  try {
+    saved = await apiClient.post<PushSubscriptionResponse, {
+      endpoint: string;
+      keys: { p256dh: string; auth: string };
+      user_agent: string;
+      device_tag: string | null;
+    }>('/notifications/subscriptions', {
+      endpoint: json.endpoint,
+      keys: {
+        p256dh: json.keys?.p256dh,
+        auth: json.keys?.auth,
+      },
+      user_agent: navigator.userAgent,
+      device_tag: localStorage.getItem('vp_device_tag'),
+    });
+  } catch {
+    return pushResult('server_unavailable', 'Autorisation acceptee, mais le service est temporairement indisponible.');
+  }
 
   localStorage.setItem('vp_push_subscription_id', saved.id);
   localStorage.setItem('vp_push_enabled', 'true');
-  return true;
+  return pushResult('enabled', 'Notifications push activees.', true);
 }
 
 export async function disablePushNotifications(): Promise<void> {

@@ -1,4 +1,4 @@
-﻿import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -16,8 +16,8 @@ export default defineConfig(async ({ mode }) => {
         start_url: '/mobile/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#FBF8F3',
-        theme_color: '#E37B03',
+        background_color: '#1A0F00',
+        theme_color: '#1A0F00',
         icons: [
           {
             src: 'favicon.svg',
@@ -27,8 +27,11 @@ export default defineConfig(async ({ mode }) => {
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        globIgnores: ['**/sw.js', '**/workbox-*.js'],
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'],
+        globIgnores: ['**/sw.js', '**/workbox-*.js', '**/startup/**'],
         navigateFallback: '/mobile/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
@@ -83,16 +86,10 @@ export default defineConfig(async ({ mode }) => {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+      fileParallelism: false,
     },
     build: {
       sourcemap: mode === 'production',
-      rollupOptions: {
-        output: {
-          manualChunks(id: string) {
-            if (id.includes('node_modules')) return 'vendor';
-          },
-        },
-      },
     },
     server: {
       port: 3000,

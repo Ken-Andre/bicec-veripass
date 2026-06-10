@@ -1,17 +1,17 @@
-import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { KycProvider } from "./contexts/KycContext";
 import { KycHydrationGate } from "./components/KycHydrationGate";
 import { KycStepGuard } from "./hooks/useKycFlow";
-import { KycResumeBanner } from "./components/KycResumeBanner";
 import { OfflineBanner } from "./components/OfflineBanner";
 import { PageLoader } from "./components/PageLoader";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { useServiceWorker } from "./hooks/use-service-worker";
+import { setViewportChromeColor } from "./lib/appChrome";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +68,11 @@ const DashboardPage = lazy(() =>
 const CardsScreen = lazy(() =>
   import("./views/dashboard/CardsScreen").then((m) => ({
     default: m.CardsScreen,
+  })),
+);
+const AtmFinderScreen = lazy(() =>
+  import("./views/dashboard/AtmFinderScreen").then((m) => ({
+    default: m.AtmFinderScreen,
   })),
 );
 const TransfersScreen = lazy(() =>
@@ -168,6 +173,9 @@ const InfoRequestedScreen = lazy(
 const DeleteAccountScreen = lazy(
   () => import("./views/settings/DeleteAccountScreen"),
 );
+const LegalDocumentsScreen = lazy(
+  () => import("./views/settings/LegalDocumentsScreen"),
+);
 
 // --- 404 ---
 const NotFoundPage = lazy(() =>
@@ -183,15 +191,10 @@ function AuthenticatedKycProvider({ children }: { children: ReactNode }) {
   return <KycProvider>{children}</KycProvider>;
 }
 
-function AuthenticatedKycResumeBanner() {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) return null;
-  return <KycResumeBanner />;
-}
-
 function LockGuard({ children }: { children: React.ReactNode }) {
   const { isLocked } = useAuth();
-  if (isLocked) return <Navigate to="/auth/lock" replace />;
+  const sessionLocked = sessionStorage.getItem("vp_is_locked") === "true";
+  if (isLocked && sessionLocked) return <Navigate to="/auth/lock" replace />;
   return <>{children}</>;
 }
 
@@ -210,6 +213,24 @@ function CniVersoCapture() {
   return <CniCaptureScreen side="verso" nextRoute="/kyc/ocr-review" />;
 }
 
+function MetaThemeColor() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === "/") return;
+
+    const color = path.includes("capture")
+      ? "#000000"
+      : path === "/dashboard"
+        ? "#E37B03"
+        : "#FBF8F3";
+    setViewportChromeColor(color);
+  }, [location.pathname]);
+
+  return null;
+}
+
 function App() {
   const { needsRefresh, updateSW, dismiss } = useServiceWorker();
 
@@ -217,11 +238,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <BrowserRouter basename="/mobile">
+          <MetaThemeColor />
           <AuthProvider>
             <AuthenticatedKycProvider>
               <OfflineBanner />
               {needsRefresh && (
-                <div className="fixed inset-x-4 top-4 z-[100] mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-white px-4 py-3 text-sm shadow-xl">
+                <div className="fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-[100] mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-white px-4 py-3 text-sm shadow-xl">
                   <span className="font-semibold text-foreground">Nouvelle version disponible</span>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={dismiss} className="text-xs font-bold text-muted-foreground">
@@ -233,7 +255,6 @@ function App() {
                   </div>
                 </div>
               )}
-              <AuthenticatedKycResumeBanner />
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
@@ -277,6 +298,7 @@ function App() {
                     >
                       <Route path="/dashboard" element={<DashboardPage />} />
                       <Route path="/cards" element={<CardsScreen />} />
+                      <Route path="/cards/atm-finder" element={<AtmFinderScreen />} />
                       <Route path="/transfers" element={<TransfersScreen />} />
                       <Route
                         path="/transfers/send"
@@ -293,6 +315,10 @@ function App() {
                       />
                       <Route path="/more" element={<MoreScreen />} />
                       <Route path="/settings" element={<SettingsScreen />} />
+                      <Route
+                        path="/settings/legal"
+                        element={<LegalDocumentsScreen />}
+                      />
                       <Route
                         path="/notifications"
                         element={<NotificationsScreen />}

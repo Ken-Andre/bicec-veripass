@@ -1,0 +1,23 @@
+
+flowchart LR
+    subgraph V["Volumes Docker (externes — NE PAS supprimer)"]
+        DBV["code_db_storage<br/>(données PostgreSQL)"]
+        DBB["code_db_backups<br/>(pg_dump quotidien)"]
+        DOCV["code_documents_storage<br/>(CNI, selfies, factures)"]
+        MODV["code_models_storage<br/>(PaddleOCR, GLM, MiniFASNet)"]
+        RDV["redis_data<br/>(transient)"]
+        PXV["models_paddlex_storage<br/>(cache PaddleX)"]
+        NCV["nginx_certs<br/>(certificats TLS locaux)"]
+    end
+
+    API[vp_api] --> DBV
+    API --> DOCV
+    API --> MODV
+    BEAT[vp_celery_beat] --> DBB
+    BEAT --> DBV
+    BEAT --> DOCV
+    OCR[vp_celery_ocr] --> DOCV
+    OCR --> MODV
+    PG[vp_postgres] --> DBV
+    RD[vp_redis] --> RDV
+    NGX[vp_nginx] --> NCV

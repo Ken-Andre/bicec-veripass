@@ -16,6 +16,10 @@ interface KycErrorContext {
   extra?: Record<string, unknown>;
 }
 
+const MOBILE_SENTRY_DSN =
+  import.meta.env.VITE_SENTRY_DSN ??
+  'https://1b4659211a1efab3936b4d3706dc9aa2@o4511113586409472.ingest.de.sentry.io/4511114011410512';
+
 // Sentry proxy endpoint - avoids tracking prevention blockers
 // Events are sent to our backend which forwards to Sentry server-side
 const SENTRY_PROXY_URL = import.meta.env.VITE_API_URL
@@ -33,8 +37,32 @@ function safeUserRole(): string {
   }
 }
 
+function eventText(event: Sentry.Event): string {
+  const parts = [
+    event.message,
+    event.exception?.values?.map((value) => `${value.type || ''} ${value.value || ''}`).join(' '),
+  ];
+  return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+export function shouldDropMobileSentryEventForNoise(event: Sentry.Event): boolean {
+  const text = eventText(event);
+  return [
+    'failed to update a serviceworker',
+    'unsupported mime type',
+    'notallowederror: permission denied',
+    'timeout starting video source',
+    'signal is aborted without reason',
+    'bill_upload_504_gateway_timeout',
+    'bill_upload_client_timeout',
+    'bill_capture_504_gateway_timeout',
+    'bill_capture_client_timeout',
+    'internal error',
+  ].some((fragment) => text.includes(fragment));
+}
+
 export function initMobileSentry(): void {
-  if (!import.meta.env.VITE_SENTRY_DSN) return;
+  if (!MOBILE_SENTRY_DSN) return;
 
   const isProd = import.meta.env.MODE === 'production';
 
@@ -49,12 +77,14 @@ export function initMobileSentry(): void {
       const sentryKey = url.searchParams.get('sentry_key') || '';
       const sentryVersion = url.searchParams.get('sentry_version') || '7';
       const sentryClient = url.searchParams.get('sentry_client') || '';
+      const sentryProject = url.pathname.split('/').filter(Boolean).at(-2) || '';
 
       // Build proxy URL — use relative path so it works regardless of VITE_API_URL at build time
       const proxyUrl = new URL(SENTRY_PROXY_URL, window.location.origin);
       proxyUrl.searchParams.set('sentry_key', sentryKey);
       proxyUrl.searchParams.set('sentry_version', sentryVersion);
       proxyUrl.searchParams.set('sentry_client', sentryClient);
+      proxyUrl.searchParams.set('sentry_project', sentryProject);
 
       const bodyStr = typeof request.body === 'string' ? request.body : new TextDecoder().decode(request.body);
 
@@ -86,14 +116,18 @@ export function initMobileSentry(): void {
     });
 
   Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
+    dsn: MOBILE_SENTRY_DSN,
+    sendDefaultPii: true,
     transport: makeProxyTransport as Parameters<typeof Sentry.init>[0]['transport'],
-    integrations: [Sentry.browserTracingIntegration()],
+    integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
     tracesSampleRate: isProd ? 0.1 : 0,
+    replaysSessionSampleRate: isProd ? 0.1 : 1.0,
+    replaysOnErrorSampleRate: 1.0,
     environment: import.meta.env.MODE,
     release: `veripass-mobile@${import.meta.env.VITE_APP_VERSION || '0.1.0'}`,
     beforeSend(event) {
       if (!isProd) return null;
+      if (shouldDropMobileSentryEventForNoise(event)) return null;
       return event;
     },
   });
@@ -105,7 +139,7 @@ export function captureKycException(
   eventName: KycEventName,
   ctx: KycErrorContext = {},
 ): void {
-  if (!import.meta.env.VITE_SENTRY_DSN) return;
+  if (!MOBILE_SENTRY_DSN) return;
   Sentry.withScope((scope) => {
     scope.setTag('domain', 'kyc');
     scope.setTag('event_name', eventName);
@@ -130,7 +164,7 @@ export function captureKycMessage(
   eventName: KycEventName,
   ctx: KycErrorContext = {},
 ): void {
-  if (!import.meta.env.VITE_SENTRY_DSN) return;
+  if (!MOBILE_SENTRY_DSN) return;
   Sentry.withScope((scope) => {
     scope.setTag('domain', 'kyc');
     scope.setTag('event_name', eventName);

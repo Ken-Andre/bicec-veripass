@@ -1,5 +1,6 @@
 import { apiClient, fetchWithCorrelation } from './apiClient';
 import type { KycStepType, LivenessResult, AddressData } from '../types';
+import type { AcceptedLegalDocument } from './legalDocuments';
 import {
   decryptJsonPayload,
   enqueueKycSyncItem,
@@ -53,6 +54,7 @@ interface ConsentPayload {
   cgu_accepted: boolean;
   privacy_accepted: boolean;
   data_processing_accepted: boolean;
+  accepted_documents?: AcceptedLegalDocument[];
 }
 
 interface SignaturePayload {
@@ -161,8 +163,15 @@ function classifyHttpSyncError(
         : `HTTP_${responseStatus}`;
 
   if (responseStatus === 409) {
-    return new SyncError(`${operation}_hash_mismatch`, {
-      code: 'HASH_MISMATCH',
+    const detailRecord = detail && typeof detail === 'object'
+      ? detail as Record<string, unknown>
+      : {};
+    const nestedDetail = detailRecord.detail && typeof detailRecord.detail === 'object'
+      ? detailRecord.detail as Record<string, unknown>
+      : {};
+    const detailCode = detailRecord.code || nestedDetail.code || 'CONFLICT';
+    return new SyncError(`${operation}_conflict`, {
+      code: String(detailCode),
       retryable: false,
       queueStatus: 'needs_reupload',
     });
@@ -247,7 +256,11 @@ async function uploadCni(item: KycSyncQueueItem): Promise<void> {
       sessionId: item.session_id,
       step: item.step,
       operation: 'offline_replay_capture_cni_hash_check',
-      extra: { queue_item_id: item.id },
+      extra: {
+        queue_item_id: item.id,
+        client_sha256_prefix: clientSha.slice(0, 12),
+        server_sha256_prefix: serverSha.slice(0, 12),
+      },
     });
     throw new SyncError('capture_cni_hash_mismatch_local_check', {
       code: 'HASH_MISMATCH',
@@ -276,13 +289,14 @@ async function uploadLiveness(item: KycSyncQueueItem): Promise<void> {
         body: formData,
       });
       if (!selfieRes.ok) {
-        captureKycMessage('Offline replay: selfie upload failed, liveness will proceed without face match', 'upload_failure', {
+        const detail = await selfieRes.json().catch(() => null);
+        captureKycMessage('Offline replay: selfie upload failed, liveness replay blocked', 'upload_failure', {
           sessionId: item.session_id,
           step: 'liveness',
           operation: 'offline_replay_selfie_upload',
           extra: { queue_item_id: item.id, status: selfieRes.status },
         });
-        // Non-fatal: liveness submit can still succeed, just without face match
+        throw classifyHttpSyncError(selfieRes.status, 'selfie_upload', detail);
       }
     } catch (err) {
       captureKycException(err, 'upload_failure', {
@@ -291,7 +305,7 @@ async function uploadLiveness(item: KycSyncQueueItem): Promise<void> {
         operation: 'offline_replay_selfie_upload',
         extra: { queue_item_id: item.id },
       });
-      // Non-fatal: continue with liveness submit
+      throw err;
     }
   }
 
@@ -371,6 +385,7 @@ async function submitConsent(item: KycSyncQueueItem): Promise<void> {
       cgu_accepted: payload.cgu_accepted,
       privacy_accepted: payload.privacy_accepted,
       data_processing_accepted: payload.data_processing_accepted,
+      accepted_documents: payload.accepted_documents,
     }),
   });
   if (!response.ok) {
@@ -592,6 +607,7 @@ export async function enqueueOfflineConsent(input: {
   cguAccepted: boolean;
   privacyAccepted: boolean;
   dataProcessingAccepted: boolean;
+  acceptedDocuments?: AcceptedLegalDocument[];
 }): Promise<void> {
   await enqueueKycSyncItem({
     op_type: 'submit_consent',
@@ -601,6 +617,7 @@ export async function enqueueOfflineConsent(input: {
       cgu_accepted: input.cguAccepted,
       privacy_accepted: input.privacyAccepted,
       data_processing_accepted: input.dataProcessingAccepted,
+      accepted_documents: input.acceptedDocuments,
     } satisfies ConsentPayload,
     meta: { cgu_accepted: String(input.cguAccepted) },
   });

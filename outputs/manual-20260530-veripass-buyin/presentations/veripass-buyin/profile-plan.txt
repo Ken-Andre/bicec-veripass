@@ -1,0 +1,33 @@
+Task mode: create
+Primary deck profile: product-platform
+Secondary gates: gtm-growth
+
+Required proof objects:
+- Product system map showing client, agent, compliance, command center.
+- Client journey visual showing how desire becomes a usable KYC proof.
+- Stakeholder value map focused on "what each person buys into".
+- Commercial growth loop linking KYC to account activation, BI PAY, cards, savings and relationship growth.
+- Pilot ask slide that converts the demo into a decision.
+
+Source/asset requirements:
+- Use local project screenshots only for product UI evidence.
+- Use the local BICEC emblem asset already present in the repository.
+- Do not use unverified external logos, partner marks, or invented BICEC scale figures.
+- Do not use BICEC internal employee/client/branch counts as persuasion.
+
+Brand authenticity constraints:
+- Local asset docs/Bicec_logo.jpg is treated as the supplied BICEC emblem.
+- Product screenshots are generated from the local MVP evidence folders.
+- No fabricated identity marks.
+
+Profile-specific QA gates:
+- Deck must show a product system, not a feature list.
+- Each capability must tie to adoption, control, revenue relationship, or decision confidence.
+- Growth loop must make sense without fabricated conversion numbers.
+- No "backlog" framing and no BICEC-org explainer.
+
+Known missing inputs:
+- Real BICEC cost per opened account.
+- Current branch-level journey metrics.
+- Real compliance rework rate.
+- Pilot sponsor names.

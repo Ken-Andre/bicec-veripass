@@ -143,7 +143,8 @@ def test_face_verify_pipeline() -> dict:
     selfie_path = Path(make_face_image())
     
     t0 = time.time()
-    score = _deepface_verify_if_available(cni_path, selfie_path)
+    face_match = _deepface_verify_if_available(cni_path, selfie_path)
+    score = face_match.score
     elapsed_ms = (time.time() - t0) * 1000
     
     if score is not None:
@@ -155,7 +156,7 @@ def test_face_verify_pipeline() -> dict:
     else:
         print("  Face match returned None (DeepFace unavailable)")
     
-    return {"score": score, "elapsed_ms": elapsed_ms}
+    return {"score": score, "status": face_match.status, "elapsed_ms": elapsed_ms}
 
 
 def test_byte_histogram_fallback() -> dict:
@@ -163,26 +164,18 @@ def test_byte_histogram_fallback() -> dict:
     print("\n" + "=" * 70)
     print("TEST 4: Byte histogram similarity fallback")
     print("=" * 70)
+    import app.modules.kyc.service as service
+
+    removed = not hasattr(service, "_byte_histogram_similarity")
+    print(f"  _byte_histogram_similarity removed from service: {removed}")
+    return {"removed": removed}
+    if False:
     
-    from app.modules.kyc.service import _byte_histogram_similarity
     
     # Same image → should be high similarity
-    cni_path = Path(make_face_image(color=(180, 140, 110)))
-    selfie_same = Path(make_face_image(color=(180, 140, 110)))
-    selfie_diff = Path(make_different_face_image())
     
-    score_same = _byte_histogram_similarity(cni_path, selfie_same)
-    score_diff = _byte_histogram_similarity(cni_path, selfie_diff)
-    
-    print(f"  Same face images similarity: {score_same:.4f}")
-    print(f"  Different face images similarity: {score_diff:.4f}")
-    
-    if score_same > score_diff:
-        print("  Same-face score > different-face score: PASS")
-    else:
         print("  Same-face score ≤ different-face score: synthetic images may not differ enough")
     
-    return {"score_same": score_same, "score_diff": score_diff}
 
 
 def test_ocr_extraction() -> dict:
@@ -270,7 +263,7 @@ def main():
     if not r1:
         all_pass = False
         print("\n⚠️  DeepFace import failed — skipping detector-specific tests")
-        print("    The opencv fallback and byte histogram can still be tested.")
+        print("    The opencv detector fallback can still be tested.")
     
     # Test 2: tf-keras availability
     r2 = test_tf_keras_availability()
@@ -323,7 +316,7 @@ def main():
     critical_tests = [
         ("DeepFace import", results.get("deepface_import", False)),
         ("Face verify pipeline", results.get("face_verify_pipeline", {}).get("score") is not None),
-        ("Byte histogram fallback", results.get("byte_histogram", {}).get("score_same", 0) > 0),
+        ("Byte histogram fallback removed", results.get("byte_histogram", {}).get("removed", False)),
     ]
     
     for name, passed in critical_tests:

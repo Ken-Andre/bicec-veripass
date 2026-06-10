@@ -9,6 +9,8 @@ from app.modules.audit import models as audit_models  # noqa: F401
 from app.modules.aml import models as aml_models  # noqa: F401
 from app.modules.analytics import models as analytics_models  # noqa: F401
 from app.modules.backoffice import models as backoffice_models  # noqa: F401
+from app.modules.banking import models as banking_models  # noqa: F401
+from app.modules.devices import models as devices_models  # noqa: F401
 from app.modules.notifications import models as notifications_models  # noqa: F401
 
 __all__ = [
@@ -19,5 +21,7 @@ __all__ = [
     "aml_models",
     "analytics_models",
     "backoffice_models",
+    "banking_models",
+    "devices_models",
     "notifications_models",
 ]

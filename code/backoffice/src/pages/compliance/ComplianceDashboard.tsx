@@ -4,11 +4,11 @@
  * Mapping vers BICEC VeriPass — RBAC THOMAS, données depuis API (no mock)
  */
 import { useMemo } from 'react';
-import { useAmlAlerts, useNiuConflicts } from '@/hooks/useQueryHooks';
+import { useAmlAlerts, useDocumentExpiry, useNiuConflicts } from '@/hooks/useQueryHooks';
 import { usePagination } from '@/hooks/usePagination';
 import { cn } from '@/lib/utils';
 import {
-  ShieldAlert, GitMerge, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Loader2,
+  ShieldAlert, GitMerge, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Loader2, CalendarClock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -30,7 +30,7 @@ const severityColors: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-800',
+  OPEN: 'bg-yellow-100 text-yellow-800',
   CLEARED: 'bg-green-100 text-green-800',
   CONFIRMED: 'bg-red-100 text-red-800',
   ESCALATED: 'bg-purple-100 text-purple-800',
@@ -40,8 +40,9 @@ export default function ComplianceDashboard() {
   const navigate = useNavigate();
   const { data: alerts, isLoading: alertsLoading, error: alertsError } = useAmlAlerts();
   const { data: conflicts, isLoading: conflictsLoading } = useNiuConflicts();
+  const { data: documentExpiry, isLoading: expiryLoading } = useDocumentExpiry();
 
-  const pendingAlerts = alerts?.filter((a) => a.status === 'PENDING').length || 0;
+  const pendingAlerts = alerts?.filter((a) => a.status === 'OPEN').length || 0;
   const criticalAlerts = alerts?.filter((a) => a.severity === 'CRITICAL').length || 0;
 
   const fpRate = useMemo(() => {
@@ -63,7 +64,7 @@ export default function ComplianceDashboard() {
       const key = weekStart.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
       if (!weeks.has(key)) weeks.set(key, { week: key, pending: 0, cleared: 0, confirmed: 0 });
       const entry = weeks.get(key)!;
-      if (a.status === 'PENDING') entry.pending++;
+      if (a.status === 'OPEN') entry.pending++;
       else if (a.status === 'CLEARED') entry.cleared++;
       else if (a.status === 'CONFIRMED') entry.confirmed++;
     });
@@ -102,12 +103,12 @@ export default function ComplianceDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         {[
           {
             icon: ShieldAlert,
             value: pendingAlerts,
-            label: 'Alertes en attente',
+            label: 'Alertes ouvertes',
             color: 'bg-yellow-50 text-yellow-700',
           },
           {
@@ -128,6 +129,12 @@ export default function ComplianceDashboard() {
             label: 'Faux positifs',
             color: 'bg-green-50 text-green-700',
           },
+          {
+            icon: CalendarClock,
+            value: expiryLoading ? '...' : documentExpiry?.total || 0,
+            label: 'Documents à renouveler',
+            color: 'bg-blue-50 text-blue-700',
+          },
         ].map((item) => (
           <Card key={item.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -142,6 +149,53 @@ export default function ComplianceDashboard() {
           </Card>
         ))}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Documents expirés / à renouveler</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Client</TableHead>
+                <TableHead>Échéance</TableHead>
+                <TableHead>État</TableHead>
+                <TableHead>Notification</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(documentExpiry?.items || []).length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    Aucun document à renouveler
+                  </TableCell>
+                </TableRow>
+              ) : (
+                (documentExpiry?.items || []).slice(0, 5).map((item) => (
+                  <TableRow key={item.sessionId}>
+                    <TableCell>
+                      <p className="font-medium">{item.clientName}</p>
+                      <p className="text-xs text-muted-foreground">{item.status} · {item.accessLevel}</p>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('fr-FR') : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={item.state === 'expired' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}>
+                        {item.state === 'expired' ? 'Expiré' : 'À renouveler'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {item.notifiedAt ? new Date(item.notifiedAt).toLocaleDateString('fr-FR') : 'Non notifié'}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Chart */}
       {weeklyData.length > 0 && (
@@ -174,9 +228,14 @@ export default function ComplianceDashboard() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Alertes AML actives</CardTitle>
+          <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/compliance/lists')}>
+            Listes AML
+          </Button>
           <Button variant="outline" size="sm" onClick={() => navigate('/compliance/duplicates')}>
             Conflits NIU →
           </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {alertsLoading ? (

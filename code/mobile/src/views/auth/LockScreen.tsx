@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
+import { Button } from '../../components/ui/button';
 import { apiClient, type ApiError } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
-import { Delete, Lock } from 'lucide-react';
-import type { PinVerifyResponse } from '../../types';
+import { Delete, Fingerprint, Lock } from 'lucide-react';
+import type { PinVerifyResponse, User } from '../../types';
 
 const LockScreen = () => {
   const navigate = useNavigate();
-  const { user, login } = useAuth();
+  const { user, login, biometricEnabled, isPasskeySupported, authenticateWithPasskey, isAuthenticated } = useAuth();
 
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -17,7 +18,20 @@ const LockScreen = () => {
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/auth', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
   const MAX_ATTEMPTS = 5;
+
+  const getResumeRoute = () => {
+    const lastRoute = sessionStorage.getItem('vp_last_route') || '/dashboard';
+    const cleanRoute = lastRoute.replace(/^\/mobile/, '') || '/dashboard';
+    if (cleanRoute === '/auth' || cleanRoute.startsWith('/auth/')) return '/dashboard';
+    return cleanRoute;
+  };
 
   const handleDigit = (digit: string) => {
     if (pin.length >= 6 || loading) return;
@@ -42,11 +56,14 @@ const LockScreen = () => {
         pin: code
       });
 
-      login(res.access_token, user);
-      const lastRoute = sessionStorage.getItem('vp_last_route') || '/dashboard';
-      // Strip any /mobile prefix to avoid double-basename issue
-      const cleanRoute = lastRoute.replace(/^\/mobile/, '') || '/dashboard';
-      navigate(cleanRoute, { replace: true });
+      const freshUser = await apiClient.get<User>('/auth/me', {
+        headers: {
+          Authorization: `Bearer ${res.access_token}`,
+        },
+      });
+
+      login(res.access_token, freshUser);
+      navigate(getResumeRoute(), { replace: true });
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       const detail = typeof apiErr.response?.data === 'object' && apiErr.response?.data !== null
@@ -95,6 +112,32 @@ const LockScreen = () => {
       } else {
         setError(`PIN incorrect (${MAX_ATTEMPTS - newAttempts} restants)`);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBiometric = async () => {
+    if (!biometricEnabled || !isPasskeySupported || loading) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await authenticateWithPasskey();
+      if (result?.access_token && user) {
+        const freshUser = await apiClient.get<User>('/auth/me', {
+          headers: {
+            Authorization: `Bearer ${result.access_token}`,
+          },
+        });
+        login(result.access_token, freshUser);
+        navigate(getResumeRoute(), { replace: true });
+      } else {
+        setError('Biométrie échouée. Utilisez votre PIN.');
+      }
+    } catch {
+      setError('Erreur de connexion biométrique');
     } finally {
       setLoading(false);
     }
@@ -171,6 +214,19 @@ const LockScreen = () => {
             >
               PIN oublié ?
             </button>
+            {biometricEnabled && isPasskeySupported && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={handleBiometric}
+                loading={loading}
+                disabled={loading || attempts >= MAX_ATTEMPTS}
+              >
+                <Fingerprint className="h-5 w-5" />
+                Connexion biométrique
+              </Button>
+            )}
           </div>
         </div>
       </div>

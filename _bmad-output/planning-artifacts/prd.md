@@ -16,6 +16,8 @@ classification:
 
 # Product Requirements Document - bicec-veripass
 
+> Historical note, 2026-05-28: this PRD is an early planning artifact. It is not current product scope, architecture, or roadmap authority. Use `docs/documentation-authority.md`, `docs/project-overview.md`, and implemented code for current truth.
+
 **Author:** Ken
 **Date:** 2026-02-07
 

@@ -8,6 +8,8 @@ inputDocuments:
 
 # bicec-veripass - Epic Breakdown
 
+> Historical note, 2026-05-28: this epic list is a planning snapshot, not current roadmap authority. Do not treat old DGI/Sopra/Amplitude/core-banking or Phase 2 items as approved future work.
+
 ## Overview
 
 This document provides the complete epic and story breakdown for **bicec-veripass**, decomposing the requirements from the PRD, UX Design Spec v2, and Architecture document into implementable stories.

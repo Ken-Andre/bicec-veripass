@@ -79,7 +79,12 @@ function Invoke-DockerPrune {
     
     if ($DryRun) {
         Write-Log "INFO" "DRY RUN MODE - No actual cleanup will be performed"
-        Write-Host "`nWould remove:"
+        Write-Host "`nWould clean non-volume Docker resources:"
+        Write-Host "  - stopped containers"
+        Write-Host "  - dangling images"
+        Write-Host "  - unused networks"
+        Write-Host "  - build cache"
+        Write-Host "  - Docker volumes: skipped"
         docker system df
         return
     }
@@ -96,9 +101,9 @@ function Invoke-DockerPrune {
     Write-Log "INFO" "Removing unused networks..."
     try { docker network prune -f | Out-Null } catch { Write-Log "WARN" "Failed to prune networks" }
     
-    # Remove unused volumes
-    Write-Log "INFO" "Removing unused volumes..."
-    try { docker volume prune -f | Out-Null } catch { Write-Log "WARN" "Failed to prune volumes" }
+    # Never prune volumes automatically: this project stores database backups,
+    # PostgreSQL data, and KYC documents in persistent Docker volumes.
+    Write-Log "INFO" "Skipping volume prune; persistent volumes are never removed automatically."
     
     # Remove build cache
     Write-Log "INFO" "Removing build cache..."

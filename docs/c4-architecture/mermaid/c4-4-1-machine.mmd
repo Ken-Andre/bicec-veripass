@@ -1,0 +1,40 @@
+
+stateDiagram-v2
+    direction LR
+    [*] --> DRAFT : OTP/PIN auth
+    DRAFT --> LOCKED_LIVENESS : 3 échecs liveness
+    LOCKED_LIVENESS --> DRAFT : Cooldown + restart
+    LOCKED_LIVENESS --> [*] : Abandon client
+    DRAFT --> PENDING_AGENT_REVIEW : POST /kyc/submit
+    PENDING_AGENT_REVIEW --> PENDING_INFO : Jean demande info
+    PENDING_INFO --> PENDING_AGENT_REVIEW : Client resoumet
+    PENDING_AGENT_REVIEW --> APPROVED : Jean/Thomas/Sylvie approuve
+    PENDING_AGENT_REVIEW --> REJECTED : Jean/Thomas/Sylvie rejette
+    PENDING_AGENT_REVIEW --> FRAUD_SUSPECT : Thomas confirme fraude
+    PENDING_AGENT_REVIEW --> ABANDONED : Timeout (Celery)
+    APPROVED --> [*] : Dossier terminé
+    REJECTED --> [*] : Dossier terminé
+    FRAUD_SUSPECT --> REJECTED : Thomas rejette
+    FRAUD_SUSPECT --> [*] : Dossier terminé
+    ABANDONED --> [*] : Dossier terminé
+
+    note right of DRAFT
+        access_level = GUEST
+    end note
+    note right of PENDING_AGENT_REVIEW
+        access_level = RESTRICTED
+    end note
+    note right of PENDING_INFO
+        access_level = RESTRICTED
+        (reste éditable)
+    end note
+    note right of APPROVED
+        access_level = LIMITED_ACCESS
+        (par défaut)
+    end note
+    note right of FRAUD_SUSPECT
+        access_level = DISABLED
+    end note
+    note right of REJECTED
+        access_level = GUEST
+    end note

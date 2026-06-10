@@ -14,6 +14,8 @@ import {
   persistKycState,
 } from '../services/kycOfflineStore';
 import { fetchWithCorrelation } from '../services/apiClient';
+import { getAuthToken } from '../services/authTokenStorage';
+import { ensureDeviceRegistered } from '../services/deviceRegistrationService';
 
 /** Status de réconciliation backend → local */
 export type ReconciliationStatus = 'pending' | 'done' | 'skipped' | 'failed';
@@ -315,6 +317,20 @@ export function KycProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     void (async () => {
       try {
+        const token = getAuthToken();
+        if (!token) {
+          if (active) setReconciliationStatus('skipped');
+          return;
+        }
+        if (!localStorage.getItem('vp_device_tag')) {
+          try {
+            await ensureDeviceRegistered();
+          } catch (err) {
+            console.warn('Skipping KYC reconciliation until device registration succeeds', err);
+            if (active) setReconciliationStatus('skipped');
+            return;
+          }
+        }
         const res = await fetchWithCorrelation('/api/v1/kyc/session/current');
         if (!active) return;
         if (res.status === 401) {

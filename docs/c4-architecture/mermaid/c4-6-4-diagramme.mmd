@@ -1,0 +1,33 @@
+flowchart LR
+    subgraph Public["Internet (public)"]
+        USER["Utilisateur mobile / desktop<br/>(agent terrain ou client)"]
+    end
+
+    subgraph Edge["Cloudflare Edge (gratuit)"]
+        DNS["DNS bicec.cm<br/>+ Named Tunnel"]
+    end
+
+    subgraph Datacenter["Reseau prive BICEC (LAN/WAN)"]
+        TUNNEL["cloudflared<br/>(sortant uniquement,<br/>pas de port entrant)"]
+        NGINX["vp_nginx<br/>(reverse proxy interne)"]
+        PWA["vp_pwa<br/>(front public)"]
+        AGENT["Agent en agence<br/>(poste de travail)"]
+        VPN["VPN IPSec<br/>site-a-site BICEC"]
+        BO["vp_backoffice<br/>(back-office,<br/>jamais public)"]
+    end
+
+    USER -->|HTTPS| DNS
+    DNS --> TUNNEL
+    TUNNEL --> NGINX
+    NGINX -->|/mobile-ALL-| PWA
+    NGINX -.->|/back-office-ALL-| BO
+    AGENT -->|LAN| NGINX
+    AGENT -->|VPN distant| VPN
+    VPN --> NGINX
+
+    classDef public fill:#fde0c5,stroke:#c44,stroke-width:1px
+    classDef edge fill:#cde4f5,stroke:#146,stroke-width:1px
+    classDef interne fill:#d4f0d4,stroke:#171,stroke-width:1px
+    class USER,DNS public
+    class TUNNEL,NGINX edge
+    class AGENT,VPN,BO,PWA interne

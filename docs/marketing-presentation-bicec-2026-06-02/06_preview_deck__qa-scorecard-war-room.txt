@@ -1,0 +1,41 @@
+Deck: veripass-rail-kyc-souverain-bicec-v3.pptx
+Date: 2026-05-31
+
+Reference-beating v3:
+- User PPTX benchmark extracted: PASS
+- Digital KYC Modules PDF extracted: PASS
+- DigitalKYC page-by-page commercial adaptation written: PASS
+- Deck expanded from 12 to 17 slides: PASS
+- Chapter structure added: context, solution, proof, opportunity: PASS
+- DigitalKYC benchmark reframed into Front office / Factory / Lifecycle, then adapted to BICEC reality: PASS
+- Dependency/subscription risk reframed as "do not buy dependency before measuring local terrain": PASS
+
+Narrative gate:
+- Strategic threat before product explanation: PASS
+- Local competitor pressure included: PASS
+- BGFI Cameroun verified and added: PASS
+- Afriland removed because source access was not defensible: PASS
+- Global market proof included: PASS
+- Stakeholder-specific buy-in included: PASS
+- Direct ask included: PASS
+
+User constraints:
+- No BICEC employee count used: PASS
+- No "backlog" language in deck: PASS
+- No invented ROI: PASS
+- No core banking production integration claim: PASS
+- MVP scope stays CNI Cameroon: PASS
+
+Package checks:
+- Final PPTX exists: PASS
+- Slide count: 17
+- Empty media files: 0
+- Artifact render: 17 PNG previews + contact sheet generated
+- Layout checker: 0 errors, tight-text warnings accepted after visual review
+
+Primary source of truth:
+- _bmad-output/veripass-strategic-war-room-2026-05-31.md
+- _bmad-output/digitalkyc-benchmark-adaptation-veripass-2026-05-31.md
+
+Final delivery copy:
+- _bmad-output/veripass-rail-kyc-souverain-bicec-v3-2026-05-31.pptx

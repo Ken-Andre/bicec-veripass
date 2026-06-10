@@ -1,22 +1,90 @@
-import asyncio
-import logging
-import os
-from app.modules.notifications.service import send_sms_notification
+import pytest
+from pydantic import ValidationError
 
-# Setup basic logging to see the logger.info too
-logging.basicConfig(level=logging.INFO)
-
-
-async def test_dev_local():
-    print("Testing SMS in dev_local mode...")
-    # Force dev_local mode so we don't call the real Orange API
-    os.environ["OTP_MODE"] = "dev_local"
-    phone = "+237670000000"
-    message = "Votre code VeriPass est 987654. Il expire dans 10 minutes."
-
-    result = await send_sms_notification(phone, message)
-    print(f"Result: {result}")
+from app.core import config as config_module
+from app.core.config import Settings
+from app.modules.notifications import service as notification_service
 
 
-if __name__ == "__main__":
-    asyncio.run(test_dev_local())
+@pytest.mark.asyncio
+async def test_send_sms_notification_simulates_in_dev_local(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def unexpected_send_sms(phone_number: str, message: str):
+        raise AssertionError(
+            "orange_sms.send_sms should not be called in dev_local mode"
+        )
+
+    monkeypatch.setenv("OTP_MODE", "dev_local")
+    monkeypatch.setattr(config_module.settings, "OTP_MODE", "dev_local")
+    monkeypatch.setattr(
+        notification_service.orange_sms, "send_sms", unexpected_send_sms
+    )
+
+    result = await notification_service.send_sms_notification(
+        "+237670000000",
+        "Votre code VeriPass est 987654. Il expire dans 10 minutes.",
+    )
+
+    assert result == {
+        "status": "simulated",
+        "mode": "dev_local",
+        "phone_number": "+237670000000",
+        "message_preview": "Votre code VeriPass ...",
+    }
+
+
+@pytest.mark.asyncio
+async def test_send_sms_notification_uses_orange_client_outside_dev_local(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    expected = {
+        "outboundSMSMessageRequest": {"resourceURL": "https://api.orange.com/sms/123"}
+    }
+
+    async def fake_send_sms(phone_number: str, message: str):
+        assert phone_number == "+237670000001"
+        assert message == "OTP 123456"
+        return expected
+
+    monkeypatch.setenv("OTP_MODE", "orange")
+    monkeypatch.setattr(config_module.settings, "OTP_MODE", "orange")
+    monkeypatch.setattr(notification_service.orange_sms, "send_sms", fake_send_sms)
+
+    result = await notification_service.send_sms_notification(
+        "+237670000001", "OTP 123456"
+    )
+
+    assert result == expected
+
+
+@pytest.mark.asyncio
+async def test_send_sms_notification_falls_back_to_configured_otp_mode(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def unexpected_send_sms(phone_number: str, message: str):
+        raise AssertionError(
+            "orange_sms.send_sms should not be called when settings use dev_local mode"
+        )
+
+    monkeypatch.delenv("OTP_MODE", raising=False)
+    monkeypatch.setattr(config_module.settings, "OTP_MODE", "dev_local")
+    monkeypatch.setattr(
+        notification_service.orange_sms, "send_sms", unexpected_send_sms
+    )
+
+    result = await notification_service.send_sms_notification(
+        "+237670000002", "Code de test VeriPass 654321"
+    )
+
+    assert result["status"] == "simulated"
+    assert result["mode"] == "dev_local"
+    assert result["phone_number"] == "+237670000002"
+
+
+def test_settings_reject_dev_local_mode_in_production():
+    with pytest.raises(
+        ValidationError,
+        match="OTP_MODE 'dev_local' is NOT allowed in production environment",
+    ):
+        Settings(ENVIRONMENT="production", OTP_MODE="dev_local")

@@ -2,10 +2,31 @@
 
 ## [Unreleased]
 
+### Weekly recap (2026-06-01 to 2026-06-05)
+
+- Added the backend analytics module with business metrics models, schemas, router/service wiring, Alembic migration `031_business_metrics.py`, and unit coverage for metrics and RBAC behavior.
+- Expanded backoffice analytics and evidence review with `AnalyticsPage`, `EvidenceViewerPage`, API client updates, and dossier service integration.
+- Strengthened verification coverage with KYC auth/ATM regression updates, analytics service hotfixes, and a dedicated SMS OTP dev/local-mode fallback test.
+- Added Docker handoff materials, including backup/restore docs, stack export/import scripts, image backup scripts, and SharePoint/OneDrive upload helpers.
+- Refreshed architecture documentation with the BICEC VERIPASS overview, C4 HTML/PDF outputs, Mermaid/SVG diagram sources, current state/sequence/ER/IA diagrams, ADR-040 for multi-agency back-office access, and maintainer/index updates.
+- Added stage-report and presentation deliverables, including memoire v8/v9/v10/v11 artifacts, rendered previews, budget/transport figures, executive/buy-in/war-room/beta PPTX outputs, speaker guide, source notes, FAQ, scorecard, and supporting marketing pack files.
+- PR references: [#323](https://github.com/Ken-Andre/bicec-veripass/pull/323) is open for the current branch; no merged GitHub PR metadata was recorded for the develop commits in this period.
+
+### Weekly recap (2026-05-25 to 2026-05-29)
+
+- Added FaceMatch v2 and biometric review metadata across backend and backoffice, including manual review reasons, queue risk flags, dossier metadata, and expanded KYC/router test coverage.
+- Expanded AML and compliance operations with AML list imports, dry-run CSV validation, registry/backoffice page support, agency CRUD, batch jobs, global notifications, and COBAC audit report evidence.
+- Improved backoffice workflows with `/back-office/` base-path support, analytics tabs and filters, connected command-center status, EvidenceViewer v2/v3 document classification, image downloads, and system-log refactors.
+- Enhanced mobile KYC and notification flows with cascading address selection, GPS and utility-provider capture, liveness upload feedback, NIU/PDF handling fixes, notification toggles, push subscription refactors, and MediaPipe CDN/local-mode documentation.
+- Strengthened infrastructure and evidence with DWH analytics endpoints, Cloudflare/Tailscale and public 8081 entrypoint configuration, DeepFace model storage/proxy updates, maintainer documentation, stage report artifacts, and regression/demo screenshots.
+- PR references: none recorded in commit history or merged GitHub PR metadata for this period.
+
 ### Weekly recap (2026-05-18 to 2026-05-24)
 
-- Added KYC image-processing and encryption-related utilities, plus OCR merge logic to improve document processing consistency.
-- Updated backend startup/dependencies and gitignore hygiene to stabilize runtime and local development behavior.
+- Added major mobile enhancements: auth entry and guard flows, lock-screen/biometric and device auto-registration, push notifications, support chat attachments, and an offline ATM finder flow.
+- Expanded backend capabilities with device-tag enforcement for banking/KYC routes, support attachment validation/upload endpoints, notification preferences APIs, AML alert detail endpoint, ATM data/model support, and better KYC session integrity/error handling.
+- Upgraded backoffice with analytics pages using real API data and role-based views, ATM directory administration, support evidence visibility, command-center loading improvements, and assignment/audit-log behavior fixes.
+- Added broad integration and evidence coverage across backend/mobile/backoffice, including KYC auth and ATM integration tests, service worker/support upload tests, and delivery/live-proof documentation updates.
 - PR references: none recorded in commit history for this period.
 
 ### Weekly recap (2026-05-11 to 2026-05-17)

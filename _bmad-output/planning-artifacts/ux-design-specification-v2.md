@@ -14,6 +14,8 @@
 
 # UX Design Specification bicec-veripass v2.1
 
+> Historical note, 2026-05-28: this UX specification is historical planning context. It is not current UI implementation or roadmap authority; verify against `code/mobile`, `code/backoffice`, and `docs/component-inventory.md`.
+
 **Author:** Ken  
 **Date:** 2026-02-24  
 **Version:** 2.1 (Reconciliation with UX/UI Inventory v2.1)

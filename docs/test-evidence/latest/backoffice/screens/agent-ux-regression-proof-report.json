@@ -1,0 +1,27 @@
+{
+  "date": "2026-05-28T04:52:22.551Z",
+  "baseURL": "http://backoffice:8080",
+  "activeMetrics": {
+    "pending": "0",
+    "infoRequired": "0",
+    "aml": "0",
+    "approved": "5"
+  },
+  "approvedMetrics": {
+    "pending": "0",
+    "infoRequired": "0",
+    "aml": "0",
+    "approved": "5"
+  },
+  "notificationCount": 0,
+  "tabsLayout": {
+    "viewportWidth": 785,
+    "containerLeft": 49,
+    "containerRight": 359.5,
+    "containerWidth": 310.5,
+    "overflowingButtons": []
+  },
+  "pageErrors": [],
+  "failedRequests": [],
+  "consoleEntries": []
+}

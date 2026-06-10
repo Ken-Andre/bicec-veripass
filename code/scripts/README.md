@@ -2,6 +2,34 @@
 
 Ce dossier contient les scripts utilitaires pour la maintenance et l'administration du projet.
 
+## Remise Docker complete a un encadreur
+
+Utiliser ce flux quand il faut remettre une stack VeriPass runnable sur une autre machine Docker Desktop.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File code\scripts\export-docker-stack.ps1 -IncludeEnv
+```
+
+Le paquet genere contient les images Docker, les volumes Docker, les fichiers Compose, les assets montes en bind mount, et un script de restauration.
+
+Sur la machine destinataire :
+
+```powershell
+tar -xzf .\veripass-stack-YYYYMMDD-HHMMSS.tar.gz
+cd .\veripass-stack-YYYYMMDD-HHMMSS
+powershell -ExecutionPolicy Bypass -File .\import-docker-stack.ps1
+```
+
+Ne pas restaurer uniquement avec `docker load`. `docker load` remet les images, mais pas les volumes, pas le projet Compose `code`, pas les reseaux, pas les variables d'environnement, et pas l'ordre de demarrage.
+
+Runbook detaille : `code/docs/DOCKER_HANDOFF.md`.
+
+## backup-docker-images.ps1 / backup-docker-images.sh
+
+Sauvegarde uniquement les images Docker dans `code/backups/docker-images`.
+
+Ce script est utile pour conserver les couches d'images localement, mais il ne produit pas une application restaurable. Il ne contient pas PostgreSQL, Redis, les documents KYC, les caches modeles, ni la configuration Compose runtime. Pour une remise complete, utiliser `export-docker-stack.ps1`.
+
 ## docker_prune.sh / docker_prune.ps1
 
 Scripts de gestion automatique de l'espace disque Docker.
@@ -13,7 +41,6 @@ Scripts de gestion automatique de l'espace disque Docker.
   - Conteneurs arrêtés
   - Images dangereuses (dangling)
   - Réseaux non utilisés
-  - Volumes non utilisés
   - Cache de build
 - Seuil configurable (par défaut : 85%)
 - Mode dry-run pour prévisualiser les actions
@@ -116,12 +143,14 @@ Format des logs :
 
 ### Sécurité
 
-⚠️ **Attention** : Le nettoyage des volumes (`docker volume prune`) peut supprimer des données persistantes non utilisées. Assurez-vous que vos volumes importants sont correctement référencés dans `docker-compose.yml`.
+⚠️ **Attention** : le nettoyage automatique ne supprime jamais les volumes Docker. Les volumes peuvent contenir PostgreSQL, les backups et les documents KYC, meme lorsqu'ils sont temporairement non utilises par un conteneur.
 
-Les volumes suivants sont protégés (utilisés par le projet) :
-- `db_storage` (PostgreSQL)
-- `redis_storage` (Redis)
-- `document_storage` (Documents KYC)
+Les volumes critiques sont declares comme externes dans `docker-compose.yml` et doivent exister avant le demarrage de la stack :
+- `code_db_storage` (PostgreSQL)
+- `code_db_backups` (backups PostgreSQL)
+- `code_documents_storage` (documents KYC)
+
+Utiliser `ensure_docker_volumes.sh` ou `ensure_docker_volumes.ps1` pour creer uniquement les volumes manquants, sans recreer les volumes existants.
 
 ### Dépannage
 
@@ -155,13 +184,12 @@ while ($true) { Clear-Host; docker system df; Start-Sleep -Seconds 5 }
 Si le script automatique ne suffit pas :
 
 ```bash
-# Nettoyage complet (⚠️ supprime TOUT ce qui n'est pas utilisé)
-docker system prune -a --volumes -f
+# Nettoyage complet des ressources non persistantes
+docker system prune -a -f
 
 # Nettoyage sélectif
 docker container prune -f  # Conteneurs arrêtés
 docker image prune -a -f   # Images non utilisées
-docker volume prune -f     # Volumes non utilisés
 docker network prune -f    # Réseaux non utilisés
 docker builder prune -a -f # Cache de build
 ```

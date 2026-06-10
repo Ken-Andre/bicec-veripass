@@ -86,7 +86,13 @@ class Settings(BaseSettings):
     OCR_GLM_FALLBACK_MIN_FIELDS: int = 2
     FACE_MATCH_MIN_SCORE: float = 0.8
     ANTI_SPOOFING_MIN_SCORE: float = 0.7
-    DEEPFACE_DETECTOR_BACKEND: str = "retinaface"  # retinaface (best) or opencv (lightweight fallback)
+    DEEPFACE_DETECTOR_BACKEND: str = "opencv"  # opencv for MVP RAM budget; retinaface can be enabled on larger hosts
+    MINIFASNET_ENABLED: bool = True
+    MINIFASNET_MODEL_PATH: str = "/opt/models-offline/minifasnet/MiniFASNetV2.onnx"
+    MINIFASNET_MODEL_SHA256: str = ""
+    MINIFASNET_CROP_SCALE: float = 2.7
+    MINIFASNET_INPUT_SIZE: int = 80
+    MINIFASNET_LIVE_CLASS_INDEX: int = 1
 
     # Orange SMS API
     ORANGE_CLIENT_ID: str = ""
@@ -127,6 +133,14 @@ class Settings(BaseSettings):
     REDIS_LOCK_GLM_TTL: int = 300  # sécurité  ADR-003
     REDIS_LOCK_AGENT_TTL: int = 30  # sécurité  12.3
     REDIS_ANALYTICS_CACHE_TTL: int = 60  # ANALYTICS-12
+    PIN_MAX_ATTEMPTS: int = 5
+    PIN_LOCKOUT_SECONDS: int = 900
+
+    # Demo/internal guardrails. Keep unauthenticated OCR/demo helpers usable for
+    # test pipelines, but bound CPU and queue pressure by default.
+    OCR_UPLOAD_MAX_BYTES: int = 2 * 1024 * 1024
+    OCR_TEST_ENDPOINT_ENABLED: bool = True
+    DEMO_BULK_KYC_MAX_COUNT: int = 5
 
     @field_validator("OTP_MODE", mode="after")
     @classmethod

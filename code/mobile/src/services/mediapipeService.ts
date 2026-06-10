@@ -3,20 +3,29 @@ import { FaceLandmarker, FilesetResolver, type NormalizedLandmark } from '@media
 let faceLandmarker: FaceLandmarker | null = null;
 let initPromise: Promise<FaceLandmarker> | null = null;
 
+const MEDIAPIPE_ASSET_MODE = (import.meta.env.VITE_MEDIAPIPE_ASSET_MODE || 'cdn').toLowerCase();
+const MEDIAPIPE_WASM_BASE =
+  MEDIAPIPE_ASSET_MODE === 'local'
+    ? (import.meta.env.VITE_MEDIAPIPE_WASM_BASE || '/mobile/mediapipe/wasm')
+    : 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
+const MEDIAPIPE_MODEL_PATH =
+  MEDIAPIPE_ASSET_MODE === 'local'
+    ? (import.meta.env.VITE_MEDIAPIPE_FACE_MODEL_PATH || '/mobile/mediapipe/face_landmarker.task')
+    : 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+
 /**
- * Initialize FaceLandmarker singleton (loads WASM + model from CDN).
+ * Initialize FaceLandmarker singleton.
+ * MVP default loads Google-hosted assets for latency; local mode is reserved for sovereign hosting.
  */
 export async function initFaceLandmarker(): Promise<FaceLandmarker> {
   if (faceLandmarker) return faceLandmarker;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-    );
+    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_BASE);
     faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+        modelAssetPath: MEDIAPIPE_MODEL_PATH,
         delegate: 'GPU',
       },
       runningMode: 'VIDEO',

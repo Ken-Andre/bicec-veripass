@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import re
 import time
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -273,8 +274,8 @@ def _parse_mrz_line2(line2: str) -> dict:
 STOP_WORDS = {
     "REPUBLIQUE", "REPUBLIC", "CAMEROON", "CAMEROUN", "NATIONAL", "IDENTITY",
     "CARD", "CARTE", "NATIONALE", "IDENTITE", "SIGNATURE", "SEXE", "NAME", "NOM",
-    "SURNAME", "GIVEN", "NAMES", "PROFESSION", "OCCUPATION", "MENAGERE", "TRAVAIL",
-    "INGENIEUR", "REPUBLIQUEDUCAMEROUN", "REPUBLICOFCAMEROON", "CARTENATIONALEDIDENTITE",
+    "SURNAME", "GIVEN", "NAMES", "PROFESSION", "OCCUPATION",
+    "REPUBLIQUEDUCAMEROUN", "REPUBLICOFCAMEROON", "CARTENATIONALEDIDENTITE",
     # Parent labels — stored BOTH as compound strings AND individual tokens because
     # _is_stop_word() extracts individual words via regex \b[A-ZÀ-Ÿ]{3,}\b.  Without
     # the individual tokens "PERE"/"MERE" etc., a block containing just "PERE" would
@@ -556,6 +557,22 @@ def _is_address_text(text: str) -> bool:
     return alpha_count / max(len(t), 1) >= 0.3
 
 
+def _is_contextual_address_text(text: str) -> bool:
+    """Validate an address value when layout already proves address context."""
+    t = text.strip()
+    if len(t) < 3:
+        return False
+    if _is_stop_word(t):
+        return False
+    if _is_date_text(t):
+        return False
+    if "<" in t:
+        return False
+    if _is_poste_text(t) or _is_sp_text(t) or _is_nin_text(t):
+        return False
+    return _is_alphabetic_text(t, min_len=3) or _is_address_text(t)
+
+
 def _is_poste_text(text: str) -> bool:
     """Check if text looks like a poste d'identification code (e.g. CE012, CM24)."""
     t = text.strip().upper()
@@ -666,7 +683,7 @@ FIELD_VALIDATORS_PADDLE: dict[str, callable] = {
     "date_delivrance": lambda v: bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", v)),
     "date_expiration": lambda v: bool(re.search(r"\b\d{2}[./,\-:]\d{2}[./,\-:]\d{2,4}\b", v)),
     "sp": lambda v: len(re.sub(r"\D", "", v)) == 6,
-    "adresse": lambda v: any(c.isdigit() for c in v) or any(kw in v.upper() for kw in ["QUARTIER", "RUE", "B.P", "BP", "LOT", "ARROND", "MELEN", "BASTOS", "AKWA"]),
+    "adresse": _is_address_text,
     "autorite_nom": lambda v: _is_alphabetic_text(v, min_len=3),
     "poste_identification": lambda v: bool(re.match(r"^[A-Z]{1,4}\d{2,4}$", v.strip().upper())),
     "pere": lambda v: _is_alphabetic_text(v, min_len=2),
@@ -683,6 +700,186 @@ def _validate_field_value(field_name: str, value: str) -> str | None:
     if validator is None:
         return value
     return value if validator(value) else None
+
+
+_CNI_HIGH_CONFIDENCE = 0.90
+_CNI_VALIDITY_YEARS = 10
+_CNI_DATE_PATTERN = re.compile(r"\b(\d{1,2})\s*([./,\-:])\s*(\d{1,2})\s*([./,\-:])\s*(\d{2,4})\b")
+
+
+def _cni_date_from_value(value: Any) -> tuple[date, str] | None:
+    """Parse a CNI date and remember the visible separator style."""
+    if not isinstance(value, str):
+        return None
+    match = _CNI_DATE_PATTERN.search(value.strip())
+    if not match:
+        return None
+    day_s, sep, month_s, _sep2, year_s = match.groups()
+    try:
+        year = int(year_s)
+        if len(year_s) == 2:
+            year = 1900 + year if year > 30 else 2000 + year
+        return date(year, int(month_s), int(day_s)), sep
+    except ValueError:
+        return None
+
+
+def _format_cni_date(dt: date, sep: str) -> str:
+    return f"{dt.day:02d}{sep}{dt.month:02d}{sep}{dt.year:04d}"
+
+
+def _add_cni_years(dt: date, years: int) -> date:
+    try:
+        return dt.replace(year=dt.year + years)
+    except ValueError:
+        return dt.replace(year=dt.year + years, day=28)
+
+
+def _append_cni_method(data: dict[str, Any], marker: str) -> None:
+    method = str(data.get("methode") or "")
+    if marker not in method:
+        data["methode"] = f"{method} + {marker}" if method else marker
+
+
+def _normalize_cni_scalar(field_name: str, value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    cleaned = re.sub(r"\s+", " ", value).strip()
+    if field_name in {"date_naissance", "date_delivrance", "date_expiration"}:
+        parsed = _cni_date_from_value(cleaned)
+        if parsed:
+            dt, sep = parsed
+            return _format_cni_date(dt, sep)
+    if field_name == "numero_cni":
+        digits = re.sub(r"\D", "", cleaned)
+        return digits if len(digits) >= 15 else cleaned
+    if field_name == "sp":
+        digits = re.sub(r"\D", "", cleaned)
+        return digits if len(digits) == 6 else cleaned
+    if field_name == "poste_identification":
+        return cleaned.replace(" ", "").upper()
+    return cleaned
+
+
+def _protected_high_conf_date(entry: dict[str, Any]) -> bool:
+    return (
+        _cni_date_from_value(entry.get("value")) is not None
+        and float(entry.get("conf") or 0.0) >= _CNI_HIGH_CONFIDENCE
+    )
+
+
+def _derive_cni_paired_date(
+    data: dict[str, Any],
+    source_field: str,
+    target_field: str,
+    years_delta: int,
+) -> bool:
+    source = data.get(source_field, {})
+    target = data.get(target_field, {})
+    source_conf = float(source.get("conf") or 0.0)
+    if source_conf < _CNI_HIGH_CONFIDENCE:
+        return False
+    parsed = _cni_date_from_value(source.get("value"))
+    if parsed is None:
+        return False
+    if isinstance(target, dict) and _protected_high_conf_date(target):
+        return False
+
+    source_dt, sep = parsed
+    expected = _add_cni_years(source_dt, years_delta)
+    data[target_field] = {
+        "value": _format_cni_date(expected, sep),
+        "conf": min(source_conf, 0.96),
+    }
+    _append_cni_method(data, "POSTPROC_DATE_10Y")
+    return True
+
+
+def _find_contextual_cni_address(
+    blocks: list[dict[str, Any]],
+    img_height: int,
+    img_width: int,
+    detected_side: str,
+) -> dict[str, Any] | None:
+    if detected_side != "verso":
+        return None
+
+    candidates: list[tuple[dict[str, Any], float, str]] = []
+    address_zones = [z for z in CNI_VERSO_ZONES if z[0] == "adresse"]
+    for _, cy_min, cy_max, cx_min, cx_max, _ in address_zones:
+        cy_lo, cy_hi = cy_min * img_height, cy_max * img_height
+        cx_lo, cx_hi = cx_min * img_width, cx_max * img_width
+        zone_cx, zone_cy = (cx_lo + cx_hi) / 2, (cy_lo + cy_hi) / 2
+        for block in blocks:
+            text = str(block.get("text", "")).strip()
+            if not _is_contextual_address_text(text):
+                continue
+            b_cx = float(block.get("cx", 0))
+            b_cy = float(block.get("cy", 0))
+            if not (cy_lo <= b_cy <= cy_hi and cx_lo <= b_cx <= cx_hi):
+                continue
+            dist = ((b_cx - zone_cx) ** 2 + (b_cy - zone_cy) ** 2) ** 0.5
+            candidates.append((block, dist, "zone"))
+
+    address_label = re.compile(r"(AD[D]?RES|ADDRESS|DRESS|ORESS|DDRES|ADR\.)", re.IGNORECASE)
+    for label in blocks:
+        label_text = str(label.get("text", "")).strip()
+        if not address_label.search(label_text):
+            continue
+        label_cx = float(label.get("cx", 0))
+        label_cy = float(label.get("cy", 0))
+        for block in blocks:
+            text = str(block.get("text", "")).strip()
+            if address_label.search(text) or not _is_contextual_address_text(text):
+                continue
+            b_cx = float(block.get("cx", 0))
+            b_cy = float(block.get("cy", 0))
+            if label_cy < b_cy <= label_cy + 120 and abs(b_cx - label_cx) <= 400:
+                candidates.append((block, (b_cy - label_cy) + abs(b_cx - label_cx) / 10, "label"))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[1])
+    best, _dist, context = candidates[0]
+    return {
+        "value": _normalize_cni_scalar("adresse", best.get("text", "")),
+        "conf": float(best.get("conf", 0.0)),
+        "address_context": context,
+    }
+
+
+def _apply_cni_postprocessing(
+    data: dict[str, Any],
+    blocks: list[dict[str, Any]] | None = None,
+    img_height: int | None = None,
+    img_width: int | None = None,
+    detected_side: str | None = None,
+) -> dict[str, Any]:
+    """Apply deterministic CNI cleanups after OCR extraction and before validation."""
+    for field_name in CNI_FIELDS:
+        entry = data.get(field_name)
+        if isinstance(entry, dict) and entry.get("value") is not None:
+            entry["value"] = _normalize_cni_scalar(field_name, entry.get("value"))
+
+    _derive_cni_paired_date(data, "date_expiration", "date_delivrance", -_CNI_VALIDITY_YEARS)
+    _derive_cni_paired_date(data, "date_delivrance", "date_expiration", _CNI_VALIDITY_YEARS)
+
+    if blocks is not None and img_height and img_width:
+        side = detected_side or str(data.get("detected_side") or "")
+        candidate = _find_contextual_cni_address(blocks, img_height, img_width, side)
+        current = data.get("adresse", {})
+        current_value = current.get("value") if isinstance(current, dict) else None
+        current_conf = float(current.get("conf") or 0.0) if isinstance(current, dict) else 0.0
+        current_context = current.get("address_context") if isinstance(current, dict) else None
+        current_valid = (
+            isinstance(current_value, str)
+            and (_is_address_text(current_value) or (current_context and _is_contextual_address_text(current_value)))
+        )
+        if candidate and (not current_valid or current_conf < _CNI_HIGH_CONFIDENCE):
+            data["adresse"] = candidate
+            _append_cni_method(data, "POSTPROC_ADDRESS_CONTEXT")
+
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -822,7 +1019,11 @@ def _extract_by_template(
             if not (cy_lo <= b_cy <= cy_hi and cx_lo <= b_cx <= cx_hi):
                 continue
             b_text = b.get("text", "")
-            if not validator(b_text):
+            if field_name == "adresse":
+                valid_for_field = validator(b_text) or _is_contextual_address_text(b_text)
+            else:
+                valid_for_field = validator(b_text)
+            if not valid_for_field:
                 continue
             # Score: prefer blocks closer to zone center
             zone_cx = (cx_lo + cx_hi) / 2
@@ -867,6 +1068,8 @@ def _extract_by_template(
                 continue
 
         parsed[field_name] = {"value": value, "conf": best_conf}
+        if field_name == "adresse":
+            parsed[field_name]["address_context"] = "zone"
 
     return parsed
 
@@ -1054,7 +1257,11 @@ def _extract_fields_from_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
                         return (cy_diff // 10) * 1000 + cx_diff + quality_bonus + penalty
                     candidates.sort(key=_addr_sort_key)
                     meilleur = candidates[0]
-                    parsed_data["adresse"] = {"value": meilleur["text"], "conf": meilleur.get("conf", conf)}
+                    parsed_data["adresse"] = {
+                        "value": meilleur["text"],
+                        "conf": meilleur.get("conf", conf),
+                        "address_context": "label",
+                    }
 
             # Poste d'identification
             match_poste = re.search(r"\b([A-Z]{2}\s?[0-9]{2})\b", text)
@@ -1525,15 +1732,26 @@ class OCRService:
 
         img_arr = cv2.imread(str(image_path))
         if img_arr is None:
-            logger.error(f"Failed to read image: {image_path}")
             empty_fields = BILL_FIELDS.get(doc_type, CNI_FIELDS) if doc_type.startswith("BILL_") else CNI_FIELDS
+            if image_path.suffix.lower() == ".pdf":
+                logger.warning("Skipping image OCR for PDF upload: %s", image_path)
+                return {
+                    "fields": {f: {"value": None, "conf": 0.0} for f in empty_fields},
+                    "blocks": [],
+                    "engine": "UNSUPPORTED_FILE_TYPE",
+                    "needs_glm_fallback": False,
+                    "avg_confidence": 0.0,
+                    "process_time_ms": round((time.perf_counter() - start_time) * 1000, 2),
+                }
+
+            logger.error(f"Failed to read image: {image_path}")
             return {
                 "fields": {f: {"value": None, "conf": 0.0} for f in empty_fields},
                 "blocks": [],
-                "engine": "paddleocr_error",
+                "engine": "PADDLE_ERROR",
                 "needs_glm_fallback": True,
                 "avg_confidence": 0.0,
-                "process_time_ms": 0.0,
+                "process_time_ms": round((time.perf_counter() - start_time) * 1000, 2),
             }
 
         result = self._extract_from_array(img_arr, doc_type=doc_type)
@@ -1807,6 +2025,14 @@ class OCRService:
                     if "RESCAN_LIEU" not in spatial_data.get("methode", ""):
                         spatial_data["methode"] += " + RESCAN_LIEU"
 
+            _apply_cni_postprocessing(
+                spatial_data,
+                blocks=blocks,
+                img_height=_img_h,
+                img_width=_img_w,
+                detected_side=detected_side,
+            )
+
         # 3. DOB plausibility check (CNI only)
         if not is_bill and spatial_data.get("date_naissance", {}).get("value") is not None:
             try:
@@ -1850,9 +2076,18 @@ class OCRService:
                 _val = fields.get(_field, {}).get("value")
                 if _val is not None:
                     _valid = _validate_field_value(_field, str(_val))
+                    if (
+                        _valid is None
+                        and _field == "adresse"
+                        and fields.get(_field, {}).get("address_context")
+                        and _is_contextual_address_text(str(_val))
+                    ):
+                        _valid = str(_val)
                     if _valid is None:
                         logger.debug(f"Field {_field} rejected by format validator: '{_val}'")
                         fields[_field] = {"value": None, "conf": 0.0}
+                    else:
+                        fields[_field].pop("address_context", None)
 
         # Calculate average confidence — only over fields that have a value
         filled_confidences = [

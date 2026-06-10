@@ -1,5 +1,7 @@
 # Empathy Maps — BICEC VeriPass
 
+> Historical note, 2026-05-28: this file is historical UX context only. Mentions of Amplitude provisioning are obsolete and are not product or roadmap authority.
+
 **Version:** 2.1  
 **Date:** 2026-02-26  
 **Auteur:** Ken (UX Designer)

@@ -11,6 +11,7 @@ export interface QueueItem {
   overall_confidence: number | null
   agency_code: string | null
   submitted_at: string | null
+  biometric_risk_flags?: string[]
 }
 
 export interface PageResponse<T> {
@@ -21,9 +22,22 @@ export interface PageResponse<T> {
   pages: number
 }
 
-export async function fetchQueue(): Promise<QueueItem[]> {
-  const res = await apiGet<PageResponse<QueueItem>>('/backoffice/queue')
+export interface QueueStats {
+  pending: number
+  info_required: number
+  fraud_suspect: number
+  approved: number
+  rejected: number
+}
+
+export async function fetchQueue(status?: string): Promise<QueueItem[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : ''
+  const res = await apiGet<PageResponse<QueueItem>>(`/backoffice/queue${query}`)
   return res.items
+}
+
+export async function fetchQueueStats(): Promise<QueueStats> {
+  return apiGet('/backoffice/queue/stats')
 }
 
 export async function fetchDossier(id: string) {
@@ -33,13 +47,32 @@ export async function fetchDossier(id: string) {
 export async function fetchAuditLog(sessionId?: string) {
   const path = sessionId
     ? `/backoffice/audit-logs?session_id=${sessionId}`
-    : '/backoffice/audit-logs'
+    : '/backoffice/audit-logs?limit=100'
   const res = await apiGet<PageResponse<unknown>>(path)
-  return res.items
+  return res.items.map((item: any) => ({
+    ...item,
+    timestamp: item.timestamp || item.performed_at,
+    agentId: item.agentId || item.agent_id || item.performed_by,
+    actionType: item.actionType || item.action,
+    previousState: item.previousState || item.previous_state || '',
+    newState: item.newState || item.new_state || '',
+    rationale: item.rationale || item.reason || '',
+    sessionId: item.sessionId || item.session_id || item.record_id,
+  }))
 }
 
-export async function reviewDossier(sessionId: string, decision: string, reason: string) {
-  return apiPost(`/backoffice/dossier/${sessionId}/review`, { decision, reason })
+export async function reviewDossier(
+  sessionId: string,
+  decision: string,
+  reason: string,
+  options?: { biometricOverrideConfirmed?: boolean; reviewDurationMs?: number },
+) {
+  return apiPost(`/backoffice/dossier/${sessionId}/review`, {
+    decision,
+    reason,
+    biometric_override_confirmed: options?.biometricOverrideConfirmed ?? false,
+    review_duration_ms: options?.reviewDurationMs,
+  })
 }
 
 export async function assignDossier(sessionId: string, agentId: string) {

@@ -9,13 +9,15 @@ import MainLayout from './components/layout/MainLayout'
 import { PageLoader } from './components/PageLoader'
 
 const LoginPage = lazy(() => import('./pages/LoginPage'))
-const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const ValidationQueuePage = lazy(() => import('./pages/validation/ValidationQueuePage'))
 const EvidenceViewerPage = lazy(() => import('./pages/validation/EvidenceViewerPage'))
 const ComplianceDashboard = lazy(() => import('./pages/compliance/ComplianceDashboard'))
 const AmlAlertDetailPage = lazy(() => import('./pages/compliance/AmlAlertDetailPage'))
 const ConflictResolverPage = lazy(() => import('./pages/compliance/ConflictResolverPage'))
+const AmlListsPage = lazy(() => import('./pages/compliance/AmlListsPage'))
 const AdminPage = lazy(() => import('@/pages/admin/AdminPage'))
+const SystemLogsPage = lazy(() => import('@/pages/admin/SystemLogsPage'))
+const LegalDocumentsPage = lazy(() => import('@/pages/admin/LegalDocumentsPage'))
 const CommandCenterPage = lazy(() => import('@/pages/command-center/CommandCenterPage'))
 const AnalyticsPage = lazy(() => import('@/pages/analytics/AnalyticsPage'))
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
@@ -53,7 +55,7 @@ function App() {
             <Route
               path="validation/dossier/:id"
               element={
-                <ProtectedRoute allowedRoles={['JEAN']}>
+                <ProtectedRoute allowedRoles={['JEAN', 'THOMAS']}>
                   <EvidenceViewerPage />
                 </ProtectedRoute>
               }
@@ -83,6 +85,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="compliance/lists"
+              element={
+                <ProtectedRoute allowedRoles={['THOMAS', 'SYLVIE', 'ADMIN_IT']}>
+                  <AmlListsPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="command-center"
@@ -95,7 +105,7 @@ function App() {
             <Route
               path="analytics"
               element={
-                <ProtectedRoute allowedRoles={['SYLVIE', 'THOMAS']}>
+                <ProtectedRoute allowedRoles={['SYLVIE', 'THOMAS', 'ADMIN_IT']}>
                   <AnalyticsPage />
                 </ProtectedRoute>
               }
@@ -106,6 +116,22 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['ADMIN_IT']}>
                   <AdminPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/audit"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN_IT', 'SYLVIE']}>
+                  <SystemLogsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/legal"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN_IT']}>
+                  <LegalDocumentsPage />
                 </ProtectedRoute>
               }
             />

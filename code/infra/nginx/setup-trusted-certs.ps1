@@ -1,8 +1,13 @@
-# Generate trusted TLS certificates using mkcert
-# Run this on your host machine (Windows)
+param(
+    [string[]]$Hosts = @()
+)
+
+# Generate trusted TLS certificates using mkcert.
+# Run this on the Windows host. Install the mkcert root CA on phones that must
+# trust https://<LAN-or-Tailscale-IP>/mobile/.
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$CertsDir = Join-Path $ScriptDir "certs"
+$CertsDir = Join-Path $ScriptDir "ssl"
 
 if (!(Test-Path $CertsDir)) {
     New-Item -ItemType Directory -Path $CertsDir -Force | Out-Null
@@ -23,9 +28,25 @@ if (!(Get-Command mkcert -ErrorAction SilentlyContinue)) {
 Write-Host "Enabling CA trust (may ask for admin permission)..." -ForegroundColor Cyan
 mkcert -install
 
-Write-Host "Generating trusted certificates for localhost..." -ForegroundColor Cyan
-# Generate into the certs folder using the names Nginx expects
-mkcert -key-file "$CertsDir/nginx-selfsigned.key" -cert-file "$CertsDir/nginx-selfsigned.crt" localhost 127.0.0.1 ::1
+$detectedHosts = Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object {
+        $_.AddressState -eq "Preferred" -and
+        $_.IPAddress -notmatch "^(127\.|169\.254\.)"
+    } |
+    Select-Object -ExpandProperty IPAddress
+
+$certificateHosts = @("localhost", "127.0.0.1", "::1") + $detectedHosts + $Hosts |
+    Where-Object { $_ } |
+    Select-Object -Unique
+
+Write-Host "Generating trusted certificates for: $($certificateHosts -join ', ')" -ForegroundColor Cyan
+# Generate into the ssl folder using the names Nginx expects.
+mkcert -key-file "$CertsDir/key.pem" -cert-file "$CertsDir/cert.pem" $certificateHosts
 
 Write-Host "TRUSTED Certificates generated successfully!" -ForegroundColor Green
-Write-Host "Restart Nginx to apply: docker-compose restart nginx" -ForegroundColor White
+Write-Host "Nginx files:" -ForegroundColor Gray
+Write-Host "   - $CertsDir/cert.pem" -ForegroundColor Gray
+Write-Host "   - $CertsDir/key.pem" -ForegroundColor Gray
+Write-Host "Install this mkcert CA on test phones, then restart Nginx:" -ForegroundColor Yellow
+Write-Host "   mkcert -CAROOT" -ForegroundColor Gray
+Write-Host "   docker compose -f code/docker-compose.yml up -d --force-recreate nginx" -ForegroundColor White

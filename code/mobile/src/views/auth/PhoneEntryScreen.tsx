@@ -129,8 +129,8 @@ const PhoneEntryScreen = () => {
 
             {loginMethod === 'phone' ? (
               <div className="flex flex-col gap-4 pt-4">
-                <div className="flex gap-3 h-16">
-                  <div className="flex items-center justify-center rounded-2xl bg-muted px-4 text-lg font-bold text-foreground border-2 border-border">
+                <div className="grid h-16 grid-cols-[5rem_minmax(0,1fr)] gap-3">
+                  <div className="flex min-w-0 items-center justify-center rounded-2xl bg-muted px-3 text-lg font-bold text-foreground border-2 border-border">
                     +237
                   </div>
                   <Input
@@ -141,7 +141,7 @@ const PhoneEntryScreen = () => {
                     value={phone}
                     onChange={(e) => setPhoneValue(e.target.value.replace(/\D/g, ''))}
                     placeholder="6XX XXX XXX"
-                    className="flex-1"
+                    className="min-w-0"
                     inputClassName="text-xl font-bold tracking-widest placeholder:tracking-normal placeholder:font-medium"
                     autoFocus
                   />
@@ -182,8 +182,8 @@ const PhoneEntryScreen = () => {
           </div>
 
           <div className="flex flex-col gap-4 pt-4">
-            <div className="flex gap-3 h-16">
-              <div className="flex items-center justify-center rounded-2xl bg-muted px-4 text-lg font-bold text-foreground border-2 border-border">
+            <div className="grid h-16 grid-cols-[5rem_minmax(0,1fr)] gap-3">
+              <div className="flex min-w-0 items-center justify-center rounded-2xl bg-muted px-3 text-lg font-bold text-foreground border-2 border-border">
                 +237
               </div>
               <Input
@@ -194,7 +194,7 @@ const PhoneEntryScreen = () => {
                 value={phone}
                 onChange={(e) => setPhoneValue(e.target.value.replace(/\D/g, ''))}
                 placeholder="6XX XXX XXX"
-                className="flex-1"
+                className="min-w-0"
                 inputClassName="text-xl font-bold tracking-widest placeholder:tracking-normal placeholder:font-medium"
                 autoFocus
               />

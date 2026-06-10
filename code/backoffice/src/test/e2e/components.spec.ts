@@ -10,7 +10,7 @@ async function triggerSessionWarning(page: Page) {
   await page.evaluate(() => fetch('/api/v1/backoffice/force-warning'))
 }
 
-async function openAdminWithStoredSession(page: Page) {
+async function openAdminWithStoredSession(page: Page, route = '/back-office/admin') {
   await page.goto('/back-office/login')
   await page.evaluate(() => {
     localStorage.setItem('veripass_access_token', 'e2e-access-token')
@@ -23,8 +23,7 @@ async function openAdminWithStoredSession(page: Page) {
       role: 'ADMIN_IT',
     }))
   })
-  await page.goto('/back-office/admin')
-  await expect(page.getByRole('heading', { name: /administration/i })).toBeVisible()
+  await page.goto(route)
 }
 
 test.describe('Back-Office Components', () => {
@@ -62,6 +61,11 @@ test.describe('Back-Office Components', () => {
   test('should access admin page with admin role', async ({ page }) => {
     await openAdminWithStoredSession(page)
     await expect(page.getByRole('heading', { name: /agents/i })).toBeVisible()
+  })
+
+  test('should render nested audit route on direct load with stored session', async ({ page }) => {
+    await openAdminWithStoredSession(page, '/back-office/admin/audit')
+    await expect(page.getByRole('heading', { name: /journal d'audit/i })).toBeVisible()
   })
 
   test('should show session warning before expiry', async ({ page }) => {

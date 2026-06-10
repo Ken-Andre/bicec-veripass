@@ -5,10 +5,24 @@ from unittest.mock import patch, AsyncMock
 import uuid
 import hashlib
 
+from sqlalchemy import select
+
 from app.main import app
-from app.core.security import get_current_user
+from app.core.security import get_current_agent, get_current_user
 from app.db.session import get_db
-from app.modules.auth.models import User
+from app.modules.admin.models import Agency
+from app.modules.auth.models import Agent, AgentRole, User
+from app.modules.kyc.models import KYCSession, Document, BiometricResult
+from app.modules.kyc.service import (
+    FACE_MATCH_STATUS_FAILED,
+    FACE_MATCH_STATUS_NOT_PERFORMED,
+    LIVENESS_MODEL_VERSION,
+    MINIFASNET_STATUS_FAILED,
+    MINIFASNET_STATUS_PASSED,
+    FaceMatchComputation,
+    MiniFASNetComputation,
+)
+from app.modules.kyc.schemas import AccessTier, LifecycleState
 
 
 @pytest.fixture
@@ -119,6 +133,27 @@ class TestKYCRouter:
         mock_storage.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_document_upload_rejects_unsupported_doc_type(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        mock_storage,
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        file_content = b"test image content"
+
+        response = await client.post(
+            "/api/v1/kyc/document/upload",
+            data={"doc_type": "PASSPORT"},
+            files={"file": ("passport.jpg", file_content, "image/jpeg")},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Document type is not supported."
+        mock_storage.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_ocr_review_update(self, client: AsyncClient, override_auth, db_session):
         await client.post("/api/v1/kyc/session/start")
         
@@ -151,3 +186,217 @@ class TestKYCRouter:
             json=payload
         )
         assert response.status_code in [200, 422, 400]
+
+    @pytest.mark.asyncio
+    async def test_liveness_missing_selfie_returns_409(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        mock_user,
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        session = (
+            await db_session.execute(
+                select(KYCSession)
+                .where(KYCSession.user_id == mock_user.id)
+                .order_by(KYCSession.started_at.desc())
+            )
+        ).scalars().first()
+        db_session.add(
+            Document(
+                id=uuid.uuid4(),
+                session_id=session.id,
+                doc_type="CNI_RECTO",
+                file_path="cni.jpg",
+                sha256_hash="a" * 64,
+            )
+        )
+        await db_session.commit()
+
+        frames = [
+            {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
+            for i in range(40)
+        ]
+        response = await client.post(
+            "/api/v1/kyc/capture/liveness",
+            json={"landmarks_json": frames, "challenge_type": "turn_left"},
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "FACE_MATCH_EVIDENCE_MISSING"
+        biometric = (
+            await db_session.execute(select(BiometricResult).where(BiometricResult.session_id == session.id))
+        ).scalar_one_or_none()
+        assert biometric is None
+
+    @pytest.mark.asyncio
+    async def test_liveness_face_mismatch_sets_priority_flag(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        monkeypatch,
+        mock_user,
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        session = (
+            await db_session.execute(
+                select(KYCSession)
+                .where(KYCSession.user_id == mock_user.id)
+                .order_by(KYCSession.started_at.desc())
+            )
+        ).scalars().first()
+
+        async def fake_face_match(*, session_id, db):
+            return FaceMatchComputation(
+                status=FACE_MATCH_STATUS_FAILED,
+                reason="score_below_threshold",
+                score=0.62,
+                distance=0.38,
+                threshold=0.80,
+                detector="opencv",
+            )
+
+        async def fake_minifasnet(*, session_id, db):
+            return MiniFASNetComputation(
+                status=MINIFASNET_STATUS_PASSED,
+                reason="score_above_threshold",
+                score=0.94,
+                label="live",
+                detector="opencv",
+            )
+
+        monkeypatch.setattr("app.modules.kyc.router.compute_face_match_for_session", fake_face_match)
+        monkeypatch.setattr("app.modules.kyc.router.compute_minifasnet_for_session", fake_minifasnet)
+        frames = [
+            {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
+            for i in range(40)
+        ]
+        response = await client.post(
+            "/api/v1/kyc/capture/liveness",
+            json={"landmarks_json": frames, "challenge_type": "turn_left"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["face_match_status"] == FACE_MATCH_STATUS_FAILED
+        assert data["anti_spoofing_score"] == 0.94
+        await db_session.refresh(session)
+        assert session.priority_flag is True
+        biometric = (
+            await db_session.execute(select(BiometricResult).where(BiometricResult.session_id == session.id))
+        ).scalar_one()
+        assert biometric.model_version_liveness == LIVENESS_MODEL_VERSION
+
+    @pytest.mark.asyncio
+    async def test_liveness_minifasnet_failure_blocks_face_match(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        monkeypatch,
+        mock_user,
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        session = (
+            await db_session.execute(
+                select(KYCSession)
+                .where(KYCSession.user_id == mock_user.id)
+                .order_by(KYCSession.started_at.desc())
+            )
+        ).scalars().first()
+
+        async def fake_minifasnet(*, session_id, db):
+            return MiniFASNetComputation(
+                status=MINIFASNET_STATUS_FAILED,
+                reason="score_below_threshold",
+                score=0.31,
+                label="spoof",
+                detector="opencv",
+            )
+
+        async def fail_face_match(*, session_id, db):
+            raise AssertionError("face match must not run after MiniFASNet PAD failure")
+
+        monkeypatch.setattr("app.modules.kyc.router.compute_minifasnet_for_session", fake_minifasnet)
+        monkeypatch.setattr("app.modules.kyc.router.compute_face_match_for_session", fail_face_match)
+        frames = [
+            {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
+            for i in range(40)
+        ]
+        response = await client.post(
+            "/api/v1/kyc/capture/liveness",
+            json={"landmarks_json": frames, "challenge_type": "turn_left"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_alive"] is False
+        assert data["face_match_status"] == FACE_MATCH_STATUS_NOT_PERFORMED
+        assert data["anti_spoofing_score"] == 0.31
+        await db_session.refresh(session)
+        assert session.liveness_strike_count == 1
+
+    @pytest.mark.asyncio
+    async def test_review_approval_requires_biometric_override_for_risk(
+        self,
+        client: AsyncClient,
+        override_auth,
+        db_session,
+        mock_user,
+    ):
+        agency = Agency(
+            id=uuid.uuid4(),
+            code="AGENCY",
+            name="Agence de test",
+        )
+        agent = Agent(
+            id=uuid.uuid4(),
+            email=f"jean.override.{uuid.uuid4()}@example.test",
+            name="Jean Override",
+            role=AgentRole.JEAN,
+            password_hash="x",
+            agency_id=agency.id,
+        )
+        session = KYCSession(
+            id=uuid.uuid4(),
+            user_id=mock_user.id,
+            status=LifecycleState.PENDING_AGENT_REVIEW,
+            access_level=AccessTier.RESTRICTED,
+            agency_id=agency.id,
+        )
+        biometric = BiometricResult(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            face_match_status=FACE_MATCH_STATUS_FAILED,
+            face_match_score=0.62,
+            anti_spoofing_score=0.92,
+        )
+        db_session.add_all([agency, agent, session, biometric])
+        await db_session.commit()
+
+        async def override_get_current_agent():
+            return agent
+
+        app.dependency_overrides[get_current_agent] = override_get_current_agent
+        try:
+            response = await client.post(
+                f"/api/v1/backoffice/dossier/{session.id}/review",
+                json={"decision": "APPROVED", "reason": "Identite validee en agence."},
+            )
+            assert response.status_code == 409
+            assert response.json()["detail"]["code"] == "BIOMETRIC_OVERRIDE_REQUIRED"
+
+            response = await client.post(
+                f"/api/v1/backoffice/dossier/{session.id}/review",
+                json={
+                    "decision": "APPROVED",
+                    "reason": "Identite validee en agence apres comparaison manuelle.",
+                    "biometric_override_confirmed": True,
+                },
+            )
+            assert response.status_code == 200
+            assert response.json()["new_status"] == LifecycleState.APPROVED
+        finally:
+            app.dependency_overrides.pop(get_current_agent, None)

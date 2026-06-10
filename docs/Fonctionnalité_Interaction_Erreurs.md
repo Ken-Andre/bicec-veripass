@@ -1,5 +1,7 @@
 # Fonctionnalités, Interactions et Erreurs - Spécifications UX/UI
 
+> Historical note, 2026-05-28: this file is a historical UX/source table. It is not current product scope, UI authority, or roadmap authority.
+
 Ce document détaille l'ensemble des écrans, interactions et états d'erreur de l'application bancaire mobile.
 
 | # | Nom de l'écran | Type d'interaction | Description de l'action | Options disponibles | État ou Message d'erreur | Catégorie de fonctionnalité |

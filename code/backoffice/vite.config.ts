@@ -30,7 +30,7 @@ export default defineConfig(async ({ mode }) => {
   }
 
   return {
-    base: './',
+    base: '/back-office/',
     plugins,
     resolve: {
       alias: {
@@ -48,6 +48,12 @@ export default defineConfig(async ({ mode }) => {
           },
         },
       },
+    },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+      exclude: ['src/test/e2e/**', 'node_modules/**', 'dist/**'],
     },
     server: {
       port: 3001,

@@ -7,7 +7,10 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.modules.auth.models import User
-from app.modules.devices.dependencies import require_registered_device
+from app.modules.devices.dependencies import (
+    require_existing_registered_device,
+    require_registered_device,
+)
 from app.modules.kyc.models import KYCSession
 from app.modules.banking import service
 from app.modules.banking.schemas import (
@@ -31,7 +34,7 @@ router = APIRouter()
 
 async def require_banking_write_access(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_registered_device),
+    current_user: User = Depends(require_existing_registered_device),
 ) -> User:
     """Require an approved KYC access tier before money-moving actions."""
     result = await db.execute(

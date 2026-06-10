@@ -1,5 +1,7 @@
 # 📊 Progress Tracker — M0 & M1
 
+> Historical note, 2026-05-28: this tracker is a dated delivery snapshot. It is not current scope or future roadmap authority.
+
 > **Légende :**
 > - `[ ]` = TODO (pas commencé)
 > - `[-]` = IN PROGRESS (en cours local/PR en attente)

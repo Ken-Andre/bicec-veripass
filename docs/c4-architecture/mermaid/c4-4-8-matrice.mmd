@@ -1,0 +1,44 @@
+
+flowchart LR
+    subgraph ROLES["Rôles agent (require_agent_role)"]
+        JEAN["JEAN<br/>(validateur KYC)"]
+        THOMAS["THOMAS<br/>(AML/CFT)"]
+        SYLVIE["SYLVIE<br/>(manager)"]
+        AIT["ADMIN_IT<br/>(administrateur)"]
+    end
+
+    subgraph FRONT["Routes front (ProtectedRoute)"]
+        F1["/validation"]
+        F2["/validation/dossier/:id"]
+        F3["/compliance"]
+        F4["/compliance/alert/:id"]
+        F5["/compliance/duplicates"]
+        F6["/command-center"]
+        F7["/analytics"]
+        F8["/admin"]
+        F9["/admin/audit"]
+    end
+
+    subgraph BACK["Décisions autorisées (submit_review_decision)"]
+        D1["APPROVED, REJECTED, INFO_REQUESTED"]
+        D2["FRAUD_SUSPECT, INFO_REQUESTED<br/>(+REJECTED depuis FRAUD_SUSPECT)"]
+        D3["APPROVED, REJECTED,<br/>INFO_REQUESTED, FRAUD_SUSPECT"]
+    end
+
+    JEAN --> F1
+    JEAN --> F2
+    THOMAS --> F2
+    THOMAS --> F3
+    THOMAS --> F4
+    THOMAS --> F5
+    THOMAS --> F7
+    SYLVIE --> F6
+    SYLVIE --> F7
+    SYLVIE --> F9
+    AIT --> F7
+    AIT --> F8
+    AIT --> F9
+
+    JEAN -.-> D1
+    THOMAS -.-> D2
+    SYLVIE -.-> D3
