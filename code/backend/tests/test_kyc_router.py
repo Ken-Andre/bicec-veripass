@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.main import app
 from app.core.security import get_current_agent, get_current_user
 from app.db.session import get_db
+from app.modules.admin.models import Agency
 from app.modules.auth.models import Agent, AgentRole, User
 from app.modules.kyc.models import KYCSession, Document, BiometricResult
 from app.modules.kyc.service import (
@@ -345,18 +346,25 @@ class TestKYCRouter:
         db_session,
         mock_user,
     ):
+        agency = Agency(
+            id=uuid.uuid4(),
+            code="AGENCY",
+            name="Agence de test",
+        )
         agent = Agent(
             id=uuid.uuid4(),
             email=f"jean.override.{uuid.uuid4()}@example.test",
             name="Jean Override",
             role=AgentRole.JEAN,
             password_hash="x",
+            agency_id=agency.id,
         )
         session = KYCSession(
             id=uuid.uuid4(),
             user_id=mock_user.id,
             status=LifecycleState.PENDING_AGENT_REVIEW,
             access_level=AccessTier.RESTRICTED,
+            agency_id=agency.id,
         )
         biometric = BiometricResult(
             id=uuid.uuid4(),
@@ -365,7 +373,7 @@ class TestKYCRouter:
             face_match_score=0.62,
             anti_spoofing_score=0.92,
         )
-        db_session.add_all([agent, session, biometric])
+        db_session.add_all([agency, agent, session, biometric])
         await db_session.commit()
 
         async def override_get_current_agent():
