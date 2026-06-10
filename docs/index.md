@@ -114,6 +114,8 @@ These files are historical prototype/planning inputs. Do not use them as current
 - **[ADR-015-tls-security-headers.md](./adr/ADR-015-tls-security-headers.md)** - TLS and security headers decision
 - **[ADR-016-redis-namespaces-data-model.md](./adr/ADR-016-redis-namespaces-data-model.md)** - Redis namespace data model
 - **[ADR-017-gestion-dynamique-gab-admin.md](./adr/ADR-017-gestion-dynamique-gab-admin.md)** - Dynamic ATM administration decision
+- **[ADR-030-mediapipe-cdn-mvp-exception.md](./adr/ADR-030-mediapipe-cdn-mvp-exception.md)** - MediaPipe CDN exception (MVP liveness assets)
+- **[ADR-040-acces-back-office-multi-agences.md](./adr/ADR-040-acces-back-office-multi-agences.md)** - Distant access to back-office across 40 agencies (VPN vs Cloudflare Access vs ZTNA, FCFA costs)
 
 ### agents_output/
 

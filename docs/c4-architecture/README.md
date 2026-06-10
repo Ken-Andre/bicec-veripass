@@ -18,6 +18,7 @@ Ce dossier contient les **artefacts visuels** et les **scripts de rendu** de l'a
 | `print_pdf.py` | Script Python partagé qui orchestre la génération du PDF (pandoc + chrome-headless-shell). |
 | `rename_mermaid.py` | Renomme les `.mmd` extraits avec un slug sémantique (`c4-{chap}-{n}-{slug}.mmd`). |
 | `normalize_mermaid.py` | Pré-traite les `.mmd` pour qu'ils passent le lexer strict de Mermaid 11 (parens, crochets, `/*`, Unicode, etc.). |
+| `scripts/generate_pareto.py` | Génère le **Pareto SVG statique** pour ADR-040 / section 6.4 (accès back-office). Manuel, hors pipeline `render.sh`. Sortie : `diagrams/c4-6-4-pareto-acces-backoffice.svg` (+ `.png`). |
 
 ## Pré-requis
 
@@ -99,6 +100,19 @@ cd docs/c4-architecture
 1. Éditer `../BICEC-VERIPASS-VUE-ENSEMBLE.md` (Mermaid inline dans les blocs ` ```mermaid `).
 2. Exécuter `render.ps1 -Pdf` (ou `render.sh --pdf`) pour régénérer les SVG, les PNG et le PDF.
 3. Committer le `.md`, les `.svg` / `.png` modifiés, et le `.pdf` régénéré.
+
+## Artefacts statiques (hors pipeline)
+
+Certains diagrammes sont générés une fois pour toutes, hors `render.sh` :
+
+- `scripts/generate_pareto.py` → `diagrams/c4-6-4-pareto-acces-backoffice.svg` (et `.png`)
+
+Ce Pareto illustre des estimations chiffrées (FCFA) pour l'ADR-040 (accès distant au back-office). Il n'est pas re-généré à chaque build, car ses valeurs ne changent pas quand on modifie le code. Pour le régénérer :
+
+```bash
+cd docs/c4-architecture
+python scripts/generate_pareto.py
+```
 
 ## Convention de nommage des fichiers produits
 

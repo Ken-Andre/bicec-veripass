@@ -1442,6 +1442,140 @@ bun run build
 
 ## 6. Annexes
 
+### 6.4 — Accès distant au back-office multi-agences
+
+Le back-office VeriPass héberge les opérations sensibles (revue KYC, validation AML, export de dossiers). Cette section documente comment les agents distants des 40 agences BICEC y accèdent, et ce qu'il faut prévoir à mesure que l'application grandit. Le détail chiffré et la justification complète des options sont dans l'ADR dédié [`docs/adr/ADR-040-acces-back-office-multi-agences.md`](./adr/ADR-040-acces-back-office-multi-agences.md).
+
+#### 6.4.1 Posture actuelle
+
+- **PWA** (front mobile / desktop) : exposée publiquement via le tunnel `cloudflared` (cf. § 2.3 et ADR [`ADR-030`](./adr/ADR-030-mediapipe-cdn-mvp-exception.md) pour la surface externe). Le tunnel ne route **que** la PWA, jamais le back-office.
+- **Back-office** : strictement interne, accessible uniquement depuis le réseau privé BICEC. Les agents en agence s'y connectent via le **VPN IPSec site-à-site** déjà utilisé pour les autres outils internes (core banking, GAB, applications métier).
+- **API** : jamais exposée directement, uniquement derrière le Nginx interne (`vp_nginx`).
+- **Dev local** : la machine de dev utilise un `quick tunnel` (`trycloudflare.com`, URL jetable). Le passage au `named tunnel` sur le domaine BICEC est documenté en [ADR-040 Annexe D](./adr/ADR-040-acces-back-office-multi-agences.md#annexe-d--procédure-de-transfert-dns-vers-named-tunnel).
+
+#### 6.4.2 Contraintes structurantes
+
+| Contrainte | Implication |
+| --- | --- |
+| **Souveraineté** | Banque camerounaise ; la hiérarchie peut être réticente à introduire un SaaS étranger sur le canal d'accès au back-office. |
+| **Coûts planifiables** | Le DSI veut des paliers stables et chiffrés, pas de surprises au scaling. |
+| **Scalabilité** | ~200 utilisateurs back-office à terme (estim. : 100 agents terrain + 60 directeurs/suppléants + 20 pool central/auditeurs + marge de croissance). |
+| **Auditabilité** | Rétention 5 ans (KYC, COSEC), traçabilité nominative des accès au back-office, logs centralisés. |
+| **Alignement existant** | Le VPN IPSec BICEC sert déjà au core banking, aux GAB, aux applications internes. Réutiliser la même brique minimise la surface d'attaque et la formation. |
+
+#### 6.4.3 Options considérées
+
+Sept options ont été étudiées, de la plus alignée sur l'existant (A) à la plus disruptive (D). Le détail est en [ADR-040 § 3](./adr/ADR-040-acces-back-office-multi-agences.md#3-options-considérées) ; ci-dessous la matrice synthétique.
+
+| # | Option | Type | Souveraineté | Auditabilité | Complexité | Coût à 200 users |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | VPN IPSec site-à-site BICEC | On-prem | ★★★★★ | Logs NOC | Faible | ~0 FCFA (intégration) |
+| B | VPN client par agent | On-prem | ★★★★★ | Logs NOC | Moyenne | 3,3 M – 7,9 M FCFA/an |
+| C | Cloudflare Access Free (≤50) / Team | SaaS | ★★☆ | Logs Cloudflare | Faible | 0 – 11,8 M FCFA/an |
+| D | Cloudflare Access Enterprise | SaaS | ★★☆ | Logs Cloudflare | Moyenne | ~26 M FCFA/an |
+| E | ZTNA on-prem (Keycloak + reverse proxy) | On-prem | ★★★★★ | Logs SIEM interne | Haute | 13 M – 16 M FCFA/an |
+| F | Cloudflare Warp hybride | Hybride | ★★★ | Logs Cloudflare | Moyenne | 11,8 M FCFA/an |
+| G | `cloudflared` + auth maison (Keycloak/Biscuit) | On-prem | ★★★★★ | Logs internes | Haute | ~2 M FCFA/an |
+
+> *Estimation indicative, sources en [ADR-040 Annexe E](./adr/ADR-040-acces-back-office-multi-agences.md#annexe-e--sources-des-estimations). À valider avec les achats et le RSSI avant tout investissement.*
+
+#### 6.4.4 Grille de coûts par palier (FCFA HT, Cameroun)
+
+| Option | 50 users | 200 users | 500 users | 1 000 users |
+| --- | --- | --- | --- | --- |
+| A — VPN site-à-site BICEC | 0 | 0 | 0 | 0 |
+| B — VPN client par agent | 1,3 M / an | 5,3 M / an | 13 M / an | 26 M / an |
+| C — Cloudflare Access (Free ≤50, Team au-delà) | 0 | 11,8 M / an | 29 M / an | 60 M / an |
+| D — Cloudflare Access Enterprise | Sur devis | ~26 M / an | ~65 M / an | ~130 M / an |
+| E — ZTNA on-prem (Keycloak + reverse proxy) | 8 M (setup) + 1 M/an | 13 M (amorti) | 16 M / an | 25 M / an |
+| F — Cloudflare Warp hybride | 1 M + 2 M / an | 11,8 M / an | 20 M / an | 32 M / an |
+| G — `cloudflared` + auth maison | 0 + 1 M dev | 0 + 1,5 M / an | Non viable | Non viable |
+
+> Les fourchettes incluent les coûts de bande passante inter-sites, les licences, et l'ops. Voir ADR-040 Annexe A pour le détail par ligne.
+
+#### 6.4.5 Matrice souveraineté × coût (vue d'ensemble)
+
+```mermaid
+quadrantChart
+    title Cout annuel (FCFA, log) vs Souverainete
+    x-axis "SaaS US" --> "On-prem total"
+    y-axis "0 FCFA" --> "30 M FCFA"
+    quadrant-1 "Recommande banque souveraine"
+    quadrant-2 "Acceptable, surveillance"
+    quadrant-3 "Eviter pour back-office"
+    quadrant-4 "Trop immature / trop cher"
+    "A VPN site-a-site": [0.95, 0.05]
+    "B VPN client": [0.95, 0.30]
+    "E ZTNA on-prem": [0.95, 0.60]
+    "G cloudflared+auth": [0.85, 0.20]
+    "F Warp hybride": [0.45, 0.45]
+    "C Cloudflare Access": [0.20, 0.50]
+    "D Cloudflare Enterprise": [0.20, 0.85]
+```
+
+Le Pareto SVG détaillé (échelle log, taille des points = palier max supporté) est en [`docs/c4-architecture/diagrams/c4-6-4-pareto-acces-backoffice.svg`](./c4-architecture/diagrams/c4-6-4-pareto-acces-backoffice.svg) et référencé en [ADR-040 Annexe B](./adr/ADR-040-acces-back-office-multi-agences.md#annexe-b--diagramme-pareto).
+
+#### 6.4.6 Diagramme de flux d'accès
+
+```mermaid
+flowchart LR
+    subgraph Public["Internet (public)"]
+        USER["Utilisateur mobile / desktop<br/>(agent terrain ou client)"]
+    end
+
+    subgraph Edge["Cloudflare Edge (gratuit)"]
+        DNS["DNS bicec.cm<br/>+ Named Tunnel"]
+    end
+
+    subgraph Datacenter["Reseau prive BICEC (LAN/WAN)"]
+        TUNNEL["cloudflared<br/>(sortant uniquement,<br/>pas de port entrant)"]
+        NGINX["vp_nginx<br/>(reverse proxy interne)"]
+        PWA["vp_pwa<br/>(front public)"]
+        AGENT["Agent en agence<br/>(poste de travail)"]
+        VPN["VPN IPSec<br/>site-a-site BICEC"]
+        BO["vp_backoffice<br/>(back-office,<br/>jamais public)"]
+    end
+
+    USER -->|HTTPS| DNS
+    DNS --> TUNNEL
+    TUNNEL --> NGINX
+    NGINX -->|/mobile/*| PWA
+    NGINX -.->|/back-office/*| BO
+    AGENT -->|LAN| NGINX
+    AGENT -->|VPN distant| VPN
+    VPN --> NGINX
+
+    classDef public fill:#fde0c5,stroke:#c44,stroke-width:1px
+    classDef edge fill:#cde4f5,stroke:#146,stroke-width:1px
+    classDef interne fill:#d4f0d4,stroke:#171,stroke-width:1px
+    class USER,DNS public
+    class TUNNEL,NGINX edge
+    class AGENT,VPN,BO,PWA interne
+```
+
+> Lecture : `cloudflared` ne route **que** la PWA. Le back-office est uniquement accessible via le VPN interne (filière du bas). Aucun chemin transversal : un attaquant ne peut pas atteindre le back-office via le tunnel, même en devinant l'URL.
+
+#### 6.4.7 Triggers d'évolution
+
+| Événement | Option à reconsidérer |
+| --- | --- |
+| ≤ 50 utilisateurs back-office | Option C gratuite suffit (Cloudflare Access Free, hors souveraineté stricte). |
+| 50 – 200 utilisateurs | Option C (Team) acceptable **OU** option A renforcée. Si la souveraineté est ferme, rester sur A. |
+| > 200 utilisateurs | Réévaluer sérieusement E (ZTNA on-prem) si la souveraineté est non-négociable. Sinon basculer sur C. |
+| Audit COSEC exigeant des logs fins | D ou E. Le VPN (A/B) n'a pas de logs applicatifs riches. |
+| Incident VPN central impactant > 4h | Préparer un canal de secours via F (Warp hybride) sans le mettre en prod. |
+| Refus hiérarchique de tout SaaS | F exclu, rester sur A/B/E. |
+
+#### 6.4.8 Recommandation et statut actuel
+
+**Décision de fait :** option A (VPN IPSec site-à-site BICEC). Le back-office est déjà accessible depuis le réseau interne, le VPN central existe, l'alignement avec le core banking est immédiat, le coût additionnel est nul.
+
+**Court terme (mise en prod) :** remplacer le `quick tunnel` par un `named tunnel` Cloudflare sur le domaine `bicec.cm` (procédure en [ADR-040 Annexe D](./adr/ADR-040-acces-back-office-multi-agences.md#annexe-d--procédure-de-transfert-dns-vers-named-tunnel)). Le `cloudflared` reste gratuit, aucune limite pratique tant qu'on ne consomme pas d'autres services Cloudflare (Access, WAF, Magic Transit).
+
+**Moyen terme (50+ users, M+12) :** réévaluer l'option C. Le `cloudflared` (named tunnel) ne devient payant qu'au moment où on active Cloudflare Access ou le WAF avancé ; tant qu'on s'en tient au tunnel simple, c'est 0 FCFA.
+
+**Long terme (souveraineté non négociable, M+24) :** si la banque formalise un objectif de souveraineté, basculer sur E (Keycloak + reverse proxy interne). Le chiffrage et la procédure sont en [ADR-040 § 6](./adr/ADR-040-acces-back-office-multi-agences.md#6-conséquences).
+
 ### Annexe A — Index croisé master ↔ docs détaillées
 
 | Section master | Doc de référence | Diagrammes liés |
