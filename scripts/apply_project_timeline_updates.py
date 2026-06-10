@@ -221,16 +221,43 @@ def update_field(project_id: str, item_id: str, field_id: str, value: dict[str, 
     run_gh_graphql(mutation, {"project": project_id, "item": item_id, "field": field_id})
 
 
+def parse_manual_update(value: str) -> dict[str, Any]:
+    """Parse issue:start:end:title for a manually verified completion."""
+    parts = value.split(":", 3)
+    if len(parts) not in (3, 4):
+        raise argparse.ArgumentTypeError("Expected issue:YYYY-MM-DD:YYYY-MM-DD[:title]")
+    issue_raw, debut, fin = parts[:3]
+    title = parts[3] if len(parts) == 4 else f"Manual update #{issue_raw}"
+    try:
+        issue = int(issue_raw.strip().lstrip("#"))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"Invalid issue number: {issue_raw}") from exc
+    return {
+        "issue": issue,
+        "title": title,
+        "debut": debut.strip(),
+        "fin": fin.strip(),
+        "manual": True,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="Mutate GitHub Project fields. Default is dry-run.")
     parser.add_argument("--all-statuses", action="store_true", help="Update even if current status is not Todo/empty.")
     parser.add_argument("--limit", type=int, default=0, help="Limit number of manifest rows processed.")
     parser.add_argument("--issues", default="", help="Comma-separated issue numbers to process.")
+    parser.add_argument(
+        "--manual-update",
+        action="append",
+        default=[],
+        type=parse_manual_update,
+        help="Add a manually verified row as issue:YYYY-MM-DD:YYYY-MM-DD[:title]. Can be passed multiple times.",
+    )
     args = parser.parse_args()
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    rows = manifest["updates"]
+    rows = [*manifest["updates"], *args.manual_update]
     if args.issues:
         wanted = {int(value.strip().lstrip("#")) for value in args.issues.split(",") if value.strip()}
         rows = [row for row in rows if int(row["issue"]) in wanted]

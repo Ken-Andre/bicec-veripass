@@ -12,6 +12,7 @@ Constraints respected:
 
 | Issue | Result | Evidence | Timeline decision |
 | --- | --- | --- | --- |
+| #192 `[ADDRESS-06] Frontend - Final Consent checkboxes and Summary` | Completed in the mobile final review screen. Submission now requires three final confirmations: information accuracy, BICEC sharing authorization, and CGU/privacy acceptance. | `code/mobile/src/views/kyc/ReviewScreen.tsx`, `code/mobile/src/views/kyc/ReviewScreen.test.tsx` | Can be dated from the commit that adds the final confirmation gate. |
 | #167 `[DEMO-03] Script de demo - Walkthrough 10 minutes` | Completed as a repo artifact. The requested line-by-line 10-minute script and 5-minute compressed version now exist. | `docs/demo-script.md` | Can be dated from the commit that adds `docs/demo-script.md`. |
 | #173 `[DEMO-09] Rapport PFE - Resume Executif & Abstract` | Completed as insertion-ready report content. The English abstract and French executive summary now exist. | `docs/rapport-stage/executive-summary-and-abstract.md` | Can be dated from the commit that adds the report insert. |
 | #165 `[DEMO-01] Rapport PFE - Sections techniques finales` | Materially advanced, but not fully closed as "done". The technical sections are ready to insert, but the final `.docx` was already dirty and was not modified in this pass. | `docs/rapport-stage/technical-sections-final.md` | Keep as partial until the Word/PDF report is regenerated or manually updated. |
@@ -34,7 +35,6 @@ Recommended next action:
 
 | Issue | Why it remains urgent | Suggested next action |
 | --- | --- | --- |
-| #192 Final consent checkboxes and summary | It is product-facing and blocks a clean end-to-end Marie story. | Inspect mobile KYC summary/consent screen and add missing final consent controls if absent. |
 | #162 Golden dataset | The demo needs deterministic personas and dossiers. | Inspect existing seed scripts and add a lightweight deterministic seed/export without starting Docker. |
 | #154 E2E Marie flow | The demo needs one reliable proof path. | Reuse existing Playwright evidence scripts; avoid Docker today unless explicitly allowed later. |
 | #153 Integration coverage | Broad and risky before soutenance. | Scope to one or two high-value backend tests instead of chasing 70% globally today. |
