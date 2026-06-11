@@ -1,288 +1,327 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import {
+  BadgeCheck,
+  Ban,
+  Bell,
+  Building2,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  ExternalLink,
+  FileCheck2,
+  Landmark,
+  Lock,
+  MapPin,
+  MessageCircle,
+  ShieldCheck,
+  Smartphone,
+  Wallet,
+} from 'lucide-react';
+import { KycResumeBanner } from '../../components/KycResumeBanner';
 import { useAuth } from '../../contexts/AuthContext';
 import { useKyc } from '../../contexts/KycContext';
-import { useLanguage } from '../../contexts/LanguageContext';
-import { KycResumeBanner } from '../../components/KycResumeBanner';
-import { apiClient } from '../../services/apiClient';
 import { cn } from '../../lib/utils';
-import type { AccountInfo, Transaction, SavingsPocket } from '../../types';
-import {
-  Bell,
-  Eye,
-  EyeOff,
-  Lock,
-  ArrowUpRight,
-  CreditCard,
-  PiggyBank,
-  ChevronRight,
-  ExternalLink,
-  Building2,
-  Briefcase,
-  TrendingUp,
-  ArrowDownLeft,
-  ShieldCheck,
-  Clock,
-  Ban,
-  CheckCircle,
-} from 'lucide-react';
+import type { AccessTier, KycStepType } from '../../types';
 
-const TIER_CONFIG = {
-  GUEST: { label: 'Accès invité', color: 'text-slate-500', bgColor: 'bg-slate-50', borderColor: 'border-slate-200', icon: Eye, canServices: false },
-  RESTRICTED: { label: 'Accès restreint', color: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200', icon: Clock, canServices: false },
-  LIMITED_ACCESS: { label: 'Accès limité', color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', icon: ShieldCheck, canServices: true },
-  FULL_ACCESS: { label: 'Accès complet', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200', icon: CheckCircle, canServices: true },
-  DISABLED: { label: 'Accès bloqué', color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200', icon: Ban, canServices: false },
+const KYC_STEPS: Array<{ id: KycStepType; label: string; route: string }> = [
+  { id: 'cni_recto', label: 'Capturer la CNI recto', route: '/kyc/cni-recto-guide' },
+  { id: 'cni_verso', label: 'Capturer la CNI verso', route: '/kyc/cni-verso-guide' },
+  { id: 'ocr_review', label: 'Vérifier les informations OCR', route: '/kyc/ocr-review' },
+  { id: 'liveness', label: 'Confirmer la présence physique', route: '/kyc/liveness-intro' },
+  { id: 'utility_bill', label: 'Ajouter le justificatif de domicile', route: '/kyc/bill-select' },
+  { id: 'address', label: 'Confirmer l’adresse de résidence', route: '/kyc/address' },
+  { id: 'niu', label: 'Renseigner le NIU si disponible', route: '/kyc/niu' },
+  { id: 'consent', label: 'Valider les consentements', route: '/kyc/consent' },
+  { id: 'signature', label: 'Signer le dossier', route: '/kyc/signature' },
+  { id: 'submission', label: 'Relire et transmettre le dossier', route: '/kyc/review' },
+];
+
+const ACCESS_COPY: Record<AccessTier, { label: string; detail: string; icon: typeof ShieldCheck; tone: string }> = {
+  GUEST: {
+    label: 'Dossier à compléter',
+    detail: 'Vous avez encore des informations à rassembler avant de pouvoir vous orienter vers les applications BICEC.',
+    icon: Clock,
+    tone: 'text-amber-700 bg-amber-50 border-amber-200',
+  },
+  RESTRICTED: {
+    label: 'En revue BICEC',
+    detail: 'Je garde les services bancaires masqués pendant la revue de votre dossier.',
+    icon: ShieldCheck,
+    tone: 'text-blue-800 bg-blue-50 border-blue-200',
+  },
+  LIMITED_ACCESS: {
+    label: 'Accès validé limité',
+    detail: 'Je peux vous orienter vers les applications BICEC selon les règles de la banque.',
+    icon: BadgeCheck,
+    tone: 'text-emerald-800 bg-emerald-50 border-emerald-200',
+  },
+  FULL_ACCESS: {
+    label: 'Identité vérifiée',
+    detail: 'Je vous redirige vers les services BICEC configurés pour votre appareil.',
+    icon: CheckCircle,
+    tone: 'text-emerald-800 bg-emerald-50 border-emerald-200',
+  },
+  DISABLED: {
+    label: 'Accès suspendu',
+    detail: 'Je garde la redirection suspendue jusqu’à l’intervention BICEC.',
+    icon: Ban,
+    tone: 'text-red-700 bg-red-50 border-red-200',
+  },
 };
 
-const ecosystem = [
-  { id: 'online', icon: Building2, fr: 'BICEC Online', descFr: 'Banque en ligne' },
-  { id: 'pro', icon: Briefcase, fr: 'BICEC Pro', descFr: 'Espace professionnel' },
-  { id: 'card', icon: CreditCard, fr: 'BICEC Card', descFr: 'Gestion cartes' },
-  { id: 'invest', icon: TrendingUp, fr: 'BICEC Invest', descFr: 'Investissements' },
+const productCards = [
+  {
+    name: 'BI PAY',
+    desc: 'Je vous oriente vers les paiements mobiles BICEC après validation.',
+    icon: Smartphone,
+    tag: 'Handoff OS-aware',
+  },
+  {
+    name: 'BICEC Wallet',
+    desc: 'Je vous ouvre l’accès Wallet selon votre appareil et les liens disponibles.',
+    icon: Wallet,
+    tag: 'App ou store',
+  },
+  {
+    name: 'BiCresco',
+    desc: 'Je vous présente les offres et parcours BICEC utiles après validation.',
+    icon: Building2,
+    tag: 'Produit BICEC',
+  },
+  {
+    name: 'Cartes BICEC',
+    desc: 'Je garde la gestion carte côté applications BICEC après KYC.',
+    icon: CreditCard,
+    tag: 'Après KYC',
+  },
+];
+
+const dossierEvents = [
+  { title: 'Votre dossier', detail: 'J’ai regroupé votre identité, vos pièces et vos consentements.', state: 'Actif' },
+  { title: 'Revue BICEC', detail: 'Je transmets votre dossier à la revue humaine BICEC.', state: 'Protégé' },
+  { title: 'Applications aval', detail: 'Je garde les opérations dans les apps BICEC. Ici, je prépare l’accès.', state: 'Masqué' },
 ];
 
 export function DashboardPage() {
-  const { t } = useLanguage();
   const { user } = useAuth();
-  const { accessLevel } = useKyc();
+  const { accessLevel, currentStep, completedSteps, reviewStatus, status } = useKyc();
   const navigate = useNavigate();
 
-  const [account, setAccount] = useState<AccountInfo | null>(null);
-  const [balanceVisible, setBalanceVisible] = useState(true);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [pockets, setPockets] = useState<SavingsPocket[]>([]);
-  const [loading, setLoading] = useState({ account: true, txs: true, pockets: true });
-
-  const tier = TIER_CONFIG[accessLevel] ?? TIER_CONFIG.GUEST;
-  const isRestricted = accessLevel === 'RESTRICTED' || accessLevel === 'GUEST';
-  const isLimited = accessLevel === 'LIMITED_ACCESS';
-  const isFull = accessLevel === 'FULL_ACCESS';
-  const isKycDone = isFull || isLimited;
-
-  useEffect(() => {
-    apiClient.get<AccountInfo>('/banking/account')
-      .then(setAccount)
-      .catch(() => setAccount(null))
-      .finally(() => setLoading(s => ({ ...s, account: false })));
-  }, []);
-
-  useEffect(() => {
-    apiClient.get<{ transactions: Transaction[] }>('/banking/transactions?page_size=3')
-      .then(data => setTransactions(data?.transactions || []))
-      .catch(() => setTransactions([]))
-      .finally(() => setLoading(s => ({ ...s, txs: false })));
-  }, []);
-
-  useEffect(() => {
-    apiClient.get<{ pockets: SavingsPocket[] }>('/banking/savings/pockets')
-      .then(data => setPockets(data?.pockets || []))
-      .catch(() => setPockets([]))
-      .finally(() => setLoading(s => ({ ...s, pockets: false })));
-  }, []);
-
-  const fmtAmount = (n: number) => Math.abs(n).toLocaleString('fr-FR');
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-
-  const quickActions = [
-    { icon: ArrowUpRight, label: 'Envoyer', locked: isRestricted, path: '/transfers/send' },
-    { icon: CreditCard, label: 'Cartes', locked: isRestricted, path: '/cards' },
-    { icon: PiggyBank, label: 'Épargne', locked: isRestricted, path: '/savings' },
-  ];
-
-  const recentTx = transactions.slice(0, 3);
+  const access = ACCESS_COPY[accessLevel] ?? ACCESS_COPY.GUEST;
+  const AccessIcon = access.icon;
+  const completedCount = new Set(completedSteps).size;
+  const progress = Math.min(Math.round((completedCount / KYC_STEPS.length) * 100), 100);
+  const nextStep = KYC_STEPS.find((step) => step.id === currentStep) ?? KYC_STEPS[0];
+  const canHandoff = accessLevel === 'LIMITED_ACCESS' || accessLevel === 'FULL_ACCESS';
+  const reviewLabel = reviewStatus?.status ?? status;
+  const firstName = user?.phone?.replace('+237', '') || 'Marie';
+  const statusPill =
+    accessLevel === 'RESTRICTED'
+      ? 'En attente'
+      : canHandoff
+        ? 'Validé'
+        : accessLevel === 'DISABLED'
+          ? 'Suspendu'
+          : 'En cours';
 
   return (
-    <div className="bg-background">
-      {/* Hero Header */}
-      <div className="gradient-primary px-6 pt-12 pb-8 rounded-b-3xl safe-top">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-primary-foreground/70 text-sm">{t('dashboard.greeting')}</p>
-            <h1 className="text-xl font-bold text-primary-foreground">{user?.phone?.replace('+237', '') || 'Marie'} 👋</h1>
-          </div>
-          <button onClick={() => navigate('/notifications')} className="relative h-10 w-10 rounded-full bg-white/10 flex items-center justify-center">
-            <Bell className="h-5 w-5 text-primary-foreground" />
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] text-white flex items-center justify-center">2</span>
-          </button>
-        </div>
-
-        {(isRestricted || isLimited) && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className={cn('rounded-xl px-4 py-2 text-sm font-medium mb-4', 'bg-warning/20 text-warning')}>
-            {isRestricted ? t('dashboard.restricted.banner') : t('dashboard.limited.banner')}
-          </motion.div>
-        )}
-
-        {/* Balance Card */}
-        <div className="glass rounded-2xl p-5 !bg-white/10 !backdrop-blur-xl !border-white/10">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-primary-foreground/70 text-xs">{t('dashboard.balance')}</p>
-            {isKycDone && (
-              <button onClick={() => setBalanceVisible(!balanceVisible)} className="p-1">
-                {balanceVisible ? <Eye className="h-4 w-4 text-primary-foreground/50" /> : <EyeOff className="h-4 w-4 text-primary-foreground/50" />}
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-3xl font-bold text-primary-foreground">
-              {loading.account ? '---' : isRestricted ? '---' : balanceVisible ? (account?.balance ?? 0).toLocaleString('fr-FR') : '••••••'}
-            </h2>
-            {!isRestricted && balanceVisible && !loading.account && <span className="text-primary-foreground/70 text-sm">FCFA</span>}
-            {isRestricted && <Lock className="h-4 w-4 text-primary-foreground/50" />}
-          </div>
-          <span className="text-xs text-primary-foreground/50">{t('dashboard.mainAccount')}</span>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="px-6 -mt-4">
-        <div className="flex gap-3">
-          {quickActions.map((action, i) => (
-            <motion.button
-              key={action.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 + i * 0.1 }}
-              onClick={() => !action.locked && navigate(action.path)}
-              className="flex-1 glass rounded-2xl p-4 flex flex-col items-center gap-2 relative"
-              disabled={action.locked}
-            >
-              <div className="relative">
-                <action.icon className={cn('h-6 w-6', action.locked ? 'text-muted-foreground' : 'text-primary')} />
-                {action.locked && <Lock className="h-3 w-3 text-muted-foreground absolute -top-1 -right-1" />}
-              </div>
-              <span className="text-xs font-medium text-foreground">{action.label}</span>
-            </motion.button>
-          ))}
-        </div>
-      </div>
-
-      <div className="px-6 mt-6 space-y-6">
-        <KycResumeBanner />
-
-        {/* KYC Banner (if not full access) */}
-        {!isKycDone && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn('glass rounded-2xl p-5 border-l-4', tier.borderColor, tier.bgColor)}>
-            <div className="flex items-start gap-3">
-              <tier.icon className={cn('h-6 w-6 shrink-0', tier.color)} />
-              <div className="flex-1">
-                <h3 className="text-sm font-bold text-foreground">{tier.label}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{t('dashboard.kycRequired')}</p>
-                <button onClick={() => navigate('/kyc/intro')} className="mt-3 w-full h-10 rounded-xl bg-primary text-white text-xs font-bold active:scale-95 transition-all">
-                  {t('dashboard.completeKyc')}
-                </button>
-              </div>
+    <div className="liquid-screen min-h-full overflow-hidden">
+      <div className="px-5 pt-[calc(env(safe-area-inset-top,0px)+1rem)]">
+        <header className="liquid-glass rounded-[1.75rem] px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">BICEC VeriPass</p>
+              <h1 className="mt-1 text-xl font-black tracking-tight text-foreground">Bonjour, {firstName}</h1>
             </div>
-          </motion.div>
-        )}
-
-        {/* Recent Transactions */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground">{t('dashboard.recentTransactions')}</h3>
-            <button onClick={() => navigate('/transactions')} className="text-xs text-primary font-medium flex items-center gap-1">
-              {t('common.seeAll')} <ChevronRight className="h-3 w-3" />
+            <button
+              type="button"
+              onClick={() => navigate('/notifications')}
+              className="relative flex h-12 w-12 items-center justify-center rounded-full border border-white/60 bg-white/70 shadow-sm backdrop-blur-2xl active:scale-95"
+              aria-label="Notifications"
+            >
+              <Bell className="h-5 w-5 text-foreground" />
+              <span className="absolute right-1 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-black text-white">
+                2
+              </span>
             </button>
           </div>
+        </header>
 
-          {loading.txs && (
-            <div className="space-y-2 animate-pulse">
-              {[1,2,3].map(i => <div key={i} className="h-14 bg-slate-200 rounded-2xl" />)}
+        <main className="mt-5 space-y-5 pb-32">
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="liquid-hero rounded-[2rem] p-4"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Entrée en relation</p>
+                <span className="rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-black text-primary ring-1 ring-primary/15">
+                  {statusPill}
+                </span>
+              </div>
+              <h2 className="text-2xl font-black leading-tight text-foreground">Votre dossier client</h2>
+              <p className="text-sm leading-6 text-muted-foreground">
+                Par ce dossier, nous vérifions votre identité et préparons votre passage vers les applications BICEC.
+              </p>
             </div>
-          )}
 
-          {!loading.txs && recentTx.length === 0 && (
-            <div className="text-center py-6 space-y-2">
-              <ArrowDownLeft className="h-8 w-8 text-muted-foreground mx-auto" />
-              <p className="text-xs text-muted-foreground">{t('transactions.empty')}</p>
+            <div className={cn('mt-4 rounded-2xl border p-4', access.tone)}>
+              <div className="flex items-start gap-3">
+                <AccessIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="text-sm font-black">{access.label}</p>
+                  <p className="mt-1 text-xs leading-5 opacity-80">{access.detail}</p>
+                </div>
+              </div>
             </div>
-          )}
 
-          <div className="space-y-2">
-            {recentTx.map((tx) => (
-              <div key={tx.id} className="glass rounded-2xl p-3 active:scale-[0.98] transition-all">
-                <div className="flex items-center gap-3">
-                  <div className={cn('h-9 w-9 rounded-lg flex items-center justify-center shrink-0', tx.amount > 0 ? 'bg-success/10' : 'bg-muted')}>
-                    {tx.amount > 0 ? <ArrowDownLeft className="h-4 w-4 text-success" /> : <ArrowUpRight className="h-4 w-4 text-muted-foreground" />}
+            <div className="mt-4 rounded-2xl bg-white/68 p-4 ring-1 ring-black/5 backdrop-blur-2xl">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-muted-foreground">Progression dossier</p>
+                <p className="text-xs font-black text-foreground">{progress}%</p>
+              </div>
+              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200/80">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#12355b] to-[#e87500] transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(nextStep.route)}
+                className="mt-4 flex w-full items-center justify-between rounded-2xl bg-primary px-4 py-3 text-left text-white shadow-[0_14px_30px_rgba(232,117,0,0.22)] active:scale-[0.99]"
+              >
+                <span>
+                  <span className="block text-[11px] font-black uppercase opacity-80">Prochaine étape</span>
+                  <span className="block text-sm font-black">{nextStep.label}</span>
+                </span>
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </motion.section>
+
+          <KycResumeBanner />
+
+          <section className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/cards/atm-finder')}
+              className="liquid-glass rounded-3xl p-4 text-left active:scale-[0.98]"
+            >
+              <MapPin className="h-6 w-6 text-primary" />
+              <p className="mt-4 text-sm font-black text-foreground">GAB BICEC</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Je vous aide à trouver un guichet sans ouvrir de service bancaire.</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/support')}
+              className="liquid-glass rounded-3xl p-4 text-left active:scale-[0.98]"
+            >
+              <MessageCircle className="h-6 w-6 text-primary" />
+              <p className="mt-4 text-sm font-black text-foreground">Support dossier</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Je vous mets en contact avec BICEC pour vos pièces ou votre revue.</p>
+            </button>
+          </section>
+
+          <section className="space-y-3 pt-44">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Produits BICEC</p>
+                <h3 className="text-lg font-black text-foreground">Passerelle après validation</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/products')}
+                className="rounded-full bg-white/70 px-3 py-2 text-xs font-black text-primary ring-1 ring-black/5 backdrop-blur-xl"
+              >
+                Voir tout
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {productCards.slice(0, 3).map((product, index) => (
+                <motion.button
+                  key={product.name}
+                  type="button"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.08 * index }}
+                  onClick={() => navigate('/products')}
+                  className="liquid-glass flex items-center gap-3 rounded-3xl p-4 text-left active:scale-[0.99]"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
+                    <product.icon className="h-6 w-6 text-primary" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">{tx.label}</p>
-                    <p className="text-[10px] text-muted-foreground">{fmtDate(tx.date)}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-black text-foreground">{product.name}</p>
+                      {!canHandoff && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{product.desc}</p>
                   </div>
-                  <span className={cn('text-xs font-bold', tx.amount > 0 ? 'text-success' : 'text-foreground')}>
-                    {tx.amount > 0 ? '+' : '-'}{fmtAmount(tx.amount)} F
+                  <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-black text-muted-foreground ring-1 ring-black/5">
+                    {product.tag}
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+          </section>
+
+          <section className="liquid-glass rounded-[1.75rem] p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#12355b]/10">
+                <Landmark className="h-5 w-5 text-[#12355b]" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-foreground">Services bancaires masqués</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Je ne réalise pas d’opérations bancaires ici. Je vérifie votre éligibilité, puis je vous oriente vers les apps BICEC selon votre appareil.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black text-foreground">Suivi du dossier</h3>
+              <span className="rounded-full bg-white/70 px-3 py-1 text-[11px] font-black text-muted-foreground ring-1 ring-black/5">
+                {reviewLabel}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {dossierEvents.map((event) => (
+                <div key={event.title} className="liquid-glass flex items-center gap-3 rounded-3xl p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/80 ring-1 ring-black/5">
+                    <FileCheck2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-foreground">{event.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{event.detail}</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">
+                    {event.state}
                   </span>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Savings Pockets */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground">{t('dashboard.pockets')}</h3>
-            <button onClick={() => navigate('/savings')} className="text-xs text-primary font-medium flex items-center gap-1">
-              {t('common.seeAll')} <ChevronRight className="h-3 w-3" />
-            </button>
-          </div>
-
-          {loading.pockets && (
-            <div className="space-y-2 animate-pulse">
-              {[1,2].map(i => <div key={i} className="h-16 bg-slate-200 rounded-2xl" />)}
+              ))}
             </div>
-          )}
+          </section>
 
-          {!loading.pockets && pockets.length === 0 && (
-            <div className="text-center py-6 space-y-2">
-              <PiggyBank className="h-8 w-8 text-muted-foreground mx-auto" />
-              <p className="text-xs text-muted-foreground">{t('savings.empty')}</p>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {pockets.slice(0, 2).map((pocket) => {
-              const progress = Math.min((pocket.amount / pocket.goal) * 100, 100);
-              return (
-                <div key={pocket.id} className="glass rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-foreground">{pocket.name}</span>
-                    <span className="text-sm font-bold text-foreground">{isRestricted ? '---' : pocket.amount.toLocaleString('fr-FR')} FCFA</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div className={cn('h-full rounded-full', pocket.color)} style={{ width: isRestricted ? '0%' : `${progress}%` }} />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Objectif: {pocket.goal.toLocaleString('fr-FR')} FCFA</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* BICEC Ecosystem */}
-        <div>
-          <h3 className="text-sm font-semibold text-foreground mb-3">{t('dashboard.ecosystem')}</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {ecosystem.map((app) => (
-              <button key={app.id} className="glass rounded-2xl p-4 text-left flex items-start gap-3 hover:bg-accent/10 transition-colors">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <app.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs font-semibold text-foreground truncate">{app.fr}</p>
-                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground truncate">{app.descFr}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+          <button
+            type="button"
+            onClick={() => navigate('/products')}
+            className="flex w-full items-center justify-between rounded-3xl bg-[#12355b] px-5 py-4 text-left text-white shadow-[0_18px_38px_rgba(18,53,91,0.22)] active:scale-[0.99]"
+          >
+            <span>
+              <span className="block text-xs font-black uppercase opacity-70">Handoff mobile</span>
+              <span className="block text-base font-black">Voir les applications BICEC</span>
+            </span>
+            <ExternalLink className="h-5 w-5" />
+          </button>
+        </main>
       </div>
-
-      <div className="h-8" />
     </div>
   );
 }
