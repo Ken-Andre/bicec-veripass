@@ -2,15 +2,21 @@
 
 ## [Unreleased]
 
-### Weekly recap (2026-06-01 to 2026-06-05)
+### Weekly recap (2026-06-01 to 2026-06-07)
 
 - Added the backend analytics module with business metrics models, schemas, router/service wiring, Alembic migration `031_business_metrics.py`, and unit coverage for metrics and RBAC behavior.
+- Added versioned legal document consent across backend, backoffice, and mobile, including legal document models/router/service, migration `032_legal_document_versions.py`, admin management UI, mobile consent/settings screens, and sync service wiring.
 - Expanded backoffice analytics and evidence review with `AnalyticsPage`, `EvidenceViewerPage`, API client updates, and dossier service integration.
+- Refreshed the backoffice brand system with a BICEC brown/gold theme, sidebar/header updates, ROI analytics fields, English analytics labels, and CSS token migrations across shared UI components.
+- Added ROI engine metrics for KYC digitization projections and strengthened COBAC export auditing with `performed_by`, `client_ip`, audit log entries, and expanded backend tests.
 - Strengthened verification coverage with KYC auth/ATM regression updates, analytics service hotfixes, and a dedicated SMS OTP dev/local-mode fallback test.
+- Hardened banking access controls, licensing, secure token storage coverage, and mobile legal-effects lint behavior.
+- Added CI coverage for backoffice linting with Bun/ESLint and expanded backoffice analytics/E2E regression tests.
 - Added Docker handoff materials, including backup/restore docs, stack export/import scripts, image backup scripts, and SharePoint/OneDrive upload helpers.
-- Refreshed architecture documentation with the BICEC VERIPASS overview, C4 HTML/PDF outputs, Mermaid/SVG diagram sources, current state/sequence/ER/IA diagrams, ADR-040 for multi-agency back-office access, and maintainer/index updates.
-- Added stage-report and presentation deliverables, including memoire v8/v9/v10/v11 artifacts, rendered previews, budget/transport figures, executive/buy-in/war-room/beta PPTX outputs, speaker guide, source notes, FAQ, scorecard, and supporting marketing pack files.
-- PR references: [#323](https://github.com/Ken-Andre/bicec-veripass/pull/323) is open for the current branch; no merged GitHub PR metadata was recorded for the develop commits in this period.
+- Refreshed architecture documentation with the BICEC VERIPASS overview, C4 HTML/PDF/PNG outputs, Mermaid/SVG diagram sources, current state/sequence/ER/IA diagrams, ADR-040 for multi-agency back-office access, and maintainer/index updates.
+- Added stage-report and presentation deliverables, including memoire v8/v9/v10/v11/v12 artifacts, rendered previews, budget/transport figures, executive/buy-in/war-room/beta PPTX outputs, speaker guide, source notes, FAQ, scorecard, and supporting marketing pack files.
+- Reduced repository weight by untracking agent directories, rendered Word outputs, and BMAD media from git history going forward.
+- PR references: [#323](https://github.com/Ken-Andre/bicec-veripass/pull/323) is the only PR created in the 2026-06-01 to 2026-06-07 window found via `gh`; it remains an open draft, and no merged PR metadata was found for the period.
 
 ### Weekly recap (2026-05-25 to 2026-05-29)
 
