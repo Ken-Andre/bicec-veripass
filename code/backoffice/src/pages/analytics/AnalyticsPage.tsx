@@ -139,11 +139,11 @@ const baselineFieldLabels: Array<{ key: keyof BaselineForm; label: string; place
   { key: 'audit_requests_per_period', label: 'Audit Frequency', placeholder: '4' },
   { key: 'current_audit_assembly_hours', label: 'Audit Reconstitution Time (hours)', placeholder: '6' },
   { key: 'veripass_audit_export_hours', label: 'VeriPass Audit Export Time (hours)', placeholder: '0.25' },
-  { key: 'average_rework_cost_xaf', label: 'Cout reprise dossier XAF', placeholder: '5000' },
+  { key: 'average_rework_cost_xaf', label: 'Coût reprise dossier XAF', placeholder: '5000' },
   { key: 'current_aml_sensitive_case_rate', label: 'AML Alert Rate (%)', placeholder: '3' },
-  { key: 'pilot_setup_cost_xaf', label: 'Cout setup pilote XAF', placeholder: '2500000' },
-  { key: 'pilot_monthly_run_cost_xaf', label: 'Cout run mensuel XAF', placeholder: '750000' },
-  { key: 'pilot_duration_months', label: 'Duree pilote (mois)', placeholder: '3' },
+  { key: 'pilot_setup_cost_xaf', label: 'Coût setup pilote XAF', placeholder: '2500000' },
+  { key: 'pilot_monthly_run_cost_xaf', label: 'Coût run mensuel XAF', placeholder: '750000' },
+  { key: 'pilot_duration_months', label: 'Durée pilote (mois)', placeholder: '3' },
 ]
 
 function buildQuery(filters: Filters) {
@@ -290,7 +290,7 @@ export default function AnalyticsPage() {
         }
       } catch (err) {
         console.error('Failed to load analytics:', err)
-        setError('Impossible de charger les metriques analytics')
+        setError('Impossible de charger les métriques')
       } finally {
         setLoading(false)
       }
@@ -363,8 +363,8 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-950">Analytics & metriques</h1>
-        <p className="text-sm text-slate-500">Donnees issues du schema DWH PostgreSQL</p>
+        <h1 className="text-2xl font-bold text-slate-950">Tableaux de bord et métriques</h1>
+        <p className="text-sm text-slate-500">Données issues du schéma DWH PostgreSQL</p>
       </div>
 
       <Card>
@@ -383,14 +383,14 @@ export default function AnalyticsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-auto flex-wrap justify-start">
-          {visibleTabs.includes('overview') && <TabsTrigger value="overview">Vue generale</TabsTrigger>}
+          {visibleTabs.includes('overview') && <TabsTrigger value="overview">Vue générale</TabsTrigger>}
           {visibleTabs.includes('business') && <TabsTrigger value="business">Pilotage & ROI</TabsTrigger>}
-          {visibleTabs.includes('funnel') && <TabsTrigger value="funnel">Funnel adoption</TabsTrigger>}
+          {visibleTabs.includes('funnel') && <TabsTrigger value="funnel">Adoption</TabsTrigger>}
           {visibleTabs.includes('documents') && <TabsTrigger value="documents">Documents & OCR</TabsTrigger>}
           {visibleTabs.includes('fraud') && <TabsTrigger value="fraud">Fraude & AML</TabsTrigger>}
-          {visibleTabs.includes('compliance') && <TabsTrigger value="compliance">Compliance</TabsTrigger>}
-          {visibleTabs.includes('marketing') && <TabsTrigger value="marketing">Marketing</TabsTrigger>}
-          {visibleTabs.includes('qa') && <TabsTrigger value="qa">QA & operations</TabsTrigger>}
+          {visibleTabs.includes('compliance') && <TabsTrigger value="compliance">Conformité</TabsTrigger>}
+          {visibleTabs.includes('marketing') && <TabsTrigger value="marketing">Acquisition</TabsTrigger>}
+          {visibleTabs.includes('qa') && <TabsTrigger value="qa">Qualité & opérations</TabsTrigger>}
           {visibleTabs.includes('technical') && <TabsTrigger value="technical">Technique</TabsTrigger>}
         </TabsList>
 
@@ -398,7 +398,7 @@ export default function AnalyticsPage() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard title="Taux de conversion" value={data?.conversion_metrics?.conversion_rate || '0%'} icon={TrendingUp} />
             <MetricCard title="Taux d'abandon" value={data?.conversion_metrics?.abandon_rate || '0%'} icon={AlertTriangle} />
-            <MetricCard title="Dossiers crees" value={data?.conversion_metrics?.total_onboardings || 0} icon={FileText} />
+            <MetricCard title="Dossiers créés" value={data?.conversion_metrics?.total_onboardings || 0} icon={FileText} />
             <MetricCard title="SLA validation" value={data?.sla?.avg_validation_time || '0m'} icon={Clock} />
           </div>
         </TabsContent>
@@ -406,7 +406,7 @@ export default function AnalyticsPage() {
         <TabsContent value="business" className="space-y-4">
           {businessCase?.baseline_required && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Baseline requise pour calculer les couts, gains et ROI. Les metriques VeriPass observees restent disponibles.
+              Baseline requise pour calculer les coûts, gains et ROI. Les métriques VeriPass observées restent disponibles.
             </div>
           )}
           {baselineError && <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{baselineError}</div>}
@@ -491,14 +491,14 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard title="Cout actuel / dossier" value={metricDisplay(finance.current_cost_per_dossier, 'Baseline requise')} icon={Calculator} />
-            <MetricCard title="Cout VeriPass / dossier" value={metricDisplay(finance.veripass_cost_per_dossier, 'Baseline requise')} icon={Calculator} />
+            <MetricCard title="Coût actuel / dossier" value={metricDisplay(finance.current_cost_per_dossier, 'Baseline requise')} icon={Calculator} />
+            <MetricCard title="Coût VeriPass / dossier" value={metricDisplay(finance.veripass_cost_per_dossier, 'Baseline requise')} icon={Calculator} />
             <MetricCard title="Total monthly gain" value={metricDisplay(roiOutputs.total_monthly_gain, 'Baseline requise')} icon={TrendingUp} />
             <MetricCard title="ROI pilote" value={metricDisplay(finance.roi_percent, 'Baseline requise')} icon={BarChart3} />
             <MetricCard title="Abandon pilote" value={metricDisplay(direction.pilot_abandonment_rate, '0%')} icon={AlertTriangle} />
             <MetricCard title="Conversion start -> approved" value={metricDisplay(direction.start_to_approved_conversion_rate, '0%')} icon={CheckCircle} />
             <MetricCard title="Gain commercial" value={metricDisplay(direction.estimated_commercial_value, 'Baseline requise')} icon={TrendingUp} />
-            <MetricCard title="Gain conformite" value={metricDisplay(finance.compliance_gain_monthly, 'Baseline requise')} icon={ShieldCheck} />
+            <MetricCard title="Gain conformité" value={metricDisplay(finance.compliance_gain_monthly, 'Baseline requise')} icon={ShieldCheck} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -541,7 +541,7 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         <TabsContent value="documents" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard title="Documents traites" value={documents.total_documents || 0} icon={FileText} />
+          <MetricCard title="Documents traités" value={documents.total_documents || 0} icon={FileText} />
           <MetricCard title="Vitesse OCR moyenne" value={documents.avg_ocr_speed || '0ms'} icon={Clock} />
           <MetricCard title="Confiance OCR moyenne" value={documents.avg_ocr_confidence || '0%'} icon={CheckCircle} />
           <MetricCard title="Correction manuelle" value={documents.manual_correction_rate || '0%'} icon={Wrench} />
@@ -565,7 +565,7 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader><CardTitle>Adoption par canal</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {marketing.length === 0 && <EmptyState label="Aucun canal mesure." />}
+              {marketing.length === 0 && <EmptyState label="Aucun canal mesuré." />}
               {marketing.map((channel: any) => (
                 <div key={channel.channel} className="flex items-center justify-between rounded-md border p-3 text-sm">
                   <span className="font-medium">{channel.channel}</span>
@@ -585,7 +585,7 @@ export default function AnalyticsPage() {
         </TabsContent>
 
         <TabsContent value="technical" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard title="Base de donnees" value={technical?.db || 'n/a'} icon={Database} />
+          <MetricCard title="Base de données" value={technical?.db || 'n/a'} icon={Database} />
           <MetricCard title="Redis" value={technical?.redis || 'n/a'} icon={Database} />
           <MetricCard title="Sentry proxy" value={technical?.sentry_proxy || 'n/a'} icon={ShieldCheck} />
           <MetricCard title="Environnement" value={technical?.environment || 'n/a'} icon={Wrench} />

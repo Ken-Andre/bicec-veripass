@@ -101,7 +101,7 @@ export default function CommandCenterPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Command Center</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Centre de pilotage</h1>
         <p className="text-slate-500">Vue d'ensemble et actions critiques</p>
       </div>
 
@@ -126,7 +126,7 @@ export default function CommandCenterPage() {
                     <p className="text-2xl font-bold">
                       {connectedAgents.length}/{jeanAgents.length}
                     </p>
-                    <p className="text-sm text-slate-500">Agents connectes</p>
+                    <p className="text-sm text-slate-500">Agents connectés</p>
                   </div>
                 </div>
               </CardContent>
@@ -161,7 +161,7 @@ export default function CommandCenterPage() {
                   <CheckCircle className="h-8 w-8 text-green-500 flex-shrink-0" />
                   <div>
                     <p className="text-2xl font-bold">{validatedToday}</p>
-                    <p className="text-sm text-slate-500">Valides aujourd'hui</p>
+                    <p className="text-sm text-slate-500">Validés aujourd'hui</p>
                   </div>
                 </div>
               </CardContent>
@@ -185,12 +185,12 @@ export default function CommandCenterPage() {
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-yellow-500" />Violations SLA
                 </CardTitle>
-                <CardDescription>Dossiers depassant le delai de 2h</CardDescription>
+                <CardDescription>Dossiers dépassant le délai de 2h</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    SLA respecte : {stats?.sla?.sla_respect_rate || '-'} - Delai moyen : {stats?.sla?.avg_validation_time || '-'}
+                    SLA respecté : {stats?.sla?.sla_respect_rate || '-'} - Délai moyen : {stats?.sla?.avg_validation_time || '-'}
                   </p>
                   {stats?.sla?.late_dossiers > 0 ? (
                     <p className="text-sm text-red-600 font-medium">
@@ -205,8 +205,8 @@ export default function CommandCenterPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Repartition de charge</CardTitle>
-                <CardDescription>Charge active par agence, historique separe</CardDescription>
+                <CardTitle>Répartition de charge</CardTitle>
+                <CardDescription>Charge active par agence, historique séparé</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -221,14 +221,14 @@ export default function CommandCenterPage() {
                           <div className="flex items-center justify-between">
                             <span className="font-medium">{agency.label}</span>
                             <span className="text-sm text-slate-500">
-                              {agency.active} actifs - {agency.completed} traites
+                              {agency.active} actifs - {agency.completed} traités
                             </span>
                           </div>
                           <div className="h-2 rounded-full bg-slate-200">
                             <div className={`h-2 rounded-full transition-all ${pct > 80 ? 'bg-red-500' : pct > 60 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${pct}%` }} />
                           </div>
                           <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-                            <Badge variant="secondary">{agency.connected}/{agency.agents.length} connectes</Badge>
+                            <Badge variant="secondary">{agency.connected}/{agency.agents.length} connectés</Badge>
                             <Badge variant="secondary">{agency.available}/{agency.agents.length} disponibles</Badge>
                             <span>{agency.totalAssigned} affectations historiques</span>
                           </div>
@@ -239,7 +239,7 @@ export default function CommandCenterPage() {
                                 <div key={agent.id} className="flex items-center justify-between gap-3 text-slate-600">
                                   <span>{agent.name}</span>
                                   <span className="text-right">
-                                    {agent.active_queue_count ?? agent.active_dossier_count ?? 0} actifs - {agent.completed_dossier_count ?? 0} traites
+                                    {agent.active_queue_count ?? agent.active_dossier_count ?? 0} actifs - {agent.completed_dossier_count ?? 0} traités
                                     {!agent.is_connected && <Badge variant="secondary" className="ml-2">Hors ligne</Badge>}
                                     {!agent.is_available && <Badge variant="secondary" className="ml-2">Indisponible</Badge>}
                                   </span>
@@ -257,8 +257,8 @@ export default function CommandCenterPage() {
 
             <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle>Export conformite COBAC</CardTitle>
-                <CardDescription>Generez les rapports de conformite reglementaire</CardDescription>
+                <CardTitle>Export conformité COBAC</CardTitle>
+                <CardDescription>Générez les rapports de conformité réglementaire</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-4">

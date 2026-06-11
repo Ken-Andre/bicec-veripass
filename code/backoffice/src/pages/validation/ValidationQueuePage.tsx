@@ -18,9 +18,9 @@ import type { QueueItem } from '@/services/dossier-service';
 const labelsByStatus: Record<string, string> = {
   PENDING_AGENT_REVIEW: 'En attente',
   PENDING_KYC: 'En attente',
-  APPROVED: 'Approuve',
-  REJECTED: 'Rejete',
-  FRAUD_SUSPECT: 'Fraude suspectee',
+  APPROVED: 'Approuvé',
+  REJECTED: 'Rejeté',
+  FRAUD_SUSPECT: 'Fraude suspectée',
   PENDING_INFO: 'Infos requises',
 };
 
@@ -84,7 +84,7 @@ export default function ValidationQueuePage() {
     return (sessions as QueueItem[] || []).filter((s) => !s.assigned_agent_name);
   }, [sessions, statusFilter]);
 
-  const scopeLabel = statusFilter === 'ACTIVE' ? 'a traiter' : (labelsByStatus[statusFilter] || statusFilter);
+  const scopeLabel = statusFilter === 'ACTIVE' ? 'à traiter' : (labelsByStatus[statusFilter] || statusFilter);
 
   if (isLoading) {
     return (
@@ -213,7 +213,7 @@ export default function ValidationQueuePage() {
                           {biometricRiskFlags.length > 0 && (
                             <Badge variant="warning" className="gap-1 border border-orange-200 bg-orange-100 text-orange-800">
                               <AlertTriangle className="h-3 w-3" />
-                              Biometrie
+                              Biométrie
                             </Badge>
                           )}
                         </div>
