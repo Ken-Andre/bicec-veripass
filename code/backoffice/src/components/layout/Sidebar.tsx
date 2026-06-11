@@ -20,10 +20,10 @@ const navigation = [
   { name: 'Validation KYC', href: '/validation', icon: FileCheck, roles: ['JEAN'] },
   { name: 'Conformité AML', href: '/compliance', icon: Shield, roles: ['THOMAS'] },
   { name: 'Listes AML', href: '/compliance/lists', icon: ListChecks, roles: ['THOMAS', 'ADMIN_IT'] },
-  { name: 'Command Center', href: '/command-center', icon: Command, roles: ['SYLVIE'] },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['SYLVIE', 'THOMAS', 'ADMIN_IT'] },
+  { name: 'Centre de pilotage', href: '/command-center', icon: Command, roles: ['SYLVIE'] },
+  { name: 'Tableaux de bord', href: '/analytics', icon: BarChart3, roles: ['SYLVIE', 'THOMAS', 'ADMIN_IT'] },
   { name: 'Journal audit', href: '/admin/audit', icon: ScrollText, roles: ['SYLVIE', 'ADMIN_IT'] },
-  { name: 'Documents legaux', href: '/admin/legal', icon: FileText, roles: ['ADMIN_IT'] },
+  { name: 'Documents légaux', href: '/admin/legal', icon: FileText, roles: ['ADMIN_IT'] },
   { name: 'Administration', href: '/admin', icon: Settings, roles: ['ADMIN_IT'] },
 ]
 
@@ -69,7 +69,7 @@ export default function Sidebar() {
           <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-sidebar text-sidebar-foreground">
             <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
               <span className="text-lg font-semibold">BICEC VeriPass</span>
-              <button onClick={() => setMobileOpen(false)}>
+              <button aria-label="Fermer le menu" onClick={() => setMobileOpen(false)}>
                 <X className="h-6 w-6" />
               </button>
             </div>
