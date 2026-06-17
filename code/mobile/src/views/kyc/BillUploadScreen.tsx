@@ -168,7 +168,7 @@ export default function BillUploadScreen() {
       setBillCapture(dataUrl);
       completeStep('utility_bill');
 
-      setTimeout(() => navigate('/kyc/niu'), 800);
+      setTimeout(() => navigate('/kyc/address'), 800);
     } catch (err) {
       setError('Erreur lors de l\'envoi. Veuillez reessayer.');
       captureKycException(err, 'upload_failure', {

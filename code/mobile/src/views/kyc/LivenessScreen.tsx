@@ -437,7 +437,7 @@ export default function LivenessScreen() {
         completeStep('liveness');
         resetLivenessAttempts();
         setMessage('Connexion indisponible. La vérification sera synchronisée automatiquement au retour réseau.');
-        navigate('/kyc/address');
+        navigate('/kyc/bill-select');
         return;
       }
       setMessage('Selfie non accepté. Veuillez recommencer la vérification faciale.');
@@ -470,7 +470,7 @@ export default function LivenessScreen() {
           },
         });
       }
-      navigate('/kyc/address');
+      navigate('/kyc/bill-select');
       await runKycSyncNow();
     } catch (err) {
       const networkLike = isNetworkLikeError(err);
@@ -483,7 +483,7 @@ export default function LivenessScreen() {
         completeStep('liveness');
         resetLivenessAttempts();
         setMessage('Connexion indisponible. La vérification sera synchronisée automatiquement au retour réseau.');
-        navigate('/kyc/address');
+        navigate('/kyc/bill-select');
         return;
       }
       captureKycException(err, 'match_error', {

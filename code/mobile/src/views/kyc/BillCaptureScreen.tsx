@@ -228,7 +228,7 @@ export default function BillCaptureScreen({ billType: propBillType }: BillCaptur
     await uploadBill(capturedBlob, capturedImage);
     setUploading(false);
     completeStep('utility_bill');
-    navigate('/kyc/niu');
+    navigate('/kyc/address');
   }, [capturedBlob, capturedImage, completeStep, navigate, uploadBill]);
 
   useEffect(() => {

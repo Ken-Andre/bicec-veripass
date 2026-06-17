@@ -35,6 +35,20 @@ type FetchState = 'loading' | 'error' | 'success';
 const RETRY_DELAYS = [2000, 4000, 8000];
 const MAX_RETRIES = 3;
 
+function parseDateToYmd(val: string): string {
+  if (!val) return '';
+  const match = val.match(/^(\d{2})[./-:](\d{2})[./-:](\d{4})$/);
+  if (match) {
+    const [_, day, month, year] = match;
+    return `${year}-${month}-${day}`;
+  }
+  const matchYmd = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (matchYmd) {
+    return val;
+  }
+  return val;
+}
+
 export default function OcrReviewScreen() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -49,6 +63,7 @@ export default function OcrReviewScreen() {
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [retryCount, setRetryCount] = useState(0);
   const [docStatuses, setDocStatuses] = useState<Record<string, string>>({});
+  const [documentId, setDocumentId] = useState<string | null>(null);
 
   // FIX-6 (Cause 6): État local isolé du KycContext pour protéger les corrections
   // manuelles de l'utilisateur contre les re-renders/réconciliations du contexte.
@@ -87,6 +102,28 @@ export default function OcrReviewScreen() {
       );
       setFetchState('loading');
 
+      let delay = 2000;
+      const maxDelay = 8000;
+
+      while (mountedRef.current) {
+        const statusRes = await apiClient.get<Record<string, any>>('/kyc/session/status');
+        if (!mountedRef.current) return;
+
+        const documents = statusRes.documents || {};
+        const rectoStatus = documents['CNI_RECTO'];
+        const versoStatus = documents['CNI_VERSO'];
+
+        if (rectoStatus === 'PENDING' || versoStatus === 'PENDING') {
+          setStatusMessage(t('ocr.loading.text') || 'Analyse de votre document en cours...');
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay = Math.min(delay * 1.5, maxDelay);
+          continue;
+        }
+        break;
+      }
+
+      if (!mountedRef.current) return;
+
       const sessionRes = await apiClient.get<Record<string, unknown>>('/kyc/session/current', {
         timeout: 15000,
       });
@@ -118,6 +155,11 @@ export default function OcrReviewScreen() {
             }
           }
         }
+      }
+
+      const rectoDoc = bestByType.get('CNI_RECTO');
+      if (rectoDoc && rectoDoc.id) {
+        setDocumentId(rectoDoc.id as string);
       }
 
       // ── FIX DOUBLON ─────────────────────────────────────────────────────────
@@ -318,11 +360,17 @@ export default function OcrReviewScreen() {
 
       if (Object.keys(corrections).length > 0) {
         await apiClient.post('/kyc/ocr/confirm', { corrected_fields: corrections });
+        if (documentId) {
+          await apiClient.post('/kyc/feedback', {
+            document_id: documentId,
+            corrected_fields: corrections,
+          }).catch((err) => console.warn('Failed to submit OCR feedback:', err));
+        }
       }
 
       setOcrFields(updatedFields); // FIX-6: appel unique au submit, pas au polling
       completeStep('ocr_review');
-      navigate('/kyc/biometric-consent');
+      navigate('/kyc/review');
     } catch (err) {
       console.error('Submission failed:', err);
       captureKycException(err, 'ocr_failure', {
@@ -332,7 +380,7 @@ export default function OcrReviewScreen() {
         extra: { corrected_fields_count: Object.keys(editedValues).length },
       });
       completeStep('ocr_review');
-      navigate('/kyc/biometric-consent');
+      navigate('/kyc/review');
     }
   };
 
@@ -451,8 +499,8 @@ export default function OcrReviewScreen() {
                   >
                     {isEditing || field.editable ? (
                       <input
-                        type="text"
-                        value={currentValue}
+                        type={['date_naissance', 'date_delivrance', 'date_expiration'].includes(field.field_name) ? 'date' : 'text'}
+                        value={['date_naissance', 'date_delivrance', 'date_expiration'].includes(field.field_name) ? parseDateToYmd(currentValue) : currentValue}
                         onChange={(e) =>
                           setEditedValues((prev) => ({
                             ...prev,

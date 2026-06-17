@@ -93,7 +93,14 @@ describe('ReviewScreen', () => {
       </MemoryRouter>,
     );
 
+    // Wait for the elements to be loaded
     const submitButton = await screen.findByRole('button', { name: /review\.submit/i });
+
+    // Click the final confirmations to enable the submit button
+    fireEvent.click(screen.getByText("Les informations du dossier sont exactes"));
+    fireEvent.click(screen.getByText("J'autorise le partage avec BICEC"));
+    fireEvent.click(screen.getByText("J'accepte les CGU et la politique de confidentialite"));
+
     fireEvent.click(submitButton);
 
     await waitFor(() => {

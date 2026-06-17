@@ -126,12 +126,12 @@ export default function SignatureScreen() {
       }
 
       completeStep('signature');
-      navigate('/kyc/review');
+      navigate('/kyc/ocr-review');
     } catch (err) {
       console.error('Signature submit error:', err);
       // Continue anyway - signature is stored in context
       completeStep('signature');
-      navigate('/kyc/review');
+      navigate('/kyc/ocr-review');
     } finally {
       setSubmitting(false);
     }

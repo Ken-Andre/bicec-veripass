@@ -17,6 +17,10 @@ export default function NiuScreen() {
   const [niuFile, setNiuFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isDeclarativeNiuValid = /^[A-Z0-9]{14}$/.test(niuValue);
+
+  const normalizeNiuValue = (value: string): string =>
+    value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14);
 
   const toHex = (buffer: ArrayBuffer): string =>
     Array.from(new Uint8Array(buffer))
@@ -155,14 +159,16 @@ export default function NiuScreen() {
             <input
               type="text"
               value={niuValue}
-              onChange={e => setNiuValue(e.target.value.toUpperCase())}
-              placeholder="M123456789012"
+              onChange={e => setNiuValue(normalizeNiuValue(e.target.value))}
+              placeholder="M012345678901A"
               className="w-full px-3 py-3 rounded-lg border bg-background text-lg font-mono tracking-wider"
-              maxLength={15}
+              maxLength={14}
+              inputMode="text"
+              autoCapitalize="characters"
             />
             <Button
               onClick={() => handleSubmit('DECLARATIVE')}
-              disabled={!/^M\d{10,14}$/.test(niuValue)}
+              disabled={!isDeclarativeNiuValid}
             >
               {t('common.continue')}
             </Button>

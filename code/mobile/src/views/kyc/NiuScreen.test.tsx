@@ -108,7 +108,7 @@ describe('NiuScreen integration', () => {
 
     await user.click(screen.getByText('niu.manual'));
 
-    expect(screen.getByPlaceholderText('M123456789012')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('M012345678901A')).toBeInTheDocument();
   });
 
   it('enqueues NIU offline when navigator is offline and MISSING is selected', async () => {
@@ -160,9 +160,8 @@ describe('NiuScreen integration', () => {
     // Switch to manual mode
     await user.click(screen.getByText('niu.manual'));
 
-    // Type a valid NIU (M + 10-14 digits)
-    const input = screen.getByPlaceholderText('M123456789012');
-    await user.type(input, 'M1234567890');
+    const input = screen.getByPlaceholderText('M012345678901A');
+    await user.type(input, 'm012345678901a');
 
     // Submit (the button shows common.continue key)
     fireEvent.click(screen.getByText('common.continue'));
@@ -172,12 +171,38 @@ describe('NiuScreen integration', () => {
         expect.objectContaining({
           sessionId: 'sess-1',
           niuType: 'DECLARATIVE',
-          niuValue: 'M1234567890',
+          niuValue: 'M012345678901A',
         }),
       );
     });
     // Verify step is marked complete after offline enqueue on API failure
     expect(mockUseKyc().completeStep).toHaveBeenCalledWith('niu');
+  });
+
+  it('normalizes manual NIU input to 14 uppercase alphanumeric characters', async () => {
+    const user = userEvent.setup();
+    renderNiuScreen();
+
+    await user.click(screen.getByText('niu.manual'));
+    const input = screen.getByPlaceholderText('M012345678901A');
+    await user.type(input, 'm012-345 678 901a-extra');
+
+    expect(input).toHaveValue('M012345678901A');
+  });
+
+  it('keeps continue disabled until the NIU has exactly 14 alphanumeric characters', async () => {
+    const user = userEvent.setup();
+    renderNiuScreen();
+
+    await user.click(screen.getByText('niu.manual'));
+    const input = screen.getByPlaceholderText('M012345678901A');
+    const continueButton = screen.getByText('common.continue');
+
+    expect(continueButton).toBeDisabled();
+    await user.type(input, 'M012345678901');
+    expect(continueButton).toBeDisabled();
+    await user.type(input, 'A');
+    expect(continueButton).not.toBeDisabled();
   });
 
   it('generates offline session ID when sessionId is null', async () => {

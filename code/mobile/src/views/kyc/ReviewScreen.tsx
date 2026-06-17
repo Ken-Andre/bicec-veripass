@@ -176,32 +176,54 @@ export default function ReviewScreen() {
   });
 
   useEffect(() => {
-    const load = async () => {
-      setLoadingReadiness(true);
+    let active = true;
+    let pollInterval: any = null;
+
+    const load = async (isPoll = false) => {
+      if (!isPoll) setLoadingReadiness(true);
       try {
         await runKycSyncNow();
 
         const sessionRes = await fetchWithCorrelation('/api/v1/kyc/session/current');
-        if (sessionRes.ok) {
+        if (sessionRes.ok && active) {
           const data = await sessionRes.json();
           setSession(data);
         }
 
         const readinessRes = await fetchWithCorrelation('/api/v1/kyc/readiness');
-        if (readinessRes.ok) {
-          setBackendReadiness(await readinessRes.json() as ReadinessData);
+        if (readinessRes.ok && active) {
+          const rData = await readinessRes.json() as ReadinessData;
+          setBackendReadiness(rData);
+          const isInProgress = rData.blocking_reasons.some(r => r.includes('Biometric verification in progress'));
+          if (isInProgress) {
+            if (!pollInterval && active) {
+              pollInterval = window.setInterval(() => load(true), 3000);
+            }
+          } else if (pollInterval) {
+            window.clearInterval(pollInterval);
+            pollInterval = null;
+          }
         }
 
         const offlineStatus = await getSubmissionBlockerStatus();
-        setOfflineBlocked(offlineStatus.canSubmit ? null : offlineStatus.blockingReason);
+        if (active) {
+          setOfflineBlocked(offlineStatus.canSubmit ? null : offlineStatus.blockingReason);
+        }
       } catch (error) {
         console.error('Failed to load review data:', error);
       } finally {
-        setLoadingReadiness(false);
+        if (!isPoll && active) setLoadingReadiness(false);
       }
     };
 
     void load();
+
+    return () => {
+      active = false;
+      if (pollInterval) {
+        window.clearInterval(pollInterval);
+      }
+    };
   }, []);
 
   const backendCanSubmit = Boolean(backendReadiness?.can_submit) && !offlineBlocked && !loadingReadiness;
@@ -372,7 +394,7 @@ export default function ReviewScreen() {
             ok={hasSignature}
           >
             {signatureData && (
-              <div className="w-12 h-8 bg-card border rounded overflow-hidden">
+              <div className="w-16 sm:w-20 h-10 sm:h-12 shrink-0 bg-card border rounded overflow-hidden">
                 <img src={signatureData} alt="Signature" className="w-full h-full object-contain" />
               </div>
             )}
