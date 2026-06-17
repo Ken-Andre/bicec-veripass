@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Weekly recap (2026-06-08 to 2026-06-13)
+
+- Added a backend Prometheus metrics endpoint with application wiring, unit coverage, and issue evidence documentation.
+- Refreshed the mobile dashboard and strengthened final KYC submission confirmations with expanded review-screen tests.
+- Updated backoffice analytics, command-center, validation-queue, and sidebar presentation details, plus a new `LayoutChrome` unit test.
+- Stabilized authentication and KYC test behavior with the SMS OTP mode fallback merge, a shared `Agency` fixture for agent/session tests, and cached token lookup in `authTokenStorage`.
+- Added planning and delivery evidence for the soutenance, including open GitHub issue inventory exports, project timeline updates/corrections, demo deliverables, and updated memoire v11/v12 artifacts.
+- Cleaned up `bmad-builder` submodule handling and opencode workflow checkout behavior to avoid broken submodule processing.
+- PR references: [#323](https://github.com/Ken-Andre/bicec-veripass/pull/323), [#324](https://github.com/Ken-Andre/bicec-veripass/pull/324), [#325](https://github.com/Ken-Andre/bicec-veripass/pull/325).
+
 ### Weekly recap (2026-06-01 to 2026-06-07)
 
 - Added the backend analytics module with business metrics models, schemas, router/service wiring, Alembic migration `031_business_metrics.py`, and unit coverage for metrics and RBAC behavior.
