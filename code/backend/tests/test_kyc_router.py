@@ -12,7 +12,7 @@ from app.core.security import get_current_agent, get_current_user
 from app.db.session import get_db
 from app.modules.admin.models import Agency
 from app.modules.auth.models import Agent, AgentRole, User
-from app.modules.kyc.models import KYCSession, Document, BiometricResult
+from app.modules.kyc.models import KYCSession, Document, BiometricResult, ConsentRecord
 from app.modules.kyc.service import (
     FACE_MATCH_STATUS_FAILED,
     FACE_MATCH_STATUS_NOT_PERFORMED,
@@ -441,3 +441,104 @@ class TestKYCRouter:
             assert response.json()["new_status"] == LifecycleState.APPROVED
         finally:
             app.dependency_overrides.pop(get_current_agent, None)
+
+    @pytest.mark.asyncio
+    async def test_signature_sheet_upload_success(self, client: AsyncClient, override_auth, db_session, mock_storage):
+        await client.post("/api/v1/kyc/session/start")
+        file_content = b"test image content"
+        valid_hash = hashlib.sha256(file_content).hexdigest()
+
+        with patch("app.tasks.ocr.process_document_ocr_task"):
+            response = await client.post(
+                "/api/v1/kyc/document/upload",
+                data={"doc_type": "SIGNATURE_SHEET", "client_sha256": valid_hash},
+                files={"file": ("signature_sheet.jpg", file_content, "image/jpeg")},
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["doc_type"] == "SIGNATURE_SHEET"
+        assert data["sha256_hash"] == valid_hash
+        assert "id" in data
+
+    @pytest.mark.asyncio
+    async def test_signature_submit_with_document_id(
+        self, client: AsyncClient, override_auth, db_session, mock_storage, mock_user
+    ):
+        await client.post("/api/v1/kyc/session/start")
+        file_content = b"test image content"
+        valid_hash = hashlib.sha256(file_content).hexdigest()
+
+        with patch("app.tasks.ocr.process_document_ocr_task"):
+            upload_res = await client.post(
+                "/api/v1/kyc/document/upload",
+                data={"doc_type": "SIGNATURE_SHEET", "client_sha256": valid_hash},
+                files={"file": ("signature_sheet.jpg", file_content, "image/jpeg")},
+            )
+        assert upload_res.status_code == 200
+        doc_handle = upload_res.json()["id"]
+
+        response = await client.post(
+            "/api/v1/kyc/signature/submit",
+            json={"document_id": doc_handle},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+
+        session_result = await db_session.execute(
+            select(KYCSession).where(KYCSession.user_id == mock_user.id)
+        )
+        session = session_result.scalars().first()
+        result = await db_session.execute(
+            select(ConsentRecord).where(
+                ConsentRecord.session_id == session.id
+            )
+        )
+        consent = result.scalars().first()
+        assert consent is not None
+        assert consent.consent_method == "PAPER_SIGNATURE_PHOTO"
+        assert "signature_document_id" in consent.consent_metadata
+
+    @pytest.mark.asyncio
+    async def test_signature_submit_legacy_base64(self, client: AsyncClient, override_auth, db_session, mock_user):
+        await client.post("/api/v1/kyc/session/start")
+
+        response = await client.post(
+            "/api/v1/kyc/signature/submit",
+            json={"signature_data": "data:image/png;base64,iVBORw0KGgo="},
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+
+        session_result = await db_session.execute(
+            select(KYCSession).where(KYCSession.user_id == mock_user.id)
+        )
+        session = session_result.scalars().first()
+        result = await db_session.execute(
+            select(ConsentRecord).where(
+                ConsentRecord.session_id == session.id
+            )
+        )
+        consent = result.scalars().first()
+        assert consent is not None
+        assert consent.consent_method == "SIGNATURE_ONLY"
+        assert consent.consent_metadata["signature_data"] == "data:image/png;base64,iVBORw0KGgo="
+
+    @pytest.mark.asyncio
+    async def test_signature_submit_missing_both_fields(self, client: AsyncClient, override_auth, db_session):
+        await client.post("/api/v1/kyc/session/start")
+
+        response = await client.post(
+            "/api/v1/kyc/signature/submit",
+            json={},
+        )
+        assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_signature_submit_invalid_document_handle(self, client: AsyncClient, override_auth, db_session):
+        await client.post("/api/v1/kyc/session/start")
+
+        response = await client.post(
+            "/api/v1/kyc/signature/submit",
+            json={"document_id": "nonexistent_handle"},
+        )
+        assert response.status_code == 404

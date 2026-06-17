@@ -317,17 +317,16 @@ describe('enqueueOfflineConsent', () => {
 
 describe('enqueueOfflineSignature', () => {
   it('enqueues an item with op_type=submit_signature and signature payload', async () => {
-    const signatureDataUrl = 'data:image/png;base64,sigdata';
+    const fileDataUrl = 'data:image/jpeg;base64,sigdata';
     await enqueueOfflineSignature({
       sessionId: 'sess-1',
-      signatureData: signatureDataUrl,
+      fileDataUrl: fileDataUrl,
     });
 
     const call = vi.mocked(enqueueKycSyncItem).mock.calls[0][0] as any;
     expect(call.op_type).toBe('submit_signature');
     expect(call.step).toBe('signature');
-    expect(call.payload.signature_data).toBe(signatureDataUrl);
-    // enqueueOfflineSignature does not pass meta — it's undefined in the input
+    expect(call.payload.file_data_url).toBe(fileDataUrl);
     expect(call.meta).toBeUndefined();
   });
 });
@@ -510,8 +509,8 @@ describe('replay: submit_consent', () => {
 });
 
 describe('replay: submit_signature', () => {
-  it('calls /api/v1/kyc/signature/submit and removes queue item on success', async () => {
-    const payload = { signature_data: 'data:image/png;base64,sig==' };
+  it('uploads document then calls /api/v1/kyc/signature/submit and removes queue item on success', async () => {
+    const payload = { file_data_url: 'data:image/jpeg;base64,c2ln' };
     const item = makeQueueItem({
       op_type: 'submit_signature',
       step: 'signature',
@@ -519,12 +518,29 @@ describe('replay: submit_signature', () => {
     });
 
     mockQueueForSync([item], [item], []);
+
+    vi.mocked(fetchWithCorrelation).mockImplementation(async (url: string) => {
+      if (url === '/api/v1/kyc/session/start') {
+        return makeResponse(true, 200, { status: 'DRAFT', session_id: 'sess-1' });
+      }
+      if (url === '/api/v1/kyc/document/upload') {
+        return makeResponse(true, 200, { id: 'doc_handle_abc', doc_type: 'SIGNATURE_SHEET' });
+      }
+      if (url === '/api/v1/kyc/signature/submit') {
+        return makeResponse(true, 200, { status: 'success' });
+      }
+      return makeResponse(true, 200, {});
+    });
+
     await runKycSyncNow();
 
-    const calls = findFetchCallsByUrl('/api/v1/kyc/signature/submit');
-    expect(calls).toHaveLength(1);
-    const bodyArg = JSON.parse(calls[0][1].body);
-    expect(bodyArg.signature_data).toBe('data:image/png;base64,sig==');
+    const docUploadCalls = findFetchCallsByUrl('/api/v1/kyc/document/upload');
+    expect(docUploadCalls).toHaveLength(1);
+
+    const signatureCalls = findFetchCallsByUrl('/api/v1/kyc/signature/submit');
+    expect(signatureCalls).toHaveLength(1);
+    const bodyArg = JSON.parse(signatureCalls[0][1].body);
+    expect(bodyArg.document_id).toBe('doc_handle_abc');
     expect(removeKycSyncItem).toHaveBeenCalledWith(item.id);
   });
 });

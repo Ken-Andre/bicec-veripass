@@ -33,7 +33,7 @@ Root: `code/mobile`
 | CNI capture | `CniIntroScreen`, `CniRectoGuideScreen`, `CniCaptureScreen`, `CniVersoGuideScreen`, `OcrProcessingScreen`, `OcrReviewScreen` |
 | Liveness | `LivenessIntroScreen`, `BiometricConsentScreen`, `LivenessScreen` |
 | Proof/address/NIU | `BillTypeSelectScreen`, `BillCaptureScreen`, `BillUploadScreen`, `AddressScreen`, `NiuScreen` |
-| Final submission | `ConsentScreen`, `SignatureScreen`, `ReviewScreen`, `SubmitSuccessScreen`, `RejectionScreen`, `InfoRequestedScreen` |
+| Final submission | `ConsentScreen`, `SignatureScreen` (capture photo feuille 3 signatures), `ReviewScreen`, `SubmitSuccessScreen`, `RejectionScreen`, `InfoRequestedScreen` |
 | fallback | `NotFoundPage` |
 
 ### Mobile Reusable Components

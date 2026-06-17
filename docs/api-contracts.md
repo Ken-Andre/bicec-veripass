@@ -79,7 +79,7 @@ Prefix: `/kyc`
 | --- | --- | --- |
 | GET | `/session/current` | Return latest relevant KYC session |
 | POST | `/session/start` | Create or resume editable KYC session |
-| POST | `/document/upload` | Upload a generic document |
+| POST | `/document/upload` | Upload a generic document (supported types: `CNI_RECTO`, `CNI_VERSO`, `SELFIE`, `BILL_ENEO`, `BILL_CAMWATER`, `NIU`, `SIGNATURE_SHEET`) |
 | POST | `/capture/cni` | Upload CNI recto/verso and run OCR pipeline |
 | POST | `/capture/bill` | Upload/capture proof of address |
 | GET | `/document/{doc_id}/ocr` | Read OCR fields for one document |
@@ -91,7 +91,7 @@ Prefix: `/kyc`
 | POST | `/address/submit` | Store address and GPS metadata |
 | POST | `/consent/submit` | Store CGU/privacy/data-processing consent |
 | POST | `/niu/submit` | Store NIU type and value |
-| POST | `/signature/submit` | Store base64 client signature |
+| POST | `/signature/submit` | Store signature reference (document_id for paper photo, or legacy base64) |
 | GET | `/readiness` | Check whether dossier can be submitted |
 | POST | `/submit` | Submit dossier to backoffice review |
 | GET | `/review-status` | Mobile-facing review status |
@@ -111,7 +111,7 @@ Key request models:
 - `AddressSubmitRequest`: region, city, commune, quartier, optional lieu-dit and GPS.
 - `NIUSubmitRequest`: `niu_type` of `MISSING`, `DECLARATIVE`, or `UPLOADED`, with optional value.
 - `ConsentSubmitRequest`: three consent booleans plus consent method.
-- `SignatureSubmitRequest`: base64 data URL.
+- `SignatureSubmitRequest`: `document_id` (opaque handle of a `SIGNATURE_SHEET` document, preferred) or `signature_data` (base64 data URL, legacy fallback). At least one is required.
 - `KYCSubmitRequest`: empty body; backend computes readiness and transitions.
 
 ## OCR Utility API

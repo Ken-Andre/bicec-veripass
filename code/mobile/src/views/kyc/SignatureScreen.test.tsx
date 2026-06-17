@@ -1,22 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Integration tests for SignatureScreen.
+ * Integration tests for SignatureScreen (paper signature capture).
  *
- * Tests the offline enqueue pattern:
- * - Canvas rendering and signature validation
- * - Submit disabled until signature drawn
+ * Tests the camera/file-upload flow:
+ * - Instructions state rendering
+ * - File picker triggers review state
  * - Online API success vs offline enqueue
- * - Clear canvas resets state
- *
- * NOTE: jsdom does not implement CanvasRenderingContext2D, so we mock
- * canvas.getContext('2d') to return a stub. The component's drawing
- * handlers call getCtx() which requires getContext('2d') to work.
- * We also directly set hasDrawn state by calling the component's
- * startDrawing+draw+stopDrawing chain, which relies on the ctx mock.
- *
- * NOTE: vi.mock factories are hoisted ABOVE const/let declarations,
- * so we use inline vi.fn() in the factory and retrieve references
- * via vi.mocked() after the module import.
+ * - Confirm triggers upload + signature submit
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
@@ -38,11 +28,14 @@ vi.mock('../../services/sentry', () => ({
   captureKycException: vi.fn(),
 }));
 
+vi.mock('../../utils/imageCompression', () => ({
+  compressForUpload: vi.fn().mockImplementation(async (blob: Blob) => blob),
+}));
+
 vi.mock('../../contexts/KycContext', () => ({
   useKyc: vi.fn().mockReturnValue({
     sessionId: 'sess-1',
     setSessionId: vi.fn(),
-    setSignature: vi.fn(),
     completeStep: vi.fn(),
   }),
   KycProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -62,76 +55,34 @@ const mockEnqueue = vi.mocked(enqueueOfflineSignature);
 const mockFetch = vi.mocked(fetchWithCorrelation);
 const mockUseKyc = vi.mocked(useKyc);
 
-// ── Canvas context mock ──────────────────────────────────────────────────
-// jsdom does not implement CanvasRenderingContext2D. We stub it so
-// the component's getCtx() returns a working mock, and drawing events
-// actually invoke ctx.beginPath/lineTo/stroke, triggering setHasDrawn.
-
-const ctxMock = {
-  beginPath: vi.fn(),
-  moveTo: vi.fn(),
-  lineTo: vi.fn(),
-  stroke: vi.fn(),
-  closePath: vi.fn(),
-  clearRect: vi.fn(),
-  strokeStyle: '',
-  lineWidth: 1,
-  lineCap: 'butt' as CanvasLineCap,
-  lineJoin: 'miter' as CanvasLineJoin,
-};
-
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
-const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
 let originalOnLine: boolean;
 
 beforeEach(() => {
   vi.clearAllMocks();
   originalOnLine = navigator.onLine;
 
-  // Stub getContext to return our mock 2d context
-  HTMLCanvasElement.prototype.getContext = vi.fn().mockImplementation((contextId: string) => {
-    if (contextId === '2d') return ctxMock;
-    return null;
-  }) as any;
-
-  // Mock canvas.toDataURL for signature extraction
-  HTMLCanvasElement.prototype.toDataURL = vi.fn().mockReturnValue('data:image/png;base64,sigtest==');
-
   mockUseKyc.mockReturnValue({
     sessionId: 'sess-1',
     setSessionId: vi.fn(),
-    setSignature: vi.fn(),
     completeStep: vi.fn(),
   } as any);
 });
 
 afterEach(() => {
-  HTMLCanvasElement.prototype.getContext = originalGetContext;
-  HTMLCanvasElement.prototype.toDataURL = originalToDataURL;
   Object.defineProperty(navigator, 'onLine', { value: originalOnLine, configurable: true });
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 function mockApiSuccess() {
-  mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ status: 'success' }) } as unknown as Response);
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve({ id: 'mock_doc_handle', status: 'success' }),
+  } as unknown as Response);
 }
 
 function mockApiFailure() {
   mockFetch.mockRejectedValue(new Error('Network error'));
-}
-
-/** Simulate drawing on the canvas by dispatching mouse events */
-function drawOnCanvas() {
-  const canvas = document.querySelector('canvas');
-  if (!canvas) throw new Error('Canvas not found');
-
-  // The component's startDrawing calls ctx.beginPath + ctx.moveTo + setIsDrawing(true)
-  fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
-  // The component's draw calls ctx.lineTo + ctx.stroke + setHasDrawn(true)
-  fireEvent.mouseMove(canvas, { clientX: 150, clientY: 120 });
-  // The component's stopDrawing calls ctx.closePath + setIsDrawing(false)
-  fireEvent.mouseUp(canvas);
 }
 
 function renderSignatureScreen() {
@@ -145,41 +96,21 @@ function renderSignatureScreen() {
 // ── Tests ────────────────────────────────────────────────────────────────
 
 describe('SignatureScreen integration', () => {
-  it('renders the signature canvas and placeholder text', () => {
+  it('renders instructions state with camera and file picker buttons', () => {
     renderSignatureScreen();
 
-    expect(screen.getByText('Signez ici')).toBeInTheDocument();
-    expect(document.querySelector('canvas')).toBeInTheDocument();
+    expect(screen.getAllByText('signature.title').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('signature.instruction')).toBeInTheDocument();
+    expect(screen.getByText('signature.capture')).toBeInTheDocument();
+    expect(screen.getByText('signature.choose_file')).toBeInTheDocument();
   });
 
-  it('submit button is disabled until signature is drawn', () => {
+  it('renders a hidden file input accepting jpg/jpeg/png', () => {
     renderSignatureScreen();
 
-    const submitBtn = screen.getByText('common.continue');
-    expect(submitBtn).toBeDisabled();
-  });
-
-  it('enables submit after drawing on canvas', () => {
-    renderSignatureScreen();
-
-    drawOnCanvas();
-
-    const submitBtn = screen.getByText('common.continue');
-    expect(submitBtn).not.toBeDisabled();
-  });
-
-  it('clears the canvas when Effacer is clicked', () => {
-    renderSignatureScreen();
-
-    drawOnCanvas();
-    expect(screen.getByText('common.continue')).not.toBeDisabled();
-
-    // Click clear button (hardcoded French text in the component)
-    fireEvent.click(screen.getByText('Effacer'));
-
-    // Submit should be disabled again after clearing
-    const submitBtn = screen.getByText('common.continue');
-    expect(submitBtn).toBeDisabled();
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toBeInTheDocument();
+    expect(fileInput).toHaveAttribute('accept', '.jpg,.jpeg,.png');
   });
 
   it('enqueues signature offline when navigator is offline', async () => {
@@ -187,39 +118,25 @@ describe('SignatureScreen integration', () => {
 
     renderSignatureScreen();
 
-    drawOnCanvas();
-    fireEvent.click(screen.getByText('common.continue'));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'sig.jpg', {
+      type: 'image/jpeg',
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByAltText(/Feuille de signature/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('signature.confirm'));
 
     await waitFor(() => {
       expect(mockEnqueue).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId: 'sess-1',
-          signatureData: 'data:image/png;base64,sigtest==',
         }),
       );
     });
-    // Verify step is marked complete after offline enqueue
-    expect(mockUseKyc().completeStep).toHaveBeenCalledWith('signature');
-  });
-
-  it('enqueues signature offline when online but API fails', async () => {
-    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
-    mockApiFailure();
-
-    renderSignatureScreen();
-
-    drawOnCanvas();
-    fireEvent.click(screen.getByText('common.continue'));
-
-    await waitFor(() => {
-      expect(mockEnqueue).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sessionId: 'sess-1',
-          signatureData: 'data:image/png;base64,sigtest==',
-        }),
-      );
-    });
-    // Verify step is marked complete after offline enqueue on API failure
     expect(mockUseKyc().completeStep).toHaveBeenCalledWith('signature');
   });
 
@@ -229,18 +146,53 @@ describe('SignatureScreen integration', () => {
 
     renderSignatureScreen();
 
-    drawOnCanvas();
-    fireEvent.click(screen.getByText('common.continue'));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'sig.jpg', {
+      type: 'image/jpeg',
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByAltText(/Feuille de signature/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('signature.confirm'));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/v1/kyc/signature/submit',
+        '/api/v1/kyc/document/upload',
         expect.objectContaining({ method: 'POST' }),
       );
     });
-    // Should NOT enqueue since API succeeded
     expect(mockEnqueue).not.toHaveBeenCalled();
-    // Verify step is marked complete after successful API call
+    expect(mockUseKyc().completeStep).toHaveBeenCalledWith('signature');
+  });
+
+  it('enqueues offline when online but API fails', async () => {
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    mockApiFailure();
+
+    renderSignatureScreen();
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'sig.jpg', {
+      type: 'image/jpeg',
+    });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByAltText(/Feuille de signature/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('signature.confirm'));
+
+    await waitFor(() => {
+      expect(mockEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'sess-1',
+        }),
+      );
+    });
     expect(mockUseKyc().completeStep).toHaveBeenCalledWith('signature');
   });
 });

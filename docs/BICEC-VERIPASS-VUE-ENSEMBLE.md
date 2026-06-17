@@ -854,7 +854,8 @@ sequenceDiagram
     M->>NGX: POST /api/v1/kyc/address/submit
     M->>NGX: POST /api/v1/kyc/niu/submit
     M->>NGX: POST /api/v1/kyc/consent/submit
-    M->>NGX: POST /api/v1/kyc/signature/submit
+    M->>NGX: POST /api/v1/kyc/document/upload (SIGNATURE_SHEET, photo feuille 3 signatures)
+    M->>NGX: POST /api/v1/kyc/signature/submit {document_id}
     M->>NGX: GET /api/v1/kyc/readiness
     API-->>M: can_submit=true, blocking_reasons=[]
     M->>NGX: POST /api/v1/kyc/submit

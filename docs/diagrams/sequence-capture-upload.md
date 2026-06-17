@@ -67,8 +67,12 @@ sequenceDiagram
     API->>DB: UPDATE kyc_sessions (niu_type, niu_number)
     M->>NGX: POST /api/v1/kyc/consent/submit
     API->>DB: INSERT consent_records
-    M->>NGX: POST /api/v1/kyc/signature/submit
-    API->>DB: UPDATE kyc_sessions (signature_data_url)
+    M->>NGX: POST /api/v1/kyc/document/upload (multipart, doc_type=SIGNATURE_SHEET)
+    API->>DB: INSERT documents (file path, sha256, type=SIGNATURE_SHEET)
+    Note right of M: OCR non déclenché pour SIGNATURE_SHEET
+    API-->>M: document_id (handle HMAC)
+    M->>NGX: POST /api/v1/kyc/signature/submit {document_id}
+    API->>DB: INSERT/UPDATE consent_records (consent_method=PAPER_SIGNATURE_PHOTO, metadata.signature_document_id)
 
     Note over M,BO: Phase 6 — Readiness et soumission
     M->>NGX: GET /api/v1/kyc/readiness

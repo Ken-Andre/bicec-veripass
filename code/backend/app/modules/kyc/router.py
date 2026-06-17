@@ -96,6 +96,7 @@ SUPPORTED_DOCUMENT_UPLOAD_TYPES = {
     "BILL_ENEO",
     "BILL_CAMWATER",
     "NIU",
+    "SIGNATURE_SHEET",
 }
 LIVENESS_LOCKOUT_COOLDOWN_SECONDS = 60
 LIVENESS_LOCKOUT_WINDOW_HOURS = 24
@@ -1395,8 +1396,31 @@ async def submit_signature(
     current_user: User = Depends(require_registered_device),
     db: AsyncSession = Depends(get_db),
 ):
-    """Submit electronic signature. Stored in consent metadata."""
+    """Submit electronic signature. Stored in consent metadata.
+
+    Accepts either:
+    - document_id: opaque handle of a SIGNATURE_SHEET document (preferred)
+    - signature_data: base64 data URL (legacy fallback)
+    """
+    if not body.document_id and not body.signature_data:
+        raise HTTPException(
+            status_code=400,
+            detail="Either document_id or signature_data is required.",
+        )
+
     session = await _get_active_editable_session(db, current_user)
+
+    # Resolve document handle if provided
+    signature_doc = None
+    if body.document_id:
+        signature_doc = await _resolve_document_by_handle(body.document_id, current_user, db)
+        if not signature_doc:
+            raise HTTPException(status_code=404, detail="Signature document not found.")
+        if signature_doc.doc_type != "SIGNATURE_SHEET":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expected SIGNATURE_SHEET document, got {signature_doc.doc_type}.",
+            )
 
     # Find or create consent record to attach signature
     result = await db.execute(
@@ -1407,6 +1431,15 @@ async def submit_signature(
     )
     consent = result.scalars().first()
 
+    consent_method = "PAPER_SIGNATURE_PHOTO" if signature_doc else "SIGNATURE_ONLY"
+    metadata_update = {
+        "signature_timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if signature_doc:
+        metadata_update["signature_document_id"] = str(signature_doc.id)
+    else:
+        metadata_update["signature_data"] = body.signature_data
+
     if consent is None:
         consent = ConsentRecord(
             id=uuid.uuid4(),
@@ -1414,19 +1447,16 @@ async def submit_signature(
             cgu_accepted=False,
             privacy_accepted=False,
             data_processing_accepted=False,
-            consent_method="SIGNATURE_ONLY",
+            consent_method=consent_method,
             signed_at=datetime.now(timezone.utc),
-            consent_metadata={
-                "signature_data": body.signature_data,
-                "signature_timestamp": datetime.now(timezone.utc).isoformat(),
-            },
+            consent_metadata=metadata_update,
         )
         db.add(consent)
     else:
         if consent.consent_metadata is None:
             consent.consent_metadata = {}
-        consent.consent_metadata["signature_data"] = body.signature_data
-        consent.consent_metadata["signature_timestamp"] = datetime.now(timezone.utc).isoformat()
+        consent.consent_metadata.update(metadata_update)
+        consent.consent_method = consent_method
 
     session.last_step_completed = "signature"
     await db.commit()

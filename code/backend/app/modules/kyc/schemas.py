@@ -242,7 +242,8 @@ class NIUSubmitRequest(BaseModel):
 
 # === Signature ===
 class SignatureSubmitRequest(BaseModel):
-    signature_data: str = Field(..., description="Base64 data URL of the signature image")
+    signature_data: Optional[str] = Field(None, description="Base64 data URL of the signature image (legacy)")
+    document_id: Optional[str] = Field(None, description="Opaque handle of the SIGNATURE_SHEET document")
 
 
 # === Geo Data ===

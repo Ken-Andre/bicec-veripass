@@ -329,8 +329,16 @@ export const translations: Record<string, Record<Language, string>> = {
     'consent.submit': { fr: 'J\'accepte et je continue', en: 'I accept and continue' },
 
     // Signature Screen
-    'signature.title': { fr: 'Signature électronique', en: 'Electronic Signature' },
-    'signature.instruction': { fr: 'Signez pour confirmer votre identité', en: 'Sign to confirm your identity' },
+    'signature.title': { fr: 'Signature manuscrite', en: 'Handwritten Signature' },
+    'signature.instruction': { fr: 'Signez 3 fois sur une feuille blanche, ajoutez la date du jour, puis prenez-la en photo.', en: 'Sign 3 times on a white sheet, add today\'s date, then take a photo.' },
+    'signature.capture': { fr: 'Capturer', en: 'Capture' },
+    'signature.choose_file': { fr: 'Choisir un fichier', en: 'Choose a file' },
+    'signature.retake': { fr: 'Reprendre', en: 'Retake' },
+    'signature.confirm': { fr: 'Confirmer', en: 'Confirm' },
+    'signature.uploading': { fr: 'Envoi en cours...', en: 'Uploading...' },
+    'signature.error_no_photo': { fr: 'Veuillez capturer la feuille de signature.', en: 'Please capture the signature sheet.' },
+    'signature.review_hint': { fr: 'Vérifiez que les 3 signatures et la date sont lisibles.', en: 'Check that the 3 signatures and date are readable.' },
+    'signature.camera_hint': { fr: 'Prenez une photo claire de la feuille avec vos 3 signatures et la date.', en: 'Take a clear photo of the sheet with your 3 signatures and the date.' },
 
     // CNI Capture Quality
     'capture.quality.cni_fail': { fr: 'Qualité insuffisante', en: 'Insufficient quality' },

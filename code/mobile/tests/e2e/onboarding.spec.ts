@@ -210,4 +210,67 @@ test.describe('Onboarding Flow', () => {
 
     console.log('Successfully completed CNI capture and OCR review.');
   });
+
+  test('should upload signature sheet photo via file input', async ({ page }) => {
+    test.setTimeout(30000);
+
+    // Intercept document upload and signature submit
+    const uploadCalls: string[] = [];
+    const submitCalls: object[] = [];
+
+    await page.route('**/api/v1/kyc/document/upload', async (route) => {
+      uploadCalls.push('document_upload');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'mock_doc_handle_abc123',
+          doc_type: 'SIGNATURE_SHEET',
+          file_path: 'test/signature_sheet.jpg',
+          sha256_hash: 'a'.repeat(64),
+          ocr_status: 'SKIPPED',
+          captured_at: new Date().toISOString(),
+          ocr_fields: [],
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/kyc/signature/submit', async (route) => {
+      const body = route.request().postDataJSON();
+      submitCalls.push(body);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'success', message: 'Signature recorded' }),
+      });
+    });
+
+    // Navigate directly to the signature screen
+    await page.goto('/kyc/signature');
+
+    // The instructions state should be visible
+    await expect(page.getByText(/Signature manuscrite/i)).toBeVisible();
+
+    // Verify the file input exists (hidden)
+    const fileInput = page.locator('input[type="file"][accept*=".jpg"]');
+    await expect(fileInput).toBeAttached();
+
+    // Upload a test image via the hidden file input
+    const testImagePath = path.resolve(process.cwd(), '../../paddleocr_test/notebooks/output/pdf_pages/trybeg/6.png');
+    await fileInput.setInputFiles(testImagePath);
+
+    // Should transition to review state
+    await expect(page.getByAltText(/Feuille de signature/i)).toBeVisible({ timeout: 10000 });
+
+    // Confirm the upload
+    await page.getByRole('button', { name: /Confirmer/i }).click();
+
+    // Wait for upload to complete
+    await expect(page.getByText(/Envoi en cours/i)).toBeVisible({ timeout: 5000 });
+
+    // Verify the API calls were made
+    expect(uploadCalls.length).toBe(1);
+    expect(submitCalls.length).toBe(1);
+    expect(submitCalls[0]).toHaveProperty('document_id', 'mock_doc_handle_abc123');
+  });
 });

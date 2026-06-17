@@ -83,7 +83,7 @@ Notes:
 | `aml_alerts` | `kyc.models.AmlAlert` | AML/PEP/sanctions alert status, match score, justification |
 | `pep_sanctions` | `kyc.models.PEPSanctions` | Synced sanctions targets |
 | `duplicate_checks` | `kyc.models.DuplicateCheck` | Potential duplicate/NIU conflict records |
-| `consent_records` | `kyc.models.ConsentRecord` | CGU/privacy/data-processing acceptance and versions |
+| `consent_records` | `kyc.models.ConsentRecord` | CGU/privacy/data-processing acceptance, versions, and consent method (`CHECKBOX_DIGITAL`, `SIGNATURE_ONLY`, `PAPER_SIGNATURE_PHOTO`) |
 | `support_threads` | `kyc.models.SupportThread` | Client-backoffice support thread per session |
 | `support_messages` | `kyc.models.SupportMessage` | Message content, sender, attachment metadata |
 | `notifications` | `kyc.models.Notification` | In-app notification inbox |

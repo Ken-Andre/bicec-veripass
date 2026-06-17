@@ -58,7 +58,7 @@ interface ConsentPayload {
 }
 
 interface SignaturePayload {
-  signature_data: string;
+  file_data_url: string;
 }
 
 export interface QueueSummary {
@@ -397,10 +397,29 @@ async function submitConsent(item: KycSyncQueueItem): Promise<void> {
 
 async function submitSignature(item: KycSyncQueueItem): Promise<void> {
   const payload = await decryptJsonPayload<SignaturePayload>(item.session_id, item.encrypted_payload);
+
+  // Upload signature sheet document first
+  const blob = dataUrlToBlob(payload.file_data_url);
+  const formData = new FormData();
+  formData.append('file', blob, 'signature_sheet.jpg');
+  formData.append('doc_type', 'SIGNATURE_SHEET');
+  if (item.session_id) formData.append('session_id', item.session_id);
+
+  const uploadRes = await fetchWithCorrelation('/api/v1/kyc/document/upload', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!uploadRes.ok) {
+    const detail = await uploadRes.json().catch(() => null);
+    throw classifyHttpSyncError(uploadRes.status, 'signature_sheet_upload', detail);
+  }
+  const uploadData = await uploadRes.json();
+
+  // Submit signature with document handle
   const response = await fetchWithCorrelation('/api/v1/kyc/signature/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signature_data: payload.signature_data }),
+    body: JSON.stringify({ document_id: uploadData.id }),
   });
   if (!response.ok) {
     const detail = await response.json().catch(() => null);
@@ -625,14 +644,14 @@ export async function enqueueOfflineConsent(input: {
 
 export async function enqueueOfflineSignature(input: {
   sessionId: string;
-  signatureData: string;
+  fileDataUrl: string;
 }): Promise<void> {
   await enqueueKycSyncItem({
     op_type: 'submit_signature',
     session_id: input.sessionId,
     step: 'signature',
     payload: {
-      signature_data: input.signatureData,
+      file_data_url: input.fileDataUrl,
     } satisfies SignaturePayload,
   });
 }
