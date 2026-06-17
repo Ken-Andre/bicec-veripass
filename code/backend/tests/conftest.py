@@ -69,6 +69,9 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
 
+from app.core.celery_config import celery as celery_app
+celery_app.conf.task_always_eager = True
+
 # Dedicated engine for tests (created lazily)
 _test_engine = None
 _db_available = None  # None = not checked yet, True/False = checked

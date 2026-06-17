@@ -119,7 +119,7 @@ class TestKYCRouter:
         file_content = b"test image content"
         valid_hash = hashlib.sha256(file_content).hexdigest()
         
-        with patch("app.modules.kyc.router.process_document_ocr_pipeline", new_callable=AsyncMock) as mock_ocr:
+        with patch("app.tasks.ocr.process_document_ocr_task") as mock_ocr_task:
             response = await client.post(
                 "/api/v1/kyc/document/upload",
                 data={"doc_type": "CNI_RECTO", "client_sha256": valid_hash},
@@ -129,7 +129,7 @@ class TestKYCRouter:
         data = response.json()
         assert data["doc_type"] == "CNI_RECTO"
         assert data["sha256_hash"] == valid_hash
-        mock_ocr.assert_called_once()
+        mock_ocr_task.apply_async.assert_called_once()
         mock_storage.assert_called_once()
 
     @pytest.mark.asyncio
@@ -248,6 +248,24 @@ class TestKYCRouter:
             )
         ).scalars().first()
 
+        # Insert mock documents to satisfy liveness router checks
+        cni = Document(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            doc_type="CNI_RECTO",
+            file_path="mock_cni.jpg",
+            sha256_hash="mock_hash_cni",
+        )
+        selfie = Document(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            doc_type="SELFIE",
+            file_path="mock_selfie.jpg",
+            sha256_hash="mock_hash_selfie",
+        )
+        db_session.add_all([cni, selfie])
+        await db_session.commit()
+
         async def fake_face_match(*, session_id, db):
             return FaceMatchComputation(
                 status=FACE_MATCH_STATUS_FAILED,
@@ -267,8 +285,8 @@ class TestKYCRouter:
                 detector="opencv",
             )
 
-        monkeypatch.setattr("app.modules.kyc.router.compute_face_match_for_session", fake_face_match)
-        monkeypatch.setattr("app.modules.kyc.router.compute_minifasnet_for_session", fake_minifasnet)
+        monkeypatch.setattr("app.modules.kyc.service.compute_face_match_for_session", fake_face_match)
+        monkeypatch.setattr("app.modules.kyc.service.compute_minifasnet_for_session", fake_minifasnet)
         frames = [
             {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
             for i in range(40)
@@ -280,14 +298,16 @@ class TestKYCRouter:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["face_match_status"] == FACE_MATCH_STATUS_FAILED
-        assert data["anti_spoofing_score"] == 0.94
+        assert data["face_match_status"] == "PENDING"
+        assert data["anti_spoofing_score"] is None
         await db_session.refresh(session)
         assert session.priority_flag is True
         biometric = (
             await db_session.execute(select(BiometricResult).where(BiometricResult.session_id == session.id))
         ).scalar_one()
         assert biometric.model_version_liveness == LIVENESS_MODEL_VERSION
+        assert biometric.face_match_status == FACE_MATCH_STATUS_FAILED
+        assert float(biometric.anti_spoofing_score) == 0.94
 
     @pytest.mark.asyncio
     async def test_liveness_minifasnet_failure_blocks_face_match(
@@ -307,6 +327,24 @@ class TestKYCRouter:
             )
         ).scalars().first()
 
+        # Insert mock documents to satisfy liveness router checks
+        cni = Document(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            doc_type="CNI_RECTO",
+            file_path="mock_cni.jpg",
+            sha256_hash="mock_hash_cni",
+        )
+        selfie = Document(
+            id=uuid.uuid4(),
+            session_id=session.id,
+            doc_type="SELFIE",
+            file_path="mock_selfie.jpg",
+            sha256_hash="mock_hash_selfie",
+        )
+        db_session.add_all([cni, selfie])
+        await db_session.commit()
+
         async def fake_minifasnet(*, session_id, db):
             return MiniFASNetComputation(
                 status=MINIFASNET_STATUS_FAILED,
@@ -319,8 +357,8 @@ class TestKYCRouter:
         async def fail_face_match(*, session_id, db):
             raise AssertionError("face match must not run after MiniFASNet PAD failure")
 
-        monkeypatch.setattr("app.modules.kyc.router.compute_minifasnet_for_session", fake_minifasnet)
-        monkeypatch.setattr("app.modules.kyc.router.compute_face_match_for_session", fail_face_match)
+        monkeypatch.setattr("app.modules.kyc.service.compute_minifasnet_for_session", fake_minifasnet)
+        monkeypatch.setattr("app.modules.kyc.service.compute_face_match_for_session", fail_face_match)
         frames = [
             {"landmarks": [{"x": 0.0, "y": 0.0}, {"x": 0.35 + i * 0.006, "y": 0.52}]}
             for i in range(40)
@@ -332,11 +370,14 @@ class TestKYCRouter:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["is_alive"] is False
-        assert data["face_match_status"] == FACE_MATCH_STATUS_NOT_PERFORMED
-        assert data["anti_spoofing_score"] == 0.31
+        assert data["face_match_status"] == "PENDING"
         await db_session.refresh(session)
         assert session.liveness_strike_count == 1
+        biometric = (
+            await db_session.execute(select(BiometricResult).where(BiometricResult.session_id == session.id))
+        ).scalar_one()
+        assert biometric.face_match_status == FACE_MATCH_STATUS_NOT_PERFORMED
+        assert float(biometric.anti_spoofing_score) == 0.31
 
     @pytest.mark.asyncio
     async def test_review_approval_requires_biometric_override_for_risk(
@@ -348,7 +389,7 @@ class TestKYCRouter:
     ):
         agency = Agency(
             id=uuid.uuid4(),
-            code="AGENCY",
+            code=f"AGENCY_{uuid.uuid4().hex[:8]}",
             name="Agence de test",
         )
         agent = Agent(
