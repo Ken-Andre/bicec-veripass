@@ -17,6 +17,7 @@ celery = Celery(
         "app.tasks.maintenance",
         "app.tasks_demo",
         "app.modules.auth.tasks",
+        "app.modules.notifications.tasks",
         "app.tasks.sanctions",
         "app.tasks.kyc",
         "app.tasks.ocr",
@@ -84,7 +85,7 @@ def run_async_task(coro):
         return asyncio.run(coro)
 
 
-from celery.signals import worker_process_init
+from celery.signals import worker_process_init  # noqa: E402
 
 @worker_process_init.connect
 def dispose_database_connections(*args, **kwargs):

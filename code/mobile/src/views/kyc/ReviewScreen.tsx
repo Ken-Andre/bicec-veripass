@@ -177,7 +177,7 @@ export default function ReviewScreen() {
 
   useEffect(() => {
     let active = true;
-    let pollInterval: any = null;
+    let pollInterval: number | null = null;
 
     const load = async (isPoll = false) => {
       if (!isPoll) setLoadingReadiness(true);

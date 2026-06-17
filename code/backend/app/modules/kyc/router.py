@@ -37,23 +37,14 @@ from app.modules.kyc.models import (
     Notification,
 )
 from app.modules.kyc.service import (
-    process_document_ocr_pipeline,
-    compute_face_match_for_session,
     compute_liveness_motion_score,
-    compute_minifasnet_for_session,
     biometric_manual_review_reasons,
     is_liveness_challenge_passed,
-    FACE_MATCH_MODEL_NAME,
-    FACE_MATCH_STATUS_ERROR,
-    FACE_MATCH_STATUS_FAILED,
     FACE_MATCH_STATUS_NOT_PERFORMED,
     LIVENESS_MODEL_VERSION,
-    MINIFASNET_STATUS_ERROR,
-    MINIFASNET_STATUS_NOT_PERFORMED,
 )
 from app.modules.audit.models import AuditLog
 from app.modules.analytics.service import (
-    record_ocr_performance_best_effort,
     track_event_best_effort,
 )
 from app.modules.legal.service import resolve_accepted_documents
@@ -421,7 +412,7 @@ async def get_session_status(
     }
 
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field  # noqa: E402
 
 class KYCFeedbackRequest(BaseModel):
     document_id: str

@@ -31,7 +31,7 @@ describe('layout chrome', () => {
   it('shows only navigation entries allowed for the current role', () => {
     renderWithRouter(<Sidebar />, '/analytics')
 
-    expect(screen.getByRole('link', { name: /Conformite AML/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Conformité AML/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Listes AML/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Analytics/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Validation KYC/i })).not.toBeInTheDocument()
@@ -44,7 +44,7 @@ describe('layout chrome', () => {
     expect(screen.getByText('Thomas')).toBeInTheDocument()
     expect(screen.getByText('THOMAS')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Deconnexion/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Déconnexion/i }))
 
     expect(authMock.state.logout).toHaveBeenCalledTimes(1)
   })

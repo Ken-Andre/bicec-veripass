@@ -39,7 +39,7 @@ function parseDateToYmd(val: string): string {
   if (!val) return '';
   const match = val.match(/^(\d{2})[./-:](\d{2})[./-:](\d{4})$/);
   if (match) {
-    const [_, day, month, year] = match;
+    const [, day, month, year] = match;
     return `${year}-${month}-${day}`;
   }
   const matchYmd = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -106,10 +106,10 @@ export default function OcrReviewScreen() {
       const maxDelay = 8000;
 
       while (mountedRef.current) {
-        const statusRes = await apiClient.get<Record<string, any>>('/kyc/session/status');
+        const statusRes = await apiClient.get<Record<string, unknown>>('/kyc/session/status');
         if (!mountedRef.current) return;
 
-        const documents = statusRes.documents || {};
+        const documents = (statusRes as Record<string, Record<string, string>>).documents || {};
         const rectoStatus = documents['CNI_RECTO'];
         const versoStatus = documents['CNI_VERSO'];
 
