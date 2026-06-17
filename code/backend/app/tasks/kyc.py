@@ -3,7 +3,6 @@ Tâches Celery pour la gestion KYC (détection sessions abandonnées, doublons, 
 Source: architecture-bicec-veripass.md §17, G32
 """
 
-import asyncio
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -548,11 +547,6 @@ async def process_biometric_verification(session_id: str, challenge_type: str, l
         is_liveness_challenge_passed,
         FACE_MATCH_MODEL_NAME,
         LIVENESS_MODEL_VERSION,
-        MINIFASNET_STATUS_PASSED,
-        MINIFASNET_STATUS_ERROR,
-        FACE_MATCH_STATUS_PASSED,
-        FACE_MATCH_STATUS_ERROR,
-        FACE_MATCH_STATUS_FAILED,
         FACE_MATCH_STATUS_NOT_PERFORMED,
         FaceMatchComputation,
         biometric_manual_review_reasons,

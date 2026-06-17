@@ -60,7 +60,7 @@ function detectPlatform() {
 export function ProductHubScreen() {
   const navigate = useNavigate();
   const { accessLevel } = useKyc();
-  const platform = useMemo(detectPlatform, []);
+  const platform = useMemo(() => detectPlatform(), []);
   const canHandoff = accessLevel === 'LIMITED_ACCESS' || accessLevel === 'FULL_ACCESS';
 
   return (
