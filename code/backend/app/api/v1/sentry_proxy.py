@@ -17,6 +17,11 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, Request, Response, status
 from fastapi.responses import JSONResponse
 
+try:
+    from starlette.requests import ClientDisconnect  # Starlette >= 0.20
+except ImportError:
+    from starlette.exceptions import HTTPException as ClientDisconnect  # fallback
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -110,7 +115,16 @@ async def _forward_to_sentry(
     ),
 )
 async def sentry_proxy(request: Request, background_tasks: BackgroundTasks) -> Response:
-    body = await request.body()
+    try:
+        body = await request.body()
+    except ClientDisconnect:
+        # Client closed the connection before we finished reading the body.
+        # The event data is lost; log quietly and return — no point forwarding.
+        logger.info(
+            'Sentry proxy: client disconnected before body was fully received '
+            '(likely browser navigation or Playwright teardown). Ignored.'
+        )
+        return Response(status_code=499)  # 499 = Client Closed Request (nginx convention)
     if not body:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -369,8 +369,16 @@ async def verify_otp_endpoint(
     kyc_session = result.scalar_one_or_none()
 
     if not kyc_session:
+        from app.modules.admin.models import Agency
+        agency_result = await db.execute(select(Agency).limit(1))
+        default_agency = agency_result.scalar_one_or_none()
+        agency_id = default_agency.id if default_agency else None
+
         kyc_session = KYCSession(
-            user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
+            user_id=user.id,
+            agency_id=agency_id,
+            status="DRAFT",
+            last_step_completed="PHONE_VERIFIED",
         )
         db.add(kyc_session)
     else:

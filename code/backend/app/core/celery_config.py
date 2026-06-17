@@ -71,3 +71,26 @@ celery.conf.beat_schedule = {
         "schedule": crontab(hour=4, minute=30),
     },
 }
+
+
+def run_async_task(coro):
+    import asyncio
+    try:
+        asyncio.get_running_loop()
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(asyncio.run, coro).result()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+
+from celery.signals import worker_process_init
+
+@worker_process_init.connect
+def dispose_database_connections(*args, **kwargs):
+    try:
+        from app.db.session import engine
+        engine.dispose(close=False)
+    except Exception:
+        pass
+

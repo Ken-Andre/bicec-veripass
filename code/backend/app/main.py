@@ -9,6 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 
+try:
+    from starlette.requests import ClientDisconnect
+except ImportError:
+    from starlette.exceptions import HTTPException as ClientDisconnect  # fallback
+
 from app.api.v1.router import api_router
 from app.routers.demo import router as demo_router
 from app.core.config import settings
@@ -127,9 +132,12 @@ async def add_correlation_id(request: Request, call_next):
     # Add to request state for use in logging/other places
     request.state.correlation_id = correlation_id
 
-    # Process request
     start_time = time.time()
-    response: Response = await call_next(request)
+    try:
+        response: Response = await call_next(request)
+    except ClientDisconnect:
+        # Client closed connection mid-request — return minimal response, no logging noise
+        return Response(status_code=499)
     process_time = time.time() - start_time
 
     # Add to response headers
@@ -142,7 +150,20 @@ async def add_correlation_id(request: Request, call_next):
 @app.middleware("http")
 async def collect_http_metrics(request: Request, call_next):
     start_time = monotonic_seconds()
-    response: Response = await call_next(request)
+    try:
+        response: Response = await call_next(request)
+    except ClientDisconnect:
+        # Client disconnected before the response was generated.
+        # Record a 499 so the dropped request is visible in metrics.
+        path = request.url.path
+        if path != "/metrics":
+            metrics_registry.record_http_request(
+                method=request.method,
+                path=path,
+                status_code=499,
+                duration_seconds=monotonic_seconds() - start_time,
+            )
+        return Response(status_code=499)
     path = request.url.path
     if path != "/metrics":
         metrics_registry.record_http_request(

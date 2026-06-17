@@ -24,6 +24,7 @@ from app.modules.kyc.models import (  # noqa
     SupportMessage,
     Notification,
     ATM,
+    OcrTrainingQueue,
 )
 from app.modules.admin.models import Agency, ProvisioningBatch, ProvisioningBatchItem  # noqa
 from app.modules.audit.models import AuditLog  # noqa
