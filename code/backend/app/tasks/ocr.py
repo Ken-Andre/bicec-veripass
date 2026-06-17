@@ -17,7 +17,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.core.celery_config import celery
+from app.core.celery_config import celery, run_async_task
 from app.core.logging import logger
 from app.core.crypto import compress_image, encrypt, decrypt
 from app.db.session import AsyncSessionLocal
@@ -112,11 +112,68 @@ def run_glm_ocr_fallback_task(self, document_id: str) -> dict:
     """
     try:
         if os.getenv("OCR_ONLINE", "").lower() in ("true", "1", "yes"):
-            return asyncio.run(_run_cloud_ocr(document_id))
-        return asyncio.run(_run_glm_ocr_fallback(document_id))
+            return run_async_task(_run_cloud_ocr(document_id))
+        return run_async_task(_run_glm_ocr_fallback(document_id))
     except Exception as exc:
         logger.error(
             "GLM OCR fallback failed for document %s: %s",
+            document_id,
+            exc,
+            exc_info=True,
+        )
+        raise self.retry(exc=exc)
+
+
+async def _run_primary_ocr(document_id: str) -> dict:
+    from app.modules.kyc.service import process_document_ocr_pipeline
+    from app.modules.analytics.service import track_event_best_effort, record_ocr_performance_best_effort
+    from app.modules.kyc.models import KYCSession
+    from datetime import datetime, timezone
+
+    async with AsyncSessionLocal() as db:
+        doc_uuid = UUID(document_id)
+        result = await process_document_ocr_pipeline(document_id=doc_uuid, db=db)
+
+        # Track completion/failure analytics in Celery
+        doc_result = await db.execute(
+            select(Document).where(Document.id == doc_uuid)
+        )
+        doc = doc_result.scalar_one_or_none()
+        if doc:
+            session_result = await db.execute(
+                select(KYCSession).where(KYCSession.id == doc.session_id)
+            )
+            session = session_result.scalar_one_or_none()
+            if session:
+                await track_event_best_effort(
+                    db,
+                    event_type="OCR_FAILED" if doc.ocr_status == "FAILED" else "OCR_COMPLETED",
+                    session_id=session.id,
+                    user_id=session.user_id,
+                    agency_id=session.agency_id,
+                    occurred_at=datetime.now(timezone.utc),
+                    step=f"upload_{doc.doc_type.lower()}",
+                    status=doc.ocr_status,
+                    metadata={"doc_type": doc.doc_type, "engine": doc.ocr_engine},
+                )
+                await record_ocr_performance_best_effort(db, doc.id)
+                await db.commit()
+        return result
+
+
+@celery.task(
+    name="app.tasks.ocr.process_document_ocr",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def process_document_ocr_task(self, document_id: str) -> dict:
+    """Run primary PaddleOCR extraction in a Celery task."""
+    try:
+        return run_async_task(_run_primary_ocr(document_id))
+    except Exception as exc:
+        logger.error(
+            "Primary OCR task failed for document %s: %s",
             document_id,
             exc,
             exc_info=True,

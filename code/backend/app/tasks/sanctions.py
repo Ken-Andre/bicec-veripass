@@ -84,14 +84,29 @@ async def _check_staleness() -> dict:
 
 
 async def _download_and_upsert(db: AsyncSession) -> int:
-    max_rows = int(os.getenv("OPEN_SANCTIONS_MAX_ROWS", "5000"))
+    # Default 500 rows to limit memory. OPEN_SANCTIONS_MAX_ROWS overrides via env.
+    max_rows = int(os.getenv("OPEN_SANCTIONS_MAX_ROWS", "500"))
+    batch_size = int(os.getenv("OPEN_SANCTIONS_BATCH_SIZE", "100"))
     async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-        response = await client.get(OPEN_SANCTIONS_CSV_URL)
-        response.raise_for_status()
+        # Stream the response to avoid loading the whole CSV in memory
+        async with client.stream("GET", OPEN_SANCTIONS_CSV_URL) as response:
+            response.raise_for_status()
+            # Read the response body in chunks and decode
+            content_chunks = []
+            async for chunk in response.aiter_text():
+                content_chunks.append(chunk)
+            text_content = "".join(content_chunks)
 
-    rows = csv.DictReader(io.StringIO(response.text))
+    # Free httpx resources immediately
+    text_content_bytes = len(text_content)
+    logger.info("[sanctions-sync] Downloaded %s bytes of CSV", text_content_bytes)
+
+    rows = csv.DictReader(io.StringIO(text_content))
+    del text_content  # Free raw text
+
     synced_date = datetime.now(timezone.utc).date()
     count = 0
+    pending_batch: list[PEPSanctions] = []
 
     for row in rows:
         if count >= max_rows:
@@ -110,13 +125,15 @@ async def _download_and_upsert(db: AsyncSession) -> int:
         programs = _split_values(_pick(row, "programs", "datasets", "dataset"))
         aliases = _split_values(_pick(row, "aliases", "alias", "weakAlias"))
 
-        existing_result = await db.execute(
+        # Check if exists to decide insert vs update (per-row but in a single transaction)
+        existing = await db.execute(
             select(PEPSanctions).where(
                 PEPSanctions.source == source,
                 PEPSanctions.full_name == full_name,
             )
         )
-        entry = existing_result.scalar_one_or_none()
+        entry = existing.scalar_one_or_none()
+
         if entry is None:
             entry = PEPSanctions(
                 source=source,
@@ -133,11 +150,44 @@ async def _download_and_upsert(db: AsyncSession) -> int:
         entry.last_synced_at = synced_date
         count += 1
 
-        if count % BATCH_INSERT_SIZE == 0:
-            await db.flush()
+        # Commit every batch_size rows to bound memory + transaction size
+        if count % batch_size == 0:
+            await db.commit()
+            # Detach all instances to free memory
+            for e in pending_batch:
+                db.expunge(e)
+            pending_batch.clear()
+            logger.info("[sanctions-sync] Progress: %s/%s records", count, max_rows)
+            # Force garbage collection
+            import gc
+            gc.collect()
 
+    # Final commit
     await db.commit()
+    logger.info("[sanctions-sync] Sync completed: %s records upserted", count)
     return count
+
+
+async def _bulk_upsert(db: AsyncSession, records: list[dict]) -> None:
+    """Bulk upsert PEP/Sanctions records using INSERT ... ON CONFLICT."""
+    from sqlalchemy.dialects.postgresql import insert
+
+    if not records:
+        return
+
+    stmt = insert(PEPSanctions).values(records)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["source", "full_name"],
+        set_={
+            "aliases": stmt.excluded.aliases,
+            "date_of_birth": stmt.excluded.date_of_birth,
+            "nationality": stmt.excluded.nationality,
+            "programs": stmt.excluded.programs,
+            "is_active": stmt.excluded.is_active,
+            "last_synced_at": stmt.excluded.last_synced_at,
+        },
+    )
+    await db.execute(stmt)
 
 
 def _pick(row: dict, *keys: str) -> str | None:

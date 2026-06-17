@@ -25,11 +25,11 @@ from app.modules.kyc.storage import document_storage
 from app.services.glm_utils import (
     DEFAULT_GLM_RECTO_PROMPT,
     DEFAULT_GLM_VERSO_PROMPT,
-    normalize_glm_key,
+    _sanitize_date,
     calculate_glm_confidence,
+    normalize_glm_key,
     parse_plaintext_fields,
     sanitize_glm_output,
-    _sanitize_date,
 )
 
 DATE_REGEX = re.compile(r"\b([0-3]?\d[./-][01]?\d[./-](?:19|20)\d{2})\b")
@@ -159,15 +159,21 @@ def _configured_model_dir(value: str, label: str) -> str | None:
     model_path = Path(cleaned)
     if model_path.is_dir():
         return str(model_path)
-    logger.warning(f"Configured {label} does not exist or is not a directory: {cleaned}")
+    logger.warning(
+        f"Configured {label} does not exist or is not a directory: {cleaned}"
+    )
     return None
 
 
-def _resolve_offline_model_dir(default_subdir: str, override_value: str, label: str) -> str | None:
+def _resolve_offline_model_dir(
+    default_subdir: str, override_value: str, label: str
+) -> str | None:
     override_dir = _configured_model_dir(override_value, label)
     if override_dir:
         return override_dir
-    candidate = Path(settings.OCR_MODELS_ROOT) / "paddlex" / "official_models" / default_subdir
+    candidate = (
+        Path(settings.OCR_MODELS_ROOT) / "paddlex" / "official_models" / default_subdir
+    )
     if candidate.is_dir():
         return str(candidate)
     logger.error(f"Missing offline Paddle model directory for {label}: {candidate}")
@@ -228,7 +234,9 @@ def get_shared_paddle_ocr() -> Any | None:
 
     try:
         _shared_paddle_ocr = PaddleOCR(**kwargs)
-        logger.info(f"PaddleOCR v3 initialized (lang={kwargs.get('lang')}) in offline mode")
+        logger.info(
+            f"PaddleOCR v3 initialized (lang={kwargs.get('lang')}) in offline mode"
+        )
     except Exception as exc:
         logger.warning(f"PaddleOCR unavailable: {exc}", exc_info=True)
         return None
@@ -239,10 +247,15 @@ def get_shared_paddle_ocr() -> Any | None:
     # nom=DSCHANG instead of KANA) because internal tensors are not yet
     # fully materialized. A warmup call forces full model initialization.
     # Controlled by PADDLE_WARMUP_ON_START env var (default: true).
-    _should_warmup = os.environ.get("PADDLE_WARMUP_ON_START", "true").lower() in ("true", "1", "yes")
+    _should_warmup = os.environ.get("PADDLE_WARMUP_ON_START", "true").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     if _should_warmup:
         try:
             import numpy as np
+
             _dummy = np.zeros((100, 300, 3), dtype=np.uint8)
             _shared_paddle_ocr.predict(_dummy)
             logger.info("PaddleOCR warmup predict() completed")
@@ -254,7 +267,9 @@ def get_shared_paddle_ocr() -> Any | None:
     return _shared_paddle_ocr
 
 
-def _extract_fields_from_lines(lines: list[tuple[str, float]]) -> tuple[dict[str, str], dict[str, float]]:
+def _extract_fields_from_lines(
+    lines: list[tuple[str, float]],
+) -> tuple[dict[str, str], dict[str, float]]:
     fields: dict[str, str] = {}
     confidences: dict[str, float] = {}
 
@@ -301,9 +316,11 @@ def _extract_fields_from_lines(lines: list[tuple[str, float]]) -> tuple[dict[str
     return fields, confidences
 
 
-def _run_paddle_ocr(image_path: Path, doc_type: str = "CNI_RECTO") -> OCRExtractionResult:
+def _run_paddle_ocr(
+    image_path: Path, doc_type: str = "CNI_RECTO"
+) -> OCRExtractionResult:
     """Run PaddleOCR and extract fields using the improved spatial extraction.
-    
+
     Delegates to app.services.ocr_service to reuse the improved field extraction
     logic (spatial anchoring, label-following, etc.) while keeping the same
     OCRExtractionResult return format for compatibility.
@@ -316,7 +333,9 @@ def _run_paddle_ocr(image_path: Path, doc_type: str = "CNI_RECTO") -> OCRExtract
     try:
         result = ocr_service.extract_from_path(image_path, doc_type=doc_type)
     except Exception as exc:
-        logger.error("PaddleOCR extraction failed on %s: %s", image_path, exc, exc_info=True)
+        logger.error(
+            "PaddleOCR extraction failed on %s: %s", image_path, exc, exc_info=True
+        )
         return OCRExtractionResult(
             engine="PADDLE_ERROR",
             raw_payload={"error": str(exc)},
@@ -327,7 +346,7 @@ def _run_paddle_ocr(image_path: Path, doc_type: str = "CNI_RECTO") -> OCRExtract
     # Convert ocr_service result format to OCRExtractionResult
     fields: dict[str, str] = {}
     confidences: dict[str, float] = {}
-    
+
     for field_name, field_data in result.get("fields", {}).items():
         if isinstance(field_data, dict):
             fields[field_name] = field_data.get("value", "")
@@ -359,7 +378,9 @@ def _extract_json_blob(value: str) -> dict[str, Any]:
         return {}
 
 
-def _run_glm_cli(image_path: Path, doc_type: str, detected_side: str = "recto") -> OCRExtractionResult:
+def _run_glm_cli(
+    image_path: Path, doc_type: str, detected_side: str = "recto"
+) -> OCRExtractionResult:
     if not settings.GLM_OCR_ENABLED:
         return OCRExtractionResult(
             engine="GLM_DISABLED",
@@ -384,20 +405,34 @@ def _run_glm_cli(image_path: Path, doc_type: str, detected_side: str = "recto") 
 
     cmd = [
         settings.GLM_OCR_CLI_PATH,
-        "-m", settings.GLM_OCR_MODEL_PATH,
-        "--mmproj", settings.GLM_OCR_MMPROJ_PATH,
-        "--image", str(image_path),
-        "-p", prompt,
-        "-n", "2048",
-        "--temp", "0.1",
-        "-c", "4096",
-        "-ngl", "0",
-        "-fit", "off",
-        "--chat-template", "chatglm4",
+        "-m",
+        settings.GLM_OCR_MODEL_PATH,
+        "--mmproj",
+        settings.GLM_OCR_MMPROJ_PATH,
+        "--image",
+        str(image_path),
+        "-p",
+        prompt,
+        "-n",
+        "2048",
+        "--temp",
+        "0.1",
+        "-c",
+        "4096",
+        "-ngl",
+        "0",
+        "-fit",
+        "off",
+        "--chat-template",
+        "chatglm4",
     ]
 
     # Set cwd to CLI's directory so Windows can find companion DLLs
-    cli_dir = settings.GLM_OCR_CLI_PATH.parent if hasattr(settings.GLM_OCR_CLI_PATH, 'parent') else None
+    cli_dir = (
+        settings.GLM_OCR_CLI_PATH.parent
+        if hasattr(settings.GLM_OCR_CLI_PATH, "parent")
+        else None
+    )
 
     try:
         proc = subprocess.run(
@@ -423,15 +458,31 @@ def _run_glm_cli(image_path: Path, doc_type: str, detected_side: str = "recto") 
 
     # Canonical field list
     _cni_keys = [
-        "nom", "prenom", "date_naissance", "lieu_naissance",
-        "sexe", "taille", "profession",
-        "numero_cni", "date_delivrance", "date_expiration",
-        "pere", "mere", "sp", "adresse", "autorite_nom", "poste_identification",
+        "nom",
+        "prenom",
+        "date_naissance",
+        "lieu_naissance",
+        "sexe",
+        "taille",
+        "profession",
+        "numero_cni",
+        "date_delivrance",
+        "date_expiration",
+        "pere",
+        "mere",
+        "sp",
+        "adresse",
+        "autorite_nom",
+        "poste_identification",
     ]
     _date_fields = {"date_naissance", "date_delivrance", "date_expiration"}
 
     # Strip markdown code fences if present
-    _clean = re.sub(r"```(?:json)?", "", combined_output, flags=re.IGNORECASE).replace("```", "").strip()
+    _clean = (
+        re.sub(r"```(?:json)?", "", combined_output, flags=re.IGNORECASE)
+        .replace("```", "")
+        .strip()
+    )
     _json_match = re.search(r"\{[\s\S]*?\}", _clean)
 
     fields: dict[str, str] = {}
@@ -440,6 +491,7 @@ def _run_glm_cli(image_path: Path, doc_type: str, detected_side: str = "recto") 
     if _json_match:
         try:
             import json
+
             _data = json.loads(_json_match.group())
             for raw_key, val in _data.items():
                 canonical = normalize_glm_key(raw_key)
@@ -454,10 +506,14 @@ def _run_glm_cli(image_path: Path, doc_type: str, detected_side: str = "recto") 
                 confidences[canonical] = calculate_glm_confidence(canonical, val)
         except (json.JSONDecodeError, ValueError):
             # Plaintext fallback
-            parse_plaintext_fields(combined_output, _cni_keys, _date_fields, fields, confidences)
+            parse_plaintext_fields(
+                combined_output, _cni_keys, _date_fields, fields, confidences
+            )
     else:
         # Plaintext fallback
-        parse_plaintext_fields(combined_output, _cni_keys, _date_fields, fields, confidences)
+        parse_plaintext_fields(
+            combined_output, _cni_keys, _date_fields, fields, confidences
+        )
 
     # Fill missing confidences with default
     for key in _cni_keys:
@@ -535,19 +591,29 @@ async def process_document_ocr_pipeline(
         }
 
     image_path = _resolve_document_path(document)
-    paddle_result = await asyncio.to_thread(_run_paddle_ocr, image_path, document.doc_type)
+    paddle_result = await asyncio.to_thread(
+        _run_paddle_ocr, image_path, document.doc_type
+    )
 
-    await _upsert_ocr_fields(db, document, paddle_result.fields, paddle_result.confidences)
+    await _upsert_ocr_fields(
+        db, document, paddle_result.fields, paddle_result.confidences
+    )
     document.ocr_engine = paddle_result.engine
     document.ocr_raw_json = paddle_result.raw_payload
     document.confidence_per_field = paddle_result.confidences
 
     # Update ocr_status based on extraction results
-    if paddle_result.engine in ("PADDLE_ERROR", "paddleocr_unavailable", "paddleocr_error"):
+    if paddle_result.engine in (
+        "PADDLE_ERROR",
+        "paddleocr_unavailable",
+        "paddleocr_error",
+    ):
         document.ocr_status = "FAILED"
         document.ocr_error = f"Engine: {paddle_result.engine}"
     elif paddle_result.fields and any(
-        v for v in paddle_result.fields.values() if isinstance(v, dict) and v.get("value")
+        v
+        for v in paddle_result.fields.values()
+        if isinstance(v, dict) and v.get("value")
     ):
         document.ocr_status = "SUCCESS"
         document.ocr_error = None
@@ -594,14 +660,20 @@ async def process_glm_fallback(
     # Detect side from doc_type
     detected_side = "verso" if "VERSO" in (document.doc_type or "").upper() else "recto"
 
-    glm_result = _run_glm_cli(image_path, document.doc_type, detected_side=detected_side)
+    glm_result = _run_glm_cli(
+        image_path, document.doc_type, detected_side=detected_side
+    )
 
     # Sanitize GLM output — nullify wrong-side fields, validate NIN length
     glm_fields_clean = sanitize_glm_output(
         {k: v for k, v in glm_result.fields.items()},
         side=detected_side,
     )
-    glm_conf_clean = {k: v for k, v in glm_result.confidences.items() if glm_fields_clean.get(k) is not None}
+    glm_conf_clean = {
+        k: v
+        for k, v in glm_result.confidences.items()
+        if glm_fields_clean.get(k) is not None
+    }
 
     # Confidence-based merge: only overwrite PaddleOCR fields if GLM has higher confidence
     existing_by_name = {field.field_name: field for field in document.ocr_fields}
@@ -612,7 +684,10 @@ async def process_glm_fallback(
         existing = existing_by_name.get(field_name)
         if existing:
             # Keep existing if it has higher confidence
-            if existing.confidence_score is not None and existing.confidence_score >= glm_conf:
+            if (
+                existing.confidence_score is not None
+                and existing.confidence_score >= glm_conf
+            ):
                 continue
             existing.extracted_value = extracted_value
             existing.confidence_score = glm_conf
@@ -686,7 +761,9 @@ def compute_anti_spoofing_score_from_landmarks(
         movement_score = _clamp_01((pstdev(xs) + pstdev(ys)) * 8)
 
     frame_score = _clamp_01(frame_count / 40.0)
-    challenge_bonus = 0.08 if challenge_type in {"smile", "blink", "turn_left", "turn_right"} else 0.0
+    challenge_bonus = (
+        0.08 if challenge_type in {"smile", "blink", "turn_left", "turn_right"} else 0.0
+    )
     score = 0.45 + (0.35 * frame_score) + (0.20 * movement_score) + challenge_bonus
     return _clamp_01(score)
 
@@ -752,7 +829,9 @@ def compute_liveness_motion_score(
     else:
         challenge_score = 0.0
 
-    return _clamp_01((0.35 * frame_score) + (0.35 * movement_score) + (0.30 * challenge_score))
+    return _clamp_01(
+        (0.35 * frame_score) + (0.35 * movement_score) + (0.30 * challenge_score)
+    )
 
 
 def is_liveness_challenge_passed(
@@ -832,7 +911,9 @@ def _minifasnet_input_size(session: Any) -> tuple[int, int]:
         return fallback, fallback
 
 
-def _extract_selfie_face_bbox(selfie_path: Path) -> tuple[list[int] | None, str | None, str | None]:
+def _extract_selfie_face_bbox(
+    selfie_path: Path,
+) -> tuple[list[int] | None, str | None, str | None]:
     _configure_deepface_home()
     try:
         from deepface import DeepFace  # type: ignore
@@ -1022,7 +1103,11 @@ def _minifasnet_verify_if_available(selfie_path: Path) -> MiniFASNetComputation:
         if live_score >= threshold
         else MINIFASNET_STATUS_FAILED
     )
-    reason = "score_above_threshold" if status == MINIFASNET_STATUS_PASSED else "score_below_threshold"
+    reason = (
+        "score_above_threshold"
+        if status == MINIFASNET_STATUS_PASSED
+        else "score_below_threshold"
+    )
     logger.info(
         "MiniFASNet verify OK (detector=%s, live_score=%.4f, label=%s, status=%s)",
         detector,
@@ -1084,7 +1169,9 @@ def _configure_deepface_home() -> None:
         logger.warning("Could not create DEEPFACE_HOME=%s: %s", deepface_home, exc)
 
 
-def _deepface_verify_if_available(cni_path: Path, selfie_path: Path) -> FaceMatchComputation:
+def _deepface_verify_if_available(
+    cni_path: Path, selfie_path: Path
+) -> FaceMatchComputation:
     _configure_deepface_home()
     try:
         from deepface import DeepFace  # type: ignore
@@ -1115,10 +1202,17 @@ def _deepface_verify_if_available(cni_path: Path, selfie_path: Path) -> FaceMatc
                 if score >= threshold
                 else FACE_MATCH_STATUS_FAILED
             )
-            reason = "score_above_threshold" if status == FACE_MATCH_STATUS_PASSED else "score_below_threshold"
+            reason = (
+                "score_above_threshold"
+                if status == FACE_MATCH_STATUS_PASSED
+                else "score_below_threshold"
+            )
             logger.info(
                 "DeepFace verify OK (detector=%s, distance=%.4f, score=%.4f, status=%s)",
-                backend, distance, score, status,
+                backend,
+                distance,
+                score,
+                status,
             )
             return FaceMatchComputation(
                 status=status,
@@ -1132,7 +1226,8 @@ def _deepface_verify_if_available(cni_path: Path, selfie_path: Path) -> FaceMatc
             last_error = exc
             logger.warning(
                 "DeepFace verification failed with detector=%s: %s",
-                backend, exc,
+                backend,
+                exc,
             )
             if backend == detector:
                 logger.info("Retrying with fallback detector: %s", fallback_detector)

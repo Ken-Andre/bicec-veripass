@@ -317,21 +317,25 @@ async def _store_document_and_create_record(
 
     # Update session step
     session.last_step_completed = f"upload_{doc_type.lower()}"
+    doc.ocr_status = "PENDING"
     await db.commit()
     await db.refresh(doc, attribute_names=["ocr_fields"])
 
     try:
-        await process_document_ocr_pipeline(document_id=doc.id, db=db)
+        from app.tasks.ocr import process_document_ocr_task
+        process_document_ocr_task.apply_async(
+            kwargs={"document_id": str(doc.id)},
+            queue=settings.GLM_OCR_QUEUE,
+        )
     except Exception as exc:
         logger.error(
-            "OCR pipeline failed for document %s (doc_type=%s): %s",
+            "Failed to enqueue primary OCR task for document %s: %s",
             doc.id,
-            doc_type,
             exc,
             exc_info=True,
         )
         doc.ocr_status = "FAILED"
-        doc.ocr_error = str(exc)[:500]
+        doc.ocr_error = f"Celery queue error: {str(exc)[:400]}"
         await db.commit()
 
     await db.refresh(doc, attribute_names=["ocr_fields"])
@@ -347,18 +351,6 @@ async def _store_document_and_create_record(
         status=doc.ocr_status,
         metadata={"doc_type": doc.doc_type, "file_size_bytes": doc.file_size_bytes},
     )
-    await track_event_best_effort(
-        db,
-        event_type="OCR_FAILED" if doc.ocr_status == "FAILED" else "OCR_COMPLETED",
-        session_id=session.id,
-        user_id=session.user_id,
-        agency_id=session.agency_id,
-        occurred_at=doc.captured_at,
-        step="ocr",
-        status=doc.ocr_status,
-        metadata={"doc_type": doc.doc_type, "engine": doc.ocr_engine},
-    )
-    await record_ocr_performance_best_effort(db, doc.id)
     await db.commit()
 
     logger.info(
@@ -395,6 +387,77 @@ async def _store_document_and_create_record(
 @limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def get_root(request: Request):
     return {"module": "kyc", "status": "initialized"}
+
+
+@router.get("/session/status")
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def get_session_status(
+    request: Request,
+    current_user: User = Depends(require_registered_device),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lightweight status checking endpoint for polling OCR and biometrics status."""
+    session = await _get_active_editable_session(db, current_user)
+    
+    doc_results = await db.execute(
+        select(Document.doc_type, Document.ocr_status)
+        .where(Document.session_id == session.id)
+    )
+    docs = {row[0]: row[1] for row in doc_results.all()}
+    
+    bio_result = await db.execute(
+        select(BiometricResult.face_match_status)
+        .where(BiometricResult.session_id == session.id)
+    )
+    bio_row = bio_result.first()
+    bio_status = bio_row[0] if bio_row else None
+    
+    return {
+        "session_id": make_session_handle(str(session.id)),
+        "status": session.status,
+        "documents": docs,
+        "biometrics": bio_status,
+    }
+
+
+from pydantic import BaseModel, Field
+
+class KYCFeedbackRequest(BaseModel):
+    document_id: str
+    corrected_fields: dict[str, str] = Field(..., description="Field name to corrected value mapping")
+
+
+@router.post("/feedback")
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def submit_kyc_feedback(
+    request: Request,
+    body: KYCFeedbackRequest,
+    current_user: User = Depends(require_registered_device),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save corrected OCR fields to ocr_training_queue for machine learning feedback loop."""
+    doc = await _resolve_document_by_handle(body.document_id, current_user, db)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    from app.modules.kyc.models import OcrTrainingQueue
+    
+    # Save each corrected field to the queue
+    for field_name, corrected_val in body.corrected_fields.items():
+        field_match = next((f for f in doc.ocr_fields if f.field_name == field_name), None)
+        extracted_val = field_match.extracted_value if field_match else None
+        
+        db.add(OcrTrainingQueue(
+            id=uuid.uuid4(),
+            document_id=doc.id,
+            field_name=field_name,
+            extracted_value=extracted_val,
+            corrected_value=corrected_val,
+            created_at=datetime.now(timezone.utc),
+        ))
+        
+    await db.commit()
+    return {"status": "success", "message": "Feedback recorded for model training"}
 
 
 @router.get("/session/current", response_model=KYCSessionResponse)
@@ -525,9 +588,15 @@ async def start_kyc_session(
     # Create new session — ADR-001: DRAFT → RESTRICTED access
     # Note: ADR-001 specifies GUEST for DRAFT, but existing sessions use RESTRICTED.
     # Keeping RESTRICTED for backward compat until migration is ready.
+    from app.modules.admin.models import Agency
+    agency_result = await db.execute(select(Agency).limit(1))
+    default_agency = agency_result.scalar_one_or_none()
+    agency_id = default_agency.id if default_agency else None
+
     session = KYCSession(
         id=uuid.uuid4(),
         user_id=current_user.id,
+        agency_id=agency_id,
         status=LifecycleState.DRAFT,
         access_level=AccessTier.RESTRICTED,
         started_at=datetime.now(timezone.utc),
@@ -951,34 +1020,8 @@ async def submit_liveness(
         body.landmarks_json,
         body.challenge_type,
     )
-    minifasnet_result = await compute_minifasnet_for_session(
-        session_id=session.id,
-        db=db,
-    )
-    if minifasnet_result.status == MINIFASNET_STATUS_NOT_PERFORMED:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "FACE_MATCH_EVIDENCE_MISSING",
-                "message": "Selfie evidence is required before liveness can be completed.",
-                "reason": minifasnet_result.reason,
-            },
-        )
-    if minifasnet_result.status == MINIFASNET_STATUS_ERROR:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "code": "ANTI_SPOOFING_ERROR",
-                "message": "MiniFASNet anti-spoofing engine unavailable. Please retry liveness.",
-                "reason": minifasnet_result.reason,
-            },
-        )
 
-    anti_spoofing_score = minifasnet_result.score
-    is_alive = challenge_passed and minifasnet_result.passed
-    confidence = liveness_score
-
-    if not is_alive:
+    if not challenge_passed:
         session.liveness_strike_count += 1
         if session.liveness_strike_count >= 3:
             session.status = LifecycleState.LOCKED_LIVENESS
@@ -996,10 +1039,7 @@ async def submit_liveness(
                 metadata={
                     "locked": True,
                     "liveness_score": liveness_score,
-                    "anti_spoofing_score": anti_spoofing_score,
-                    "anti_spoofing_reason": minifasnet_result.reason,
-                    "anti_spoofing_model": minifasnet_result.model,
-                    "challenge_passed": challenge_passed,
+                    "challenge_passed": False,
                 },
                 request_id=_request_uuid(request),
             )
@@ -1017,57 +1057,62 @@ async def submit_liveness(
             metadata={
                 "locked": False,
                 "liveness_score": liveness_score,
-                "anti_spoofing_score": anti_spoofing_score,
-                "anti_spoofing_reason": minifasnet_result.reason,
-                "anti_spoofing_model": minifasnet_result.model,
-                "challenge_passed": challenge_passed,
+                "challenge_passed": False,
             },
             request_id=_request_uuid(request),
         )
         await db.commit()
         return LivenessResultResponse(
             is_alive=False,
-            confidence=confidence,
+            confidence=liveness_score,
             attempts_remaining=3 - session.liveness_strike_count,
             strikes_remaining=3 - session.liveness_strike_count,
             face_match_score=None,
             face_match_status=FACE_MATCH_STATUS_NOT_PERFORMED,
             face_match_reason="liveness_failed",
-            anti_spoofing_score=anti_spoofing_score,
+            anti_spoofing_score=None,
             is_locked=False,
             cooldown_seconds=None,
             lockout_count_24h=current_user.liveness_lockout_count_24h or 0,
             branch_fallback_available=False,
         )
 
-    face_match_result = await compute_face_match_for_session(
-        session_id=session.id,
-        db=db,
+    # Motion challenge passed! Verify evidence exists before enqueuing heavy ML tasks
+    selfie_doc_result = await db.execute(
+        select(Document).where(
+            Document.session_id == session.id,
+            Document.doc_type == "SELFIE",
+        )
     )
-    if face_match_result.status == FACE_MATCH_STATUS_NOT_PERFORMED:
+    selfie_doc = selfie_doc_result.scalars().first()
+    if not selfie_doc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "FACE_MATCH_EVIDENCE_MISSING",
+                "message": "Selfie evidence is required before liveness can be completed.",
+                "reason": "selfie_missing",
+            },
+        )
+
+    cni_recto_result = await db.execute(
+        select(Document).where(
+            Document.session_id == session.id,
+            Document.doc_type == "CNI_RECTO",
+        )
+    )
+    cni_recto = cni_recto_result.scalars().first()
+    if not cni_recto:
         raise HTTPException(
             status_code=409,
             detail={
                 "code": "FACE_MATCH_EVIDENCE_MISSING",
                 "message": "CNI recto and selfie evidence are required before liveness can be completed.",
-                "reason": face_match_result.reason,
+                "reason": "cni_recto_missing",
             },
         )
 
-    if face_match_result.status == FACE_MATCH_STATUS_FAILED:
-        session.priority_flag = True
-        await track_event_best_effort(
-            db,
-            event_type="FACE_MATCH_FAILED",
-            session_id=session.id,
-            user_id=session.user_id,
-            agency_id=session.agency_id,
-            step="face_match",
-            status=session.status,
-            metadata={"score": face_match_result.score, "reason": face_match_result.reason},
-            request_id=_request_uuid(request),
-        )
-
+    # Initialize/update BiometricResult as PENDING
     result = await db.execute(
         select(BiometricResult).where(BiometricResult.session_id == session.id)
     )
@@ -1076,72 +1121,45 @@ async def submit_liveness(
         biometric = BiometricResult(
             id=uuid.uuid4(),
             session_id=session.id,
-            liveness_score=confidence,
-            face_match_score=face_match_result.score,
-            face_match_status=face_match_result.status,
-            face_match_reason=face_match_result.reason,
-            face_match_distance=face_match_result.distance,
-            face_match_threshold=face_match_result.threshold,
-            face_match_detector=face_match_result.detector,
-            anti_spoofing_score=anti_spoofing_score,
-            model_version_face=FACE_MATCH_MODEL_NAME,
+            liveness_score=liveness_score,
+            face_match_status="PENDING",
             model_version_liveness=LIVENESS_MODEL_VERSION,
             processed_at=datetime.now(timezone.utc),
         )
         db.add(biometric)
     else:
-        biometric.liveness_score = confidence
-        biometric.face_match_score = face_match_result.score
-        biometric.face_match_status = face_match_result.status
-        biometric.face_match_reason = face_match_result.reason
-        biometric.face_match_distance = face_match_result.distance
-        biometric.face_match_threshold = face_match_result.threshold
-        biometric.face_match_detector = face_match_result.detector
-        biometric.anti_spoofing_score = anti_spoofing_score
-        biometric.model_version_face = FACE_MATCH_MODEL_NAME
+        biometric.liveness_score = liveness_score
+        biometric.face_match_status = "PENDING"
         biometric.model_version_liveness = LIVENESS_MODEL_VERSION
         biometric.processed_at = datetime.now(timezone.utc)
-
-    if face_match_result.status == FACE_MATCH_STATUS_ERROR:
-        await db.commit()
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "code": "FACE_MATCH_ERROR",
-                "message": "Face match engine unavailable. Please retry liveness.",
-                "reason": face_match_result.reason,
-            },
-        )
-
-    session.liveness_strike_count = 0
-    session.last_step_completed = "liveness"
-    await track_event_best_effort(
-        db,
-        event_type="LIVENESS_PASSED",
-        session_id=session.id,
-        user_id=session.user_id,
-        agency_id=session.agency_id,
-        step="liveness",
-        status=session.status,
-        metadata={
-            "liveness_score": liveness_score,
-            "anti_spoofing_score": anti_spoofing_score,
-            "anti_spoofing_model": minifasnet_result.model,
-            "face_match_status": face_match_result.status,
-        },
-        request_id=_request_uuid(request),
-    )
     await db.commit()
 
+    try:
+        from app.tasks.kyc import process_biometric_verification_task
+        process_biometric_verification_task.apply_async(
+            args=[str(session.id), body.challenge_type, body.landmarks_json],
+            queue=settings.GLM_OCR_QUEUE,
+        )
+    except Exception as exc:
+        logger.error(
+            "Failed to enqueue biometric task for session %s: %s",
+            session.id,
+            exc,
+            exc_info=True,
+        )
+        biometric.face_match_status = "ERROR"
+        biometric.face_match_reason = f"Celery queue error: {str(exc)[:400]}"
+        await db.commit()
+
     return LivenessResultResponse(
-        is_alive=is_alive,
-        confidence=confidence,
+        is_alive=True,
+        confidence=liveness_score,
         attempts_remaining=3 - session.liveness_strike_count,
         strikes_remaining=3 - session.liveness_strike_count,
-        face_match_score=face_match_result.score,
-        face_match_status=face_match_result.status,
-        face_match_reason=face_match_result.reason,
-        anti_spoofing_score=anti_spoofing_score,
+        face_match_score=None,
+        face_match_status="PENDING",
+        face_match_reason="biometrics_running",
+        anti_spoofing_score=None,
         is_locked=False,
         cooldown_seconds=None,
         lockout_count_24h=current_user.liveness_lockout_count_24h or 0,
@@ -1333,10 +1351,13 @@ async def submit_niu(
         )
 
     niu_value = body.niu_value.strip().upper() if body.niu_value else None
+    if niu_value:
+        niu_value = re.sub(r"[^A-Z0-9]", "", niu_value)
+
     if niu_type == "DECLARATIVE":
         if not niu_value:
             raise HTTPException(status_code=400, detail="niu_value is required for DECLARATIVE NIU")
-        if not re.fullmatch(r"M\d{10,14}", niu_value):
+        if not re.fullmatch(r"^[A-Z0-9]\d{12}[A-Z0-9]$", niu_value):
             raise HTTPException(status_code=400, detail="Invalid NIU format")
     elif niu_type == "UPLOADED":
         doc_result = await db.execute(
@@ -1433,7 +1454,10 @@ async def _compute_kyc_readiness(
         select(BiometricResult).where(BiometricResult.session_id == session.id)
     )
     biometric = result.scalar_one_or_none()
-    has_biometric_result = biometric is not None
+    has_biometric_result = (
+        biometric is not None
+        and biometric.face_match_status not in ("PENDING", "PROCESSING")
+    )
 
     missing = sorted(required - doc_types)
     blocking_reasons: list[str] = []
@@ -1491,7 +1515,10 @@ async def _compute_kyc_readiness(
         blocking_reasons.append("OCR review not completed. Please confirm identity fields first.")
 
     if not has_biometric_result:
-        blocking_reasons.append("Liveness step not completed")
+        if biometric and biometric.face_match_status in ("PENDING", "PROCESSING"):
+            blocking_reasons.append("Biometric verification in progress. Please wait.")
+        else:
+            blocking_reasons.append("Liveness step not completed")
 
     confidence_score_global: float | None = None
     if biometric and ocr_scores:

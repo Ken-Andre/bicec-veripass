@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.core.celery_config import celery
+from app.core.celery_config import celery, run_async_task
 from app.db.session import AsyncSessionLocal
 from app.core.logging import logger
 from app.modules.notifications.service import create_user_notification
@@ -526,14 +526,209 @@ async def screen_active_clients_against_sanctions() -> int:
 
 @celery.task(name="app.tasks.kyc.check_document_expiry", bind=True, max_retries=2)
 def celery_check_document_expiry(self):
-    return asyncio.run(check_document_expiry())
+    return run_async_task(check_document_expiry())
 
 
 @celery.task(name="app.tasks.kyc.screen_session_against_sanctions", bind=True, max_retries=2)
 def celery_screen_session_against_sanctions(self, session_id: str):
-    return asyncio.run(screen_session_against_sanctions(session_id))
+    return run_async_task(screen_session_against_sanctions(session_id))
 
 
 @celery.task(name="app.tasks.kyc.screen_active_clients_against_sanctions", bind=True, max_retries=2)
 def celery_screen_active_clients_against_sanctions(self):
-    return asyncio.run(screen_active_clients_against_sanctions())
+    return run_async_task(screen_active_clients_against_sanctions())
+
+
+async def process_biometric_verification(session_id: str, challenge_type: str, landmarks_json: list) -> dict:
+    from app.modules.kyc.models import KYCSession, BiometricResult
+    from app.modules.kyc.service import (
+        compute_minifasnet_for_session,
+        compute_face_match_for_session,
+        compute_liveness_motion_score,
+        is_liveness_challenge_passed,
+        FACE_MATCH_MODEL_NAME,
+        LIVENESS_MODEL_VERSION,
+        MINIFASNET_STATUS_PASSED,
+        MINIFASNET_STATUS_ERROR,
+        FACE_MATCH_STATUS_PASSED,
+        FACE_MATCH_STATUS_ERROR,
+        FACE_MATCH_STATUS_FAILED,
+        FACE_MATCH_STATUS_NOT_PERFORMED,
+        FaceMatchComputation,
+        biometric_manual_review_reasons,
+    )
+    from app.modules.analytics.service import track_event_best_effort
+    from app.modules.auth.models import User
+
+    async with AsyncSessionLocal() as db:
+        session_uuid = uuid.UUID(session_id)
+        result = await db.execute(
+            select(KYCSession).where(KYCSession.id == session_uuid)
+        )
+        session = result.scalar_one_or_none()
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+
+        # Get or create BiometricResult
+        result = await db.execute(
+            select(BiometricResult).where(BiometricResult.session_id == session.id)
+        )
+        biometric = result.scalar_one_or_none()
+        if not biometric:
+            biometric = BiometricResult(
+                id=uuid.uuid4(),
+                session_id=session.id,
+                face_match_status="PROCESSING",
+                processed_at=datetime.now(timezone.utc),
+            )
+            db.add(biometric)
+        else:
+            biometric.face_match_status = "PROCESSING"
+            biometric.processed_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        try:
+            # 1. MiniFASNet anti-spoofing
+            minifasnet_result = await compute_minifasnet_for_session(
+                session_id=session.id,
+                db=db,
+            )
+
+            liveness_score = compute_liveness_motion_score(landmarks_json, challenge_type)
+            challenge_passed = is_liveness_challenge_passed(landmarks_json, challenge_type)
+
+            anti_spoofing_score = minifasnet_result.score
+            is_alive = challenge_passed and minifasnet_result.passed
+            confidence = liveness_score
+
+            # 2. DeepFace match
+            if is_alive:
+                face_match_result = await compute_face_match_for_session(
+                    session_id=session.id,
+                    db=db,
+                )
+            else:
+                face_match_result = FaceMatchComputation(
+                    status=FACE_MATCH_STATUS_NOT_PERFORMED,
+                    reason="liveness_failed",
+                    score=None,
+                    distance=None,
+                    threshold=None,
+                    detector=None,
+                )
+
+            # Update biometric fields
+            biometric.liveness_score = confidence
+            biometric.face_match_score = face_match_result.score
+            biometric.face_match_status = face_match_result.status
+            biometric.face_match_reason = face_match_result.reason
+            biometric.face_match_distance = face_match_result.distance
+            biometric.face_match_threshold = face_match_result.threshold
+            biometric.face_match_detector = face_match_result.detector
+            biometric.anti_spoofing_score = anti_spoofing_score
+            biometric.model_version_face = FACE_MATCH_MODEL_NAME
+            biometric.model_version_liveness = LIVENESS_MODEL_VERSION
+            biometric.processed_at = datetime.now(timezone.utc)
+
+            # Flag session as priority if there are biometric review reasons
+            if biometric_manual_review_reasons(biometric):
+                session.priority_flag = True
+
+            # Fetch user to reset lockout or strike
+            user_result = await db.execute(select(User).where(User.id == session.user_id))
+            user = user_result.scalar_one_or_none()
+
+            if not is_alive:
+                session.liveness_strike_count += 1
+                if session.liveness_strike_count >= 3:
+                    session.status = "LOCKED_LIVENESS"
+                    if user:
+                        user.liveness_lockout_count_24h = (user.liveness_lockout_count_24h or 0) + 1
+                    await track_event_best_effort(
+                        db,
+                        event_type="LIVENESS_FAILED",
+                        session_id=session.id,
+                        user_id=session.user_id,
+                        agency_id=session.agency_id,
+                        step="liveness",
+                        status=session.status,
+                        metadata={
+                            "locked": True,
+                            "liveness_score": liveness_score,
+                            "anti_spoofing_score": anti_spoofing_score,
+                            "anti_spoofing_reason": minifasnet_result.reason,
+                            "anti_spoofing_model": minifasnet_result.model,
+                            "challenge_passed": challenge_passed,
+                        },
+                    )
+                else:
+                    await track_event_best_effort(
+                        db,
+                        event_type="LIVENESS_FAILED",
+                        session_id=session.id,
+                        user_id=session.user_id,
+                        agency_id=session.agency_id,
+                        step="liveness",
+                        status=session.status,
+                        metadata={
+                            "locked": False,
+                            "liveness_score": liveness_score,
+                            "anti_spoofing_score": anti_spoofing_score,
+                            "anti_spoofing_reason": minifasnet_result.reason,
+                            "anti_spoofing_model": minifasnet_result.model,
+                            "challenge_passed": challenge_passed,
+                        },
+                    )
+            else:
+                session.liveness_strike_count = 0
+                session.last_step_completed = "liveness"
+                await track_event_best_effort(
+                    db,
+                    event_type="LIVENESS_PASSED",
+                    session_id=session.id,
+                    user_id=session.user_id,
+                    agency_id=session.agency_id,
+                    step="liveness",
+                    status=session.status,
+                    metadata={
+                        "liveness_score": liveness_score,
+                        "anti_spoofing_score": anti_spoofing_score,
+                        "anti_spoofing_model": minifasnet_result.model,
+                        "face_match_status": face_match_result.status,
+                    },
+                )
+            await db.commit()
+            return {
+                "is_alive": is_alive,
+                "confidence": confidence,
+                "face_match_score": float(face_match_result.score) if face_match_result.score is not None else None,
+                "face_match_status": face_match_result.status,
+                "face_match_reason": face_match_result.reason,
+                "anti_spoofing_score": float(anti_spoofing_score) if anti_spoofing_score is not None else None,
+            }
+
+        except Exception as e:
+            logger.error(
+                "Biometric verification task failed for session %s: %s",
+                session_id,
+                e,
+                exc_info=True,
+            )
+            biometric.face_match_status = "ERROR"
+            biometric.face_match_reason = str(e)[:400]
+            await db.commit()
+            raise
+
+
+@celery.task(
+    name="app.tasks.kyc.process_biometric_verification",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def process_biometric_verification_task(self, session_id: str, challenge_type: str, landmarks_json: list) -> dict:
+    """Run biometric verification (MiniFASNet + DeepFace) in a Celery task."""
+    try:
+        return run_async_task(process_biometric_verification(session_id, challenge_type, landmarks_json))
+    except Exception as exc:
+        raise self.retry(exc=exc)

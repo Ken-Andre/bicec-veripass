@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Numeric,
+    UniqueConstraint,
 )
 
 # from sqlalchemy import Table
@@ -280,7 +281,7 @@ class PEPSanctions(Base):
     __tablename__ = "pep_sanctions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    source = Column(String(100), nullable=False)
+    source = Column(Text, nullable=False)
     entity_type = Column(String(50), nullable=False)  # INDIVIDUAL, ENTITY
     full_name = Column(Text, nullable=False, index=True)
     aliases = Column(ARRAY(Text), nullable=True)
@@ -289,6 +290,10 @@ class PEPSanctions(Base):
     programs = Column(ARRAY(Text), nullable=True)
     is_active = Column(Boolean, default=True)
     last_synced_at = Column(DATE, default=lambda: datetime.now(timezone.utc).date())
+
+    __table_args__ = (
+        UniqueConstraint("source", "full_name", name="uq_pep_sanctions_source_full_name"),
+    )
 
     # Relationships
     alerts = relationship("AmlAlert", back_populates="pep_sanctions")
@@ -425,3 +430,19 @@ class ATM(Base):
     available_24h = Column(Boolean, default=True)
     access_tier = Column(String(20), default="basic")  # basic vs full
     last_verified = Column(DATE, default=lambda: datetime.now(timezone.utc).date())
+
+
+class OcrTrainingQueue(Base):
+    __tablename__ = "ocr_training_queue"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
+    field_name = Column(Text, nullable=False)
+    extracted_value = Column(Text, nullable=True)
+    corrected_value = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationships
+    document = relationship("Document")
