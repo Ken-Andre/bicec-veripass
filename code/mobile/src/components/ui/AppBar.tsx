@@ -25,10 +25,10 @@ export const AppBar: React.FC<AppBarProps> = ({
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 safe-top border-b backdrop-blur-xl',
+        'sticky top-0 z-30 safe-top border-b backdrop-blur-2xl',
         transparent
           ? 'bg-transparent border-transparent'
-          : 'bg-background/92 border-border/60 shadow-sm',
+          : 'bg-white/72 border-white/60 shadow-[0_10px_28px_rgba(18,53,91,0.08)]',
         className
       )}
     >
@@ -36,7 +36,7 @@ export const AppBar: React.FC<AppBarProps> = ({
         {showBack && (
           <button
             onClick={onBack ?? (() => navigate(-1))}
-            className="p-2 -ml-2 rounded-full hover:bg-muted active:bg-slate-200 transition-colors shrink-0"
+            className="p-2 -ml-2 rounded-full bg-white/60 ring-1 ring-black/5 hover:bg-white active:scale-95 transition-all shrink-0"
             aria-label="Retour"
           >
             <ArrowLeft className="w-6 h-6 text-foreground" />

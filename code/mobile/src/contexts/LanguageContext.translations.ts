@@ -129,7 +129,7 @@ export const translations: Record<string, Record<Language, string>> = {
     'niu.skip.warning': { fr: 'Vous pouvez passer cette étape, mais cela peut ralentir votre vérification.', en: 'You can skip this step, but it may slow down your verification.' },
     'niu.upload': { fr: 'Photographier mon attestation NIU', en: 'Photograph my NIU certificate' },
     'niu.manual': { fr: 'Saisir manuellement', en: 'Enter manually' },
-    'niu.format.hint': { fr: 'Format : M suivi de 10 à 14 chiffres', en: 'Format: M followed by 10-14 digits' },
+    'niu.format.hint': { fr: 'Format : 14 caracteres alphanumeriques en majuscules', en: 'Format: 14 uppercase alphanumeric characters' },
     'niu.skip': { fr: 'Passer cette étape', en: 'Skip this step' },
     'niu.enter': { fr: 'Entrez votre Numéro Identifiant Unique', en: 'Enter your Unique Identification Number' },
     'stepper.signature': { fr: 'Signature', en: 'Signature' },

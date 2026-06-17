@@ -1,7 +1,7 @@
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Bell, HelpCircle, MessageCircle, CreditCard, History, PiggyBank, ChevronRight, LogOut } from 'lucide-react';
+import { Settings, Bell, HelpCircle, MessageCircle, LayoutGrid, MapPin, ChevronRight, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useState } from 'react';
 import { Button } from '../../components/ui/button';
@@ -14,11 +14,10 @@ export function MoreScreen() {
 
   const sections = [
     {
-      title: t('more.services'),
+      title: 'Passerelles BICEC',
       items: [
-        { icon: CreditCard, label: t('nav.cards'), path: '/cards' },
-        { icon: PiggyBank, label: t('savings.title'), path: '/savings' },
-        { icon: History, label: t('transactions.title'), path: '/transactions' },
+        { icon: LayoutGrid, label: 'Produits BICEC', path: '/products' },
+        { icon: MapPin, label: 'Trouver un GAB', path: '/cards/atm-finder' },
       ],
     },
     {
@@ -34,17 +33,17 @@ export function MoreScreen() {
 
   return (
     <div className="min-h-screen bg-background">
-      <ScreenLayoutV2 title={t('more.title')}>
+      <ScreenLayoutV2 title={t('more.title')} className="liquid-screen">
         <div className="space-y-6 pt-2">
           {sections.map((section) => (
             <div key={section.title}>
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{section.title}</h3>
-              <div className="bg-card border border-border rounded-2xl divide-y divide-border/50 overflow-hidden">
+              <div className="liquid-glass rounded-3xl divide-y divide-border/40 overflow-hidden">
                 {section.items.map((item) => (
                   <button
                     key={item.path}
                     onClick={() => navigate(item.path)}
-                    className="w-full flex items-center gap-4 px-4 py-4 hover:bg-muted/50 active:bg-muted transition-colors text-left"
+                    className="w-full flex items-center gap-4 px-4 py-4 hover:bg-white/60 active:bg-white/70 transition-colors text-left"
                   >
                     <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                       <item.icon className="h-5 w-5 text-primary" />
@@ -59,7 +58,7 @@ export function MoreScreen() {
 
           <button
             onClick={() => setShowLogout(true)}
-            className="w-full bg-card border border-border rounded-2xl p-4 flex items-center gap-4 active:scale-[0.98] transition-all"
+            className="liquid-glass w-full rounded-3xl p-4 flex items-center gap-4 active:scale-[0.98] transition-all"
           >
             <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center">
               <LogOut className="h-5 w-5 text-destructive" />

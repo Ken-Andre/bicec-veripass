@@ -1,23 +1,21 @@
 import { cn } from '../lib/utils';
-import { Home, CreditCard, ArrowLeftRight, MoreHorizontal } from 'lucide-react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { Home, LayoutGrid, MapPin, MoreHorizontal } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 export const BottomNav = () => {
-  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
   const items = [
-    { icon: Home, label: t('nav.home'), path: '/dashboard' },
-    { icon: CreditCard, label: t('nav.cards'), path: '/cards' },
-    { icon: ArrowLeftRight, label: t('nav.transfers'), path: '/transfers' },
-    { icon: MoreHorizontal, label: t('nav.more'), path: '/more' },
+    { icon: Home, label: 'Dossier', path: '/dashboard' },
+    { icon: LayoutGrid, label: 'Produits', path: '/products' },
+    { icon: MapPin, label: 'GAB', path: '/cards/atm-finder' },
+    { icon: MoreHorizontal, label: 'Plus', path: '/more' },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border/70 bg-background/96 backdrop-blur-xl shadow-[0_-4px_18px_rgba(0,0,0,0.06)]">
-      <div className="flex min-h-14 items-center justify-around px-2 pt-1 pb-safe">
+    <nav className="fixed inset-x-3 bottom-3 z-40 rounded-[1.75rem] border border-white/55 bg-white/72 shadow-[0_-10px_34px_rgba(18,53,91,0.14)] backdrop-blur-2xl">
+      <div className="grid min-h-16 grid-cols-4 items-center gap-1 px-2 pt-1 pb-safe">
         {items.map(({ icon: Icon, label, path }) => {
           const active = location.pathname === path || location.pathname.startsWith(path + '/');
           return (
@@ -25,8 +23,8 @@ export const BottomNav = () => {
               key={path}
               onClick={() => navigate(path)}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 w-full h-full transition-colors',
-                active ? 'text-primary' : 'text-muted-foreground'
+                'flex h-12 flex-col items-center justify-center gap-1 rounded-2xl transition-all',
+                active ? 'bg-primary/12 text-primary shadow-sm' : 'text-muted-foreground'
               )}
             >
               <Icon className="w-5 h-5" />

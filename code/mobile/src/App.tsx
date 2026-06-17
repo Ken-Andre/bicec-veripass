@@ -70,6 +70,11 @@ const CardsScreen = lazy(() =>
     default: m.CardsScreen,
   })),
 );
+const ProductHubScreen = lazy(() =>
+  import("./views/dashboard/ProductHubScreen").then((m) => ({
+    default: m.ProductHubScreen,
+  })),
+);
 const AtmFinderScreen = lazy(() =>
   import("./views/dashboard/AtmFinderScreen").then((m) => ({
     default: m.AtmFinderScreen,
@@ -210,7 +215,7 @@ function CniRectoCapture() {
 }
 
 function CniVersoCapture() {
-  return <CniCaptureScreen side="verso" nextRoute="/kyc/ocr-review" />;
+  return <CniCaptureScreen side="verso" nextRoute="/kyc/biometric-consent" />;
 }
 
 function MetaThemeColor() {
@@ -223,8 +228,8 @@ function MetaThemeColor() {
     const color = path.includes("capture")
       ? "#000000"
       : path === "/dashboard"
-        ? "#E37B03"
-        : "#FBF8F3";
+        ? "#F6F8FB"
+        : "#F6F8FB";
     setViewportChromeColor(color);
   }, [location.pathname]);
 
@@ -297,6 +302,7 @@ function App() {
                       }
                     >
                       <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/products" element={<ProductHubScreen />} />
                       <Route path="/cards" element={<CardsScreen />} />
                       <Route path="/cards/atm-finder" element={<AtmFinderScreen />} />
                       <Route path="/transfers" element={<TransfersScreen />} />
