@@ -126,13 +126,13 @@ function firstIncompleteStep(completedSteps: KycStepType[]): KycStepType {
   const sequence: KycStepType[] = [
     'cni_recto',
     'cni_verso',
-    'ocr_review',
     'liveness',
     'utility_bill',
     'address',
     'niu',
     'consent',
     'signature',
+    'ocr_review',
     'submission',
   ];
   return sequence.find((step) => !completedSteps.includes(step)) ?? 'submission';

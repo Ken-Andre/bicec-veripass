@@ -16,13 +16,13 @@ import type { KycStepType } from '../types';
 export const KYC_STEP_ORDER: KycStepType[] = [
   'cni_recto',
   'cni_verso',
-  'ocr_review',
   'liveness',
   'utility_bill',
   'address',
   'niu',
   'consent',
   'signature',
+  'ocr_review',
   'submission',
 ];
 
