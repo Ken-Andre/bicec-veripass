@@ -33,7 +33,7 @@ describe('layout chrome', () => {
 
     expect(screen.getByRole('link', { name: /Conformité AML/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Listes AML/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Analytics/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Tableaux de bord/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Validation KYC/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Administration/i })).not.toBeInTheDocument()
   })
