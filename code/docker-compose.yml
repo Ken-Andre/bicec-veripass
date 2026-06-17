@@ -91,9 +91,11 @@ services:
       args:
         - VITE_SENTRY_DSN=${VITE_SENTRY_DSN_MOBILE}
         - VITE_APP_VERSION=${APP_VERSION}
+        - VITE_VAPID_PUBLIC_KEY=${VITE_VAPID_PUBLIC_KEY}
     container_name: vp_pwa
     environment:
       - VITE_API_URL=/api
+      - VITE_VAPID_PUBLIC_KEY=${VITE_VAPID_PUBLIC_KEY}
     networks:
       - veripass-net
     restart: unless-stopped
@@ -316,6 +318,7 @@ services:
       - SKIP_MIGRATIONS=1
       - SENTRY_DSN=${SENTRY_DSN_BACKEND}
       - PADDLEX_HOME=/home/vpuser/.paddlex
+      - MINIFASNET_ENABLED=${MINIFASNET_ENABLED:-true}
     volumes:
       - documents_storage:/data/documents
       - models_storage:/data/models
@@ -376,7 +379,7 @@ services:
     networks:
       - veripass-net
     restart: unless-stopped
-    mem_limit: 512m
+    mem_limit: 3g     # PEP/Sanctions sync needs headroom for CSV + bulk upsert
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.celery inspect ping -d notif_worker@$$HOSTNAME 2>/dev/null | grep -q pong || exit 1"]
       interval: 30s
