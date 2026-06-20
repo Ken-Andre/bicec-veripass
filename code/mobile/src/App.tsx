@@ -65,11 +65,12 @@ const DashboardPage = lazy(() =>
     default: m.DashboardPage,
   })),
 );
-const CardsScreen = lazy(() =>
-  import("./views/dashboard/CardsScreen").then((m) => ({
-    default: m.CardsScreen,
-  })),
-);
+// --- Core banking screens (hors périmètre, à réactiver ultérieurement) ---
+// const CardsScreen = lazy(() =>
+//   import("./views/dashboard/CardsScreen").then((m) => ({
+//     default: m.CardsScreen,
+//   })),
+// );
 const ProductHubScreen = lazy(() =>
   import("./views/dashboard/ProductHubScreen").then((m) => ({
     default: m.ProductHubScreen,
@@ -80,31 +81,31 @@ const AtmFinderScreen = lazy(() =>
     default: m.AtmFinderScreen,
   })),
 );
-const TransfersScreen = lazy(() =>
-  import("./views/dashboard/TransfersScreen").then((m) => ({
-    default: m.TransfersScreen,
-  })),
-);
-const TransferSendScreen = lazy(() =>
-  import("./views/dashboard/TransferSendScreen").then((m) => ({
-    default: m.TransferSendScreen,
-  })),
-);
-const TransferReceiveScreen = lazy(() =>
-  import("./views/dashboard/TransferReceiveScreen").then((m) => ({
-    default: m.TransferReceiveScreen,
-  })),
-);
-const SavingsScreen = lazy(() =>
-  import("./views/dashboard/SavingsScreen").then((m) => ({
-    default: m.SavingsScreen,
-  })),
-);
-const TransactionHistoryScreen = lazy(() =>
-  import("./views/dashboard/TransactionHistoryScreen").then((m) => ({
-    default: m.TransactionHistoryScreen,
-  })),
-);
+// const TransfersScreen = lazy(() =>
+//   import("./views/dashboard/TransfersScreen").then((m) => ({
+//     default: m.TransfersScreen,
+//   })),
+// );
+// const TransferSendScreen = lazy(() =>
+//   import("./views/dashboard/TransferSendScreen").then((m) => ({
+//     default: m.TransferSendScreen,
+//   })),
+// );
+// const TransferReceiveScreen = lazy(() =>
+//   import("./views/dashboard/TransferReceiveScreen").then((m) => ({
+//     default: m.TransferReceiveScreen,
+//   })),
+// );
+// const SavingsScreen = lazy(() =>
+//   import("./views/dashboard/SavingsScreen").then((m) => ({
+//     default: m.SavingsScreen,
+//   })),
+// );
+// const TransactionHistoryScreen = lazy(() =>
+//   import("./views/dashboard/TransactionHistoryScreen").then((m) => ({
+//     default: m.TransactionHistoryScreen,
+//   })),
+// );
 const SettingsScreen = lazy(() =>
   import("./views/dashboard/SettingsScreen").then((m) => ({
     default: m.SettingsScreen,
@@ -302,23 +303,15 @@ function App() {
                       }
                     >
                       <Route path="/dashboard" element={<DashboardPage />} />
+                      {/* Core banking routes (hors périmètre, à réactiver ultérieurement) */}
                       <Route path="/products" element={<ProductHubScreen />} />
-                      <Route path="/cards" element={<CardsScreen />} />
+                      {/* <Route path="/cards" element={<CardsScreen />} /> */}
                       <Route path="/cards/atm-finder" element={<AtmFinderScreen />} />
-                      <Route path="/transfers" element={<TransfersScreen />} />
-                      <Route
-                        path="/transfers/send"
-                        element={<TransferSendScreen />}
-                      />
-                      <Route
-                        path="/transfers/receive"
-                        element={<TransferReceiveScreen />}
-                      />
-                      <Route path="/savings" element={<SavingsScreen />} />
-                      <Route
-                        path="/transactions"
-                        element={<TransactionHistoryScreen />}
-                      />
+                      {/* <Route path="/transfers" element={<TransfersScreen />} /> */}
+                      {/* <Route path="/transfers/send" element={<TransferSendScreen />} /> */}
+                      {/* <Route path="/transfers/receive" element={<TransferReceiveScreen />} /> */}
+                      {/* <Route path="/savings" element={<SavingsScreen />} /> */}
+                      {/* <Route path="/transactions" element={<TransactionHistoryScreen />} /> */}
                       <Route path="/more" element={<MoreScreen />} />
                       <Route path="/settings" element={<SettingsScreen />} />
                       <Route
