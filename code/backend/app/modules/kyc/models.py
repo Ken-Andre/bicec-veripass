@@ -28,7 +28,11 @@ class KYCSession(Base):
     agency_id = Column(UUID(as_uuid=True), ForeignKey("agencies.id"), nullable=True)
 
     status = Column(String(50), nullable=False, default="DRAFT")
-    access_level = Column(String(50), nullable=False, default="RESTRICTED")
+    # ADR-001: DRAFT sessions must default to GUEST so that a freshly signed-up
+    # user does not land on the post-submission dashboard UI before submitting
+    # their dossier. The previous RESTRICTED default caused new users to see a
+    # misleading "Merci pour votre confiance" banner.
+    access_level = Column(String(50), nullable=False, default="GUEST")
     niu_type = Column(String(50), nullable=True)  # DECLARATIVE, UPLOADED, MISSING
     niu_number = Column(String(32), nullable=True)
     niu_declarative = Column(Boolean, nullable=False, default=False)

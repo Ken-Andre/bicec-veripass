@@ -577,9 +577,10 @@ async def start_kyc_session(
     if existing:
         return _session_start_response(existing, existing=True)
 
-    # Create new session — ADR-001: DRAFT → RESTRICTED access
-    # Note: ADR-001 specifies GUEST for DRAFT, but existing sessions use RESTRICTED.
-    # Keeping RESTRICTED for backward compat until migration is ready.
+    # ADR-001: DRAFT → GUEST (the user has not started any KYC step yet, so
+    # we must not display the post-submission "Dossier complet" UI.
+    # The previous hardcoded RESTRICTED caused new users to land on the
+    # dashboard with a misleading "Merci pour votre confiance" banner.)
     from app.modules.admin.models import Agency
     agency_result = await db.execute(select(Agency).limit(1))
     default_agency = agency_result.scalar_one_or_none()
@@ -590,7 +591,7 @@ async def start_kyc_session(
         user_id=current_user.id,
         agency_id=agency_id,
         status=LifecycleState.DRAFT,
-        access_level=AccessTier.RESTRICTED,
+        access_level=LIFECYCLE_TO_ACCESS_TIER[LifecycleState.DRAFT],
         started_at=datetime.now(timezone.utc),
     )
     db.add(session)

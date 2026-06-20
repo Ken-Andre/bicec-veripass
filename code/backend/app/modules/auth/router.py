@@ -80,7 +80,10 @@ async def _get_or_create_mobile_session(db: AsyncSession, user: User) -> KYCSess
     kyc_session = result.scalar_one_or_none()
     if kyc_session is None:
         kyc_session = KYCSession(
-            user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
+            user_id=user.id,
+            status="DRAFT",
+            last_step_completed="PHONE_VERIFIED",
+            access_level="GUEST",
         )
         db.add(kyc_session)
         try:
@@ -379,6 +382,7 @@ async def verify_otp_endpoint(
             agency_id=agency_id,
             status="DRAFT",
             last_step_completed="PHONE_VERIFIED",
+            access_level="GUEST",
         )
         db.add(kyc_session)
     else:
@@ -697,7 +701,10 @@ async def verify_pin(
     if not kyc_session:
         # No active session (old one may be ABANDONED/SUBMITTED) — start fresh
         kyc_session = KYCSession(
-            user_id=user.id, status="DRAFT", last_step_completed="PHONE_VERIFIED"
+            user_id=user.id,
+            status="DRAFT",
+            last_step_completed="PHONE_VERIFIED",
+            access_level="GUEST",
         )
         db.add(kyc_session)
         try:
