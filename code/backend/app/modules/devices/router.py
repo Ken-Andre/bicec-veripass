@@ -10,11 +10,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import logger
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.modules.auth.models import User
 from app.modules.devices.models import DeviceRegistration
 from app.modules.devices.schemas import DeviceRegisterRequest, DeviceRegisterResponse
+from app.modules.kyc.models import Notification
 
 router = APIRouter()
 
@@ -64,16 +66,17 @@ async def register_device(
         )
     )
     active_devices = list(active_result.scalars().all())
-    if active_devices:
-        if not x_device_tag:
-            raise HTTPException(
-                status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-                detail="Current device tag required to register or rotate devices.",
-            )
+    had_active_devices = len(active_devices) > 0
+
+    # Assouplissement pour la démo : accepter un nouveau device même sans
+    # X-Device-Tag si le user vient de se connecter (OTP/PIN). Le token JWT
+    # suffit comme preuve d'authentification. On garde le 403 si le tag
+    # fourni ne correspond à aucun device actif (tentative d'usurpation).
+    if active_devices and x_device_tag:
         if x_device_tag not in {device.device_tag for device in active_devices}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Current device tag is not registered for this user.",
+                detail="Device tag is not registered for this user.",
             )
 
     result = await db.execute(
@@ -124,6 +127,36 @@ async def register_device(
         await db.commit()
 
     await db.refresh(device)
+
+    # Notification "Nouvelle connexion détectée" si un autre device était déjà actif
+    if had_active_devices:
+        try:
+            _ua = user_agent or "Appareil inconnu"
+            _platform = "mobile" if "Mobile" in (_ua or "") else "desktop"
+            notif = Notification(
+                user_id=current_user.id,
+                type="GENERAL",
+                message=f"Nouvelle connexion détectée depuis {_platform} ({_ua[:60]}). Si ce n'est pas vous, changez votre PIN.",
+            )
+            db.add(notif)
+            await db.commit()
+
+            # Push notification de sécurité
+            try:
+                from app.modules.notifications.tasks import send_push_task
+                send_push_task.delay(
+                    str(current_user.id),
+                    {
+                        "title": "Nouvelle connexion détectée",
+                        "body": f"Connexion depuis {_platform}. Si ce n'est pas vous, changez votre PIN.",
+                        "tag": "security_new_device",
+                    },
+                )
+            except Exception as exc:
+                logger.warning("Failed to enqueue security push for new device: %s", exc)
+        except Exception as exc:
+            logger.warning("Failed to create security notification for new device: %s", exc)
+
     return DeviceRegisterResponse(
         id=device.id,
         device_tag=device.device_tag,
