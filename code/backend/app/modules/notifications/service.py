@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from datetime import datetime, timezone
@@ -15,7 +16,7 @@ from app.core.orange_sms import orange_sms
 from app.core.logging import logger
 from app.modules.auth.models import User
 from app.modules.kyc.models import Notification
-from app.modules.notifications.models import NotificationPreference
+from app.modules.notifications.models import NotificationPreference, PushSubscription
 
 
 async def send_sms_notification(phone_number: str, message: str) -> Dict[str, Any]:
@@ -130,6 +131,49 @@ async def _send_official_channel(
     return None
 
 
+def _enqueue_push_notification(
+    user_id: uuid.UUID,
+    notification_type: str,
+    message: str,
+    payload: dict[str, Any] | None,
+) -> None:
+    """Enqueue a push notification task asynchronously via Celery."""
+    from app.modules.notifications.tasks import send_push_task
+
+    push_payload = {
+        "title": _NOTIFICATION_TITLE.get(notification_type, "Notification"),
+        "body": message,
+        "tag": notification_type,
+        "url": "/notifications",
+        "data": {
+            "notification_type": notification_type,
+            **({"event_key": payload.get("event_key")} if payload and payload.get("event_key") else {}),
+        },
+    }
+
+    try:
+        send_push_task.delay(str(user_id), push_payload)
+    except Exception as exc:
+        logger.warning(
+            "Failed to enqueue push task for user %s: %s",
+            user_id, exc,
+        )
+
+
+_NOTIFICATION_TITLE: dict[str, str] = {
+    "DOSSIER_APPROVED": "Dossier valide",
+    "DOSSIER_REJECTED": "Dossier rejete",
+    "KYC_APPROVED": "Compte active",
+    "KYC_REJECTED": "Demande rejetee",
+    "KYC_INFO_REQUESTED": "Informations requises",
+    "KYC_SUBMITTED": "Dossier recu",
+    "INFO_REQUESTED": "Information demandee",
+    "SUPPORT_MESSAGE": "Nouveau message support",
+    "SUPPORT_MESSAGE_SENT": "Message envoye",
+    "GENERAL": "Notification",
+}
+
+
 async def create_user_notification(
     db: AsyncSession,
     *,
@@ -188,6 +232,10 @@ async def create_user_notification(
                 **(notification.payload or {}),
                 "official_channel_sent": sent_channel,
             }
+
+    push_enabled = True if preference is None else bool(preference.push_enabled)
+    if push_enabled:
+        _enqueue_push_notification(user.id, notification_type, message, payload)
 
     return notification
 

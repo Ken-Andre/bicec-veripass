@@ -8,6 +8,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.logging import logger
 from app.core.rate_limit import limiter
 from app.core.security import get_current_user
 from app.db.session import get_db
@@ -61,7 +62,10 @@ def _to_preference_response(
     if preference is None:
         return NotificationPreferenceResponse(
             official_channel=_default_official_channel(current_user),
-            push_enabled=True,
+            # ADR: push est opt-in. L'utilisateur doit explicitement activer
+            # les notifications push via /notifications/subscriptions.
+            # L'in-app reste activé par défaut.
+            push_enabled=False,
             in_app_enabled=True,
             updated_at=None,
         )
@@ -265,6 +269,41 @@ async def create_push_subscription(
 
     await db.commit()
     await db.refresh(subscription)
+
+    # Activer push_enabled dans les préférences utilisateur
+    pref_result = await db.execute(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    )
+    preference = pref_result.scalar_one_or_none()
+    if preference is None:
+        preference = NotificationPreference(
+            user_id=current_user.id,
+            official_channel=_default_official_channel(current_user),
+            push_enabled=True,
+            in_app_enabled=True,
+        )
+        db.add(preference)
+    else:
+        preference.push_enabled = True
+    await db.commit()
+
+    # Planifier une notification de confirmation push (3s après activation)
+    try:
+        from app.modules.notifications.tasks import send_push_task
+        send_push_task.apply_async(
+            args=[
+                str(current_user.id),
+                {
+                    "title": "Notifications VeriPass activées",
+                    "body": "Vous recevrez désormais les mises à jour importantes de votre dossier.",
+                    "tag": "push_confirmation",
+                },
+            ],
+            countdown=3,
+        )
+    except Exception as exc:
+        logger.warning("Failed to enqueue push confirmation task: %s", exc)
+
     return PushSubscriptionResponse(
         id=subscription.id,
         endpoint=subscription.endpoint,

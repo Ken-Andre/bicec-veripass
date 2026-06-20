@@ -24,6 +24,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7",
     "aiosmtplib>=5.1.0",
     "aiofiles>=23.0",
+    "pywebpush>=1.11.0",
     "sentry-sdk[fastapi]>=2.0",
     # OCR dependencies
     "paddleocr>=2.8",

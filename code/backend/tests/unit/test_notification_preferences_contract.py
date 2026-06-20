@@ -18,7 +18,7 @@ def test_notification_preference_defaults_to_sms_without_email():
     response = _to_preference_response(None, user)
 
     assert response.official_channel == "sms"
-    assert response.push_enabled is True
+    assert response.push_enabled is False
     assert response.in_app_enabled is True
 
 

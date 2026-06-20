@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     MINIFASNET_INPUT_SIZE: int = 80
     MINIFASNET_LIVE_CLASS_INDEX: int = 1
 
+    # VAPID keys for Web Push notifications
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_CLAIMS_EMAIL: str = "mailto:admin@bicec.cm"
+
     # Orange SMS API
     ORANGE_CLIENT_ID: str = ""
     ORANGE_CLIENT_SECRET: str = ""
