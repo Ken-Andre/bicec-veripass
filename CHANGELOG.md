@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Weekly recap (2026-06-14 to 2026-06-20)
+
+- Added Web Push notification support with VAPID keys: `push_sender.py`, Celery `send_push_task`, `pywebpush` dependency, router auto-enable on subscription, service-level push enqueue on every notification, and unit/integration tests.
+- Fixed `ModuleNotFoundError: pywebpush` crash-looping Celery worker by adding missing dependency to `uv.lock` and rebuilding all backend images.
+- Fixed KYC session `access_level` default from `RESTRICTED` to `GUEST` (ADR-001), preventing misleading "Merci pour votre confiance" banner for new users. Added migration `035_fix_draft_access_level.py`.
+- Relaxed device registration tag requirement for demo (OTP/PIN auth sufficient), added security push notification on new device detection.
+- Hardened mobile push notification service with OS permission check, better error handling, and custom service worker (`injectManifest` strategy). Stopped auto-reloading on SW update to prevent breaking push subscriptions.
+- Refactored mobile dashboard: rewritten hero copy per access level, removed product cards section, added `useNotificationUnreadCount` hook with React Query, unread badge from API.
+- Disabled core banking screens (cards, transfers, savings, transactions) as out-of-scope, added Support tab to BottomNav.
+- Fixed Google Translate extension breaking React DOM reconciliation with `translate="no"` meta tag and `notranslate` class.
+- Updated remaining issues action plan: removed closed issues (#8, #161, #200), fixed markdown pipe escaping, added k6 polling load test.
+- Improved KYC happy path test script: face match polling, NIU format fix, biometric override confirmation.
+
 ### Weekly recap (2026-06-08 to 2026-06-13)
 
 - Added a backend Prometheus metrics endpoint with application wiring, unit coverage, and issue evidence documentation.
