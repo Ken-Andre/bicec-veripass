@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ScreenLayoutV2 } from '../../components/ui/ScreenLayoutV2';
-import { apiClient } from '../../services/apiClient';
+import { useMarkNotificationsRead, useNotificationsQuery } from '../../hooks/useNotificationUnreadCount';
 import { Bell, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Notification, NotificationType } from '../../types';
@@ -22,19 +21,11 @@ const typeColors: Partial<Record<NotificationType, string>> = {
 
 export function NotificationsScreen() {
   const { t } = useLanguage();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    apiClient.get<{ items: Notification[]; unread_count: number }>('/notifications')
-      .then(data => {
-        setNotifications(data.items || []);
-        setUnreadCount(data.unread_count || 0);
-      })
-      .catch(() => setNotifications([]))
-      .finally(() => setLoading(false));
-  }, []);
+  const query = useNotificationsQuery();
+  const markAllRead = useMarkNotificationsRead();
+  const loading = query.isLoading;
+  const notifications: Notification[] = query.data?.items ?? [];
+  const unreadCount = query.data?.unread_count ?? 0;
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -45,9 +36,11 @@ export function NotificationsScreen() {
           <button
             type="button"
             onClick={async () => {
-              await apiClient.post('/notifications/read', { mark_all: true });
-              setNotifications((items) => items.map((item) => ({ ...item, read: true })));
-              setUnreadCount(0);
+              try {
+                await markAllRead();
+            } catch (err) {
+              console.warn('[notifications] mark-all-read failed', err);
+            }
             }}
             className="w-full rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary"
           >
@@ -63,8 +56,13 @@ export function NotificationsScreen() {
 
         {!loading && notifications.length === 0 && (
           <div className="text-center py-12 space-y-3">
-            <Bell className="h-10 w-10 text-muted-foreground mx-auto" />
-            <p className="text-sm text-muted-foreground">{t('notifications.empty')}</p>
+            <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/50">
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              </svg>
+            </div>
+            <p className="text-sm text-muted-foreground">{t('notifications.empty') || 'Aucune notification pour le moment'}</p>
           </div>
         )}
 

@@ -26,7 +26,7 @@ export function SettingsScreen() {
   const { t, language, setLanguage } = useLanguage();
   const { biometricEnabled, isPasskeySupported, setBiometric } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [pushEnabled, setPushEnabled] = useState(() => localStorage.getItem('vp_push_enabled') === 'true');
+  const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushMessage, setPushMessage] = useState('');
   const [biometricLoading, setBiometricLoading] = useState(false);
@@ -46,9 +46,18 @@ export function SettingsScreen() {
     try {
       const prefs = await apiClient.get<{ official_channel: OfficialChannel; push_enabled: boolean }>('/notifications/preferences');
       setOfficialChannel(prefs.official_channel);
-      setPushEnabled(prefs.push_enabled);
+      // Ne mettre push_enabled à true QUE SI le backend dit true ET la permission OS est accordée.
+      // Évite le bug où le toggle apparaît activé sans que Notification.requestPermission()
+      // n'ait jamais été appelé.
+      const osPermission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+      const effectivePushEnabled = prefs.push_enabled && osPermission === 'granted';
+      setPushEnabled(effectivePushEnabled);
+      if (prefs.push_enabled && osPermission !== 'granted') {
+        console.warn('[push] backend says push_enabled=true but OS permission is', osPermission);
+      }
       setPushMessage('');
-    } catch {
+    } catch (err) {
+      console.warn('[push] loadPreferences failed', err);
       setPreferencesError(label('settings.serviceUnavailable', SERVICE_UNAVAILABLE));
     }
   }, [label]);

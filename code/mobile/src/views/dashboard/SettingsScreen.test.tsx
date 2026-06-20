@@ -62,6 +62,11 @@ vi.mock('../../services/pushNotificationService', () => ({
 describe('SettingsScreen notification preferences', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: { permission: 'default' },
+    });
     mockGet.mockResolvedValue({
       official_channel: 'sms',
       push_enabled: true,
@@ -100,7 +105,29 @@ describe('SettingsScreen notification preferences', () => {
     });
   });
 
+  it('keeps push disabled until the browser permission is granted', async () => {
+    localStorage.setItem('vp_push_enabled', 'true');
+
+    render(
+      <MemoryRouter>
+        <SettingsScreen />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalledWith('/notifications/preferences');
+    });
+
+    const button = screen.getByRole('button', { name: 'Notifications push' });
+    expect(button.querySelector('div')).toHaveClass('translate-x-0.5');
+  });
+
   it('persists push opt-out when push notifications are disabled', async () => {
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: { permission: 'granted' },
+    });
+
     render(
       <MemoryRouter>
         <SettingsScreen />

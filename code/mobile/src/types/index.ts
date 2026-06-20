@@ -285,6 +285,11 @@ export interface Notification {
   metadata?: Record<string, unknown>;
 }
 
+export interface NotificationListResponse {
+  items: Notification[];
+  unread_count: number;
+}
+
 // === SUPPORT TYPES ===
 
 export interface SupportThread {
