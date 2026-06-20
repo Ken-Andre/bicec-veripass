@@ -23,6 +23,10 @@ STATE_ORDER = {
 PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "": 4}
 
 
+def markdown_table_cell(value: object) -> str:
+    return str(value or "").replace("|", "\\|")
+
+
 def action_for(row: dict) -> str:
     issue = row["issue"]
     title = row["titre"]
@@ -50,7 +54,7 @@ def main() -> None:
     remaining = [
         row
         for row in rows
-        if row["etat_code"] != "Terminé probable"
+        if row["etat_code"] != "Terminé probable" and row["issue"] not in {8, 161, 200}
     ]
     remaining.sort(
         key=lambda row: (
@@ -119,10 +123,14 @@ def main() -> None:
         ]
     )
     for row in top:
+        title = markdown_table_cell(row["titre"])
+        state = markdown_table_cell(row["etat_code"])
+        milestone = markdown_table_cell(row.get("milestone") or "")
+        action = markdown_table_cell(row["recommended_action"])
         lines.append(
-            f"| [#{row['issue']}]({row['url']}) {row['titre']} | "
-            f"{row.get('priorite') or ''} | {row['etat_code']} | {row.get('milestone') or ''} | "
-            f"{row['recommended_action']} |"
+            f"| [#{row['issue']}]({row['url']}) {title} | "
+            f"{row.get('priorite') or ''} | {state} | {milestone} | "
+            f"{action} |"
         )
 
     lines.extend(
@@ -135,11 +143,12 @@ def main() -> None:
         ]
     )
     for row in remaining:
-        summary = (row.get("resume") or "").replace("|", "\\|")
-        action = row["recommended_action"].replace("|", "\\|")
+        summary = markdown_table_cell(row.get("resume") or "")
+        action = markdown_table_cell(row["recommended_action"])
+        state = markdown_table_cell(row["etat_code"])
         lines.append(
             f"| [#{row['issue']}]({row['url']}) | {row.get('priorite') or ''} | "
-            f"{row['etat_code']} | {summary} | {action} |"
+            f"{state} | {summary} | {action} |"
         )
 
     OUT_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")

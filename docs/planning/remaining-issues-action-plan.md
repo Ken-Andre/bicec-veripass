@@ -1,22 +1,21 @@
 # Remaining open issues action plan
 
 - Source: `docs\planning\github-open-issues-inventory.json`
-- Remaining issues not classified as `Terminé probable`: 51
+- Remaining issues not classified as `Terminé probable`: 48
 - Docker was not started.
 
 ## Counts
 
 | State | Count |
 | --- | ---: |
-| Partiellement terminé | 40 |
-| Trace faible / à vérifier | 10 |
-| Non terminé localement | 1 |
+| Partiellement terminé | 39 |
+| Trace faible / à vérifier | 9 |
 
 | Priority | Count |
 | --- | ---: |
-| non taguée | 30 |
-| critical | 7 |
-| medium | 6 |
+| non taguée | 29 |
+| critical | 6 |
+| medium | 5 |
 | low | 5 |
 | high | 3 |
 
@@ -30,7 +29,6 @@
 | [#162](https://github.com/Ken-Andre/bicec-veripass/issues/162) [TEST-10] Golden Dataset — Données de démo préparées | critical | Partiellement terminé | M6 - Analytics & Demo | Validate missing acceptance criteria manually and schedule remaining work this week. |
 | [#154](https://github.com/Ken-Andre/bicec-veripass/issues/154) [TEST-02] Tests E2E Playwright — Parcours Marie complet | critical | Partiellement terminé | M6 - Analytics & Demo | Validate missing acceptance criteria manually and schedule remaining work this week. |
 | [#153](https://github.com/Ken-Andre/bicec-veripass/issues/153) [TEST-01] Tests d'intégration — Coverage ≥ 70% | critical | Partiellement terminé | M6 - Analytics & Demo | Validate missing acceptance criteria manually and schedule remaining work this week. |
-| [#8](https://github.com/Ken-Andre/bicec-veripass/issues/8) 🏦 Epic 8: Client Relationship & Banking Discovery (Frontend-Only) | critical | Partiellement terminé | M6 - Analytics & Demo | Validate missing acceptance criteria manually and schedule remaining work this week. |
 | [#160](https://github.com/Ken-Andre/bicec-veripass/issues/160) [TEST-08] Performance Benchmark — Hardware cible | high | Trace faible / à vérifier | M6 - Analytics & Demo | Inspect detected files and either finish the implementation or mark as future scope. |
 | [#187](https://github.com/Ken-Andre/bicec-veripass/issues/187) [ADDRESS-01] Frontend — Address Step and Map Picker | high | Partiellement terminé | M4 - Back-Office MVP | Validate missing acceptance criteria manually and schedule remaining work this week. |
 | [#173](https://github.com/Ken-Andre/bicec-veripass/issues/173) [DEMO-09] Rapport PFE — Résumé Exécutif & Abstract | high | Partiellement terminé |  | Finish or explicitly scope the presentation/report deliverable before soutenance. |
@@ -46,13 +44,11 @@
 | [#162](https://github.com/Ken-Andre/bicec-veripass/issues/162) | critical | Partiellement terminé | Golden Dataset — Données de démo préparées: Script scripts/seed_demo.py : créer 5 profils utilisateurs complets; Profil 1 "Happy Path" : Marie Mballa — score 0.92, approuvée, accès FULL | Validate missing acceptance criteria manually and schedule remaining work this week. |
 | [#154](https://github.com/Ken-Andre/bicec-veripass/issues/154) | critical | Partiellement terminé | Tests E2E Playwright — Parcours Marie complet: Flow complet : OTP → PIN setup → CNI recto → CNI verso → OCR review → selfie → liveness → adresse → NIU → consentement → soumission; Utiliser seed data (20 images CNI synthétiques + selfies) | Validate missing acceptance criteria manually and schedule remaining work this week. |
 | [#153](https://github.com/Ken-Andre/bicec-veripass/issues/153) | critical | Partiellement terminé | Tests d'intégration — Coverage ≥ 70%: Pytest fixtures : DB de test isolée (pytest-postgresql), Redis mock (fakeredis), Celery eager mode; Couvrir : auth OTP, upload CNI, OCR pipeline, state machine transitions, Jean approve/reject, AML screening | Validate missing acceptance criteria manually and schedule remaining work this week. |
-| [#8](https://github.com/Ken-Andre/bicec-veripass/issues/8) | critical | Partiellement terminé | 🏦 Epic 8: Client Relationship & Banking Discovery (Frontend-Only): [ ] Story 8.1 — Plan Personalization Screen (Standard / Premium / Ultra swipeable tabs); [ ] Story 8.2 — Use-Case Personalization Selection (Everyday / Global / Investments chips) | Validate missing acceptance criteria manually and schedule remaining work this week. |
 | [#160](https://github.com/Ken-Andre/bicec-veripass/issues/160) | high | Trace faible / à vérifier | Performance Benchmark — Hardware cible: Scénario de charge : 5 sessions simultanées (5 tabs Chrome); Mesurer : temps OCR PaddleOCR (target < 5s), temps GLM-OCR (target < 30s), temps liveness (target < 10s), temps face match (target < 15s) | Inspect detected files and either finish the implementation or mark as future scope. |
 | [#187](https://github.com/Ken-Andre/bicec-veripass/issues/187) | high | Partiellement terminé | Frontend — Address Step and Map Picker: Écran AddressStep : champ texte "Quartier / Ville"; Intégration Leaflet ou Google Maps (via API key .env) pour sélecteur de point GPS | Validate missing acceptance criteria manually and schedule remaining work this week. |
 | [#173](https://github.com/Ken-Andre/bicec-veripass/issues/173) | high | Partiellement terminé | Rapport PFE — Résumé Exécutif & Abstract: Abstract (1 page, anglais) : contexte BICEC, problème, solution, résultats clés, technologies; Résumé exécutif (2 pages, français) : pour direction BICEC non-technique | Finish or explicitly scope the presentation/report deliverable before soutenance. |
 | [#190](https://github.com/Ken-Andre/bicec-veripass/issues/190) | medium | Trace faible / à vérifier | Frontend — NIU Input and Validation: Input masqué (masking) pour NIU; Validation temps réel (14 caractères alphanumériques) | Inspect detected files and either finish the implementation or mark as future scope. |
 | [#172](https://github.com/Ken-Andre/bicec-veripass/issues/172) | medium | Trace faible / à vérifier | Pre-commit Hooks + Code Quality finale: Configurer .pre-commit-config.yaml : black, isort, ruff, mypy (backend), eslint (frontend); pre-commit run --all-files → zéro warning | Inspect detected files and either finish the implementation or mark as future scope. |
-| [#161](https://github.com/Ken-Andre/bicec-veripass/issues/161) | medium | Trace faible / à vérifier | Tests de charge — 5 sessions simultanées: Utiliser Locust ou k6 pour simuler 5 utilisateurs concurrents; Scénario : 5 uploads CNI simultanés → 5 pipelines OCR → 5 pipelines biométrie | Inspect detected files and either finish the implementation or mark as future scope. |
 | [#171](https://github.com/Ken-Andre/bicec-veripass/issues/171) | medium | Partiellement terminé | Vidéo démo — Enregistrement backup: Enregistrer une vidéo de la démo complète (OBS ou loom); Durée : 10-12 minutes — parcours complet avec narration | Finish or explicitly scope the presentation/report deliverable before soutenance. |
 | [#170](https://github.com/Ken-Andre/bicec-veripass/issues/170) | medium | Partiellement terminé | Architecture Diagrams — Mise à jour finale: Mettre à jour diagramme C4 Level 1 (System Context) si changements; Mettre à jour diagramme C4 Level 2 (Containers) avec tous les services réels | Backlog candidate after presentation unless it blocks the demo narrative. |
 | [#169](https://github.com/Ken-Andre/bicec-veripass/issues/169) | medium | Partiellement terminé | ADRs finaux — Review et complétion: Vérifier cohérence ADR-001 à ADR-012 avec code final livré; Créer ADR-013 : "Stratégie de test E2E — Playwright vs Cypress" | Backlog candidate after presentation unless it blocks the demo narrative. |
@@ -61,7 +57,6 @@
 | [#184](https://github.com/Ken-Andre/bicec-veripass/issues/184) | low | Trace faible / à vérifier | Frontend — Banking offerings explorer: Écran "Découvrez nos offres" après soumission KYC; Carousel de cartes produit (Compte Jeune, Pack Epargne, Crédit Scolaire) | Inspect detected files and either finish the implementation or mark as future scope. |
 | [#179](https://github.com/Ken-Andre/bicec-veripass/issues/179) | low | Partiellement terminé | Monitoring — Grafana Performance Dashboard: Dashboard Grafana : CPU/RAM usage, throughput Prometheus, latences OCR, liveness failure rates; Alerting : notifier si error rate > 5% pendant 1 min | Backlog candidate after presentation unless it blocks the demo narrative. |
 | [#150](https://github.com/Ken-Andre/bicec-veripass/issues/150) | low | Partiellement terminé | Back-Office React — CSV Export Button: Bouton "Exporter CSV" sur toutes les pages analytics (funnel, OCR, agents); Appel GET /analytics/export?table={}&format=csv → déclencher téléchargement | Backlog candidate after presentation unless it blocks the demo narrative. |
-| [#200](https://github.com/Ken-Andre/bicec-veripass/issues/200) |  | Non terminé localement | Infrastructure — SSL Certbot Let's Encrypt (Production): Ajouter un service certbot dans docker-compose.yml; Volume partagé certbot_www pour le challenge HTTP-01 | Keep out of completed timeline; plan only if needed for the demo. |
 | [#118](https://github.com/Ken-Andre/bicec-veripass/issues/118) |  | Trace faible / à vérifier | Backend — Administrative divisions data (Ville/Commune/Quartier): Seed database with Cameroonian administrative divisions; Hierarchy: Region -> Ville -> Commune -> Quartier | Inspect detected files and either finish the implementation or mark as future scope. |
 | [#96](https://github.com/Ken-Andre/bicec-veripass/issues/96) |  | Trace faible / à vérifier | Integration — ENTO/Blackout scenario persistence: Implement tests for session persistence through full battery drain/shutdown; Ensure IndexedDB data survives browser tab closure | Inspect detected files and either finish the implementation or mark as future scope. |
 | [#63](https://github.com/Ken-Andre/bicec-veripass/issues/63) |  | Trace faible / à vérifier | Backend — PaddleOCR Service (Primary): Implement PaddleOCR PP-OCRv5 primary service; Optimize for CPU-only execution on i3 | Inspect detected files and either finish the implementation or mark as future scope. |
