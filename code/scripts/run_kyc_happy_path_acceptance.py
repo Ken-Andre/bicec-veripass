@@ -408,6 +408,28 @@ def run(args: argparse.Namespace) -> int:
         device_tag=device_tag,
         payload={"challenge_type": "turn_right", "landmarks_json": _landmarks()},
     )
+    # Attente du résultat du face match asynchrone (géré par Celery)
+    max_retries = 30
+    delay = 1.0
+    for attempt in range(max_retries):
+        session_current = api.request_json(
+            "kyc session current get",
+            "GET",
+            "/kyc/session/current",
+            token=mobile_token,
+            device_tag=device_tag,
+        )
+        bio = session_current.get("biometric_result")
+        if bio:
+            status = bio.get("face_match_status")
+            if status not in {"PENDING", "PROCESSING"}:
+                liveness["face_match_status"] = status
+                liveness["face_match_score"] = bio.get("face_match_score")
+                liveness["face_match_reason"] = bio.get("face_match_reason")
+                liveness["anti_spoofing_score"] = bio.get("anti_spoofing_score")
+                break
+        time.sleep(delay)
+
     if liveness.get("face_match_status") not in {"PASSED", "FAILED"}:
         raise ApiFailure(
             "Liveness completed without an attempted face match",
@@ -450,7 +472,7 @@ def run(args: argparse.Namespace) -> int:
         "/kyc/niu/submit",
         token=mobile_token,
         device_tag=device_tag,
-        payload={"niu_type": "DECLARATIVE", "niu_value": f"M{run_id}"},
+        payload={"niu_type": "DECLARATIVE", "niu_value": f"M{run_id[:11]}0Z"},
     )
     one_px_png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
     api.request_json(
@@ -561,7 +583,11 @@ def run(args: argparse.Namespace) -> int:
         "POST",
         f"/backoffice/dossier/{session_id}/review",
         token=jean_token,
-        payload={"decision": "APPROVED", "reason": "Dossier complet apres justificatif complementaire."},
+        payload={
+            "decision": "APPROVED",
+            "reason": "Dossier complet apres justificatif complementaire.",
+            "biometric_override_confirmed": True,
+        },
     )
     final_status = api.request_json(
         "client sees approved status",

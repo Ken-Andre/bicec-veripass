@@ -15,8 +15,10 @@ COPY . .
 # Pass Sentry DSN and Version as build-time arguments for Vite injection
 ARG VITE_SENTRY_DSN
 ARG VITE_APP_VERSION
+ARG VITE_VAPID_PUBLIC_KEY
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 ENV VITE_APP_VERSION=$VITE_APP_VERSION
+ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
 
 # Build the application
 RUN bun run build && \
