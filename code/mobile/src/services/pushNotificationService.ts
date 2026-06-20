@@ -26,14 +26,15 @@ function pushResult(code: PushEnableCode, message: string, enabled = false): Pus
   return { enabled, code, message };
 }
 
-async function getReadyServiceWorker(timeoutMs = 2000): Promise<ServiceWorkerRegistration | null> {
+async function getReadyServiceWorker(timeoutMs = 5000): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) return null;
   try {
     return await Promise.race([
       navigator.serviceWorker.ready,
       new Promise<null>((resolve) => window.setTimeout(() => resolve(null), timeoutMs)),
     ]);
-  } catch {
+  } catch (err) {
+    console.warn('[push] getReadyServiceWorker failed', err);
     return null;
   }
 }
@@ -51,21 +52,31 @@ function urlBase64ToUint8Array(value: string): Uint8Array {
 
 export async function enablePushNotifications(): Promise<PushEnableResult> {
   if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[push] unsupported: Notification, serviceWorker, or PushManager missing');
     return pushResult('unsupported', "Les notifications push ne sont pas prises en charge sur cet appareil.");
+  }
+
+  // Vérifier la permission AVANT de la demander pour éviter un re-prompt inutile
+  if (Notification.permission === 'denied') {
+    console.warn('[push] permission previously denied by user');
+    return pushResult('permission_denied', "Autorisation refusee. Activez les notifications dans les reglages de l'appareil.");
   }
 
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
+    console.warn('[push] permission not granted:', permission);
     return pushResult('permission_denied', "Autorisation refusee. Activez les notifications dans les reglages de l'appareil.");
   }
 
   const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
   if (!vapidKey) {
+    console.warn('[push] VITE_VAPID_PUBLIC_KEY not set');
     return pushResult('missing_vapid_key', 'Configuration push indisponible. Reessayez plus tard.');
   }
 
   const registration = await getReadyServiceWorker();
   if (!registration) {
+    console.warn('[push] service worker not ready after timeout');
     return pushResult('service_worker_unavailable', 'Service de notification indisponible. Rouvrez l application et reessayez.');
   }
 
@@ -77,12 +88,21 @@ export async function enablePushNotifications(): Promise<PushEnableResult> {
       userVisibleOnly: true,
       applicationServerKey,
     });
-  } catch {
+  } catch (err) {
+    const name = err instanceof Error ? err.name : String(err);
+    console.warn('[push] subscribe failed', { name, error: err });
+    if (name === 'NotAllowedError') {
+      return pushResult('permission_denied', 'Autorisation refusee par le navigateur.');
+    }
+    if (name === 'InvalidStateError') {
+      return pushResult('subscription_failed', 'Abonnement deja existant dans un etat invalide.');
+    }
     return pushResult('subscription_failed', 'Impossible de creer l abonnement push sur cet appareil.');
   }
 
   const json = subscription.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+    console.warn('[push] subscription incomplete', json);
     return pushResult('subscription_failed', 'Abonnement push incomplet. Reessayez.');
   }
 
@@ -102,10 +122,19 @@ export async function enablePushNotifications(): Promise<PushEnableResult> {
       user_agent: navigator.userAgent,
       device_tag: localStorage.getItem('vp_device_tag'),
     });
-  } catch {
+  } catch (err) {
+    const status = (err as { status?: number })?.status;
+    console.warn('[push] POST /subscriptions failed', { status, error: err });
+    if (status === 401) {
+      // Nettoyer le localStorage si la session a expiré
+      localStorage.removeItem('vp_push_subscription_id');
+      localStorage.removeItem('vp_push_enabled');
+      return pushResult('server_unavailable', 'Session expiree. Reconnectez-vous.');
+    }
     return pushResult('server_unavailable', 'Autorisation acceptee, mais le service est temporairement indisponible.');
   }
 
+  // localStorage APRÈS le succès de l'API (D5)
   localStorage.setItem('vp_push_subscription_id', saved.id);
   localStorage.setItem('vp_push_enabled', 'true');
   return pushResult('enabled', 'Notifications push activees.', true);
@@ -117,7 +146,11 @@ export async function disablePushNotifications(): Promise<void> {
     const registration = await getReadyServiceWorker();
     const subscription = await registration?.pushManager.getSubscription();
     endpoint = subscription?.endpoint ?? null;
-    await subscription?.unsubscribe();
+    try {
+      await subscription?.unsubscribe();
+    } catch (err) {
+      console.warn('[push] unsubscribe failed', err);
+    }
   }
 
   try {
@@ -127,8 +160,8 @@ export async function disablePushNotifications(): Promise<void> {
     if (matching) {
       await apiClient.delete(`/notifications/subscriptions/${matching.id}`);
     }
-  } catch {
-    // Local opt-out must still complete if the server is temporarily unavailable.
+  } catch (err) {
+    console.warn('[push] disablePushNotifications API cleanup failed', err);
   }
 
   localStorage.removeItem('vp_push_subscription_id');

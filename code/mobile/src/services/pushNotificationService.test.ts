@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockPost = vi.hoisted(() => vi.fn());
 const mockGet = vi.hoisted(() => vi.fn());
 const mockDelete = vi.hoisted(() => vi.fn());
+const mockPut = vi.hoisted(() => vi.fn());
 
 vi.mock('./apiClient', () => ({
   apiClient: {
     post: mockPost,
     get: mockGet,
     delete: mockDelete,
+    put: mockPut,
   },
 }));
 
@@ -86,5 +88,82 @@ describe('pushNotificationService', () => {
     }));
     expect(localStorage.getItem('vp_push_subscription_id')).toBe('sub-2');
     expect(localStorage.getItem('vp_push_enabled')).toBe('true');
+  });
+
+  it('does not request a subscription or update local state when permission is denied', async () => {
+    const requestPermission = vi.fn().mockResolvedValue('denied');
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: { requestPermission },
+    });
+    Object.defineProperty(window, 'PushManager', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription: vi.fn(),
+          },
+        }),
+      },
+    });
+
+    const { enablePushNotifications } = await import('./pushNotificationService');
+    const result = await enablePushNotifications();
+
+    expect(result).toEqual(expect.objectContaining({
+      enabled: false,
+      code: 'permission_denied',
+    }));
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(localStorage.getItem('vp_push_enabled')).toBeNull();
+  });
+
+  it('can resubscribe after a previous disable', async () => {
+    const browserSubscription = {
+      endpoint: 'https://push.example/sub/3',
+      toJSON: () => ({
+        endpoint: 'https://push.example/sub/3',
+        keys: { p256dh: 'client-key-3', auth: 'auth-secret-3' },
+      }),
+    };
+    const getSubscription = vi.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    const subscribe = vi.fn().mockResolvedValue(browserSubscription);
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: { requestPermission: vi.fn().mockResolvedValue('granted') },
+    });
+    Object.defineProperty(window, 'PushManager', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription,
+            subscribe,
+          },
+        }),
+      },
+    });
+    mockGet.mockResolvedValue([]);
+    mockPost.mockResolvedValue({ id: 'sub-3', endpoint: 'https://push.example/sub/3', is_active: true });
+    vi.stubEnv('VITE_VAPID_PUBLIC_KEY', 'QUFB');
+
+    const { disablePushNotifications, enablePushNotifications } = await import('./pushNotificationService');
+    await disablePushNotifications();
+    const result = await enablePushNotifications();
+
+    expect(result.enabled).toBe(true);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('vp_push_subscription_id')).toBe('sub-3');
   });
 });

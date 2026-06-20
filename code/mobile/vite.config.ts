@@ -9,6 +9,9 @@ export default defineConfig(async ({ mode }) => {
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw.js',
       manifest: {
         name: 'BICEC VeriPass',
         short_name: 'VeriPass',
@@ -27,30 +30,8 @@ export default defineConfig(async ({ mode }) => {
         ]
       },
       workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
-        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'],
         globIgnores: ['**/sw.js', '**/workbox-*.js', '**/startup/**'],
-        navigateFallback: '/mobile/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/localhost:3000\/api\//i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24
-              }
-            }
-          }
-        ]
-      },
-      devOptions: {
-        enabled: true,
-        type: 'module'
       }
     })
   ]

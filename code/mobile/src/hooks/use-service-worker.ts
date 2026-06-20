@@ -27,16 +27,13 @@ export function useServiceWorker(): ServiceWorkerState {
   const [updateFn, setUpdateFn] = useState<((reloadPage?: boolean) => Promise<void>) | null>(null);
 
   useEffect(() => {
-    let reloading = false;
     const cleanups: Array<() => void> = [];
     const update = registerSW({
       immediate: true,
       onNeedRefresh() {
-        reloading = true;
+        // Ne PAS recharger automatiquement : une subscription push peut être
+        // en cours de création. Le banner App.tsx propose "Recharger" / "Plus tard".
         setNeedsRefresh(true);
-        update(true).catch((err) => {
-          console.warn('[SW] Update failed:', err);
-        });
       },
       onOfflineReady() {
         setOfflineReady(true);
@@ -76,8 +73,8 @@ export function useServiceWorker(): ServiceWorkerState {
     });
 
     const handleControllerChange = () => {
-      if (!reloading) return;
-      window.location.reload();
+      // Le reload explicite passe par updateSW() qui appelle updateFn(true).
+      // On ne déclenche plus de reload automatique depuis controllerchange.
     };
 
     navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange);
