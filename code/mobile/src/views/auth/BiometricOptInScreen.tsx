@@ -19,14 +19,14 @@ export default function BiometricOptInScreen() {
     const success = await setBiometric(true);
     setLoading(false);
     if (success) {
-      navigate('/kyc/what-you-need');
+      navigate('/kyc/intro');
     } else {
       setError(t('auth.biometric.failed') || 'Activation échouée. Vous pouvez continuer sans.');
     }
   };
 
   const handleSkip = () => {
-    navigate('/kyc/what-you-need');
+    navigate('/kyc/intro');
   };
 
   return (
